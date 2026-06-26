@@ -170,6 +170,65 @@ describe("loadCustomerSystemsEquipmentSummary", () => {
     });
   });
 
+  it("returns profile-owned systems and equipment for a no-job customer", async () => {
+    const supabase = makeSupabase({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      locations: [
+        { id: "loc-1", customer_id: "cust-1", nickname: "Main House", address_line1: "1 Oak", city: "Fresno", state: "CA" },
+      ],
+      jobs: [],
+      customer_location_systems: [
+        {
+          id: "profile-sys-1",
+          owner_user_id: "owner-1",
+          customer_id: "cust-1",
+          location_id: "loc-1",
+          name: "Downstairs",
+          archived_at: null,
+        },
+      ],
+      equipment: [
+        {
+          id: "profile-eq-1",
+          owner_user_id: "owner-1",
+          location_id: "loc-1",
+          system_id: "profile-sys-1",
+          equipment_type: "furnace",
+          manufacturer: "Bryant",
+          model: "B80",
+          serial: "S123",
+          updated_at: "2026-06-26T12:00:00Z",
+        },
+      ],
+      job_systems: [],
+      job_equipment: [],
+    });
+
+    const summary = await loadCustomerSystemsEquipmentSummary({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+    });
+
+    expect(summary.totalSystemCount).toBe(1);
+    expect(summary.totalEquipmentCount).toBe(1);
+    expect(summary.locations[0].systems[0]).toMatchObject({
+      id: "profile:profile-sys-1",
+      name: "Downstairs",
+      sourceJob: null,
+    });
+    expect(summary.locations[0].systems[0].equipment[0]).toMatchObject({
+      id: "profile-eq-1",
+      jobId: null,
+      sourceType: "profile",
+      equipmentRole: "furnace",
+      manufacturer: "Bryant",
+      sourceJob: null,
+    });
+    expect(supabase.calls.map((call) => call.table)).toContain("customer_location_systems");
+    expect(supabase.calls.map((call) => call.table)).toContain("equipment");
+  });
+
   it("uses the same-account customer boundary before reading job equipment", async () => {
     const supabase = makeSupabase({
       customers: [{ id: "cust-1", owner_user_id: "owner-2" }],

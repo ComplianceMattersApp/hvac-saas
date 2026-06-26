@@ -5,7 +5,8 @@ import {
 
 export type CustomerEquipmentSummaryRow = {
   id: string;
-  jobId: string;
+  jobId: string | null;
+  sourceType: "job" | "profile";
   equipmentRole: string | null;
   componentType: string | null;
   manufacturer: string | null;
@@ -18,7 +19,7 @@ export type CustomerEquipmentSummaryRow = {
   heatingEfficiencyPercent: string | null;
   updatedAt: string | null;
   createdAt: string | null;
-  sourceJob: CustomerEquipmentSourceJob;
+  sourceJob: CustomerEquipmentSourceJob | null;
 };
 
 export type CustomerEquipmentSourceJob = {
@@ -111,6 +112,32 @@ type EquipmentRow = {
   updated_at?: string | null;
 };
 
+type ProfileSystemRow = {
+  id?: string | null;
+  owner_user_id?: string | null;
+  customer_id?: string | null;
+  location_id?: string | null;
+  name?: string | null;
+  system_type?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  archived_at?: string | null;
+};
+
+type ProfileEquipmentRow = {
+  id?: string | null;
+  location_id?: string | null;
+  system_id?: string | null;
+  equipment_type?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serial?: string | null;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 function clean(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -154,8 +181,8 @@ function sourceJob(job: JobRow): CustomerEquipmentSourceJob {
 }
 
 function compareLatestEquipment(a: CustomerEquipmentSummaryRow, b: CustomerEquipmentSummaryRow) {
-  const aDate = a.updatedAt || a.createdAt || a.sourceJob.scheduledDate || a.sourceJob.createdAt || "";
-  const bDate = b.updatedAt || b.createdAt || b.sourceJob.scheduledDate || b.sourceJob.createdAt || "";
+  const aDate = a.updatedAt || a.createdAt || a.sourceJob?.scheduledDate || a.sourceJob?.createdAt || "";
+  const bDate = b.updatedAt || b.createdAt || b.sourceJob?.scheduledDate || b.sourceJob?.createdAt || "";
   return bDate.localeCompare(aDate);
 }
 
@@ -227,46 +254,83 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
   if (jobErr) throw jobErr;
 
   const jobs = ((jobRows ?? []) as JobRow[]).filter((job) => clean(job.id));
-  if (jobs.length === 0) return empty;
 
   const jobIds = jobs.map((job) => clean(job.id)).filter(Boolean);
 
-  const { data: systemRows, error: systemErr } = await params.supabase
-    .from("job_systems")
-    .select("id, job_id, name")
-    .in("job_id", jobIds)
-    .order("name", { ascending: true });
+  let systemRows: SystemRow[] = [];
+  let equipmentRows: EquipmentRow[] = [];
 
-  if (systemErr) throw systemErr;
+  if (jobIds.length > 0) {
+    const { data: jobSystemRows, error: systemErr } = await params.supabase
+      .from("job_systems")
+      .select("id, job_id, name")
+      .in("job_id", jobIds)
+      .order("name", { ascending: true });
 
-  const { data: equipmentRows, error: equipmentErr } = await params.supabase
-    .from("job_equipment")
-    .select(
-      [
-        "id",
-        "job_id",
-        "system_id",
-        "equipment_role",
-        "component_type",
-        "system_location",
-        "manufacturer",
-        "model",
-        "model_number",
-        "serial",
-        "tonnage",
-        "refrigerant_type",
-        "heating_capacity_kbtu",
-        "heating_output_btu",
-        "heating_efficiency_percent",
-        "created_at",
-        "updated_at",
-      ].join(", "),
-    )
-    .in("job_id", jobIds)
-    .order("updated_at", { ascending: false })
-    .limit(params.equipmentLimit ?? 500);
+    if (systemErr) throw systemErr;
+    systemRows = (jobSystemRows ?? []) as SystemRow[];
 
-  if (equipmentErr) throw equipmentErr;
+    const { data: jobEquipmentRows, error: equipmentErr } = await params.supabase
+      .from("job_equipment")
+      .select(
+        [
+          "id",
+          "job_id",
+          "system_id",
+          "equipment_role",
+          "component_type",
+          "system_location",
+          "manufacturer",
+          "model",
+          "model_number",
+          "serial",
+          "tonnage",
+          "refrigerant_type",
+          "heating_capacity_kbtu",
+          "heating_output_btu",
+          "heating_efficiency_percent",
+          "created_at",
+          "updated_at",
+        ].join(", "),
+      )
+      .in("job_id", jobIds)
+      .order("updated_at", { ascending: false })
+      .limit(params.equipmentLimit ?? 500);
+
+    if (equipmentErr) throw equipmentErr;
+    equipmentRows = (jobEquipmentRows ?? []) as EquipmentRow[];
+  }
+
+  const locationIds = ((locationRows ?? []) as LocationRow[]).map((location) => clean(location.id)).filter(Boolean);
+  let profileSystemRows: ProfileSystemRow[] = [];
+  let profileEquipmentRows: ProfileEquipmentRow[] = [];
+
+  if (locationIds.length > 0) {
+    const { data: profileSystemsData, error: profileSystemsErr } = await params.supabase
+      .from("customer_location_systems")
+      .select("id, owner_user_id, customer_id, location_id, name, system_type, notes, created_at, updated_at, archived_at")
+      .eq("owner_user_id", accountOwnerUserId)
+      .eq("customer_id", customerId)
+      .in("location_id", locationIds)
+      .is("archived_at", null)
+      .order("name", { ascending: true });
+
+    if (profileSystemsErr) throw profileSystemsErr;
+    profileSystemRows = (profileSystemsData ?? []) as ProfileSystemRow[];
+
+    const profileSystemIds = profileSystemRows.map((system) => clean(system.id)).filter(Boolean);
+    if (profileSystemIds.length > 0) {
+      const { data: profileEquipmentData, error: profileEquipmentErr } = await params.supabase
+        .from("equipment")
+        .select("id, location_id, system_id, equipment_type, manufacturer, model, serial, notes, created_at, updated_at")
+        .eq("owner_user_id", accountOwnerUserId)
+        .in("system_id", profileSystemIds)
+        .order("updated_at", { ascending: false });
+
+      if (profileEquipmentErr) throw profileEquipmentErr;
+      profileEquipmentRows = (profileEquipmentData ?? []) as ProfileEquipmentRow[];
+    }
+  }
 
   const locationsById = new Map<string, LocationRow>();
   for (const location of (locationRows ?? []) as LocationRow[]) {
@@ -280,7 +344,7 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
   }
 
   const systemsById = new Map<string, SystemRow>();
-  for (const system of (systemRows ?? []) as SystemRow[]) {
+  for (const system of systemRows) {
     const id = clean(system.id);
     if (id) systemsById.set(id, system);
   }
@@ -334,7 +398,44 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     return system;
   }
 
-  for (const system of (systemRows ?? []) as SystemRow[]) {
+  function ensureProfileLocation(locationId: string) {
+    const location = locationsById.get(locationId) ?? null;
+    const fallbackAddress = locationAddress(location);
+    let summary = locationMap.get(locationId);
+    if (!summary) {
+      summary = {
+        id: locationId,
+        label: locationLabel(location, fallbackAddress),
+        address: fallbackAddress,
+        systems: [],
+      };
+      locationMap.set(locationId, summary);
+    }
+    return summary;
+  }
+
+  function ensureProfileSystem(profileSystem: ProfileSystemRow) {
+    const systemId = clean(profileSystem.id);
+    const locationId = clean(profileSystem.location_id);
+    if (!systemId || !locationId) return null;
+    const location = ensureProfileLocation(locationId);
+    const key = `profile:${systemId}`;
+    let system = systemMap.get(key);
+    if (!system) {
+      system = {
+        id: key,
+        name: cleanNullable(profileSystem.name) || "System",
+        sourceJob: null,
+        filters: [],
+        equipment: [],
+      };
+      systemMap.set(key, system);
+      location.systems.push(system);
+    }
+    return system;
+  }
+
+  for (const system of systemRows) {
     const job = jobsById.get(clean(system.job_id));
     if (!job) continue;
     ensureSystem({
@@ -344,8 +445,12 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     });
   }
 
+  for (const profileSystem of profileSystemRows) {
+    ensureProfileSystem(profileSystem);
+  }
+
   let totalEquipmentCount = 0;
-  for (const equipment of (equipmentRows ?? []) as EquipmentRow[]) {
+  for (const equipment of equipmentRows) {
     const equipmentId = clean(equipment.id);
     const job = jobsById.get(clean(equipment.job_id));
     if (!equipmentId || !job) continue;
@@ -360,6 +465,7 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     summary.equipment.push({
       id: equipmentId,
       jobId: clean(job.id),
+      sourceType: "job",
       equipmentRole: cleanNullable(equipment.equipment_role),
       componentType: cleanNullable(equipment.component_type),
       manufacturer: cleanNullable(equipment.manufacturer),
@@ -377,6 +483,39 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     totalEquipmentCount += 1;
   }
 
+  const profileSystemsById = new Map<string, ProfileSystemRow>();
+  for (const system of profileSystemRows) {
+    const id = clean(system.id);
+    if (id) profileSystemsById.set(id, system);
+  }
+
+  for (const equipment of profileEquipmentRows) {
+    const equipmentId = clean(equipment.id);
+    const profileSystem = profileSystemsById.get(clean(equipment.system_id));
+    const system = profileSystem ? ensureProfileSystem(profileSystem) : null;
+    if (!equipmentId || !system) continue;
+
+    system.equipment.push({
+      id: equipmentId,
+      jobId: null,
+      sourceType: "profile",
+      equipmentRole: cleanNullable(equipment.equipment_type),
+      componentType: cleanNullable(equipment.equipment_type),
+      manufacturer: cleanNullable(equipment.manufacturer),
+      model: cleanNullable(equipment.model),
+      serial: cleanNullable(equipment.serial),
+      tonnage: null,
+      refrigerantType: null,
+      heatingCapacityKbtu: null,
+      heatingOutputBtu: null,
+      heatingEfficiencyPercent: null,
+      updatedAt: cleanNullable(equipment.updated_at),
+      createdAt: cleanNullable(equipment.created_at),
+      sourceJob: null,
+    });
+    totalEquipmentCount += 1;
+  }
+
   for (const filter of filterRows) {
     const system = systemMap.get(filter.system_id);
     if (!system) continue;
@@ -387,7 +526,7 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     .map((location) => ({
       ...location,
       systems: location.systems
-        .filter((system) => system.equipment.length > 0 || system.sourceJob)
+        .filter((system) => system.equipment.length > 0 || system.sourceJob || system.id.startsWith("profile:"))
         .map((system) => ({
           ...system,
           filters: system.filters.slice().sort(compareFilters),

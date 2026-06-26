@@ -8,6 +8,7 @@ import {
   requireInternalUser,
 } from "@/lib/auth/internal-user";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
+import { mapToCanonicalRole } from "@/lib/utils/equipment-domain";
 import { redirect } from "next/navigation"
 
 function toFullName(first?: string | null, last?: string | null) {
@@ -23,6 +24,11 @@ function readTrimmed(formData: FormData, key: string) {
 function emptyToNull(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function customerSystemsEquipmentHref(customerId: string, params: Record<string, string>) {
+  const search = new URLSearchParams({ tab: "systems-equipment", ...params });
+  return `/customers/${customerId}?${search.toString()}#systems-equipment`;
 }
 
 function normalizeAddressPart(value?: string | null) {
@@ -498,4 +504,144 @@ export async function addCustomerServiceLocationFromForm(formData: FormData) {
       createdLocationId ? `#location-contacts-${createdLocationId}` : ""
     }`,
   );
+}
+
+async function requireInternalScopedCustomerLocationForMutation(params: {
+  supabase: any;
+  customerId: string;
+  locationId: string;
+}) {
+  const scopedCustomer = await requireInternalScopedCustomerForMutation({
+    supabase: params.supabase,
+    customerId: params.customerId,
+  });
+
+  const locationId = String(params.locationId ?? "").trim();
+  if (!locationId) throw new Error("Location is required");
+
+  const admin = createAdminClient();
+  const { data: location, error: locationErr } = await admin
+    .from("locations")
+    .select("id, customer_id, owner_user_id")
+    .eq("id", locationId)
+    .eq("customer_id", scopedCustomer.customerId)
+    .eq("owner_user_id", scopedCustomer.accountOwnerUserId)
+    .maybeSingle();
+
+  if (locationErr) throw locationErr;
+  if (!location?.id) throw new Error("Location not found in internal account scope");
+
+  return {
+    ...scopedCustomer,
+    locationId,
+    admin,
+  };
+}
+
+export async function addCustomerLocationSystemFromForm(formData: FormData) {
+  "use server";
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+  const name = readTrimmed(formData, "name");
+  const systemType = readTrimmed(formData, "system_type");
+  const notes = readTrimmed(formData, "notes");
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+  if (!name) redirect(customerSystemsEquipmentHref(customerId, { err: "system_required" }));
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  const { error } = await scoped.admin
+    .from("customer_location_systems")
+    .insert({
+      owner_user_id: scoped.accountOwnerUserId,
+      customer_id: scoped.customerId,
+      location_id: scoped.locationId,
+      name,
+      system_type: emptyToNull(systemType),
+      notes: emptyToNull(notes),
+    });
+
+  if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "system_failed" }));
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  redirect(customerSystemsEquipmentHref(customerId, { saved: "system_added" }));
+}
+
+export async function addCustomerLocationEquipmentFromForm(formData: FormData) {
+  "use server";
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+  const systemId = readTrimmed(formData, "system_id");
+  const rawEquipmentType = readTrimmed(formData, "equipment_type");
+  const equipmentType = mapToCanonicalRole(rawEquipmentType || "other");
+  const manufacturer = readTrimmed(formData, "manufacturer");
+  const model = readTrimmed(formData, "model");
+  const serial = readTrimmed(formData, "serial");
+  const notes = readTrimmed(formData, "notes");
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+  if (!systemId) throw new Error("System is required");
+  if (!equipmentType) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_required" }));
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  const { data: system, error: systemErr } = await scoped.admin
+    .from("customer_location_systems")
+    .select("id")
+    .eq("id", systemId)
+    .eq("customer_id", scoped.customerId)
+    .eq("location_id", scoped.locationId)
+    .eq("owner_user_id", scoped.accountOwnerUserId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (systemErr) throw systemErr;
+  if (!system?.id) throw new Error("System not found in internal account scope");
+
+  const { error } = await scoped.admin
+    .from("equipment")
+    .insert({
+      owner_user_id: scoped.accountOwnerUserId,
+      location_id: scoped.locationId,
+      system_id: systemId,
+      equipment_type: equipmentType,
+      manufacturer: emptyToNull(manufacturer),
+      model: emptyToNull(model),
+      serial: emptyToNull(serial),
+      notes: emptyToNull(notes),
+    });
+
+  if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_failed" }));
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  redirect(customerSystemsEquipmentHref(customerId, { saved: "equipment_added" }));
 }

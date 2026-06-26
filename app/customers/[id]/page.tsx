@@ -7,6 +7,8 @@ import {
 } from "@/lib/customers/visibility";
 import {
   addCustomerServiceLocationFromForm,
+  addCustomerLocationEquipmentFromForm,
+  addCustomerLocationSystemFromForm,
   archiveCustomerFromForm,
   updateCustomerNotesFromForm,
 } from "@/lib/actions/customer-actions";
@@ -82,7 +84,7 @@ import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/li
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
-import { equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
+import { EQUIPMENT_ROLE_OPTIONS, equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 
 
@@ -600,6 +602,7 @@ export default async function CustomerDetailPage(props: {
     rcLocSaved?: string;
     rcLocError?: string;
     locSaved?: string;
+    saved?: string;
   }>;
 }) {
   const supabase = await createClient();
@@ -629,6 +632,8 @@ export default async function CustomerDetailPage(props: {
   const locationRoleContactSaved = String(sp.rcLocSaved ?? "").trim() === "1";
   const locationRoleContactError = String(sp.rcLocError ?? "").trim() === "1";
   const serviceLocationSaved = String(sp.locSaved ?? "").trim().toLowerCase();
+  const systemsEquipmentSaved = String(sp.saved ?? "").trim().toLowerCase();
+  const systemsEquipmentError = String(sp.err ?? "").trim().toLowerCase();
   const workspaceTabParam = String(sp.tab ?? "").trim().toLowerCase();
 
   if (!id || !isUuid(id)) {
@@ -784,6 +789,25 @@ export default async function CustomerDetailPage(props: {
           totalSystemCount: 0,
           totalEquipmentCount: 0,
         };
+  const systemsEquipmentLocations = (() => {
+    const byLocationId = new Map(systemsEquipmentSummary.locations.map((location) => [location.id, location]));
+    const fromCustomerLocations = locations.map((location) => {
+      const locationId = String(location.id ?? location.location_id ?? "").trim();
+      const existing = locationId ? byLocationId.get(locationId) : null;
+      if (existing) return existing;
+      return {
+        id: locationId,
+        label: locationDisplayName(location),
+        address: locationAddressLine(location) || null,
+        systems: [],
+      };
+    });
+    const locationIds = new Set(fromCustomerLocations.map((location) => location.id));
+    return [
+      ...fromCustomerLocations,
+      ...systemsEquipmentSummary.locations.filter((location) => !locationIds.has(location.id)),
+    ];
+  })();
 
   // Lightweight service-case awareness
   const serviceCaseIds = Array.from(
@@ -1315,6 +1339,24 @@ export default async function CustomerDetailPage(props: {
         {locationRoleContactError && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
             Could not save location contact. Verify role, name, and phone/email.
+          </div>
+        )}
+        {systemsEquipmentSaved === "system_added" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            System added
+          </div>
+        )}
+        {systemsEquipmentSaved === "equipment_added" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Equipment added
+          </div>
+        )}
+        {["system_failed", "equipment_failed", "system_required", "equipment_required"].includes(systemsEquipmentError) && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            {systemsEquipmentError === "system_required" && "System name is required."}
+            {systemsEquipmentError === "equipment_required" && "Equipment type is required."}
+            {systemsEquipmentError === "system_failed" && "Could not add system. Verify the customer and property scope, then try again."}
+            {systemsEquipmentError === "equipment_failed" && "Could not add equipment. Verify the system and property scope, then try again."}
           </div>
         )}
         {/* Header */}
@@ -2437,12 +2479,12 @@ export default async function CustomerDetailPage(props: {
         ) : null}
 
         {activeWorkspaceTab === "systems-equipment" && isInternalViewer ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section id="systems-equipment" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Systems &amp; Equipment</h2>
                 <p className="mt-0.5 text-sm text-slate-500">
-                  Read-only systems and equipment records captured from customer jobs.
+                  Systems and equipment saved for each customer property.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 text-xs text-slate-600">
@@ -2455,28 +2497,68 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
 
-            {systemsEquipmentSummary.locations.length === 0 ? (
+            {systemsEquipmentLocations.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-                No systems or equipment records yet. Add equipment from a job when system details are captured.
+                No systems or equipment saved for this property yet.
               </div>
             ) : (
               <div className="space-y-4">
-                {systemsEquipmentSummary.locations.map((location) => (
+                {systemsEquipmentLocations.map((location) => (
                   <div key={location.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                     <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3">
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <h3 className="text-sm font-semibold text-slate-900">{location.label}</h3>
                           {location.address ? (
                             <div className="mt-0.5 text-xs text-slate-500">{location.address}</div>
                           ) : null}
                         </div>
-                        <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                          {location.systems.length} system{location.systems.length === 1 ? "" : "s"}
-                        </span>
+                        <div className="flex flex-wrap items-start gap-2">
+                          <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                            {location.systems.length} system{location.systems.length === 1 ? "" : "s"}
+                          </span>
+                          <details className="w-full rounded-lg border border-slate-200 bg-white p-3 sm:w-72">
+                            <summary className="cursor-pointer text-xs font-semibold text-slate-800">Add System</summary>
+                            <form action={addCustomerLocationSystemFromForm} className="mt-3 space-y-3">
+                              <input type="hidden" name="customer_id" value={customerId} />
+                              <input type="hidden" name="location_id" value={location.id} />
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={`system-name-${location.id}`}>
+                                  System name
+                                </label>
+                                <input
+                                  id={`system-name-${location.id}`}
+                                  name="name"
+                                  required
+                                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                                  placeholder="Upstairs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={`system-type-${location.id}`}>
+                                  System type
+                                </label>
+                                <input
+                                  id={`system-type-${location.id}`}
+                                  name="system_type"
+                                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                                  placeholder="Split system"
+                                />
+                              </div>
+                              <button className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                                Add System
+                              </button>
+                            </form>
+                          </details>
+                        </div>
                       </div>
                     </div>
 
+                    {location.systems.length === 0 ? (
+                      <div className="p-4 text-sm text-slate-500">
+                        No systems or equipment saved for this property yet.
+                      </div>
+                    ) : (
                     <div className="divide-y divide-slate-200">
                       {location.systems.map((system) => (
                         <div key={system.id} className="p-4">
@@ -2488,9 +2570,49 @@ export default async function CustomerDetailPage(props: {
                                   Latest source: {formatEquipmentSourceJobLabel(system.sourceJob)}
                                 </div>
                               ) : null}
+                              {!system.sourceJob ? (
+                                <div className="mt-0.5 text-xs text-slate-500">Saved property equipment</div>
+                              ) : null}
                             </div>
-                            {system.sourceJob ? (
-                              <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              {!system.sourceJob ? (
+                              <details className="w-full rounded-lg border border-slate-200 bg-white p-3 sm:w-72">
+                                <summary className="cursor-pointer text-xs font-semibold text-slate-800">Add Equipment</summary>
+                                <form action={addCustomerLocationEquipmentFromForm} className="mt-3 space-y-3">
+                                  <input type="hidden" name="customer_id" value={customerId} />
+                                  <input type="hidden" name="location_id" value={location.id} />
+                                  <input type="hidden" name="system_id" value={system.id.replace(/^profile:/, "")} />
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={`equipment-type-${system.id}`}>
+                                      Equipment type
+                                    </label>
+                                    <select
+                                      id={`equipment-type-${system.id}`}
+                                      name="equipment_type"
+                                      required
+                                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                      defaultValue="outdoor_unit"
+                                    >
+                                      {EQUIPMENT_ROLE_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <input name="manufacturer" className="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Manufacturer" />
+                                    <input name="model" className="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Model" />
+                                    <input name="serial" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" placeholder="Serial" />
+                                  </div>
+                                  <button className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                                    Add Equipment
+                                  </button>
+                                </form>
+                              </details>
+                              ) : null}
+                              {system.sourceJob ? (
+                                <>
                                 <Link
                                   href={`/jobs/${system.sourceJob.id}/equipment`}
                                   className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
@@ -2509,8 +2631,9 @@ export default async function CustomerDetailPage(props: {
                                 >
                                   Open Job
                                 </Link>
-                              </div>
-                            ) : null}
+                                </>
+                              ) : null}
+                            </div>
                           </div>
 
                           {system.equipment.length === 0 ? (
@@ -2535,10 +2658,15 @@ export default async function CustomerDetailPage(props: {
                                             </span>
                                           ))}
                                         </div>
-                                        <div className="mt-2 text-xs text-slate-500">
-                                          Source: {formatEquipmentSourceJobLabel(equipment.sourceJob)}
-                                        </div>
+                                        {equipment.sourceJob ? (
+                                          <div className="mt-2 text-xs text-slate-500">
+                                            Source: {formatEquipmentSourceJobLabel(equipment.sourceJob)}
+                                          </div>
+                                        ) : (
+                                          <div className="mt-2 text-xs text-slate-500">Saved property equipment</div>
+                                        )}
                                       </div>
+                                      {equipment.sourceJob ? (
                                       <div className="flex shrink-0 flex-wrap gap-2">
                                         <Link
                                           href={`/jobs/${equipment.sourceJob.id}/equipment`}
@@ -2559,6 +2687,7 @@ export default async function CustomerDetailPage(props: {
                                           Open Job
                                         </Link>
                                       </div>
+                                      ) : null}
                                     </div>
                                   </div>
                                 );
@@ -2584,6 +2713,7 @@ export default async function CustomerDetailPage(props: {
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
                 ))}
               </div>

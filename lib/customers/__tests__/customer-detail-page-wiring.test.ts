@@ -217,11 +217,11 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Site / Access Contact");
   });
 
-  it("renders read-only Systems & Equipment profile section with grouped records and empty state", () => {
+  it("renders Systems & Equipment profile section with grouped records and profile-owned add CTAs", () => {
     expect(customerPageSource).toContain("loadCustomerSystemsEquipmentSummary");
     expect(customerPageSource).toContain("Systems &amp; Equipment");
     expect(customerPageSource).toContain('activeWorkspaceTab === "systems-equipment" && isInternalViewer');
-    expect(customerPageSource).toContain("systemsEquipmentSummary.locations.map((location)");
+    expect(customerPageSource).toContain("systemsEquipmentLocations.map((location)");
     expect(customerPageSource).toContain("location.systems.map((system)");
     expect(customerPageSource).toContain("system.filters.map((filter)");
     expect(customerPageSource).toContain("formatSystemFilterSummary(filter)");
@@ -230,10 +230,16 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource.indexOf("system.equipment.map((equipment)")).toBeLessThan(
       customerPageSource.indexOf("system.filters.map((filter)"),
     );
-    expect(customerPageSource).toContain("No systems or equipment records yet. Add equipment from a job when system details are captured.");
+    expect(customerPageSource).toContain("No systems or equipment saved for this property yet.");
+    expect(customerPageSource).toContain("addCustomerLocationSystemFromForm");
+    expect(customerPageSource).toContain("addCustomerLocationEquipmentFromForm");
+    expect(customerPageSource).toContain("Add System");
+    expect(customerPageSource).toContain("Add Equipment");
+    expect(customerPageSource).toContain("System added");
+    expect(customerPageSource).toContain("Equipment added");
   });
 
-  it("keeps customer profile equipment visibility navigational, not mutating", () => {
+  it("preserves job equipment links without using job equipment actions on the customer profile", () => {
     const systemsEquipmentTabSource =
       customerPageSource.match(/activeWorkspaceTab === "systems-equipment"[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
 
@@ -255,8 +261,6 @@ describe("customer detail relationship hub wiring", () => {
     expect(systemsEquipmentTabSource).not.toContain("addSystemFilterFromForm");
     expect(systemsEquipmentTabSource).not.toContain("updateSystemFilterFromForm");
     expect(systemsEquipmentTabSource).not.toContain("archiveSystemFilterFromForm");
-    expect(systemsEquipmentTabSource).not.toContain("<form");
-    expect(systemsEquipmentTabSource).not.toContain("<button");
   });
 
   it("includes read-only billing periods inside maintenance agreement cards", () => {
