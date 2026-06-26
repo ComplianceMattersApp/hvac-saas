@@ -298,6 +298,41 @@ describe("Operations Board reason mapping", () => {
     });
   });
 
+  it("uses internal failed banner note ahead of computed ECC failure detail", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        {
+          job_type: "ecc",
+          ops_status: "failed",
+          next_action_note: "Waiting on correction photos",
+          ops_board_failure_detail: "Duct Leakage failed",
+        },
+        "Failed",
+      ),
+    ).toEqual({
+      label: "Failed ECC test",
+      detail: "Waiting on correction photos",
+      source: "mapped",
+    });
+  });
+
+  it("does not expose failed banner notes for passing ECC jobs", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        {
+          job_type: "ecc",
+          ops_status: "closed",
+          next_action_note: "Waiting on correction photos",
+        },
+        "Closeout Complete",
+      ),
+    ).toEqual({
+      label: "Closeout Complete",
+      detail: null,
+      source: "fallback",
+    });
+  });
+
   it("keeps waiting-parts label while adding captured detail", () => {
     expect(
       getOpsBoardVisibleReasonDetail({

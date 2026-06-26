@@ -57,6 +57,7 @@ type OpsBoardReasonJob = {
   ops_status?: string | null;
   pending_info_reason?: string | null;
   on_hold_reason?: string | null;
+  next_action_note?: string | null;
   ops_board_failure_detail?: string | null;
   permit_number?: string | null;
   field_complete?: boolean | null;
@@ -183,7 +184,7 @@ function visibleDetailFromJob(job: OpsBoardReasonJob, mappedReason: OpsBoardReas
   const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
   const rawDetail =
     mappedReason.key === "failed_ecc_test"
-      ? job.ops_board_failure_detail ?? job.pending_info_reason ?? job.on_hold_reason
+      ? job.next_action_note ?? job.ops_board_failure_detail ?? job.pending_info_reason ?? job.on_hold_reason
       : opsStatus === "on_hold"
       ? job.on_hold_reason ?? job.pending_info_reason
       : job.pending_info_reason ?? job.on_hold_reason;

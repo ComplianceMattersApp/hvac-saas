@@ -35,6 +35,7 @@ export type FocusedQueueJob = {
   customer_last_name?: string | null;
   pending_info_reason?: string | null;
   on_hold_reason?: string | null;
+  next_action_note?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   account_owner_user_id?: string | null;
@@ -301,7 +302,7 @@ function isGenericAssignmentFallbackLabel(value: unknown): boolean {
 }
 
 export function getOpsQueueCardStatusReason(
-  job: Pick<FocusedQueueJob, "status" | "ops_status" | "job_type" | "pending_info_reason" | "on_hold_reason" | "service_follow_up_progress_label">,
+  job: Pick<FocusedQueueJob, "status" | "ops_status" | "job_type" | "pending_info_reason" | "on_hold_reason" | "next_action_note" | "service_follow_up_progress_label">,
 ): string {
   const status = normalize(job?.ops_status);
   const lifecycle = normalize(job?.status);
@@ -343,7 +344,11 @@ export function getOpsQueueCardStatusReason(
   }
 
   if (status === "failed") {
-    if (isEccJobType(job?.job_type)) return formatEccOpsStatusLabel(status, "ops") ?? "Failed / Correction Required";
+    if (isEccJobType(job?.job_type)) {
+      const failedNote = cleanReason(job?.next_action_note);
+      const label = formatEccOpsStatusLabel(status, "ops") ?? "Failed / Correction Required";
+      return failedNote ? `${label}: ${failedNote}` : label;
+    }
     const reason = cleanReason(job?.pending_info_reason) || cleanReason(job?.on_hold_reason);
     return reason ? `Failed: ${sentenceCaseReason(reason.replace(/^failed\s*[-:]\s*/i, ""))}` : "Failed";
   }

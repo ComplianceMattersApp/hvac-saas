@@ -496,6 +496,7 @@ function telHref(phone?: string | null) {
     const jobId = String(job?.id ?? "").trim();
     return {
       ...job,
+      next_action_note: job?.next_action_note ?? null,
       ops_board_failure_detail: jobId ? primaryFailureReasonByJob.get(jobId) ?? null : null,
     };
   }
@@ -510,6 +511,9 @@ function telHref(phone?: string | null) {
     if (opsStatus === "pending_office_review") return "Correction Required";
     if (opsStatus !== "failed") return "";
 
+    const failedNote = String(job?.next_action_note ?? "").trim();
+    if (failedNote) return `Failed Test - ${failedNote}`;
+
     const jobId = String(job?.id ?? "").trim();
     return (jobId ? primaryFailureReasonByJob.get(jobId) ?? "" : "") || "Failed";
   }
@@ -518,7 +522,7 @@ function telHref(phone?: string | null) {
   const wsStartTomorrowUtc = startOfTomorrowUtcIsoLA();
 
     const workspaceSelect =
-      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, pending_info_reason, on_hold_reason, permit_number, jurisdiction, permit_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
+      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, pending_info_reason, on_hold_reason, next_action_note, permit_number, jurisdiction, permit_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
 

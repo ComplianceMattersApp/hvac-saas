@@ -2912,6 +2912,14 @@ const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(
     String(job.ops_status ?? "").trim().toLowerCase(),
   );
+const failedReasonBannerNote = String((job as any).next_action_note ?? "").replace(/\s+/g, " ").trim();
+const canShowEccFailedReasonBanner =
+  isInternalUser &&
+  String(job.job_type ?? "").trim().toLowerCase() === "ecc" &&
+  isFailedFamilyOpsStatus(job.ops_status);
+const failedReasonBannerText = failedReasonBannerNote
+  ? `Failed Test - ${failedReasonBannerNote}`
+  : "Failed Test";
 const isEccPermitNeededActive = isEccPermitNeededBlocker({
   job_type: job.job_type,
   ops_status: job.ops_status,
@@ -3805,6 +3813,16 @@ const failureResolutionPathCount =
               >
                 <div className="font-semibold">{completionActionAttentionBanner.title}</div>
                 <div className="mt-1">{completionActionAttentionBanner.message}</div>
+              </div>
+            ) : null}
+
+            {canShowEccFailedReasonBanner ? (
+              <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-5 text-rose-950">
+                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-rose-800">Failed reason</div>
+                <div className="mt-1 font-semibold">{failedReasonBannerText}</div>
+                <a href="#job-status" className="mt-1 inline-flex text-xs font-semibold text-rose-800 underline-offset-2 hover:underline">
+                  Edit failed reason
+                </a>
               </div>
             ) : null}
 
@@ -5415,6 +5433,15 @@ const failureResolutionPathCount =
                 </details>
               </div>
             ) : null}
+          </div>
+        ) : null}
+        {canShowEccFailedReasonBanner ? (
+          <div className="hidden w-full rounded-xl border border-rose-200 bg-rose-50/85 px-3.5 py-3 text-sm text-rose-950 sm:block">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-800">Failed reason</div>
+            <div className="mt-1 font-semibold">{failedReasonBannerText}</div>
+            <a href="#job-status" className="mt-1 inline-flex text-xs font-semibold text-rose-800 underline-offset-2 hover:underline">
+              Edit failed reason
+            </a>
           </div>
         ) : null}
         {showPrimaryCloseoutBlockers ? (
@@ -8420,6 +8447,39 @@ const failureResolutionPathCount =
       {formatOpsStatusLabel(job.ops_status, job.job_type)}
     </div>
   </div>
+
+  {canShowEccFailedReasonBanner ? (
+    <div className="mb-4 space-y-3 rounded-xl border border-rose-200 bg-rose-50/80 px-3.5 py-3 text-sm text-rose-950">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-rose-800">Failed reason</div>
+        <div className="mt-1 font-semibold">{failedReasonBannerText}</div>
+        <p className="mt-1 text-xs leading-5 text-rose-900/85">
+          Internal queue context only. ECC pass/fail truth still comes from completed test runs.
+        </p>
+      </div>
+      <form action={updateJobOpsDetailsFromForm} className="grid gap-2 rounded-lg border border-rose-200 bg-white/85 p-3">
+        <input type="hidden" name="job_id" value={job.id} />
+        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
+        <label className={workspaceFieldLabelClass}>Failed reason banner</label>
+        <textarea
+          name="next_action_note"
+          defaultValue={job.next_action_note ?? ""}
+          maxLength={240}
+          rows={3}
+          className={workspaceTextareaClass}
+          placeholder="Waiting on correction photos"
+        />
+        <p className="text-xs leading-5 text-slate-600">
+          Shown on internal Failed queue cards so office users know what is needed without opening the job.
+        </p>
+        <div className={recordActionRowEndClass}>
+          <SubmitButton loadingText="Saving..." className={recordPrimaryButtonClass}>
+            Save Failed Reason
+          </SubmitButton>
+        </div>
+      </form>
+    </div>
+  ) : null}
 
   <form action={updateJobOpsFromForm} className="space-y-4 rounded-xl border border-slate-200/80 bg-white/96 p-4">
     <input type="hidden" name="job_id" value={job.id} />

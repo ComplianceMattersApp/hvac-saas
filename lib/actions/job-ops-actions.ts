@@ -1844,21 +1844,32 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
     next_action_note: beforeJob.next_action_note ?? null,
     action_required_by: beforeJob.action_required_by ?? null,
   };
+  const hasFollowUpDateInput = formData.has("follow_up_date");
+  const hasNextActionNoteInput = formData.has("next_action_note");
+  const hasActionRequiredByInput = formData.has("action_required_by");
   const followUpDateRaw = formData.get('follow_up_date');
   const nextActionNoteRaw = formData.get('next_action_note');
   const actionRequiredByRaw = formData.get('action_required_by');
 
   const next_action_note =
-    typeof nextActionNoteRaw === 'string' && nextActionNoteRaw.trim()
-      ? nextActionNoteRaw.trim()
-      : null;
+    hasNextActionNoteInput
+      ? typeof nextActionNoteRaw === 'string' && nextActionNoteRaw.trim()
+        ? nextActionNoteRaw.trim()
+        : null
+      : before.next_action_note;
 
   const follow_up_date =
-    typeof followUpDateRaw === 'string' && followUpDateRaw.trim()
-      ? followUpDateRaw.trim()
-      : null;
+    hasFollowUpDateInput
+      ? typeof followUpDateRaw === 'string' && followUpDateRaw.trim()
+        ? followUpDateRaw.trim()
+        : null
+      : before.follow_up_date;
 
-  const action_required_by = isActionRequiredBy(actionRequiredByRaw) ? actionRequiredByRaw : null;
+  const action_required_by = hasActionRequiredByInput
+    ? isActionRequiredBy(actionRequiredByRaw)
+      ? actionRequiredByRaw
+      : null
+    : before.action_required_by;
 
   const after: OpsSnapshot = {
     ...before,
