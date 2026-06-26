@@ -126,6 +126,16 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("Create Estimate");
     expect(mobileJobDetailV2PreviewSource).toContain("Create Return Visit");
     expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-follow-up-job")');
+    expect(mobileJobDetailV2PreviewSource).toContain("hasServicePlanToolContext");
+    expect(mobileJobDetailV2PreviewSource).toContain("markVisitCountedLinkId");
+    expect(mobileJobDetailV2PreviewSource).toContain("suggestedNextDueProjection");
+    expect(mobileJobDetailV2PreviewSource).toContain("confirmedNextDueContext");
+    expect(mobileJobDetailV2PreviewSource).toContain("servicePlanToolHref");
+    expect(mobileJobDetailV2PreviewSource).toContain("?tab=service-plans");
+    expect(mobileJobDetailV2PreviewSource).toContain("&maFocus=");
+    expect(mobileJobDetailV2PreviewSource).toContain("Service Plan");
+    expect(mobileJobDetailV2PreviewSource).toContain("View agreement, visits, and next due details");
+    expect(mobileJobDetailV2PreviewSource).toContain("Sign customer up for a service plan");
     expect(mobileJobDetailV2PreviewSource).toContain("Permit Information");
     expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-permit-info")');
     expect(mobileJobDetailV2PreviewSource).toContain("Job Status Tools");

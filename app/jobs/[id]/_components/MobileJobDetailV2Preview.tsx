@@ -590,6 +590,8 @@ export default function MobileJobDetailV2Preview(props: any) {
     linkedRetestPassiveHeading,
     LockIcon,
     MapPinIcon,
+    markVisitCountedAgreementName,
+    markVisitCountedLinkId,
     MessageIcon,
     markJobFieldCompleteFromForm,
     mobileAppointmentTimeLabel,
@@ -622,6 +624,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     showSharedNotesCard,
     sp,
     SubmitButton,
+    suggestedNextDueProjection,
     surfaceProfile,
     Suspense,
     tab,
@@ -637,6 +640,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     JobLocationPreviewFallback,
     sharedNoteBannerMessage,
     sharedNotesMeta,
+    confirmedNextDueContext,
   } = props;
 
   const lifecycle = buildLifecyclePreview({
@@ -674,6 +678,19 @@ export default function MobileJobDetailV2Preview(props: any) {
   });
   const standardJobHref = `/jobs/${job.id}?tab=${tab}`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
+  const hasServicePlanToolContext = Boolean(
+    markVisitCountedLinkId ||
+      String(markVisitCountedAgreementName ?? "").trim() ||
+      suggestedNextDueProjection ||
+      confirmedNextDueContext,
+  );
+  const servicePlanFocusId = String(suggestedNextDueProjection?.agreementId ?? "").trim();
+  const servicePlanToolHref = mobileCustomerHref
+    ? `${mobileCustomerHref}?tab=service-plans${servicePlanFocusId ? `&maFocus=${encodeURIComponent(servicePlanFocusId)}` : ""}`
+    : standardJobHref;
+  const servicePlanToolHelper = hasServicePlanToolContext
+    ? "View agreement, visits, and next due details"
+    : "Sign customer up for a service plan";
   const currentActionHref = nextStep.anchor
     ? standardJobAnchorHref(nextStep.anchor)
     : "href" in nextStep && nextStep.href
@@ -1237,6 +1254,18 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
                   </Link>
                 ) : null}
+                <Link href={servicePlanToolHref} className={toolsRowClass}>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className={toolsRowIconClass}>
+                      <ClockIcon className="h-4 w-4" />
+                    </span>
+                    <span className={toolsRowTextClass}>
+                      <span className="block font-semibold text-slate-950">Service Plan</span>
+                      <span className="block text-sm font-medium text-slate-600">{servicePlanToolHelper}</span>
+                    </span>
+                  </span>
+                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                </Link>
                 {surfaceProfile?.surfaces?.permits ? (
                   <Link href={standardJobAnchorHref("mobile-permit-info")} className={toolsRowClass}>
                     <span className="flex min-w-0 flex-1 items-center gap-2">
