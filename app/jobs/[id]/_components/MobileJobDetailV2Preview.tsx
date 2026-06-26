@@ -269,19 +269,27 @@ function getVisitScopeCountLabel(count: number) {
 }
 
 function buildNextStepPreview(props: {
+  billingState: any;
+  closeoutNeeds: any;
   job: any;
+  internalInvoiceTruth: any;
   isFieldComplete: boolean;
   isEccPermitNeededActive: boolean;
   showPrimaryCloseoutBlockers: boolean;
   showConfirmRetestReady: boolean;
   showRetestSection: boolean;
   isServiceFieldFollowUpPendingInfo: boolean;
+  showExternalDataEntryPrompt: boolean;
+  showInternalInvoicePanel: boolean;
+  showInternalInvoicingPlaceholder: boolean;
+  showMobileInvoiceOpenAttention: boolean;
   showMobileServiceInvoiceFieldAction: boolean;
   showMobileEccTestAction: boolean;
+  jobPageInvoiceNextAction: string;
+  jobPageInvoiceSummaryText: string;
   primaryCloseoutMessage: string;
   serviceFollowUpProgressState: any;
   surfaceProfile: any;
-  closeoutNeeds: any;
   hasRequiredEccTestAttention: boolean;
   activeWaitingState: any;
   failedReasonBannerText: string;
@@ -296,6 +304,15 @@ function buildNextStepPreview(props: {
   const isService = String(props.job?.job_type ?? "").trim().toLowerCase() === "service";
   const isEcc = String(props.job?.job_type ?? "").trim().toLowerCase() === "ecc";
   const finishWorkLabel = getActionOrientedWorkLabel(props.surfaceProfile?.labels?.finishComplete);
+  const hasInvoiceAttention =
+    props.showMobileServiceInvoiceFieldAction ||
+    props.showInternalInvoicingPlaceholder ||
+    props.showMobileInvoiceOpenAttention ||
+    Boolean(props.internalInvoiceTruth) ||
+    Boolean(props.showInternalInvoicePanel && props.closeoutNeeds?.needsInvoice);
+  const hasExternalBillingAttention =
+    props.showExternalDataEntryPrompt ||
+    Boolean(props.closeoutNeeds?.needsInvoice && props.billingState?.lightweightBillingAllowed);
   const isActiveEccWork =
     isEcc &&
     (!props.isFieldComplete ||
@@ -321,17 +338,6 @@ function buildNextStepPreview(props: {
     !props.isServiceFieldFollowUpPendingInfo
   ) {
     return exceptionNextStep;
-  }
-
-  if (props.isEccPermitNeededActive && !props.showPrimaryCloseoutBlockers) {
-    return {
-      eyebrow: "Closeout blocker",
-      title: "Add permit information",
-      summary: "Add the permit details so cert closeout can continue.",
-      anchor: "mobile-ecc-permit-needed-action",
-      actionLabel: "Add permit details",
-      isSafeInlineLifecycleAction: false,
-    };
   }
 
   if (props.showConfirmRetestReady) {
@@ -383,17 +389,6 @@ function buildNextStepPreview(props: {
     };
   }
 
-  if (props.showPrimaryCloseoutBlockers) {
-    return {
-      eyebrow: "Closeout",
-      title: isService ? "Closeout responsibility" : "Finish compliance closeout",
-      summary: props.primaryCloseoutMessage || "Finish the remaining closeout responsibility.",
-      anchor: "mobile-next-service-action",
-      actionLabel: "Continue closeout",
-      isSafeInlineLifecycleAction: false,
-    };
-  }
-
   if (isActiveEccWork && props.showMobileEccTestAction && props.hasRequiredEccTestAttention) {
     return {
       eyebrow: "Compliance work",
@@ -408,11 +403,11 @@ function buildNextStepPreview(props: {
 
   if (isActiveEccWork && props.isEccPermitNeededActive) {
     return {
-      eyebrow: "Compliance closeout",
-      title: "Add permit information",
-      summary: "Add the permit details so cert closeout can continue.",
+      eyebrow: "Permit blocker",
+      title: "Permit needed",
+      summary: "Add or review permit details before closeout.",
       anchor: "mobile-ecc-permit-needed-action",
-      actionLabel: "Add permit details",
+      actionLabel: "Review permit info",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -428,15 +423,39 @@ function buildNextStepPreview(props: {
     };
   }
 
-  if (props.showMobileServiceInvoiceFieldAction) {
+  if (props.isFieldComplete && hasExternalBillingAttention) {
     return {
-      eyebrow: "Service closeout",
-      title: "Review service billing",
-      summary: props.isFieldComplete
-        ? "The field visit is complete. Build or review billing so closeout can continue."
-        : "Review the existing billing action from the standard job view.",
+      eyebrow: "Billing closeout",
+      title: "External billing review",
+      summary: "Confirm external billing before closeout.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Review external billing",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (props.isFieldComplete && hasInvoiceAttention) {
+    return {
+      eyebrow: isService ? "Service closeout" : "Billing closeout",
+      title: props.internalInvoiceTruth ? "Review invoice" : "Billing review",
+      summary:
+        props.jobPageInvoiceSummaryText ||
+        (isService
+          ? "The field visit is complete. Build or review billing so closeout can continue."
+          : "Review invoice requirements before closeout."),
       anchor: "mobile-invoice-summary-card",
-      actionLabel: "Review billing",
+      actionLabel: props.jobPageInvoiceNextAction || "Review invoice",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (props.showPrimaryCloseoutBlockers) {
+    return {
+      eyebrow: "Closeout",
+      title: "Closeout review",
+      summary: props.primaryCloseoutMessage || "Review remaining closeout responsibilities.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Review closeout",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -502,7 +521,9 @@ function buildBillingPreview(props: {
   showMobileServiceInvoiceFieldAction: boolean;
   showPrimaryCloseoutBlockers: boolean;
   isEcc: boolean;
+  isEccComplianceActive: boolean;
   isFieldComplete: boolean;
+  isReadOnlyState: boolean;
 }) {
   const hasInvoiceAttention =
     props.showMobileServiceInvoiceFieldAction ||
@@ -516,17 +537,18 @@ function buildBillingPreview(props: {
   const hasCloseoutAttention =
     props.showPrimaryCloseoutBlockers ||
     Boolean(props.closeoutNeeds?.needsInvoice || props.closeoutNeeds?.needsCerts);
-  const isEccWorkStillActive =
-    props.isEcc &&
-    !props.isFieldComplete &&
-    !props.showMobileServiceInvoiceFieldAction &&
-    !props.showMobileInvoiceOpenAttention &&
-    !props.showInternalInvoicingPlaceholder &&
-    !props.showInternalInvoicePanel &&
-    !props.internalInvoiceTruth &&
-    !props.showExternalDataEntryPrompt;
 
-  if (isEccWorkStillActive) {
+  if (props.isReadOnlyState) {
+    return {
+      title: "Billing / Closeout",
+      summary: "Review billing, closeout, and history from the standard job view.",
+      actionLabel: "Review job history",
+      hrefAnchor: "mobile-tools",
+      statusLabel: "Read-only",
+    };
+  }
+
+  if (props.isEccComplianceActive) {
     return {
       title: "Billing / Closeout",
       summary: "No billing action needed yet.",
@@ -536,33 +558,33 @@ function buildBillingPreview(props: {
     };
   }
 
-  if (hasInvoiceAttention) {
-    return {
-      title: props.jobPageInvoiceStateLabel || "Billing review",
-      summary:
-        props.jobPageInvoiceSummaryText ||
-        "Review the invoice or billing requirements for this job.",
-      actionLabel: props.jobPageInvoiceNextAction || "Review billing",
-      hrefAnchor: "mobile-invoice-summary-card",
-      statusLabel: props.internalInvoiceTruth ? "Invoice active" : "Invoice needed",
-    };
-  }
-
   if (hasExternalBillingAttention) {
     return {
-      title: "External billing needed",
-      summary: "Mark external billing complete when billing is finished.",
-      actionLabel: "Open billing action",
+      title: "External billing review",
+      summary: "Confirm external billing before closeout.",
+      actionLabel: "Review external billing",
       hrefAnchor: "mobile-next-service-action",
       statusLabel: "Action needed",
     };
   }
 
+  if (hasInvoiceAttention) {
+    return {
+      title: props.internalInvoiceTruth ? "Review invoice" : props.jobPageInvoiceStateLabel || "Billing review",
+      summary:
+        props.jobPageInvoiceSummaryText ||
+        "Review the invoice or billing requirements for this job.",
+      actionLabel: props.jobPageInvoiceNextAction || "Review invoice",
+      hrefAnchor: "mobile-invoice-summary-card",
+      statusLabel: props.internalInvoiceTruth ? "Invoice active" : "Invoice needed",
+    };
+  }
+
   if (hasCloseoutAttention) {
     return {
-      title: "Closeout attention",
+      title: "Closeout review",
       summary: "Review the remaining closeout items for this job.",
-      actionLabel: "Open closeout",
+      actionLabel: "Review closeout",
       hrefAnchor: "mobile-next-service-action",
       statusLabel: "Review",
     };
@@ -683,6 +705,16 @@ export default function MobileJobDetailV2Preview(props: any) {
     confirmedNextDueContext,
   } = props;
 
+  const normalizedStatus = String(job?.status ?? "").trim().toLowerCase();
+  const normalizedOpsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+  const isReadOnlyState =
+    normalizedOpsStatus === "archived" ||
+    normalizedOpsStatus === "closed" ||
+    normalizedStatus === "cancelled" ||
+    Boolean(job?.deleted_at);
+  const hasRequiredEccTestAttention =
+    String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job);
+
   const lifecycle = buildLifecyclePreview({
     job,
     isFieldComplete,
@@ -694,21 +726,28 @@ export default function MobileJobDetailV2Preview(props: any) {
     showLinkedRetestCreated,
   });
   const nextStep = buildNextStepPreview({
+    billingState,
+    closeoutNeeds,
     job,
+    internalInvoiceTruth,
     isFieldComplete,
     isEccPermitNeededActive,
     showPrimaryCloseoutBlockers,
     showConfirmRetestReady,
     showRetestSection,
     isServiceFieldFollowUpPendingInfo,
+    showExternalDataEntryPrompt,
+    showInternalInvoicePanel,
+    showInternalInvoicingPlaceholder,
+    showMobileInvoiceOpenAttention,
     showMobileServiceInvoiceFieldAction,
     showMobileEccTestAction,
+    jobPageInvoiceNextAction,
+    jobPageInvoiceSummaryText,
     primaryCloseoutMessage,
     serviceFollowUpProgressState,
     surfaceProfile,
-    closeoutNeeds,
-    hasRequiredEccTestAttention:
-      String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job),
+    hasRequiredEccTestAttention,
     activeWaitingState,
     failedReasonBannerText,
     isHistoricalServiceFollowUpContinued,
@@ -738,7 +777,10 @@ export default function MobileJobDetailV2Preview(props: any) {
     ? nextStep.href
     : standardJobHref;
   const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
-  const normalizedOpsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+  const isEccComplianceActive =
+    isEcc &&
+    !isReadOnlyState &&
+    (!isFieldComplete || hasRequiredEccTestAttention || isEccPermitNeededActive || Boolean(closeoutNeeds?.needsCerts));
   const isEccFailedReviewState =
     isEcc && (normalizedOpsStatus === "failed" || normalizedOpsStatus === "pending_office_review");
   const isEccRetestNeededState = isEcc && normalizedOpsStatus === "retest_needed";
@@ -756,7 +798,9 @@ export default function MobileJobDetailV2Preview(props: any) {
     showMobileServiceInvoiceFieldAction,
     showPrimaryCloseoutBlockers,
     isEcc,
+    isEccComplianceActive,
     isFieldComplete,
+    isReadOnlyState,
   });
   const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);
   const heroPreviewClassName =
@@ -1127,12 +1171,14 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <span className={previewPillClass}>Open</span>
                   </Link>
                 ) : null}
-                <Link href={standardJobAnchorHref("mobile-tools")} className={previewRowClass}>
+                <Link href={standardJobAnchorHref("mobile-permit-info")} className={previewRowClass}>
                   <span className={previewRowTextClass}>
-                    <span className="block font-semibold text-slate-950">Permit Info</span>
-                    <span className="block text-sm text-slate-600">Review permit details and actions</span>
+                    <span className="block font-semibold text-slate-950">Permit Information</span>
+                    <span className="block text-sm text-slate-600">
+                      {isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"}
+                    </span>
                   </span>
-                  <span className={previewPillClass}>Status</span>
+                  <span className={previewPillClass}>{isEccPermitNeededActive ? "Needed" : "Status"}</span>
                 </Link>
               </>
             ) : (

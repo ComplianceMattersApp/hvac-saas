@@ -179,14 +179,41 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('"This service job is waiting on follow-up before normal field work can continue."');
     expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-next-service-action"');
     expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: nextActionLabel || "Open follow-up tools"');
-    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "Service closeout"');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: "Review service billing"');
+    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: isService ? "Service closeout" : "Billing closeout"');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: props.internalInvoiceTruth ? "Review invoice" : "Billing review"');
     expect(mobileJobDetailV2PreviewSource).toContain('"The field visit is complete. Build or review billing so closeout can continue."');
     expect(mobileJobDetailV2PreviewSource).toContain('title: isEcc ? "Review compliance closeout" : "Review service closeout"');
     expect(mobileJobDetailV2PreviewSource).toContain('"Field work is complete. Review work performed, notes, and any billing or closeout items below."');
     expect(mobileJobDetailV2PreviewSource).not.toContain("<FieldOutcomePanel");
     expect(mobileJobDetailV2PreviewSource).not.toContain("form action={markJobPartsNeededFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("form action={markJobApprovalNeededFromForm}");
+  });
+
+  it("hardens V2 permit, billing, external billing, and closeout blockers without duplicating forms", () => {
+    const requiredTestsIndex = mobileJobDetailV2PreviewSource.indexOf('title: "Complete required tests"');
+    const permitIndex = mobileJobDetailV2PreviewSource.indexOf('title: "Permit needed"');
+    const externalBillingIndex = mobileJobDetailV2PreviewSource.indexOf('title: "External billing review"');
+    const invoiceIndex = mobileJobDetailV2PreviewSource.indexOf('title: props.internalInvoiceTruth ? "Review invoice" : "Billing review"');
+
+    expect(requiredTestsIndex).toBeGreaterThan(-1);
+    expect(permitIndex).toBeGreaterThan(requiredTestsIndex);
+    expect(externalBillingIndex).toBeGreaterThan(permitIndex);
+    expect(invoiceIndex).toBeGreaterThan(externalBillingIndex);
+    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "Permit blocker"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Add or review permit details before closeout."');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review permit info"');
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-permit-info")');
+    expect(mobileJobDetailV2PreviewSource).toContain('isEccComplianceActive');
+    expect(mobileJobDetailV2PreviewSource).toContain('!isFieldComplete || hasRequiredEccTestAttention || isEccPermitNeededActive || Boolean(closeoutNeeds?.needsCerts)');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Confirm external billing before closeout."');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review external billing"');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: "Closeout review"');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review closeout"');
+    expect(mobileJobDetailV2PreviewSource).toContain('isReadOnlyState');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Review billing, closeout, and history from the standard job view."');
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markEccPermitAvailableFromForm}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markInvoiceCompleteFromForm}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={completeDataEntryFromForm}");
   });
 
   it("hardens ECC failed, correction-review, and retest states without duplicating forms", () => {
