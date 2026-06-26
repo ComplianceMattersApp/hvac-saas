@@ -588,7 +588,7 @@ export async function addCustomerLocationEquipmentFromForm(formData: FormData) {
   const customerId = readTrimmed(formData, "customer_id");
   const locationId = readTrimmed(formData, "location_id");
   const systemId = readTrimmed(formData, "system_id");
-  const rawEquipmentType = readTrimmed(formData, "equipment_type");
+  const rawEquipmentType = readTrimmed(formData, "equipment_role") || readTrimmed(formData, "equipment_type");
   const equipmentType = mapToCanonicalRole(rawEquipmentType || "other");
   const manufacturer = readTrimmed(formData, "manufacturer");
   const model = readTrimmed(formData, "model");

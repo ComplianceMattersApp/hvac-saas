@@ -7,7 +7,6 @@ import {
 } from "@/lib/customers/visibility";
 import {
   addCustomerServiceLocationFromForm,
-  addCustomerLocationEquipmentFromForm,
   addCustomerLocationSystemFromForm,
   archiveCustomerFromForm,
   updateCustomerNotesFromForm,
@@ -84,8 +83,9 @@ import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/li
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
-import { EQUIPMENT_ROLE_OPTIONS, equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
+import { equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
+import ProfileEquipmentCreateForm from "./_components/ProfileEquipmentCreateForm";
 
 
 type CustomerRow = {
@@ -2578,37 +2578,11 @@ export default async function CustomerDetailPage(props: {
                               {!system.sourceJob ? (
                               <details className="w-full rounded-lg border border-slate-200 bg-white p-3 sm:w-72">
                                 <summary className="cursor-pointer text-xs font-semibold text-slate-800">Add Equipment</summary>
-                                <form action={addCustomerLocationEquipmentFromForm} className="mt-3 space-y-3">
-                                  <input type="hidden" name="customer_id" value={customerId} />
-                                  <input type="hidden" name="location_id" value={location.id} />
-                                  <input type="hidden" name="system_id" value={system.id.replace(/^profile:/, "")} />
-                                  <div>
-                                    <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={`equipment-type-${system.id}`}>
-                                      Equipment type
-                                    </label>
-                                    <select
-                                      id={`equipment-type-${system.id}`}
-                                      name="equipment_type"
-                                      required
-                                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                                      defaultValue="outdoor_unit"
-                                    >
-                                      {EQUIPMENT_ROLE_OPTIONS.map((option) => (
-                                        <option key={option.value} value={option.value}>
-                                          {option.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    <input name="manufacturer" className="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Manufacturer" />
-                                    <input name="model" className="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Model" />
-                                    <input name="serial" className="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2" placeholder="Serial" />
-                                  </div>
-                                  <button className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
-                                    Add Equipment
-                                  </button>
-                                </form>
+                                <ProfileEquipmentCreateForm
+                                  customerId={customerId}
+                                  locationId={location.id}
+                                  systemId={system.id.replace(/^profile:/, "")}
+                                />
                               </details>
                               ) : null}
                               {system.sourceJob ? (

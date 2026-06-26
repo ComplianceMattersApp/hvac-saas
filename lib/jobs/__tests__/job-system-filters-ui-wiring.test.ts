@@ -32,6 +32,11 @@ const equipmentCreateFormSource = readFileSync(
   "utf8",
 );
 
+const equipmentCreateFormFieldsSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/EquipmentCreateFormFields.tsx"),
+  "utf8",
+);
+
 const systemLocationPickerSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/SystemLocationPicker.tsx"),
   "utf8",
@@ -91,23 +96,24 @@ describe("job equipment system filter management wiring", () => {
   });
 
   it("offers Filter in the add selector and routes it to system filter creation", () => {
-    expect(equipmentCreateFormSource).toContain("Add Equipment or Filter");
-    expect(equipmentCreateFormSource).toContain('const FILTER_ROLE_VALUE = "__system_filter__";');
-    expect(equipmentCreateFormSource).toContain('<option value={FILTER_ROLE_VALUE}>Filter</option>');
-    expect(equipmentCreateFormSource).toContain("addingFilter ? addSystemFilterFromForm : addJobEquipmentFromForm");
-    expect(equipmentCreateFormSource).toContain("Filter Details");
-    expect(equipmentCreateFormSource).toContain("Filter location");
-    expect(equipmentCreateFormSource).toContain("Date changed");
-    expect(equipmentCreateFormSource).toContain('name="height"');
-    expect(equipmentCreateFormSource).toContain('{addingFilter ? "Add Filter" : "Add Equipment"}');
-    expect(equipmentCreateFormSource).not.toContain('value: "filter"');
+    expect(equipmentCreateFormFieldsSource).toContain("Add Equipment or Filter");
+    expect(equipmentCreateFormFieldsSource).toContain('FILTER_ROLE_VALUE = "__system_filter__";');
+    expect(equipmentCreateFormFieldsSource).toContain('<option value={FILTER_ROLE_VALUE}>Filter</option>');
+    expect(equipmentCreateFormSource).toContain("role === FILTER_ROLE_VALUE ? addSystemFilterFromForm : addJobEquipmentFromForm");
+    expect(equipmentCreateFormFieldsSource).toContain("Filter Details");
+    expect(equipmentCreateFormFieldsSource).toContain("Filter location");
+    expect(equipmentCreateFormFieldsSource).toContain("Date changed");
+    expect(equipmentCreateFormFieldsSource).toContain('name="height"');
+    expect(equipmentCreateFormFieldsSource).toContain('{addingFilter ? "Add Filter" : "Add Equipment"}');
+    expect(equipmentCreateFormFieldsSource).not.toContain('value: "filter"');
   });
 
   it("preserves normal equipment create routing and submits selected system context", () => {
     expect(equipmentCreateFormSource).toContain("addJobEquipmentFromForm");
-    expect(equipmentCreateFormSource).toContain("Product Details");
-    expect(equipmentCreateFormSource).toContain('name="manufacturer"');
-    expect(equipmentCreateFormSource).toContain('name="serial"');
+    expect(equipmentCreateFormSource).toContain("<EquipmentCreateFormFields");
+    expect(equipmentCreateFormFieldsSource).toContain("Product Details");
+    expect(equipmentCreateFormFieldsSource).toContain('name="manufacturer"');
+    expect(equipmentCreateFormFieldsSource).toContain('name="serial"');
     expect(systemLocationPickerSource).toContain('name="system_id"');
     expect(systemLocationPickerSource).toContain('name="system_location"');
     expect(jobActionsSource).toContain('formData.get("system_location") || formData.get("system_location_choice")');

@@ -232,7 +232,7 @@ describe("customer detail relationship hub wiring", () => {
     );
     expect(customerPageSource).toContain("No systems or equipment saved for this property yet.");
     expect(customerPageSource).toContain("addCustomerLocationSystemFromForm");
-    expect(customerPageSource).toContain("addCustomerLocationEquipmentFromForm");
+    expect(customerPageSource).toContain("ProfileEquipmentCreateForm");
     expect(customerPageSource).toContain("Add System");
     expect(customerPageSource).toContain("Add Equipment");
     expect(customerPageSource).toContain("System added");
@@ -250,7 +250,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/equipment`}');
     expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}');
     expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}`}');
-    expect(systemsEquipmentTabSource).not.toContain("EquipmentCreateForm");
+    expect(systemsEquipmentTabSource).not.toContain("<EquipmentCreateForm");
     expect(systemsEquipmentTabSource).not.toContain("EquipmentEditCard");
     expect(systemsEquipmentTabSource).not.toContain("addJobEquipmentFromForm");
     expect(systemsEquipmentTabSource).not.toContain("updateJobEquipmentFromForm");

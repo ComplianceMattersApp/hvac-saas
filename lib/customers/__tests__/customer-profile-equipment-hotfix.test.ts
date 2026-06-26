@@ -17,6 +17,16 @@ const customerPageSource = readFileSync(
   "utf8",
 );
 
+const profileEquipmentCreateFormSource = readFileSync(
+  resolve(__dirname, "../../../app/customers/[id]/_components/ProfileEquipmentCreateForm.tsx"),
+  "utf8",
+);
+
+const equipmentCreateFormFieldsSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/EquipmentCreateFormFields.tsx"),
+  "utf8",
+);
+
 const jobInfoPageSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/info/page.tsx"),
   "utf8",
@@ -59,12 +69,24 @@ describe("customer profile equipment hotfix", () => {
 
   it("wires profile-owned CTAs without replacing the existing job equipment flow", () => {
     expect(customerPageSource).toContain("addCustomerLocationSystemFromForm");
-    expect(customerPageSource).toContain("addCustomerLocationEquipmentFromForm");
+    expect(customerPageSource).toContain("ProfileEquipmentCreateForm");
+    expect(profileEquipmentCreateFormSource).toContain("addCustomerLocationEquipmentFromForm");
+    expect(profileEquipmentCreateFormSource).toContain("EquipmentCreateFormFields");
+    expect(profileEquipmentCreateFormSource).toContain('name="customer_id"');
+    expect(profileEquipmentCreateFormSource).toContain('name="location_id"');
+    expect(profileEquipmentCreateFormSource).toContain('name="system_id"');
+    expect(profileEquipmentCreateFormSource).toContain("includeFilterOption={false}");
+    expect(equipmentCreateFormFieldsSource).toContain("System Item Type");
+    expect(equipmentCreateFormFieldsSource).toContain("Product Details");
+    expect(equipmentCreateFormFieldsSource).toContain('name="equipment_role"');
+    expect(equipmentCreateFormFieldsSource).toContain('name="manufacturer"');
+    expect(equipmentCreateFormFieldsSource).toContain('name="serial"');
     expect(customerPageSource).toContain("Saved property equipment");
     expect(customerPageSource).toContain("No systems or equipment saved for this property yet.");
     expect(customerPageSource).toContain('href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}');
 
     expect(jobEquipmentCreateFormSource).toContain("addJobEquipmentFromForm");
+    expect(jobEquipmentCreateFormSource).toContain("EquipmentCreateFormFields");
     expect(jobInfoPageSource).toContain("<EquipmentCreateForm");
     expect(jobInfoPageSource).toContain('focused === "equipment"');
   });
