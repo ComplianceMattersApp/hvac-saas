@@ -10,6 +10,7 @@ import EccLivePreview from "@/components/jobs/EccLivePreview";
 import DuctLeakageEntryFields from "@/components/jobs/DuctLeakageEntryFields";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
 import RefrigerantChargeExceptionFields from "@/components/jobs/RefrigerantChargeExceptionFields";
+import RefrigerantEvidenceImage from "@/components/jobs/RefrigerantEvidenceImage";
 import RefrigerantChargeInlinePreview from "@/components/jobs/RefrigerantChargeInlinePreview";
 import RefrigerantChargePhotoEvidencePanel from "@/components/jobs/RefrigerantChargePhotoEvidencePanel";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
@@ -62,8 +63,7 @@ import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
-  REFRIGERANT_CHARGE_ATTACHMENT_TAG,
-  stripRefrigerantChargeEvidenceTag,
+  listJobRefrigerantChargeEvidenceImages,
 } from "@/lib/jobs/refrigerant-charge-evidence";
 
 function getEffectiveResultLabel(t: any) {
@@ -1078,68 +1078,20 @@ export default async function JobTestsPage({
   let refrigerantEvidenceAttachments: Array<{
     id: string;
     fileName: string;
+    contentType: string | null;
     uploadedAt: string;
+    uploadedBy: string | null;
     caption: string | null;
     signedUrl: string | null;
   }> = [];
 
-  if (focusedType === "refrigerant_charge") {
-    const { data: evidenceRows, error: evidenceErr } = await supabase
-      .from("attachments")
-      .select("id, bucket, storage_path, file_name, caption, created_at")
-      .eq("entity_type", "job")
-      .eq("entity_id", id)
-      .ilike("caption", `${REFRIGERANT_CHARGE_ATTACHMENT_TAG}%`)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    if (evidenceErr) throw evidenceErr;
-
-    if (Array.isArray(evidenceRows) && evidenceRows.length) {
-      const attachmentAdmin = createAdminClient();
-      const signedEvidence = await Promise.all(
-        evidenceRows.map(async (row: any) => {
-          const bucket = String(row?.bucket ?? "").trim();
-          const storagePath = String(row?.storage_path ?? "")
-            .trim()
-            .replace(/^\/+/, "");
-
-          if (!bucket || !storagePath) {
-            return {
-              id: String(row?.id ?? "").trim(),
-              fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
-              uploadedAt: String(row?.created_at ?? "").trim(),
-              caption: stripRefrigerantChargeEvidenceTag(row?.caption),
-              signedUrl: null,
-            };
-          }
-
-          const { data: signed, error: signErr } = await attachmentAdmin.storage
-            .from(bucket)
-            .createSignedUrl(storagePath, 60 * 60);
-
-          if (signErr || !signed?.signedUrl) {
-            return {
-              id: String(row?.id ?? "").trim(),
-              fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
-              uploadedAt: String(row?.created_at ?? "").trim(),
-              caption: stripRefrigerantChargeEvidenceTag(row?.caption),
-              signedUrl: null,
-            };
-          }
-
-          return {
-            id: String(row?.id ?? "").trim(),
-            fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
-            uploadedAt: String(row?.created_at ?? "").trim(),
-            caption: stripRefrigerantChargeEvidenceTag(row?.caption),
-            signedUrl: signed.signedUrl,
-          };
-        })
-      );
-
-      refrigerantEvidenceAttachments = signedEvidence.filter((row) => Boolean(row.id));
-    }
+  if (focusedType === "refrigerant_charge" || isCompletionReportFocused) {
+    refrigerantEvidenceAttachments = await listJobRefrigerantChargeEvidenceImages({
+      supabase,
+      admin: createAdminClient(),
+      jobId: id,
+      limit: 20,
+    });
   }
 
   const scenarioResult = resolveEccScenario({
@@ -1681,6 +1633,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       systemLocationLabel: systemLocations.length ? systemLocations.join("; ") : "—",
     };
   });
+  const refrigerantEvidenceReportSystemId =
+    systemSummaries.find((sys) => sys.showRefrigerantReport)?.systemId ?? "";
 
     return (
       <div className={eccPageShellClass}>
@@ -2359,6 +2313,45 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         </div>
                       </>
                     )}
+                    {sys.systemId === refrigerantEvidenceReportSystemId && refrigerantEvidenceAttachments.length > 0 ? (
+                      <div className="break-inside-avoid space-y-2 rounded-md border border-slate-200 bg-white p-3 print:rounded-none print:border-slate-400 print:p-2.5">
+                        <div>
+                          <div className="text-sm font-bold text-slate-950 print:text-[12px]">
+                            Refrigerant Charge Evidence
+                          </div>
+                          <div className="text-xs text-slate-700 print:text-[11px]">
+                            Photo evidence attached for refrigerant-side measurements.
+                          </div>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2 print:grid-cols-2">
+                          {refrigerantEvidenceAttachments.map((attachment) => {
+                            const uploadedAtLabel = formatBusinessDateTimeUS(attachment.uploadedAt);
+                            const caption = attachment.caption || attachment.fileName;
+                            return (
+                              <figure
+                                key={attachment.id}
+                                className="break-inside-avoid space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2 print:rounded-none print:border-slate-300 print:bg-white"
+                              >
+                                <RefrigerantEvidenceImage
+                                  src={attachment.signedUrl}
+                                  alt={`Refrigerant charge evidence photo: ${caption}`}
+                                />
+                                <figcaption className="space-y-0.5 text-xs text-slate-700 print:text-[10px]">
+                                  <div className="break-words font-semibold text-slate-900">
+                                    {caption}
+                                  </div>
+                                  <div className="break-all">{attachment.fileName}</div>
+                                  <div>
+                                    {uploadedAtLabel ? `Uploaded ${uploadedAtLabel}` : "Upload date unavailable"}
+                                    {attachment.uploadedBy ? ` by ${attachment.uploadedBy}` : ""}
+                                  </div>
+                                </figcaption>
+                              </figure>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                   ) : null}
                 </div>
