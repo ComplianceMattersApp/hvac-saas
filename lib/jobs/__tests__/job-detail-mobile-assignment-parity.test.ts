@@ -68,6 +68,16 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}#');
   });
 
+  it("does not treat ECC test availability as required test attention in the V2 preview", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain("function hasCompletedEccTestRun");
+    expect(mobileJobDetailV2PreviewSource).toContain('String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job)');
+    expect(mobileJobDetailV2PreviewSource).toContain("hasRequiredEccTestAttention: boolean");
+    expect(mobileJobDetailV2PreviewSource).toContain("props.hasRequiredEccTestAttention");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("!props.isFieldComplete ||\n      props.showMobileEccTestAction");
+    expect(mobileJobDetailV2PreviewSource).toContain("Open test workflow");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Open the required test workflow");
+  });
+
   it("exposes mobile assignment controls in the visible Team Assignment card", () => {
     const mobilePanelStart = mobileJobDetailCurrentSource.indexOf("<AssignedTeamControls", mobileJobDetailCurrentSource.indexOf("Contact Logging"));
     const mobilePanelEnd = mobileJobDetailCurrentSource.indexOf("showMobileContractorContext", mobilePanelStart);

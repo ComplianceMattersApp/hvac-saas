@@ -98,6 +98,11 @@ function getNoteSignalLabel(message: string | undefined) {
   return String(message ?? "").trim() ? "New" : "";
 }
 
+function hasCompletedEccTestRun(job: any) {
+  const runs = Array.isArray(job?.ecc_test_runs) ? job.ecc_test_runs : [];
+  return runs.some((run: any) => run?.is_completed === true);
+}
+
 function buildNextStepPreview(props: {
   job: any;
   isFieldComplete: boolean;
@@ -112,6 +117,7 @@ function buildNextStepPreview(props: {
   serviceFollowUpProgressState: any;
   surfaceProfile: any;
   closeoutNeeds: any;
+  hasRequiredEccTestAttention: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
   const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
@@ -121,7 +127,7 @@ function buildNextStepPreview(props: {
   const isActiveEccWork =
     isEcc &&
     (!props.isFieldComplete ||
-      props.showMobileEccTestAction ||
+      props.hasRequiredEccTestAttention ||
       props.isEccPermitNeededActive ||
       Boolean(props.closeoutNeeds?.needsCerts));
 
@@ -180,7 +186,7 @@ function buildNextStepPreview(props: {
     };
   }
 
-  if (isActiveEccWork && props.showMobileEccTestAction) {
+  if (isActiveEccWork && props.showMobileEccTestAction && props.hasRequiredEccTestAttention) {
     return {
       eyebrow: "Compliance work",
       title: "Complete required tests",
@@ -420,6 +426,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     showPrimaryCloseoutBlockers,
     showRetestSection,
     showSharedNotesCard,
+    sp,
     SubmitButton,
     surfaceProfile,
     Suspense,
@@ -456,6 +463,8 @@ export default function MobileJobDetailV2Preview(props: any) {
     serviceFollowUpProgressState,
     surfaceProfile,
     closeoutNeeds,
+    hasRequiredEccTestAttention:
+      String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job),
   });
   const standardJobHref = `/jobs/${job.id}?tab=${tab}`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
@@ -754,7 +763,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                   <Link href={`/jobs/${job.id}/tests`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
                     <span>
                       <span className="block font-semibold text-slate-950">ECC Tests</span>
-                      <span className="block text-sm text-slate-600">Open the required test workflow</span>
+                      <span className="block text-sm text-slate-600">Open test workflow</span>
                     </span>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
                   </Link>
