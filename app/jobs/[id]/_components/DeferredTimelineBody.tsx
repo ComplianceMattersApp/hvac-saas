@@ -19,8 +19,45 @@ type DeferredTimelineBodyProps = {
   jobSummary: JobHistorySummaryJobInput;
 };
 
+const DEFERRED_TIMELINE_SOFT_TIMEOUT_MS = 3500;
+
 const UUID_PATTERN =
   /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+
+class DeferredTimelineSoftTimeoutError extends Error {
+  constructor(operation: string) {
+    super(`${operation} exceeded ${DEFERRED_TIMELINE_SOFT_TIMEOUT_MS}ms`);
+    this.name = "DeferredTimelineSoftTimeoutError";
+  }
+}
+
+async function withDeferredTimelineSoftTimeout<T>(
+  operation: string,
+  run: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+
+  return await new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      controller.abort();
+      reject(new DeferredTimelineSoftTimeoutError(operation));
+    }, DEFERRED_TIMELINE_SOFT_TIMEOUT_MS);
+
+    run(controller.signal)
+      .then(resolve, reject)
+      .finally(() => clearTimeout(timeout));
+  });
+}
+
+function withAbortSignal<T>(query: T, signal: AbortSignal): T {
+  const maybeAbortableQuery = query as T & {
+    abortSignal?: (abortSignal: AbortSignal) => T;
+  };
+
+  return typeof maybeAbortableQuery.abortSignal === "function"
+    ? maybeAbortableQuery.abortSignal(signal)
+    : query;
+}
 
 function sanitizeStoryLine(value: string): string {
   const normalized = String(value ?? "").trim();
@@ -430,12 +467,17 @@ export default async function DeferredTimelineBody({
 
     const narrativeScopeJobIds = timelineJobIds.length ? timelineJobIds : [jobId];
 
-    const { data: timelineEvents, error: timelineErr } = await supabase
-      .from("job_events")
-      .select("id, job_id, created_at, event_type, message, meta, user_id")
-      .in("job_id", narrativeScopeJobIds)
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const { data: timelineEvents, error: timelineErr } =
+      await withDeferredTimelineSoftTimeout("timeline job_events read", async (signal) => {
+        const query = supabase
+          .from("job_events")
+          .select("id, job_id, created_at, event_type, message, meta, user_id")
+          .in("job_id", narrativeScopeJobIds)
+          .order("created_at", { ascending: false })
+          .limit(200);
+
+        return await withAbortSignal(query, signal);
+      });
 
     if (timelineErr) {
       throw new Error(timelineErr.message);
@@ -448,12 +490,17 @@ export default async function DeferredTimelineBody({
 
     let linkedJobs: JobHistorySummaryLinkedJobInput[] = [];
     if (hasRetestHistory) {
-      const { data: linkedRows, error: linkedErr } = await supabase
-        .from("jobs")
-        .select("id, status, ops_status, parent_job_id")
-        .eq("parent_job_id", jobId)
-        .order("created_at", { ascending: false })
-        .limit(20);
+      const { data: linkedRows, error: linkedErr } =
+        await withDeferredTimelineSoftTimeout("timeline linked jobs read", async (signal) => {
+          const query = supabase
+            .from("jobs")
+            .select("id, status, ops_status, parent_job_id")
+            .eq("parent_job_id", jobId)
+            .order("created_at", { ascending: false })
+            .limit(20);
+
+          return await withAbortSignal(query, signal);
+        });
 
       if (linkedErr) {
         throw new Error(linkedErr.message);
@@ -515,10 +562,12 @@ export default async function DeferredTimelineBody({
 
     const actorDisplayMap =
       timelineActorIds.length > 0
-        ? await resolveUserDisplayMap({
-            supabase,
-            userIds: timelineActorIds,
-          })
+        ? await withDeferredTimelineSoftTimeout("timeline actor display read", async () =>
+            resolveUserDisplayMap({
+              supabase,
+              userIds: timelineActorIds,
+            }),
+          )
         : {};
 
     return (

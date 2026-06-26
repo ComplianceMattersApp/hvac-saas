@@ -91,6 +91,42 @@ function buildSupabaseClient(
   };
 }
 
+function buildHangingTimelineSupabaseClient(calls: Array<{ method: string; args: unknown[] }>) {
+  return {
+    from: vi.fn((table: string) => {
+      if (table !== "job_events") {
+        throw new Error(`Unexpected table ${table}`);
+      }
+
+      const query: any = {
+        select: (...args: unknown[]) => {
+          calls.push({ method: "select", args });
+          return query;
+        },
+        in: (...args: unknown[]) => {
+          calls.push({ method: "in", args });
+          return query;
+        },
+        order: (...args: unknown[]) => {
+          calls.push({ method: "order", args });
+          return query;
+        },
+        limit: (...args: unknown[]) => {
+          calls.push({ method: "limit", args });
+          return query;
+        },
+        abortSignal: (...args: unknown[]) => {
+          calls.push({ method: "abortSignal", args });
+          return query;
+        },
+        then: () => new Promise(() => undefined),
+      };
+
+      return query;
+    }),
+  };
+}
+
 describe("job detail deferred narrative fail-open behavior", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -178,6 +214,35 @@ describe("job detail deferred narrative fail-open behavior", () => {
 
     expect(html).toContain("Section temporarily unavailable");
     expect(html).toContain("Timeline is temporarily unavailable");
+  });
+
+  it("returns an isolated fallback when timeline query exceeds the local soft timeout", async () => {
+    vi.useFakeTimers();
+    const calls: Array<{ method: string; args: unknown[] }> = [];
+
+    createClientMock.mockResolvedValue(buildHangingTimelineSupabaseClient(calls));
+
+    try {
+      const renderPromise = DeferredTimelineBody({
+        jobId: "job-1",
+        timelineJobIds: ["job-1", "job-2"],
+        hasDirectNarrativeChain: true,
+        emptyStateClassName: "empty-state",
+        jobSummary: baseJobSummary,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(3500);
+
+      const jsx = await renderPromise;
+      const html = renderToStaticMarkup(jsx);
+
+      expect(html).toContain("Section temporarily unavailable");
+      expect(html).toContain("Timeline is temporarily unavailable");
+      expect(calls.some((call) => call.method === "abortSignal")).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("renders job history summary card while keeping detailed timeline entries", async () => {
