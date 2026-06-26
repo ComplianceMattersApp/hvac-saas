@@ -7,6 +7,13 @@ const source = readFileSync(
   "utf8",
 );
 
+const mobileJobDetailCurrentSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
+  "utf8",
+);
+
+const jobDetailAndCurrentMobileSource = `${source}\n${mobileJobDetailCurrentSource}`;
+
 describe("job detail field billing panel wiring", () => {
   it("attaches invoice readiness to the Work Items flow", () => {
     const workInvoiceIndex = source.indexOf("Work & Invoice");
@@ -24,7 +31,7 @@ describe("job detail field billing panel wiring", () => {
 
   it("labels the job Work Items editor as an add/update surface", () => {
     expect(source).toContain('{hasVisitScopeDefined ? "Add or Update Work" : "Add Work"}');
-    expect(source).not.toContain("Edit Work Items");
+    expect(jobDetailAndCurrentMobileSource).not.toContain("Edit Work Items");
   });
 
   it("keeps the separate Field Billing Summary only for non-duplicate details", () => {
@@ -110,8 +117,8 @@ describe("job detail field billing panel wiring", () => {
   });
 
   it("routes Create Invoice directly to the invoice workspace after draft creation", () => {
-    const noInvoicePanelIndex = source.indexOf('internalInvoiceTruth ? jobPageInvoiceNextAction : "Create invoice"');
-    const noInvoicePanelSlice = source.slice(noInvoicePanelIndex, noInvoicePanelIndex + 1400);
+    const noInvoicePanelIndex = mobileJobDetailCurrentSource.indexOf('internalInvoiceTruth ? jobPageInvoiceNextAction : "Create invoice"');
+    const noInvoicePanelSlice = mobileJobDetailCurrentSource.slice(noInvoicePanelIndex, noInvoicePanelIndex + 1400);
 
     expect(noInvoicePanelIndex).toBeGreaterThanOrEqual(0);
     expect(noInvoicePanelSlice).toContain("createInternalInvoiceDraftFromForm");
@@ -123,16 +130,15 @@ describe("job detail field billing panel wiring", () => {
   });
 
   it("uses direct draft creation for invoice-required job detail CTAs instead of a button-to-button link", () => {
-    const mobileCloseoutIndex = source.indexOf("{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (");
-    const mobileCloseoutSlice = source.slice(mobileCloseoutIndex, mobileCloseoutIndex + 1400);
+    const mobileCloseoutIndex = mobileJobDetailCurrentSource.indexOf("{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (");
+    const mobileCloseoutSlice = mobileJobDetailCurrentSource.slice(mobileCloseoutIndex, mobileCloseoutIndex + 1400);
     const desktopCloseoutIndex = source.indexOf(
       "{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (",
-      mobileCloseoutIndex + 1,
     );
     const desktopCloseoutSlice = source.slice(desktopCloseoutIndex, desktopCloseoutIndex + 1400);
 
     expect(mobileCloseoutIndex).toBeGreaterThanOrEqual(0);
-    expect(desktopCloseoutIndex).toBeGreaterThan(mobileCloseoutIndex);
+    expect(desktopCloseoutIndex).toBeGreaterThanOrEqual(0);
 
     for (const closeoutSlice of [mobileCloseoutSlice, desktopCloseoutSlice]) {
       expect(closeoutSlice).toContain("internalInvoiceTruth ? (");
@@ -165,8 +171,8 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("Work captured: ${formatCurrencyFromCents(eligibleUnaddedPricedWorkItemsTotalCents)}");
     expect(source).toContain("Work Item pricing is ready to add as editable draft invoice charges. Review and edit before issuing.");
     expect(source).toContain("Price ${Number(item.expected_unit_price).toFixed(2)}");
-    expect(source).toContain("Create invoice");
-    expect(source).not.toContain("Resolve $0 Invoice");
+    expect(jobDetailAndCurrentMobileSource).toContain("Create invoice");
+    expect(jobDetailAndCurrentMobileSource).not.toContain("Resolve $0 Invoice");
   });
 
   it("gates the top invoice-required banner on billing closeout state instead of missing invoice alone", () => {

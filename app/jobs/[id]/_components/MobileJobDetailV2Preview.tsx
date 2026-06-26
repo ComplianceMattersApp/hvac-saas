@@ -1,0 +1,608 @@
+// app/jobs/[id]/_components/MobileJobDetailV2Preview
+
+function buildLifecyclePreview(props: {
+  job: any;
+  isFieldComplete: boolean;
+  billingState: any;
+  closeoutNeeds: any;
+}) {
+  const status = String(props.job?.status ?? "").trim().toLowerCase();
+  const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
+  const isEcc = String(props.job?.job_type ?? "").trim().toLowerCase() === "ecc";
+  const isClosed =
+    opsStatus === "closed" ||
+    status === "cancelled" ||
+    opsStatus === "archived" ||
+    Boolean(props.billingState?.billedTruthSatisfied && (!isEcc || props.job?.certs_complete));
+  const attentionStatuses = new Set([
+    "pending_info",
+    "waiting",
+    "on_hold",
+    "failed",
+    "pending_office_review",
+    "retest_needed",
+    "need_to_schedule",
+    "cancelled",
+    "archived",
+  ]);
+  const hasAttentionState = attentionStatuses.has(opsStatus) || attentionStatuses.has(status);
+
+  const activeKey = isClosed
+    ? "closeout"
+    : props.isFieldComplete || status === "completed"
+    ? "field_done"
+    : status === "in_process" || opsStatus === "in_process"
+    ? "in_progress"
+    : status === "on_the_way" || opsStatus === "on_the_way"
+    ? "on_the_way"
+    : "scheduled";
+
+  const stages = [
+    { key: "scheduled", label: "Scheduled" },
+    { key: "on_the_way", label: "On the way" },
+    { key: "in_progress", label: "In progress" },
+    { key: "field_done", label: "Field done" },
+    { key: "closeout", label: "Closeout" },
+  ];
+  const activeIndex = stages.findIndex((stage) => stage.key === activeKey);
+
+  const attentionLabel = hasAttentionState
+    ? opsStatus === "pending_info" || opsStatus === "waiting"
+      ? "Paused for information"
+      : opsStatus === "on_hold"
+      ? "On hold"
+      : opsStatus === "failed" || opsStatus === "pending_office_review"
+      ? "Needs review"
+      : opsStatus === "retest_needed"
+      ? "Retest needed"
+      : opsStatus === "need_to_schedule"
+      ? "Needs scheduling"
+      : status === "cancelled"
+      ? "Cancelled"
+      : opsStatus === "archived"
+      ? "Archived"
+      : "Needs attention"
+    : "";
+
+  return {
+    stages,
+    activeIndex,
+    attentionLabel,
+  };
+}
+
+function buildNextStepPreview(props: {
+  job: any;
+  isFieldComplete: boolean;
+  isEccPermitNeededActive: boolean;
+  showPrimaryCloseoutBlockers: boolean;
+  showConfirmRetestReady: boolean;
+  showRetestSection: boolean;
+  isServiceFieldFollowUpPendingInfo: boolean;
+  showMobileServiceInvoiceFieldAction: boolean;
+  primaryCloseoutMessage: string;
+  serviceFollowUpProgressState: any;
+  surfaceProfile: any;
+}) {
+  const status = String(props.job?.status ?? "").trim().toLowerCase();
+  const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
+  const isService = String(props.job?.job_type ?? "").trim().toLowerCase() === "service";
+
+  if (props.isEccPermitNeededActive && !props.showPrimaryCloseoutBlockers) {
+    return {
+      eyebrow: "Closeout blocker",
+      title: "Permit needed",
+      summary: "Add the permit in the current action area to continue cert closeout.",
+      anchor: "mobile-ecc-permit-needed-action",
+      actionLabel: "Open current permit action",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (props.showConfirmRetestReady) {
+    return {
+      eyebrow: "Retest review",
+      title: "Confirm retest ready",
+      summary: "Use the current retest action area to confirm corrections are ready.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Open current retest action",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (props.showRetestSection) {
+    return {
+      eyebrow: "Retest scheduling",
+      title: "Retest ready",
+      summary: "Use the current retest action area to schedule or queue the linked retest.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Open current retest action",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (props.isServiceFieldFollowUpPendingInfo && props.serviceFollowUpProgressState?.reason) {
+    return {
+      eyebrow: "Follow-up",
+      title: String(props.serviceFollowUpProgressState.reason.display ?? "Follow-up needed"),
+      summary: "Use the current follow-up action area to update progress or create the return visit.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Open current follow-up action",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (props.showPrimaryCloseoutBlockers) {
+    return {
+      eyebrow: "Closeout",
+      title: isService ? "Closeout responsibility" : "Closeout blocker",
+      summary: props.primaryCloseoutMessage || "Use the current action area to complete closeout.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Open current closeout action",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (props.showMobileServiceInvoiceFieldAction) {
+    return {
+      eyebrow: "Billing",
+      title: "Invoice review needed",
+      summary: "Use the current invoice action area to build or review the invoice.",
+      anchor: "mobile-invoice-summary-card",
+      actionLabel: "Open current invoice action",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (!props.isFieldComplete && status === "completed") {
+    return {
+      eyebrow: "Field status",
+      title: "Mark field complete",
+      summary: "Finish the field handoff before office closeout continues.",
+      anchor: "",
+      actionLabel: "Mark Field Complete",
+      isSafeInlineLifecycleAction: true,
+    };
+  }
+
+  if (!props.isFieldComplete) {
+    const title =
+      status === "on_the_way" || opsStatus === "on_the_way"
+        ? "Start the visit"
+        : status === "in_process" || opsStatus === "in_process"
+        ? props.surfaceProfile?.labels?.finishComplete ?? "Finish Visit"
+        : "Head to the job";
+    const summary =
+      status === "on_the_way" || opsStatus === "on_the_way"
+        ? "When you arrive, begin field work from the existing lifecycle action."
+        : status === "in_process" || opsStatus === "in_process"
+        ? "Complete the current field lifecycle step from the existing action."
+        : "Use the current lifecycle action when you are ready to go.";
+
+    return {
+      eyebrow: "Next step",
+      title,
+      summary,
+      anchor: "",
+      actionLabel: "",
+      isSafeInlineLifecycleAction: true,
+    };
+  }
+
+  return {
+    eyebrow: "Status",
+    title: "Review remaining closeout",
+    summary: "Field work is complete. Continue with any current closeout, notes, or billing responsibilities below.",
+    anchor: "mobile-tools",
+    actionLabel: "Open current tools",
+    isSafeInlineLifecycleAction: false,
+  };
+}
+
+export default function MobileJobDetailV2Preview(props: any) {
+  const {
+    appointmentDateLabel,
+    assignedTeam,
+    billingState,
+    ChatIcon,
+    ChevronRightIcon,
+    ClockIcon,
+    closeoutNeeds,
+    contractorName,
+    hasFullSchedule,
+    headerJobTypeLabel,
+    isEccPermitNeededActive,
+    isFieldComplete,
+    isInternalUser,
+    isServiceFieldFollowUpPendingInfo,
+    job,
+    JobFieldActionButton,
+    jobHeaderReference,
+    jobWorkbenchAccountLabel,
+    jobWorkbenchTitle,
+    Link,
+    MapPinIcon,
+    markJobFieldCompleteFromForm,
+    mobileAppointmentTimeLabel,
+    mobileCallHref,
+    mobileCustomerHref,
+    mobileTextHref,
+    mobileToolLinkClass,
+    onTheWayUndoEligibility,
+    PhoneIcon,
+    primaryCloseoutMessage,
+    recordBlockingPhase,
+    serviceAddressDisplay,
+    serviceAddressLine1,
+    serviceAddressLine2,
+    serviceCity,
+    serviceFollowUpProgressState,
+    serviceLocationEditHref,
+    serviceState,
+    serviceZip,
+    showConfirmRetestReady,
+    showMobileEccTestAction,
+    showMobileServiceInvoiceFieldAction,
+    showPrimaryCloseoutBlockers,
+    showRetestSection,
+    SubmitButton,
+    surfaceProfile,
+    Suspense,
+    tab,
+    TimedJobLocationPreview,
+    timingEnabled,
+    ToolIcon,
+    visitReasonText,
+    visitScopeCount,
+    WarningIcon,
+    JobLocationPreviewFallback,
+  } = props;
+
+  const lifecycle = buildLifecyclePreview({
+    job,
+    isFieldComplete,
+    billingState,
+    closeoutNeeds,
+  });
+  const nextStep = buildNextStepPreview({
+    job,
+    isFieldComplete,
+    isEccPermitNeededActive,
+    showPrimaryCloseoutBlockers,
+    showConfirmRetestReady,
+    showRetestSection,
+    isServiceFieldFollowUpPendingInfo,
+    showMobileServiceInvoiceFieldAction,
+    primaryCloseoutMessage,
+    serviceFollowUpProgressState,
+    surfaceProfile,
+  });
+  const currentActionHref = nextStep.anchor
+    ? `/jobs/${job.id}?tab=${tab}#${nextStep.anchor}`
+    : `/jobs/${job.id}?tab=${tab}`;
+  const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
+  const heroPreviewClassName =
+    "px-0 pb-0 [&_a:first-child]:rounded-none [&_a:first-child]:border-0 [&_a:first-child]:shadow-none [&_img]:h-56 [&_img]:rounded-none [&_img]:object-cover";
+  const lifecycleActionClass =
+    "inline-flex min-h-14 w-full items-center justify-center rounded-2xl border border-blue-500 bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700";
+
+  return (
+    <div className="block min-h-screen bg-slate-100 px-3 py-3.5 text-slate-950 lg:hidden">
+      <div className="mx-auto max-w-lg space-y-3">
+        <section className="overflow-hidden rounded-[1.35rem] border border-slate-200/90 bg-white shadow-[0_24px_52px_-34px_rgba(15,23,42,0.38)]">
+          <div className="px-4 pb-3.5 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-blue-700">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#0f1f35] text-blue-100">
+                  <ToolIcon className="h-4 w-4" />
+                </span>
+                <span>Job Workbench</span>
+              </div>
+              <Link
+                href={`/jobs/${job.id}?tab=${tab}`}
+                className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+              >
+                Current
+              </Link>
+            </div>
+
+            <h1 className="mt-4 break-words text-[2rem] font-semibold leading-[1.05] tracking-normal text-[#071225]">
+              {jobWorkbenchTitle}
+            </h1>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-semibold text-slate-700">
+                {jobHeaderReference}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700">
+                {headerJobTypeLabel}
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 min-[420px]:grid-cols-[minmax(0,1fr)_minmax(8rem,0.72fr)]">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-500">Customer</div>
+                <div className="mt-1 break-words text-xl font-semibold leading-tight text-slate-950">
+                  {mobileCustomerHref ? (
+                    <Link href={mobileCustomerHref} className="underline decoration-slate-300 underline-offset-4">
+                      {jobWorkbenchAccountLabel || "Customer"}
+                    </Link>
+                  ) : (
+                    jobWorkbenchAccountLabel || "Customer"
+                  )}
+                </div>
+                {contractorName ? (
+                  <>
+                    <div className="mt-3 text-sm font-semibold text-slate-500">Contractor</div>
+                    <div className="mt-1 break-words text-base font-semibold text-slate-700">{contractorName}</div>
+                  </>
+                ) : null}
+              </div>
+
+              <div className="min-w-0 border-slate-200 min-[420px]:border-l min-[420px]:pl-4">
+                <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500">
+                  <ClockIcon className="h-4 w-4" />
+                  <span>Schedule</span>
+                </div>
+                <div className="mt-1 break-words text-lg font-semibold leading-tight text-slate-950">
+                  {appointmentDateLabel}
+                </div>
+                {mobileAppointmentTimeLabel ? (
+                  <div className="mt-1 text-sm font-semibold text-slate-700">{mobileAppointmentTimeLabel}</div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="relative overflow-hidden border-t border-slate-200 bg-slate-200">
+            <Suspense
+              fallback={
+                <JobLocationPreviewFallback
+                  addressLine1={serviceAddressLine1}
+                  addressLine2={serviceAddressLine2}
+                  city={serviceCity}
+                  state={serviceState}
+                  zip={serviceZip}
+                  className="px-0 pb-0"
+                />
+              }
+            >
+              <TimedJobLocationPreview
+                addressLine1={serviceAddressLine1}
+                addressLine2={serviceAddressLine2}
+                city={serviceCity}
+                state={serviceState}
+                zip={serviceZip}
+                className={heroPreviewClassName}
+                timingEnabled={timingEnabled}
+                onPhaseTiming={recordBlockingPhase}
+              />
+            </Suspense>
+            <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-2xl border border-white/30 bg-slate-950/78 p-3 text-white shadow-[0_18px_36px_-18px_rgba(15,23,42,0.78)] backdrop-blur-md">
+              <div className="flex items-start gap-2">
+                <MapPinIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                <div className="min-w-0 break-words text-lg font-semibold leading-tight">{serviceAddressDisplay}</div>
+              </div>
+              <div className="pointer-events-auto mt-3 grid grid-cols-3 gap-2">
+                {mobileCallHref ? (
+                  <a href={mobileCallHref} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2 text-sm font-semibold text-white">
+                    <PhoneIcon className="h-4 w-4" />
+                    <span>Call</span>
+                  </a>
+                ) : (
+                  <span className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-semibold text-white/45">
+                    <PhoneIcon className="h-4 w-4" />
+                    <span>Call</span>
+                  </span>
+                )}
+                {mobileTextHref ? (
+                  <a href={mobileTextHref} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2 text-sm font-semibold text-white">
+                    <ChatIcon className="h-4 w-4" />
+                    <span>Text</span>
+                  </a>
+                ) : (
+                  <span className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-semibold text-white/45">
+                    <ChatIcon className="h-4 w-4" />
+                    <span>Text</span>
+                  </span>
+                )}
+                {serviceAddressDisplay !== "No address set" ? (
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddressDisplay)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2 text-sm font-semibold text-white"
+                  >
+                    <MapPinIcon className="h-4 w-4" />
+                    <span>Navigate</span>
+                  </a>
+                ) : (
+                  <span className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-semibold text-white/45">
+                    <MapPinIcon className="h-4 w-4" />
+                    <span>Navigate</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+          <div className="relative grid grid-cols-5 gap-1">
+            <div className="absolute left-[10%] right-[10%] top-4 h-px bg-slate-200" />
+            {lifecycle.stages.map((stage, index) => {
+              const isPast = index < lifecycle.activeIndex;
+              const isActive = index === lifecycle.activeIndex;
+              return (
+                <div key={stage.key} className="relative z-10 min-w-0 text-center">
+                  <div
+                    className={[
+                      "mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-sm font-bold",
+                      isActive
+                        ? "border-blue-600 bg-blue-600 text-white shadow-[0_0_0_4px_rgba(37,99,235,0.14)]"
+                        : isPast
+                        ? "border-blue-500 bg-blue-500 text-white"
+                        : "border-slate-300 bg-white text-slate-300",
+                    ].join(" ")}
+                  >
+                    {isPast ? "v" : isActive ? "o" : ""}
+                  </div>
+                  <div className={isActive ? "mt-2 text-xs font-semibold text-slate-950" : "mt-2 text-xs font-medium text-slate-500"}>
+                    {stage.label}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {lifecycle.attentionLabel ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950">
+              {lifecycle.attentionLabel}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="rounded-2xl border border-[#071225] bg-[#071225] px-4 py-4 text-white shadow-[0_22px_46px_-28px_rgba(15,23,42,0.7)]">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#071225]">
+              <ToolIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-blue-100/80">{nextStep.eyebrow}</div>
+              <h2 className="mt-1 text-2xl font-semibold leading-tight tracking-normal">{nextStep.title}</h2>
+              <p className="mt-2 text-base leading-6 text-slate-200">{nextStep.summary}</p>
+            </div>
+          </div>
+          <div className="mt-4">
+            {nextStep.isSafeInlineLifecycleAction ? (
+              !isFieldComplete && String(job.status ?? "").trim().toLowerCase() === "completed" ? (
+                <form action={markJobFieldCompleteFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <SubmitButton loadingText="Completing..." className={lifecycleActionClass}>
+                    Mark Field Complete
+                  </SubmitButton>
+                </form>
+              ) : (
+                <JobFieldActionButton
+                  jobId={job.id}
+                  currentStatus={job.status}
+                  tab={tab}
+                  hasFullSchedule={hasFullSchedule}
+                  variant="fieldMode"
+                  completeLabel={surfaceProfile.labels.finishComplete}
+                  completedLabel={surfaceProfile.labels.finishComplete}
+                />
+              )
+            ) : (
+              <Link href={currentActionHref} className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-blue-500 bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700">
+                <span>{nextStep.actionLabel}</span>
+                <ChevronRightIcon className="h-5 w-5" />
+              </Link>
+            )}
+          </div>
+          {onTheWayUndoEligibility?.eligible ? (
+            <Link href={`/jobs/${job.id}?tab=${tab}`} className="mt-3 inline-flex w-full justify-center text-sm font-semibold text-blue-100 underline underline-offset-4">
+              Undo On the Way is available in the current layout
+            </Link>
+          ) : null}
+        </section>
+
+        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  {isEcc ? <WarningIcon className="h-5 w-5" /> : <ToolIcon className="h-5 w-5" />}
+                </span>
+                <div>
+                  <h2 className="text-xl font-semibold leading-tight text-[#071225]">
+                    {isEcc ? "Compliance Work" : "Work Preview"}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-slate-600">
+                    {isEcc ? "Preview only. Current ECC actions remain in the existing layout." : visitReasonText}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+              Current
+            </Link>
+          </div>
+
+          <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
+            {isEcc ? (
+              <>
+                <Link href={`/jobs/${job.id}/info?f=equipment`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+                  <span>
+                    <span className="block font-semibold text-slate-950">Equipment</span>
+                    <span className="block text-sm text-slate-600">Capture equipment and furnace details</span>
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
+                </Link>
+                {showMobileEccTestAction ? (
+                  <Link href={`/jobs/${job.id}/tests`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+                    <span>
+                      <span className="block font-semibold text-slate-950">ECC Tests</span>
+                      <span className="block text-sm text-slate-600">Complete required tests</span>
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
+                  </Link>
+                ) : null}
+                <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+                  <span>
+                    <span className="block font-semibold text-slate-950">Permit Info</span>
+                    <span className="block text-sm text-slate-600">Use current permit details and actions</span>
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Current</span>
+                </Link>
+              </>
+            ) : (
+              <Link href={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+                <span>
+                  <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
+                  <span className="block text-sm text-slate-600">
+                    {visitScopeCount > 0 ? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"} recorded` : "Open current work details"}
+                  </span>
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Current</span>
+              </Link>
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 text-xl font-semibold text-[#071225]">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <ChatIcon className="h-5 w-5" />
+              </span>
+              <span>Evidence & Notes</span>
+            </div>
+            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-notes-hub`} className="text-slate-500">
+              <ChevronRightIcon className="h-5 w-5" />
+            </Link>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <Link href={`/jobs/${job.id}/attachments`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">
+              Attachments
+            </Link>
+            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-internal-notes`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">
+              Internal
+            </Link>
+            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-shared-notes`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">
+              Shared
+            </Link>
+          </div>
+        </section>
+
+        <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className={mobileToolLinkClass}>
+          More Details / Tools
+        </Link>
+        {isInternalUser && serviceLocationEditHref ? (
+          <Link href={serviceLocationEditHref} className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700">
+            Edit service location in current tools
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}

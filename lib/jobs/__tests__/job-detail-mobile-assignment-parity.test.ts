@@ -7,6 +7,16 @@ const pageSource = readFileSync(
   "utf8",
 );
 
+const mobileJobDetailCurrentSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
+  "utf8",
+);
+
+const mobileJobDetailV2PreviewSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx"),
+  "utf8",
+);
+
 const controlsSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/AssignedTeamControls.tsx"),
   "utf8",
@@ -28,10 +38,23 @@ const contactLoggingSource = readFileSync(
 );
 
 describe("mobile job detail assignment parity", () => {
+  it("keeps current mobile as default and gates the V2 preview behind mobileLayout=v2", () => {
+    expect(pageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
+    expect(pageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
+    expect(pageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
+    expect(pageSource).toContain('const useMobileV2Preview = mobileLayout === "v2";');
+    expect(pageSource).toContain("const MobileJobDetailMobileComponent = useMobileV2Preview");
+    expect(pageSource).toContain("? MobileJobDetailV2Preview");
+    expect(pageSource).toContain(": MobileJobDetailCurrent");
+    expect(pageSource).toContain("<MobileJobDetailMobileComponent");
+    expect(mobileJobDetailV2PreviewSource).toContain("export default function MobileJobDetailV2Preview");
+    expect(mobileJobDetailV2PreviewSource).toContain("Preview only. Current ECC actions remain in the existing layout.");
+  });
+
   it("exposes mobile assignment controls in the visible Team Assignment card", () => {
-    const mobilePanelStart = pageSource.indexOf("<AssignedTeamControls", pageSource.indexOf("Contact Logging"));
-    const mobilePanelEnd = pageSource.indexOf("showMobileContractorContext", mobilePanelStart);
-    const mobilePanel = pageSource.slice(mobilePanelStart, mobilePanelEnd);
+    const mobilePanelStart = mobileJobDetailCurrentSource.indexOf("<AssignedTeamControls", mobileJobDetailCurrentSource.indexOf("Contact Logging"));
+    const mobilePanelEnd = mobileJobDetailCurrentSource.indexOf("showMobileContractorContext", mobilePanelStart);
+    const mobilePanel = mobileJobDetailCurrentSource.slice(mobilePanelStart, mobilePanelEnd);
 
     expect(mobilePanelStart).toBeGreaterThan(-1);
     expect(mobilePanel).toContain("<AssignedTeamControls");
@@ -42,9 +65,9 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("omits the redundant lower mobile tools jump to the visible assignment card", () => {
-    const mobileToolsStart = pageSource.indexOf('id="mobile-tools"');
-    const mobileToolsEnd = pageSource.indexOf('id="mobile-tools-timeline"', mobileToolsStart);
-    const mobileTools = pageSource.slice(mobileToolsStart, mobileToolsEnd);
+    const mobileToolsStart = mobileJobDetailCurrentSource.indexOf('id="mobile-tools"');
+    const mobileToolsEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-tools-timeline"', mobileToolsStart);
+    const mobileTools = mobileJobDetailCurrentSource.slice(mobileToolsStart, mobileToolsEnd);
 
     expect(mobileToolsStart).toBeGreaterThan(-1);
     expect(mobileTools).not.toContain('href="#mobile-assigned-team"');
@@ -132,11 +155,11 @@ describe("mobile job detail assignment parity", () => {
 
   it("keeps compact mobile schedule and equal-height contact logging controls", () => {
     expect(pageSource).toContain("const mobileAppointmentTimeLabel = job.scheduled_date ? appointmentTimeLabel : \"\";");
-    expect(pageSource).toContain("{mobileAppointmentTimeLabel ? (");
-    expect(pageSource).toContain('<details id="mobile-when-panel" className="group relative overflow-visible rounded-xl');
-    expect(pageSource).toContain("mt-2 break-words text-xl font-semibold leading-tight text-[#0f1f35]");
-    expect(pageSource).toContain("mt-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold text-blue-900");
-    expect(pageSource).toContain("hidden w-full max-w-[calc(100vw-1.5rem)] group-open:block");
+    expect(mobileJobDetailCurrentSource).toContain("{mobileAppointmentTimeLabel ? (");
+    expect(mobileJobDetailCurrentSource).toContain('<details id="mobile-when-panel" className="group relative overflow-visible rounded-xl');
+    expect(mobileJobDetailCurrentSource).toContain("mt-2 break-words text-xl font-semibold leading-tight text-[#0f1f35]");
+    expect(mobileJobDetailCurrentSource).toContain("mt-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold text-blue-900");
+    expect(mobileJobDetailCurrentSource).toContain("hidden w-full max-w-[calc(100vw-1.5rem)] group-open:block");
     expect(contactLoggingSource).toContain("min-h-[4rem]");
     expect(contactLoggingSource).toContain("h-full");
     expect(contactLoggingSource).toContain("whitespace-normal");
@@ -144,25 +167,25 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("omits the redundant mobile work summary card from the header", () => {
-    const mobileScheduleStart = pageSource.indexOf('id="mobile-when-panel"');
-    const mobileScheduleEnd = pageSource.indexOf('{banner === "note_added"', mobileScheduleStart);
-    const mobileScheduleSection = pageSource.slice(mobileScheduleStart, mobileScheduleEnd);
+    const mobileScheduleStart = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"');
+    const mobileScheduleEnd = mobileJobDetailCurrentSource.indexOf('{banner === "note_added"', mobileScheduleStart);
+    const mobileScheduleSection = mobileJobDetailCurrentSource.slice(mobileScheduleStart, mobileScheduleEnd);
 
     expect(mobileScheduleStart).toBeGreaterThan(-1);
     expect(mobileScheduleEnd).toBeGreaterThan(mobileScheduleStart);
-    expect(pageSource).not.toContain("const mobileWorkStateLabel =");
-    expect(pageSource).not.toContain("{mobileWorkStateLabel}");
+    expect(`${pageSource}\n${mobileJobDetailCurrentSource}`).not.toContain("const mobileWorkStateLabel =");
+    expect(mobileJobDetailCurrentSource).not.toContain("{mobileWorkStateLabel}");
     expect(mobileScheduleSection).not.toContain("<span>Work</span>");
     expect(mobileScheduleSection).not.toContain('job.job_type === "service" ? "Service" : "ECC"');
   });
 
   it("keeps the top mobile customer link while omitting the duplicate operations-board customer card", () => {
-    const mobileHeaderStart = pageSource.indexOf("<h1");
-    const mobileHeaderEnd = pageSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
-    const mobileHeader = pageSource.slice(mobileHeaderStart, mobileHeaderEnd);
-    const fieldOpsStart = pageSource.indexOf("Field Operations Board");
-    const fieldOpsEnd = pageSource.indexOf('id="assigned-team"', fieldOpsStart);
-    const fieldOpsBoard = pageSource.slice(fieldOpsStart, fieldOpsEnd);
+    const mobileHeaderStart = mobileJobDetailCurrentSource.indexOf("<h1");
+    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeader = mobileJobDetailCurrentSource.slice(mobileHeaderStart, mobileHeaderEnd);
+    const fieldOpsStart = mobileJobDetailCurrentSource.indexOf("Field Operations Board");
+    const fieldOpsEnd = mobileJobDetailCurrentSource.indexOf('id="assigned-team"', fieldOpsStart);
+    const fieldOpsBoard = mobileJobDetailCurrentSource.slice(fieldOpsStart, fieldOpsEnd);
 
     expect(mobileHeaderStart).toBeGreaterThan(-1);
     expect(mobileHeaderEnd).toBeGreaterThan(mobileHeaderStart);
@@ -177,9 +200,9 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("styles the mobile Notes & Attachments attachment link as a blue action", () => {
-    const notesHubStart = pageSource.indexOf('id="mobile-notes-hub"');
-    const notesHubEnd = pageSource.indexOf('id="mobile-internal-notes"', notesHubStart);
-    const notesHub = pageSource.slice(notesHubStart, notesHubEnd);
+    const notesHubStart = mobileJobDetailCurrentSource.indexOf('id="mobile-notes-hub"');
+    const notesHubEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-internal-notes"', notesHubStart);
+    const notesHub = mobileJobDetailCurrentSource.slice(notesHubStart, notesHubEnd);
 
     expect(notesHubStart).toBeGreaterThan(-1);
     expect(notesHubEnd).toBeGreaterThan(notesHubStart);
@@ -191,9 +214,9 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("folds the mobile service address edit affordance into the address row", () => {
-    const mobileHeaderStart = pageSource.indexOf("<h1");
-    const mobileHeaderEnd = pageSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
-    const mobileHeader = pageSource.slice(mobileHeaderStart, mobileHeaderEnd);
+    const mobileHeaderStart = mobileJobDetailCurrentSource.indexOf("<h1");
+    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeader = mobileJobDetailCurrentSource.slice(mobileHeaderStart, mobileHeaderEnd);
 
     expect(mobileHeaderStart).toBeGreaterThan(-1);
     expect(mobileHeaderEnd).toBeGreaterThan(mobileHeaderStart);
@@ -207,9 +230,9 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("removes duplicate mobile workflow and field status row below the schedule/work cards", () => {
-    const mobileWorkbenchStart = pageSource.indexOf('id="mobile-when-panel"');
-    const mobileWorkbenchEnd = pageSource.indexOf('{banner === "note_added"', mobileWorkbenchStart);
-    const mobileWorkbench = pageSource.slice(mobileWorkbenchStart, mobileWorkbenchEnd);
+    const mobileWorkbenchStart = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"');
+    const mobileWorkbenchEnd = mobileJobDetailCurrentSource.indexOf('{banner === "note_added"', mobileWorkbenchStart);
+    const mobileWorkbench = mobileJobDetailCurrentSource.slice(mobileWorkbenchStart, mobileWorkbenchEnd);
 
     expect(mobileWorkbenchStart).toBeGreaterThan(-1);
     expect(mobileWorkbenchEnd).toBeGreaterThan(mobileWorkbenchStart);
@@ -218,15 +241,15 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("uses the current mobile field status as the compact action card header", () => {
-    const actionCardStart = pageSource.indexOf('shadow-[0_18px_36px_-30px_rgba(29,78,216,0.32)]');
-    const actionCardEnd = pageSource.indexOf("<JobFieldActionButton", actionCardStart);
-    const actionCard = pageSource.slice(actionCardStart, actionCardEnd);
+    const actionCardStart = mobileJobDetailCurrentSource.indexOf('shadow-[0_18px_36px_-30px_rgba(29,78,216,0.32)]');
+    const actionCardEnd = mobileJobDetailCurrentSource.indexOf("<JobFieldActionButton", actionCardStart);
+    const actionCard = mobileJobDetailCurrentSource.slice(actionCardStart, actionCardEnd);
 
     expect(actionCardStart).toBeGreaterThan(-1);
     expect(actionCardEnd).toBeGreaterThan(actionCardStart);
     expect(actionCard).toContain("<span>{mobileCurrentStatusLabel}</span>");
     expect(actionCard).not.toContain("Next Field Action");
     expect(actionCard).not.toContain("Current Status");
-    expect(pageSource).toContain("<JobFieldActionButton");
+    expect(mobileJobDetailCurrentSource).toContain("<JobFieldActionButton");
   });
 });

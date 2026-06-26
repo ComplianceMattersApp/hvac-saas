@@ -173,6 +173,7 @@ import {
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";
+import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 import { isMissingJobsBillingDispositionColumnError } from "@/lib/supabase/jobs-billing-disposition-compat";
 
@@ -1286,6 +1287,14 @@ export default async function JobDetailPage({
   }
 
   const sp: SearchParams = (searchParams ? await searchParams : {}) ?? {};
+  const mobileLayoutRaw = sp.mobileLayout;
+  const mobileLayout =
+    Array.isArray(mobileLayoutRaw)
+      ? mobileLayoutRaw[0]
+      : typeof mobileLayoutRaw === "string"
+      ? mobileLayoutRaw
+      : "";
+  const useMobileV2Preview = mobileLayout === "v2";
 
   const tabRaw = sp.tab;
   const tab =
@@ -3490,10 +3499,13 @@ const showCorrectionReviewResolution =
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
   const showMobileContractorContext =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
+  const MobileJobDetailMobileComponent = useMobileV2Preview
+    ? MobileJobDetailV2Preview
+    : MobileJobDetailCurrent;
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
-      <MobileJobDetailCurrent
+      <MobileJobDetailMobileComponent
         activeWaitingState={activeWaitingState}
         addPublicNoteFromForm={addPublicNoteFromForm}
         appointmentDateLabel={appointmentDateLabel}

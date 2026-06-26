@@ -7,13 +7,18 @@ const jobPageSource = readFileSync(
   "utf8",
 );
 
+const mobileJobDetailCurrentSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
+  "utf8",
+);
+
 describe("job detail service address edit affordance", () => {
   it("links internal users from job detail to the saved service address editor", () => {
     expect(jobPageSource).toContain(
       "const serviceLocationEditHref = locationId ? `/locations/${locationId}` : null;",
     );
-    expect(jobPageSource).toContain("aria-label={`Edit service address: ${serviceAddressDisplay}`}");
+    expect(mobileJobDetailCurrentSource).toContain("aria-label={`Edit service address: ${serviceAddressDisplay}`}");
     expect(jobPageSource).toContain("Correct address");
-    expect(jobPageSource).toContain("href={serviceLocationEditHref}");
+    expect(mobileJobDetailCurrentSource).toContain("href={serviceLocationEditHref}");
   });
 });
