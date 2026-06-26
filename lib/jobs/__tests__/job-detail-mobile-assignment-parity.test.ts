@@ -37,15 +37,37 @@ const contactLoggingSource = readFileSync(
   "utf8",
 );
 
+const standardViewAnchors = [
+  "mobile-work-scope",
+  "mobile-tools",
+  "mobile-internal-notes",
+  "mobile-shared-notes",
+  "mobile-invoice-summary-card",
+  "mobile-next-service-action",
+  "mobile-follow-up-job",
+  "mobile-permit-info",
+  "mobile-tools-timeline",
+];
+
+const realPreviewWorkspacePatterns = [
+  "`/jobs/${job.id}/info?f=equipment`",
+  "`/jobs/${job.id}/tests`",
+  "`/jobs/${job.id}/attachments`",
+  "?tab=service-plans",
+];
+
 describe("mobile job detail assignment parity", () => {
   it("keeps current mobile as default and gates the V2 preview behind mobileLayout=v2", () => {
+    const mobileSelectionStart = pageSource.indexOf("const MobileJobDetailMobileComponent = useMobileV2Preview");
+    const mobileSelection = pageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
+
+    expect(mobileSelectionStart).toBeGreaterThan(-1);
     expect(pageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
     expect(pageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
     expect(pageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
     expect(pageSource).toContain('const useMobileV2Preview = mobileLayout === "v2";');
-    expect(pageSource).toContain("const MobileJobDetailMobileComponent = useMobileV2Preview");
-    expect(pageSource).toContain("? MobileJobDetailV2Preview");
-    expect(pageSource).toContain(": MobileJobDetailCurrent");
+    expect(mobileSelection).toContain("? MobileJobDetailV2Preview");
+    expect(mobileSelection).toContain(": MobileJobDetailCurrent");
     expect(pageSource).toContain("<MobileJobDetailMobileComponent");
     expect(mobileJobDetailV2PreviewSource).toContain("export default function MobileJobDetailV2Preview");
     expect(mobileJobDetailV2PreviewSource).toContain("Billing / Closeout");
@@ -53,19 +75,58 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Preview only");
   });
 
+  it("keeps the desktop branch separate from the V2 preview selector", () => {
+    const desktopBranchStart = pageSource.indexOf('<div className="hidden space-y-5 lg:block"');
+    const desktopBranch = pageSource.slice(desktopBranchStart);
+
+    expect(desktopBranchStart).toBeGreaterThan(-1);
+    expect(desktopBranch).not.toContain("<MobileJobDetailMobileComponent");
+    expect(desktopBranch).not.toContain("<MobileJobDetailV2Preview");
+    expect(desktopBranch).toContain("<AssignedTeamControls");
+    expect(pageSource).toContain("lg:hidden");
+  });
+
   it("keeps V2 preview anchor CTAs routed to standard current mobile anchors or real workspaces", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('const standardJobHref = `/jobs/${job.id}?tab=${tab}`;');
     expect(mobileJobDetailV2PreviewSource).toContain("const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("mobileLayout=v2");
     expect(mobileJobDetailV2PreviewSource).toContain("? standardJobAnchorHref(nextStep.anchor)");
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-work-scope")');
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-tools")');
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-internal-notes")');
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-shared-notes")');
     expect(mobileJobDetailV2PreviewSource).toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
     expect(mobileJobDetailV2PreviewSource).toContain("nextStep.href");
     expect(mobileJobDetailV2PreviewSource).toContain("href: `/jobs/${props.job.id}/tests`");
-    expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/attachments`}');
+    for (const anchor of standardViewAnchors) {
+      expect(mobileJobDetailCurrentSource).toContain(`id="${anchor}"`);
+      expect(mobileJobDetailV2PreviewSource).toContain(anchor);
+    }
+    for (const routePattern of realPreviewWorkspacePatterns) {
+      expect(mobileJobDetailV2PreviewSource).toContain(routePattern);
+    }
+    expect(mobileJobDetailV2PreviewSource).toContain("servicePlanToolHref = mobileCustomerHref");
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}#');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('href={`?mobileLayout=v2#');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('href="#mobile-');
+  });
+
+  it("keeps V2 preview out of source-of-truth and mutation ownership", () => {
+    expect(mobileJobDetailV2PreviewSource).not.toContain("from \"@/lib/actions");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("from '@/lib/actions");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("createClient(");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("createServerClient(");
+    expect(mobileJobDetailV2PreviewSource).not.toContain(".from(");
+    expect(mobileJobDetailV2PreviewSource).not.toContain(".insert(");
+    expect(mobileJobDetailV2PreviewSource).not.toContain(".update(");
+    expect(mobileJobDetailV2PreviewSource).not.toContain(".upsert(");
+    expect(mobileJobDetailV2PreviewSource).not.toContain(".delete(");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<MarkVisitCountedActionButton");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<ConfirmNextDueDateActionButton");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("createMaintenanceAgreement");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("updateMaintenanceAgreement");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("markCertsCompleteFromForm");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("markEccPermitAvailableFromForm");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("createRetestJobFromForm");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("scheduleRetestNowFromForm");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("markInvoiceCompleteFromForm");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("completeDataEntryFromForm");
   });
 
   it("does not treat ECC test availability as required test attention in the V2 preview", () => {
