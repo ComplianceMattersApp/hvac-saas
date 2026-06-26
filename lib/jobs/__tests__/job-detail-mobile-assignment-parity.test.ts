@@ -91,6 +91,26 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
 
+  it("hardens V2 preview lifecycle exceptions as read-only or attention states", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain("function getLifecycleExceptionLabel");
+    expect(mobileJobDetailV2PreviewSource).toContain("function getWaitingStateLabel");
+    expect(mobileJobDetailV2PreviewSource).toContain("function buildExceptionNextStepPreview");
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Approval needed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Waiting on part"');
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Waiting on info"');
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Paused"');
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Correction needed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Review needed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Retest needed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Linked active job"');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: "Job cancelled"');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: "Job closed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review job history"');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open waiting tools"');
+    expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-tools"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"href" in nextStep && nextStep.href');
+  });
+
   it("exposes mobile assignment controls in the visible Team Assignment card", () => {
     const mobilePanelStart = mobileJobDetailCurrentSource.indexOf("<AssignedTeamControls", mobileJobDetailCurrentSource.indexOf("Contact Logging"));
     const mobilePanelEnd = mobileJobDetailCurrentSource.indexOf("showMobileContractorContext", mobilePanelStart);

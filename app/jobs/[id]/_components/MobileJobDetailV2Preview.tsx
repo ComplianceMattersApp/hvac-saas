@@ -6,10 +6,19 @@ function buildLifecyclePreview(props: {
   billingState: any;
   closeoutNeeds: any;
   hasScheduleInformation: boolean;
+  activeWaitingState: any;
+  isHistoricalServiceFollowUpContinued: boolean;
+  showLinkedRetestCreated: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
   const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
   const isEcc = String(props.job?.job_type ?? "").trim().toLowerCase() === "ecc";
+  const exceptionLabel = getLifecycleExceptionLabel({
+    job: props.job,
+    activeWaitingState: props.activeWaitingState,
+    isHistoricalServiceFollowUpContinued: props.isHistoricalServiceFollowUpContinued,
+    showLinkedRetestCreated: props.showLinkedRetestCreated,
+  });
   const isClosed =
     opsStatus === "closed" ||
     status === "cancelled" ||
@@ -40,7 +49,7 @@ function buildLifecyclePreview(props: {
     (opsStatus === "need_to_schedule" || status === "need_to_schedule") &&
     !props.hasScheduleInformation &&
     !isActiveFieldState;
-  const hasAttentionState = attentionStatuses.has(opsStatus) || attentionStatuses.has(status);
+  const hasAttentionState = Boolean(exceptionLabel) || attentionStatuses.has(opsStatus) || attentionStatuses.has(status);
 
   const stages = [
     { key: "scheduled", label: "Scheduled" },
@@ -51,7 +60,9 @@ function buildLifecyclePreview(props: {
   ];
   const activeIndex = stages.findIndex((stage) => stage.key === activeKey);
 
-  const attentionLabel = hasAttentionState
+  const attentionLabel = exceptionLabel
+    ? exceptionLabel
+    : hasAttentionState
     ? opsStatus === "pending_info" || opsStatus === "waiting"
       ? "Paused for information"
       : opsStatus === "on_hold"
@@ -70,6 +81,145 @@ function buildLifecyclePreview(props: {
     activeIndex,
     attentionLabel,
   };
+}
+
+function getLifecycleExceptionLabel(props: {
+  job: any;
+  activeWaitingState: any;
+  isHistoricalServiceFollowUpContinued: boolean;
+  showLinkedRetestCreated: boolean;
+}) {
+  const status = String(props.job?.status ?? "").trim().toLowerCase();
+  const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
+  const waitingLabel = getWaitingStateLabel(props.activeWaitingState, props.job);
+
+  if (props.isHistoricalServiceFollowUpContinued || props.showLinkedRetestCreated) return "Linked active job";
+  if (opsStatus === "archived" || props.job?.deleted_at) return "Archived";
+  if (status === "cancelled") return "Job cancelled";
+  if (opsStatus === "closed") return "Job closed";
+  if (waitingLabel) return waitingLabel;
+  if (opsStatus === "failed") return "Correction needed";
+  if (opsStatus === "pending_office_review") return "Review needed";
+  if (opsStatus === "retest_needed") return "Retest needed";
+
+  return "";
+}
+
+function getWaitingStateLabel(activeWaitingState: any, job: any) {
+  const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+  const blockerType = String(activeWaitingState?.blockerType ?? "").trim().toLowerCase();
+  const reason = String(
+    activeWaitingState?.blockerReason ?? job?.pending_info_reason ?? job?.on_hold_reason ?? "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (blockerType.includes("approval") || reason.includes("approval")) return "Approval needed";
+  if (blockerType.includes("part") || blockerType.includes("material") || reason.includes("part") || reason.includes("material")) {
+    return "Waiting on part";
+  }
+  if (opsStatus === "pending_info" || opsStatus === "waiting" || blockerType.includes("information")) return "Waiting on info";
+  if (opsStatus === "on_hold") return "Paused";
+
+  return activeWaitingState ? "Waiting" : "";
+}
+
+function buildExceptionNextStepPreview(props: {
+  job: any;
+  activeWaitingState: any;
+  failedReasonBannerText: string;
+  isHistoricalServiceFollowUpContinued: boolean;
+  linkedRetestPassiveCopy: string;
+  linkedRetestPassiveHeading: string;
+  showLinkedRetestCreated: boolean;
+}) {
+  const status = String(props.job?.status ?? "").trim().toLowerCase();
+  const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
+  const waitingLabel = getWaitingStateLabel(props.activeWaitingState, props.job);
+  const waitingReason = String(
+    props.activeWaitingState?.blockerReason ?? props.job?.pending_info_reason ?? props.job?.on_hold_reason ?? "",
+  ).trim();
+
+  if (props.isHistoricalServiceFollowUpContinued || props.showLinkedRetestCreated) {
+    return {
+      eyebrow: "Linked work",
+      title: props.linkedRetestPassiveHeading || "Linked active job",
+      summary:
+        props.linkedRetestPassiveCopy ||
+        "This job has linked follow-up work. Review the current job tools before taking action here.",
+      anchor: "mobile-tools",
+      actionLabel: "Review job history",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (opsStatus === "archived" || props.job?.deleted_at) {
+    return {
+      eyebrow: "Read-only",
+      title: "Archived",
+      summary: "This job is archived. Review history or tools from the standard job view.",
+      anchor: "mobile-tools",
+      actionLabel: "Review job history",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (status === "cancelled") {
+    return {
+      eyebrow: "Read-only",
+      title: "Job cancelled",
+      summary: "This job is cancelled. Review history or tools from the standard job view.",
+      anchor: "mobile-tools",
+      actionLabel: "Review job history",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (opsStatus === "closed") {
+    return {
+      eyebrow: "Read-only",
+      title: "Job closed",
+      summary: "This job is closed. Review history, notes, or closeout details from the standard job view.",
+      anchor: "mobile-tools",
+      actionLabel: "Review job history",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (waitingLabel) {
+    return {
+      eyebrow: "Waiting",
+      title: waitingLabel,
+      summary: waitingReason || "This job is paused until the waiting item is resolved.",
+      anchor: "mobile-tools",
+      actionLabel: "Open waiting tools",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (opsStatus === "failed" || opsStatus === "pending_office_review") {
+    return {
+      eyebrow: "Review",
+      title: opsStatus === "pending_office_review" ? "Review needed" : "Correction needed",
+      summary: props.failedReasonBannerText || "Review the failed or pending review state before continuing.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Review next action",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (opsStatus === "retest_needed") {
+    return {
+      eyebrow: "Retest",
+      title: "Retest needed",
+      summary: "Review the retest workflow from the standard job view.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Review retest",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  return null;
 }
 
 function getActionOrientedWorkLabel(label: string | undefined) {
@@ -130,6 +280,12 @@ function buildNextStepPreview(props: {
   surfaceProfile: any;
   closeoutNeeds: any;
   hasRequiredEccTestAttention: boolean;
+  activeWaitingState: any;
+  failedReasonBannerText: string;
+  isHistoricalServiceFollowUpContinued: boolean;
+  linkedRetestPassiveCopy: string;
+  linkedRetestPassiveHeading: string;
+  showLinkedRetestCreated: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
   const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
@@ -142,6 +298,25 @@ function buildNextStepPreview(props: {
       props.hasRequiredEccTestAttention ||
       props.isEccPermitNeededActive ||
       Boolean(props.closeoutNeeds?.needsCerts));
+
+  const exceptionNextStep = buildExceptionNextStepPreview({
+    job: props.job,
+    activeWaitingState: props.activeWaitingState,
+    failedReasonBannerText: props.failedReasonBannerText,
+    isHistoricalServiceFollowUpContinued: props.isHistoricalServiceFollowUpContinued,
+    linkedRetestPassiveCopy: props.linkedRetestPassiveCopy,
+    linkedRetestPassiveHeading: props.linkedRetestPassiveHeading,
+    showLinkedRetestCreated: props.showLinkedRetestCreated,
+  });
+
+  if (
+    exceptionNextStep &&
+    !props.showConfirmRetestReady &&
+    !props.showRetestSection &&
+    !props.isServiceFieldFollowUpPendingInfo
+  ) {
+    return exceptionNextStep;
+  }
 
   if (props.isEccPermitNeededActive && !props.showPrimaryCloseoutBlockers) {
     return {
@@ -379,6 +554,7 @@ function buildBillingPreview(props: {
 
 export default function MobileJobDetailV2Preview(props: any) {
   const {
+    activeWaitingState,
     appointmentDateLabel,
     assignedTeam,
     billingState,
@@ -388,6 +564,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     ClockIcon,
     closeoutNeeds,
     contractorName,
+    failedReasonBannerText,
     FolderIcon,
     hasFullSchedule,
     headerJobTypeLabel,
@@ -396,6 +573,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     internalNotesMeta,
     isEccPermitNeededActive,
     isFieldComplete,
+    isHistoricalServiceFollowUpContinued,
     isInternalUser,
     isServiceFieldFollowUpPendingInfo,
     job,
@@ -407,6 +585,8 @@ export default function MobileJobDetailV2Preview(props: any) {
     jobWorkbenchAccountLabel,
     jobWorkbenchTitle,
     Link,
+    linkedRetestPassiveCopy,
+    linkedRetestPassiveHeading,
     LockIcon,
     MapPinIcon,
     MessageIcon,
@@ -432,6 +612,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     showExternalDataEntryPrompt,
     showInternalInvoicePanel,
     showInternalInvoicingPlaceholder,
+    showLinkedRetestCreated,
     showMobileEccTestAction,
     showMobileInvoiceOpenAttention,
     showMobileServiceInvoiceFieldAction,
@@ -463,6 +644,9 @@ export default function MobileJobDetailV2Preview(props: any) {
     billingState,
     closeoutNeeds,
     hasScheduleInformation: hasFullSchedule || Boolean(appointmentDateLabel || mobileAppointmentTimeLabel),
+    activeWaitingState,
+    isHistoricalServiceFollowUpContinued,
+    showLinkedRetestCreated,
   });
   const nextStep = buildNextStepPreview({
     job,
@@ -480,12 +664,18 @@ export default function MobileJobDetailV2Preview(props: any) {
     closeoutNeeds,
     hasRequiredEccTestAttention:
       String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job),
+    activeWaitingState,
+    failedReasonBannerText,
+    isHistoricalServiceFollowUpContinued,
+    linkedRetestPassiveCopy,
+    linkedRetestPassiveHeading,
+    showLinkedRetestCreated,
   });
   const standardJobHref = `/jobs/${job.id}?tab=${tab}`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
   const currentActionHref = nextStep.anchor
     ? standardJobAnchorHref(nextStep.anchor)
-    : nextStep.href
+    : "href" in nextStep && nextStep.href
     ? nextStep.href
     : standardJobHref;
   const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
