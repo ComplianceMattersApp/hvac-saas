@@ -103,6 +103,18 @@ function hasCompletedEccTestRun(job: any) {
   return runs.some((run: any) => run?.is_completed === true);
 }
 
+function getVisitScopeItemTitle(item: any) {
+  return String(item?.title ?? "").trim();
+}
+
+function getVisitScopeItemDetails(item: any) {
+  return String(item?.details ?? "").trim();
+}
+
+function getVisitScopeCountLabel(count: number) {
+  return `${count} item${count === 1 ? "" : "s"}`;
+}
+
 function buildNextStepPreview(props: {
   job: any;
   isFieldComplete: boolean;
@@ -434,8 +446,11 @@ export default function MobileJobDetailV2Preview(props: any) {
     TimedJobLocationPreview,
     timingEnabled,
     ToolIcon,
+    hasVisitScopeDefined,
     visitReasonText,
     visitScopeCount,
+    visitScopeItems,
+    visitScopeSummary,
     WarningIcon,
     JobLocationPreviewFallback,
     sharedNoteBannerMessage,
@@ -499,6 +514,27 @@ export default function MobileJobDetailV2Preview(props: any) {
   const sharedNotesBadge = getCountBadgeFromMeta(sharedNotesMeta);
   const internalNotesSignal = getNoteSignalLabel(internalNoteBannerMessage);
   const sharedNotesSignal = getNoteSignalLabel(sharedNoteBannerMessage);
+  const allVisitScopeItems = Array.isArray(visitScopeItems) ? visitScopeItems : [];
+  const companionServiceItems = allVisitScopeItems.filter((item: any) => item?.kind === "companion_service");
+  const serviceWorkItems = isEcc ? companionServiceItems : allVisitScopeItems;
+  const serviceWorkCount = serviceWorkItems.length;
+  const serviceWorkPreviewItems = serviceWorkItems
+    .map((item: any) => ({
+      title: getVisitScopeItemTitle(item),
+      details: getVisitScopeItemDetails(item),
+    }))
+    .filter((item: any) => item.title)
+    .slice(0, 3);
+  const serviceWorkSummary = String(visitScopeSummary || visitReasonText || "").trim();
+  const showServiceWorkLane = isEcc ? companionServiceItems.length > 0 : Boolean(hasVisitScopeDefined || serviceWorkSummary);
+  const serviceWorkLaneTitle = isEcc
+    ? "Companion Service Work"
+    : isFieldComplete
+    ? "Work Performed"
+    : "Work to Do";
+  const serviceWorkLaneHelper = isEcc
+    ? "Service scope connected to this compliance visit."
+    : "Visit scope and Work Items for this trip.";
   const evidenceActionClass =
     "flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700";
   const evidenceActionTopClass = "flex min-w-0 items-center gap-2";
@@ -736,16 +772,16 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </span>
                 <div>
                   <h2 className="text-xl font-semibold leading-tight text-[#071225]">
-                    {isEcc ? "Compliance Work" : "Work Performed"}
+                    {isEcc ? "Compliance Work" : serviceWorkLaneTitle}
                   </h2>
                   <p className="mt-0.5 text-sm text-slate-600">
-                    {isEcc ? "Equipment, tests, permits, and closeout readiness." : visitReasonText}
+                    {isEcc ? "Equipment, tests, permits, and closeout readiness." : serviceWorkLaneHelper}
                   </p>
                 </div>
               </div>
             </div>
             <Link href={standardJobAnchorHref("mobile-work-scope")} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
-              {isEcc ? "Compliance details" : "View details"}
+              {isEcc ? "Compliance details" : "View work details"}
             </Link>
           </div>
 
@@ -777,18 +813,82 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </Link>
               </>
             ) : (
-              <Link href={standardJobAnchorHref("mobile-work-scope")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
-                <span>
-                  <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
-                  <span className="block text-sm text-slate-600">
-                    {visitScopeCount > 0 ? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"} recorded` : "View details"}
+              <>
+                {serviceWorkSummary ? (
+                  <div className="px-3 py-3">
+                    <div className="text-sm font-semibold text-slate-500">Visit reason / summary</div>
+                    <p className="mt-1 text-base leading-6 text-slate-800">{serviceWorkSummary}</p>
+                  </div>
+                ) : null}
+                {serviceWorkPreviewItems.length > 0 ? (
+                  <div className="divide-y divide-slate-100">
+                    {serviceWorkPreviewItems.map((item: any, index: number) => (
+                      <div key={`${item.title}-${index}`} className="px-3 py-3">
+                        <div className="font-semibold text-slate-950">{item.title}</div>
+                        {item.details ? <div className="mt-1 text-sm leading-5 text-slate-600">{item.details}</div> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-3 py-3 text-sm leading-6 text-slate-600">
+                    No Work Items saved yet.
+                  </div>
+                )}
+                <Link href={standardJobAnchorHref("mobile-work-scope")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+                  <span>
+                    <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
+                    <span className="block text-sm text-slate-600">
+                      {serviceWorkCount > 0 ? `${getVisitScopeCountLabel(serviceWorkCount)} recorded` : "View details"}
+                    </span>
                   </span>
-                </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Details</span>
-              </Link>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Details</span>
+                </Link>
+              </>
             )}
           </div>
         </section>
+
+        {isEcc && showServiceWorkLane ? (
+          <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-700 ring-1 ring-slate-200">
+                    <ToolIcon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-xl font-semibold leading-tight text-[#071225]">{serviceWorkLaneTitle}</h2>
+                    <p className="mt-0.5 text-sm text-slate-600">{serviceWorkLaneHelper}</p>
+                  </div>
+                </div>
+              </div>
+              <Link href={standardJobAnchorHref("mobile-work-scope")} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+                View work details
+              </Link>
+            </div>
+            <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
+              {serviceWorkSummary ? (
+                <div className="px-3 py-3">
+                  <div className="text-sm font-semibold text-slate-500">Visit reason / summary</div>
+                  <p className="mt-1 text-base leading-6 text-slate-800">{serviceWorkSummary}</p>
+                </div>
+              ) : null}
+              {serviceWorkPreviewItems.map((item: any, index: number) => (
+                <div key={`${item.title}-${index}`} className="px-3 py-3">
+                  <div className="font-semibold text-slate-950">{item.title}</div>
+                  {item.details ? <div className="mt-1 text-sm leading-5 text-slate-600">{item.details}</div> : null}
+                </div>
+              ))}
+              <Link href={standardJobAnchorHref("mobile-work-scope")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+                <span>
+                  <span className="block font-semibold text-slate-950">Service Work</span>
+                  <span className="block text-sm text-slate-600">{getVisitScopeCountLabel(serviceWorkCount)} recorded</span>
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Details</span>
+              </Link>
+            </div>
+          </section>
+        ) : null}
 
         <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
           <div className="flex items-start gap-3">

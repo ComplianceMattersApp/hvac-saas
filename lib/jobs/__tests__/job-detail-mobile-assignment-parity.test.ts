@@ -78,6 +78,19 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Open the required test workflow");
   });
 
+  it("surfaces existing Visit Scope as Service work without treating it as billing truth", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain("const allVisitScopeItems = Array.isArray(visitScopeItems) ? visitScopeItems : [];");
+    expect(mobileJobDetailV2PreviewSource).toContain('item?.kind === "companion_service"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Companion Service Work"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Work Performed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Work to Do"');
+    expect(mobileJobDetailV2PreviewSource).toContain("Visit reason / summary");
+    expect(mobileJobDetailV2PreviewSource).toContain("No Work Items saved yet.");
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-work-scope")');
+    expect(mobileJobDetailV2PreviewSource).toContain("View work details");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
+  });
+
   it("exposes mobile assignment controls in the visible Team Assignment card", () => {
     const mobilePanelStart = mobileJobDetailCurrentSource.indexOf("<AssignedTeamControls", mobileJobDetailCurrentSource.indexOf("Contact Logging"));
     const mobilePanelEnd = mobileJobDetailCurrentSource.indexOf("showMobileContractorContext", mobilePanelStart);
