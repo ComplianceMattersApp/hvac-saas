@@ -82,6 +82,22 @@ function getActionOrientedWorkLabel(label: string | undefined) {
   return trimmed || "Finish Visit";
 }
 
+function getCountBadgeFromMeta(meta: string | undefined) {
+  const trimmed = String(meta ?? "").trim();
+  if (!trimmed) return "";
+
+  const match = trimmed.match(/^(\d+)\s+/);
+  const count = match ? Number.parseInt(match[1] ?? "", 10) : Number.NaN;
+
+  if (!Number.isFinite(count) || count <= 0) return "";
+
+  return trimmed;
+}
+
+function getNoteSignalLabel(message: string | undefined) {
+  return String(message ?? "").trim() ? "New" : "";
+}
+
 function buildNextStepPreview(props: {
   job: any;
   isFieldComplete: boolean;
@@ -350,12 +366,16 @@ export default function MobileJobDetailV2Preview(props: any) {
     billingState,
     ChatIcon,
     ChevronRightIcon,
+    ClipboardIcon,
     ClockIcon,
     closeoutNeeds,
     contractorName,
+    FolderIcon,
     hasFullSchedule,
     headerJobTypeLabel,
     internalInvoiceTruth,
+    internalNoteBannerMessage,
+    internalNotesMeta,
     isEccPermitNeededActive,
     isFieldComplete,
     isInternalUser,
@@ -369,7 +389,9 @@ export default function MobileJobDetailV2Preview(props: any) {
     jobWorkbenchAccountLabel,
     jobWorkbenchTitle,
     Link,
+    LockIcon,
     MapPinIcon,
+    MessageIcon,
     markJobFieldCompleteFromForm,
     mobileAppointmentTimeLabel,
     mobileCallHref,
@@ -397,6 +419,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     showMobileServiceInvoiceFieldAction,
     showPrimaryCloseoutBlockers,
     showRetestSection,
+    showSharedNotesCard,
     SubmitButton,
     surfaceProfile,
     Suspense,
@@ -408,6 +431,8 @@ export default function MobileJobDetailV2Preview(props: any) {
     visitScopeCount,
     WarningIcon,
     JobLocationPreviewFallback,
+    sharedNoteBannerMessage,
+    sharedNotesMeta,
   } = props;
 
   const lifecycle = buildLifecyclePreview({
@@ -459,6 +484,17 @@ export default function MobileJobDetailV2Preview(props: any) {
   const lifecycleActionClass =
     "inline-flex min-h-14 w-full items-center justify-center rounded-2xl border border-blue-500 bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700";
   const finishWorkLabel = getActionOrientedWorkLabel(surfaceProfile.labels.finishComplete);
+  const internalNotesBadge = getCountBadgeFromMeta(internalNotesMeta);
+  const sharedNotesBadge = getCountBadgeFromMeta(sharedNotesMeta);
+  const internalNotesSignal = getNoteSignalLabel(internalNoteBannerMessage);
+  const sharedNotesSignal = getNoteSignalLabel(sharedNoteBannerMessage);
+  const evidenceActionClass =
+    "flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700";
+  const evidenceActionTopClass = "flex min-w-0 items-center gap-2";
+  const evidenceIconClass = "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200";
+  const evidenceLabelClass = "min-w-0 break-words leading-tight";
+  const evidenceBadgeClass = "inline-flex max-w-full rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold leading-tight text-slate-600";
+  const evidenceSignalClass = "inline-flex max-w-full rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-semibold leading-tight text-blue-700";
 
   return (
     <div className="block min-h-screen bg-slate-100 px-3 py-3.5 text-slate-950 lg:hidden">
@@ -685,7 +721,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                  {isEcc ? <WarningIcon className="h-5 w-5" /> : <ToolIcon className="h-5 w-5" />}
+                  {isEcc ? <ClipboardIcon className="h-5 w-5" /> : <ToolIcon className="h-5 w-5" />}
                 </span>
                 <div>
                   <h2 className="text-xl font-semibold leading-tight text-[#071225]">
@@ -744,26 +780,56 @@ export default function MobileJobDetailV2Preview(props: any) {
         </section>
 
         <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
             <div className="inline-flex items-center gap-2 text-xl font-semibold text-[#071225]">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                <ChatIcon className="h-5 w-5" />
+                <MessageIcon className="h-5 w-5" />
               </span>
-              <span>Evidence & Notes</span>
+              <span className="min-w-0">
+                <span className="block">Evidence & Notes</span>
+                <span className="mt-0.5 block text-sm font-medium leading-5 text-slate-600">
+                  Notes, photos, and shared job context.
+                </span>
+              </span>
             </div>
-            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-notes-hub`} className="text-slate-500">
-              <ChevronRightIcon className="h-5 w-5" />
-            </Link>
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <Link href={`/jobs/${job.id}/attachments`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">
-              Attachments
+          <div className="mt-3 space-y-2">
+            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-internal-notes`} className={evidenceActionClass}>
+              <span className={evidenceActionTopClass}>
+                <span className={evidenceIconClass}>
+                  <LockIcon className="h-4 w-4" />
+                </span>
+                <span className={evidenceLabelClass}>Team Notes</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {internalNotesSignal ? <span className={evidenceSignalClass}>{internalNotesSignal}</span> : null}
+                {internalNotesBadge ? <span className={evidenceBadgeClass}>{internalNotesBadge}</span> : null}
+                <ChevronRightIcon className="h-5 w-5 text-slate-400" />
+              </span>
             </Link>
-            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-internal-notes`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">
-              Internal
-            </Link>
-            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-shared-notes`} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700">
-              Shared
+            {showSharedNotesCard ? (
+              <Link href={`/jobs/${job.id}?tab=${tab}#mobile-shared-notes`} className={evidenceActionClass}>
+                <span className={evidenceActionTopClass}>
+                  <span className={evidenceIconClass}>
+                    <ChatIcon className="h-4 w-4" />
+                  </span>
+                  <span className={evidenceLabelClass}>Shared Notes</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {sharedNotesSignal ? <span className={evidenceSignalClass}>{sharedNotesSignal}</span> : null}
+                  {sharedNotesBadge ? <span className={evidenceBadgeClass}>{sharedNotesBadge}</span> : null}
+                  <ChevronRightIcon className="h-5 w-5 text-slate-400" />
+                </span>
+              </Link>
+            ) : null}
+            <Link href={`/jobs/${job.id}/attachments`} className={evidenceActionClass}>
+              <span className={evidenceActionTopClass}>
+                <span className={evidenceIconClass}>
+                  <FolderIcon className="h-4 w-4" />
+                </span>
+                <span className={evidenceLabelClass}>Files & Attachments</span>
+              </span>
+              <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
             </Link>
           </div>
         </section>
@@ -794,14 +860,42 @@ export default function MobileJobDetailV2Preview(props: any) {
           ) : null}
         </section>
 
-        <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className={mobileToolLinkClass}>
-          More Details / Tools
-        </Link>
-        {isInternalUser && serviceLocationEditHref ? (
-          <Link href={serviceLocationEditHref} className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700">
-            Edit service location
-          </Link>
-        ) : null}
+        <details className="group rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+          <summary className="cursor-pointer list-none">
+            <div className={`${mobileToolLinkClass} justify-between`}>
+              <span>More Details / Tools</span>
+              <ChevronRightIcon className="h-5 w-5 shrink-0 transition-transform group-open:rotate-90" />
+            </div>
+          </summary>
+          <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
+            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">
+                  <ToolIcon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-semibold text-slate-950">Job Tools</span>
+                  <span className="block text-sm text-slate-600">Open tools area</span>
+                </span>
+              </span>
+              <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+            </Link>
+            {isInternalUser && serviceLocationEditHref ? (
+              <Link href={serviceLocationEditHref} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">
+                    <MapPinIcon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-slate-950">Location & Address</span>
+                    <span className="block text-sm text-slate-600">Edit service location</span>
+                  </span>
+                </span>
+                <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+              </Link>
+            ) : null}
+          </div>
+        </details>
       </div>
     </div>
   );
