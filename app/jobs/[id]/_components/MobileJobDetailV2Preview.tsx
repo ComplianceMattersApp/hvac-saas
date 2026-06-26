@@ -148,8 +148,8 @@ function buildExceptionNextStepPreview(props: {
       summary:
         props.linkedRetestPassiveCopy ||
         "This original job is historical while the linked retest or follow-up job carries the active work.",
-      anchor: "mobile-tools",
-      actionLabel: "Review retest history",
+      anchor: "",
+      actionLabel: "Open Standard Controls",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -159,8 +159,8 @@ function buildExceptionNextStepPreview(props: {
       eyebrow: "Read-only",
       title: "Archived",
       summary: "This job is archived. Review history or tools from the standard job view.",
-      anchor: "mobile-tools",
-      actionLabel: "Review job history",
+      anchor: "",
+      actionLabel: "Open Standard Controls",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -170,8 +170,8 @@ function buildExceptionNextStepPreview(props: {
       eyebrow: "Read-only",
       title: "Job cancelled",
       summary: "This job is cancelled. Review history or tools from the standard job view.",
-      anchor: "mobile-tools",
-      actionLabel: "Review job history",
+      anchor: "",
+      actionLabel: "Open Standard Controls",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -181,8 +181,8 @@ function buildExceptionNextStepPreview(props: {
       eyebrow: "Read-only",
       title: "Job closed",
       summary: "This job is closed. Review history, notes, or closeout details from the standard job view.",
-      anchor: "mobile-tools",
-      actionLabel: "Review job history",
+      anchor: "",
+      actionLabel: "Open Standard Controls",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -191,9 +191,9 @@ function buildExceptionNextStepPreview(props: {
     return {
       eyebrow: "Waiting",
       title: waitingLabel,
-      summary: waitingReason || "This job is paused until the waiting item is resolved.",
-      anchor: "mobile-tools",
-      actionLabel: "Open waiting tools",
+      summary: waitingReason || "Open the standard job controls for this state.",
+      anchor: "",
+      actionLabel: "Open Standard Controls",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -318,8 +318,7 @@ function buildNextStepPreview(props: {
     isEcc &&
     (!props.isFieldComplete ||
       props.hasRequiredEccTestAttention ||
-      props.isEccPermitNeededActive ||
-      Boolean(props.closeoutNeeds?.needsCerts));
+      props.isEccPermitNeededActive);
 
   const exceptionNextStep = buildExceptionNextStepPreview({
     job: props.job,
@@ -413,7 +412,7 @@ function buildNextStepPreview(props: {
     };
   }
 
-  if (isActiveEccWork && props.closeoutNeeds?.needsCerts) {
+  if (props.isFieldComplete && props.closeoutNeeds?.needsCerts) {
     return {
       eyebrow: "Compliance closeout",
       title: "Finish certification items",
@@ -513,8 +512,8 @@ function buildNextStepPreview(props: {
     summary: isEcc
       ? "Field work is complete. Continue with any closeout, notes, or billing responsibilities below."
       : "Field work is complete. Review work performed, notes, and any billing or closeout items below.",
-    anchor: "mobile-tools",
-    actionLabel: "Open job tools",
+    anchor: "",
+    actionLabel: "Open Standard Controls",
     isSafeInlineLifecycleAction: false,
   };
 }
@@ -554,8 +553,8 @@ function buildBillingPreview(props: {
     return {
       title: "Billing / Closeout",
       summary: "Review billing, closeout, and history from the standard job view.",
-      actionLabel: "Review job history",
-      hrefAnchor: "mobile-tools",
+      actionLabel: "",
+      hrefAnchor: "",
       statusLabel: "Read-only",
     };
   }

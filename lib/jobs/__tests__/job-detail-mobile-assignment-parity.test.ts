@@ -253,6 +253,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review closeout"');
     expect(mobileJobDetailV2PreviewSource).toContain('isReadOnlyState');
     expect(mobileJobDetailV2PreviewSource).toContain('"Review billing, closeout, and history from the standard job view."');
+    expect(mobileJobDetailV2PreviewSource).toContain("if (props.isFieldComplete && props.closeoutNeeds?.needsCerts)");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("props.isEccPermitNeededActive ||\n      Boolean(props.closeoutNeeds?.needsCerts)");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markEccPermitAvailableFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markInvoiceCompleteFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={completeDataEntryFromForm}");
@@ -261,7 +263,7 @@ describe("mobile job detail assignment parity", () => {
   it("hardens ECC failed, correction-review, and retest states without duplicating forms", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: props.showLinkedRetestCreated ? "Linked retest" : "Linked work"');
     expect(mobileJobDetailV2PreviewSource).toContain('"This original job is historical while the linked retest or follow-up job carries the active work."');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review retest history"');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open Standard Controls"');
     expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "ECC review"');
     expect(mobileJobDetailV2PreviewSource).toContain('title: opsStatus === "pending_office_review" ? "Office review needed" : "Correction or retest needed"');
     expect(mobileJobDetailV2PreviewSource).toContain('"This failed ECC result needs correction review or retest review before normal closeout can continue."');
@@ -295,9 +297,11 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('return "Linked active job"');
     expect(mobileJobDetailV2PreviewSource).toContain('title: "Job cancelled"');
     expect(mobileJobDetailV2PreviewSource).toContain('title: "Job closed"');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review job history"');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open waiting tools"');
-    expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-tools"');
+    expect(mobileJobDetailV2PreviewSource).toContain('summary: waitingReason || "Open the standard job controls for this state."');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open Standard Controls"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('actionLabel: "Review job history"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('actionLabel: "Open waiting tools"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('anchor: "mobile-tools"');
     expect(mobileJobDetailV2PreviewSource).toContain('"href" in nextStep && nextStep.href');
   });
 
