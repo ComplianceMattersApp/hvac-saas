@@ -151,6 +151,17 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("job.title =");
   });
 
+  it("keeps the V2 hero image mostly visible with display-only address cleanup", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain("function getHeroAddressDisplay");
+    expect(mobileJobDetailV2PreviewSource).toContain("const heroAddressDisplay = getHeroAddressDisplay(serviceAddressDisplay, serviceState);");
+    expect(mobileJobDetailV2PreviewSource).toContain("escapeRegExp(stateText)");
+    expect(mobileJobDetailV2PreviewSource).toContain("max-w-[92%] rounded-2xl");
+    expect(mobileJobDetailV2PreviewSource).toContain("border-t border-slate-200 bg-white px-3.5 py-3");
+    expect(mobileJobDetailV2PreviewSource).toContain("href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(heroAddressDisplay)}`}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("pointer-events-auto mt-3 grid grid-cols-3");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("serviceAddressDisplay =");
+  });
+
   it("does not treat ECC test availability as required test attention in the V2 preview", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function hasCompletedEccTestRun");
     expect(mobileJobDetailV2PreviewSource).toContain('String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job)');

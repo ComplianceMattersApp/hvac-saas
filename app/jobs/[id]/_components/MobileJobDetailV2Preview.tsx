@@ -613,6 +613,21 @@ function getHeroDisplayTitle(title: unknown, city: unknown) {
   return titleText;
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getHeroAddressDisplay(address: unknown, state: unknown) {
+  const addressText = String(address ?? "").trim();
+  const stateText = String(state ?? "").trim();
+  if (!addressText || !stateText) return addressText;
+
+  return addressText
+    .replace(new RegExp(`\\b${escapeRegExp(stateText)}\\s+${escapeRegExp(stateText)}\\b`, "gi"), stateText)
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export default function MobileJobDetailV2Preview(props: any) {
   const {
     activeWaitingState,
@@ -803,8 +818,13 @@ export default function MobileJobDetailV2Preview(props: any) {
     isReadOnlyState,
   });
   const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);
+  const heroAddressDisplay = getHeroAddressDisplay(serviceAddressDisplay, serviceState);
   const heroPreviewClassName =
     "px-0 pb-0 [&_a:first-child]:rounded-none [&_a:first-child]:border-0 [&_a:first-child]:shadow-none [&_img]:h-52 [&_img]:rounded-none [&_img]:object-cover min-[390px]:[&_img]:h-56";
+  const heroContactActionClass =
+    "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-700 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.45)] transition-colors hover:bg-slate-50 min-[390px]:gap-2 min-[390px]:px-3";
+  const heroContactDisabledClass =
+    "inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-2 text-sm font-semibold text-slate-400 min-[390px]:gap-2 min-[390px]:px-3";
   const lifecycleActionClass =
     "inline-flex min-h-14 w-full items-center justify-center rounded-2xl border border-blue-500 bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700";
   const finishWorkLabel = getActionOrientedWorkLabel(surfaceProfile.labels.finishComplete);
@@ -972,52 +992,56 @@ export default function MobileJobDetailV2Preview(props: any) {
                 onPhaseTiming={recordBlockingPhase}
               />
             </Suspense>
-            <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-2xl border border-white/30 bg-slate-950/78 p-2.5 text-white shadow-[0_18px_36px_-18px_rgba(15,23,42,0.78)] backdrop-blur-md min-[390px]:inset-x-3 min-[390px]:bottom-3 min-[390px]:p-3">
-              <div className="flex items-start gap-2">
-                <MapPinIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                <div className="min-w-0 break-words text-base font-semibold leading-tight min-[390px]:text-lg">{serviceAddressDisplay}</div>
-              </div>
-              <div className="pointer-events-auto mt-3 grid grid-cols-3 gap-2">
-                {mobileCallHref ? (
-                  <a href={mobileCallHref} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/25 bg-white/10 px-1.5 text-xs font-semibold text-white min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
-                    <PhoneIcon className="h-4 w-4" />
-                    <span>Call</span>
-                  </a>
-                ) : (
-                  <span className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1.5 text-xs font-semibold text-white/45 min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
-                    <PhoneIcon className="h-4 w-4" />
-                    <span>Call</span>
-                  </span>
-                )}
-                {mobileTextHref ? (
-                  <a href={mobileTextHref} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/25 bg-white/10 px-1.5 text-xs font-semibold text-white min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
-                    <ChatIcon className="h-4 w-4" />
-                    <span>Text</span>
-                  </a>
-                ) : (
-                  <span className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1.5 text-xs font-semibold text-white/45 min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
-                    <ChatIcon className="h-4 w-4" />
-                    <span>Text</span>
-                  </span>
-                )}
-                {serviceAddressDisplay !== "No address set" ? (
-                  <a
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddressDisplay)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/25 bg-white/10 px-1.5 text-xs font-semibold text-white min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm"
-                  >
-                    <MapPinIcon className="h-4 w-4" />
-                    <span>Navigate</span>
-                  </a>
-                ) : (
-                  <span className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1.5 text-xs font-semibold text-white/45 min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
-                    <MapPinIcon className="h-4 w-4" />
-                    <span>Navigate</span>
-                  </span>
-                )}
+            <div className="pointer-events-none absolute inset-x-2 bottom-2 flex justify-start min-[390px]:inset-x-3 min-[390px]:bottom-3">
+              <div className="max-w-[92%] rounded-2xl border border-white/35 bg-slate-950/70 px-3 py-2 text-white shadow-[0_14px_28px_-16px_rgba(15,23,42,0.75)] backdrop-blur-sm">
+                <div className="flex items-start gap-2">
+                  <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div className="min-w-0 break-words text-sm font-semibold leading-tight min-[390px]:text-base">
+                    {heroAddressDisplay}
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 border-t border-slate-200 bg-white px-3.5 py-3 min-[390px]:gap-2.5 min-[390px]:px-4">
+            {mobileCallHref ? (
+              <a href={mobileCallHref} className={heroContactActionClass}>
+                <PhoneIcon className="h-4 w-4 shrink-0" />
+                <span>Call</span>
+              </a>
+            ) : (
+              <span className={heroContactDisabledClass}>
+                <PhoneIcon className="h-4 w-4 shrink-0" />
+                <span>Call</span>
+              </span>
+            )}
+            {mobileTextHref ? (
+              <a href={mobileTextHref} className={heroContactActionClass}>
+                <ChatIcon className="h-4 w-4 shrink-0" />
+                <span>Text</span>
+              </a>
+            ) : (
+              <span className={heroContactDisabledClass}>
+                <ChatIcon className="h-4 w-4 shrink-0" />
+                <span>Text</span>
+              </span>
+            )}
+            {heroAddressDisplay !== "No address set" ? (
+              <a
+                href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(heroAddressDisplay)}`}
+                target="_blank"
+                rel="noreferrer"
+                className={heroContactActionClass}
+              >
+                <MapPinIcon className="h-4 w-4 shrink-0" />
+                <span>Navigate</span>
+              </a>
+            ) : (
+              <span className={heroContactDisabledClass}>
+                <MapPinIcon className="h-4 w-4 shrink-0" />
+                <span>Navigate</span>
+              </span>
+            )}
           </div>
         </section>
 
