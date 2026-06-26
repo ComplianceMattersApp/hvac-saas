@@ -129,6 +129,17 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("completeDataEntryFromForm");
   });
 
+  it("uses a display-only V2 hero title without mutating source job titles", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain("function getHeroDisplayTitle");
+    expect(mobileJobDetailV2PreviewSource).toContain("const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);");
+    expect(mobileJobDetailV2PreviewSource).toContain("{heroDisplayTitle || jobWorkbenchTitle}");
+    expect(mobileJobDetailV2PreviewSource).toContain("` — ${cityText}`");
+    expect(mobileJobDetailV2PreviewSource).toContain("` - ${cityText}`");
+    expect(mobileJobDetailV2PreviewSource).toContain("`, ${cityText}`");
+    expect(mobileJobDetailV2PreviewSource).toContain("titleText.toLowerCase().endsWith(suffix.toLowerCase())");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("job.title =");
+  });
+
   it("does not treat ECC test availability as required test attention in the V2 preview", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function hasCompletedEccTestRun");
     expect(mobileJobDetailV2PreviewSource).toContain('String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job)');

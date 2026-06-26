@@ -577,6 +577,20 @@ function buildBillingPreview(props: {
   };
 }
 
+function getHeroDisplayTitle(title: unknown, city: unknown) {
+  const titleText = String(title ?? "").trim();
+  const cityText = String(city ?? "").trim();
+  if (!titleText || !cityText) return titleText;
+
+  for (const suffix of [` — ${cityText}`, ` - ${cityText}`, `, ${cityText}`]) {
+    if (titleText.toLowerCase().endsWith(suffix.toLowerCase())) {
+      return titleText.slice(0, -suffix.length).trim();
+    }
+  }
+
+  return titleText;
+}
+
 export default function MobileJobDetailV2Preview(props: any) {
   const {
     activeWaitingState,
@@ -744,6 +758,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     isEcc,
     isFieldComplete,
   });
+  const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);
   const heroPreviewClassName =
     "px-0 pb-0 [&_a:first-child]:rounded-none [&_a:first-child]:border-0 [&_a:first-child]:shadow-none [&_img]:h-52 [&_img]:rounded-none [&_img]:object-cover min-[390px]:[&_img]:h-56";
   const lifecycleActionClass =
@@ -842,7 +857,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             </div>
 
             <h1 className="mt-4 break-words text-[1.8rem] font-semibold leading-[1.08] tracking-normal text-[#071225] min-[390px]:text-[2rem]">
-              {jobWorkbenchTitle}
+              {heroDisplayTitle || jobWorkbenchTitle}
             </h1>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
