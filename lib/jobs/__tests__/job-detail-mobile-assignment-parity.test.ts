@@ -22,7 +22,12 @@ const mobileJobStatusActionSurfaceSource = readFileSync(
   "utf8",
 );
 
-const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
+const mobileJobSchedulePanelSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobSchedulePanel.tsx"),
+  "utf8",
+);
+
+const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}`;
 
 const controlsSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/AssignedTeamControls.tsx"),
@@ -171,18 +176,30 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("serviceAddressDisplay =");
   });
 
-  it("routes the compact V2 schedule display to the existing current mobile scheduling panel", () => {
+  it("renders the native current mobile schedule panel in V2", () => {
     expect(mobileJobDetailV2PreviewSource).toContain(
       "hasFullSchedule || job?.scheduled_date || job?.window_start || job?.window_end || mobileAppointmentTimeLabel",
     );
-    expect(mobileJobDetailV2PreviewSource).toContain('const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");');
-    expect(mobileJobDetailV2PreviewSource).toContain("href={schedulePanelHref}");
-    expect(mobileJobDetailV2PreviewSource).toContain('{hasScheduleInformation ? "Edit" : "Schedule"}');
+    expect(mobileJobDetailCurrentSource).toContain("<MobileJobSchedulePanel {...props} />");
+    expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobSchedulePanel from "./MobileJobSchedulePanel";');
+    expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobSchedulePanel {...props} />");
+    expect(mobileJobDetailV2PreviewSource).not.toContain('const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");');
+    expect(mobileJobDetailV2PreviewSource).not.toContain("href={schedulePanelHref}");
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Change appointment date or arrival window.");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Edit Schedule");
     expect(mobileJobDetailV2PreviewSource).not.toContain("updateJobScheduleFromForm");
     expect(mobileJobDetailV2PreviewSource).not.toContain('name="scheduled_date"');
+    expect(mobileJobSchedulePanelSource).toContain('id="mobile-when-panel"');
+    expect(mobileJobSchedulePanelSource).toContain('form action={updateJobScheduleFromForm}');
+    expect(mobileJobSchedulePanelSource).toContain('name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-when-panel`}');
+    expect(mobileJobSchedulePanelSource).toContain('name="permit_number"');
+    expect(mobileJobSchedulePanelSource).toContain('name="jurisdiction"');
+    expect(mobileJobSchedulePanelSource).toContain('name="permit_date"');
+    expect(mobileJobSchedulePanelSource).toContain('name="scheduled_date"');
+    expect(mobileJobSchedulePanelSource).toContain('name="window_start"');
+    expect(mobileJobSchedulePanelSource).toContain('name="window_end"');
+    expect(mobileJobSchedulePanelSource).toContain("<UnscheduleButton");
   });
 
   it("does not treat ECC test availability as required test attention in the V2 preview", () => {
@@ -417,11 +434,11 @@ describe("mobile job detail assignment parity", () => {
 
   it("keeps compact mobile schedule and equal-height contact logging controls", () => {
     expect(pageSource).toContain("const mobileAppointmentTimeLabel = job.scheduled_date ? appointmentTimeLabel : \"\";");
-    expect(mobileJobDetailCurrentSource).toContain("{mobileAppointmentTimeLabel ? (");
-    expect(mobileJobDetailCurrentSource).toContain('<details id="mobile-when-panel" className="group relative overflow-visible rounded-xl');
-    expect(mobileJobDetailCurrentSource).toContain("mt-2 break-words text-xl font-semibold leading-tight text-[#0f1f35]");
-    expect(mobileJobDetailCurrentSource).toContain("mt-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold text-blue-900");
-    expect(mobileJobDetailCurrentSource).toContain("hidden w-full max-w-[calc(100vw-1.5rem)] group-open:block");
+    expect(mobileJobSchedulePanelSource).toContain("{mobileAppointmentTimeLabel ? (");
+    expect(mobileJobSchedulePanelSource).toContain('<details id="mobile-when-panel" className="group relative overflow-visible rounded-xl');
+    expect(mobileJobSchedulePanelSource).toContain("mt-2 break-words text-xl font-semibold leading-tight text-[#0f1f35]");
+    expect(mobileJobSchedulePanelSource).toContain("mt-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold text-blue-900");
+    expect(mobileJobSchedulePanelSource).toContain("hidden w-full max-w-[calc(100vw-1.5rem)] group-open:block");
     expect(contactLoggingSource).toContain("min-h-[4rem]");
     expect(contactLoggingSource).toContain("h-full");
     expect(contactLoggingSource).toContain("whitespace-normal");
@@ -429,12 +446,8 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("omits the redundant mobile work summary card from the header", () => {
-    const mobileScheduleStart = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"');
-    const mobileScheduleEnd = mobileJobDetailCurrentSource.indexOf('{banner === "note_added"', mobileScheduleStart);
-    const mobileScheduleSection = mobileJobDetailCurrentSource.slice(mobileScheduleStart, mobileScheduleEnd);
+    const mobileScheduleSection = mobileJobSchedulePanelSource;
 
-    expect(mobileScheduleStart).toBeGreaterThan(-1);
-    expect(mobileScheduleEnd).toBeGreaterThan(mobileScheduleStart);
     expect(`${pageSource}\n${mobileJobDetailCurrentSource}`).not.toContain("const mobileWorkStateLabel =");
     expect(mobileJobDetailCurrentSource).not.toContain("{mobileWorkStateLabel}");
     expect(mobileScheduleSection).not.toContain("<span>Work</span>");
@@ -443,7 +456,7 @@ describe("mobile job detail assignment parity", () => {
 
   it("keeps the top mobile customer link while omitting the duplicate operations-board customer card", () => {
     const mobileHeaderStart = mobileJobDetailCurrentSource.indexOf("<h1");
-    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf("<MobileJobSchedulePanel", mobileHeaderStart);
     const mobileHeader = mobileJobDetailCurrentSource.slice(mobileHeaderStart, mobileHeaderEnd);
     const fieldOpsStart = mobileJobDetailCurrentSource.indexOf("Field Operations Board");
     const fieldOpsEnd = mobileJobDetailCurrentSource.indexOf('id="assigned-team"', fieldOpsStart);
@@ -477,7 +490,7 @@ describe("mobile job detail assignment parity", () => {
 
   it("folds the mobile service address edit affordance into the address row", () => {
     const mobileHeaderStart = mobileJobDetailCurrentSource.indexOf("<h1");
-    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf("<MobileJobSchedulePanel", mobileHeaderStart);
     const mobileHeader = mobileJobDetailCurrentSource.slice(mobileHeaderStart, mobileHeaderEnd);
 
     expect(mobileHeaderStart).toBeGreaterThan(-1);
@@ -492,7 +505,7 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("removes duplicate mobile workflow and field status row below the schedule/work cards", () => {
-    const mobileWorkbenchStart = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"');
+    const mobileWorkbenchStart = mobileJobDetailCurrentSource.indexOf("<MobileJobSchedulePanel");
     const mobileWorkbenchEnd = mobileJobDetailCurrentSource.indexOf('{banner === "note_added"', mobileWorkbenchStart);
     const mobileWorkbench = mobileJobDetailCurrentSource.slice(mobileWorkbenchStart, mobileWorkbenchEnd);
 

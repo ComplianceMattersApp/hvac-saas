@@ -17,6 +17,11 @@ const mobileJobDetailCurrentSource = readFileSync(
   "utf8",
 );
 
+const mobileJobSchedulePanelSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobSchedulePanel.tsx"),
+  "utf8",
+);
+
 const jobLocationPreviewSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/JobLocationPreview.tsx"),
   "utf8",
@@ -470,7 +475,7 @@ describe("job detail field operations board layout", () => {
 
   it("keeps customer context in the mobile header without duplicating it in the Field Operations Board", () => {
     const mobileHeaderStart = mobileJobDetailCurrentSource.indexOf('<span>Job Workbench</span>');
-    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeaderEnd = mobileJobDetailCurrentSource.indexOf("<MobileJobSchedulePanel", mobileHeaderStart);
     const mobileHeaderSlice =
       mobileHeaderStart > -1 && mobileHeaderEnd > mobileHeaderStart
         ? mobileJobDetailCurrentSource.slice(mobileHeaderStart, mobileHeaderEnd)
@@ -507,17 +512,14 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps the mobile schedule editor mounted in visible overflow containers", () => {
-    const mobileScheduleStart = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"');
-    const mobileScheduleEnd = mobileJobDetailCurrentSource.indexOf("Quick Field Actions", mobileScheduleStart);
-    const mobileScheduleSlice =
-      mobileScheduleStart > -1 && mobileScheduleEnd > mobileScheduleStart
-        ? mobileJobDetailCurrentSource.slice(mobileScheduleStart, mobileScheduleEnd)
-        : "";
+    const mobileScheduleStart = mobileJobSchedulePanelSource.indexOf('id="mobile-when-panel"');
+    const mobileScheduleSlice = mobileJobSchedulePanelSource;
 
     expect(mobileScheduleStart).toBeGreaterThan(-1);
     expect(mobileJobDetailCurrentSource).toContain(
       '<section className="overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_48px_-34px_rgba(15,23,42,0.36)] ring-1 ring-blue-100/35">',
     );
+    expect(mobileJobDetailCurrentSource).toContain("<MobileJobSchedulePanel {...props} />");
     expect(mobileScheduleSlice).toContain('className="group relative overflow-visible rounded-xl');
     expect(mobileScheduleSlice).toContain("<ClockIcon");
     expect(mobileScheduleSlice).toContain("{appointmentDateLabel}");
