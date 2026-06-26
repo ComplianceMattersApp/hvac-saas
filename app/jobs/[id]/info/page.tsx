@@ -198,6 +198,7 @@ if (!job) return notFound();
     acc[filter.system_id].push(filter);
     return acc;
   }, {});
+  const activeFilterCount = systemFilters.filter((filter) => !filter.archived_at).length;
 
   const equipmentRows = ((job.job_equipment ?? []) as Array<any>).filter((equipment) =>
     String(equipment?.id ?? "").trim(),
@@ -325,9 +326,9 @@ if (!job) return notFound();
                     <div className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
                       {(systems ?? []).length} system{(systems ?? []).length === 1 ? "" : "s"}
                     </div>
-                    {equipmentRows.length > 0 ? (
+                    {equipmentRows.length + activeFilterCount > 0 ? (
                       <div className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                        {equipmentRows.length} equipment
+                        {equipmentRows.length + activeFilterCount} inventory item{equipmentRows.length + activeFilterCount === 1 ? "" : "s"}
                       </div>
                     ) : null}
                   </div>
@@ -338,6 +339,8 @@ if (!job) return notFound();
                 <div className="space-y-4 p-4 sm:p-5">
                   {(systems ?? []).map((system) => {
                     const systemEquipment = equipmentBySystemId[system.id] ?? [];
+                    const systemFiltersForInventory = (filtersBySystemId[system.id] ?? []).filter((filter) => !filter.archived_at);
+                    const systemInventoryCount = systemEquipment.length + systemFiltersForInventory.length;
                     return (
                       <div key={system.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                         <div className="border-b border-gray-200 bg-gray-50/80 px-4 py-3">
@@ -347,7 +350,7 @@ if (!job) return notFound();
                               <p className="mt-0.5 text-xs text-gray-500">System details, equipment, and filters.</p>
                             </div>
                             <span className="inline-flex w-fit rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600">
-                              {systemEquipment.length} equipment record{systemEquipment.length === 1 ? "" : "s"}
+                              {systemInventoryCount} inventory item{systemInventoryCount === 1 ? "" : "s"}
                             </span>
                           </div>
                         </div>
@@ -357,7 +360,7 @@ if (!job) return notFound();
                             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
                               Inventory
                             </div>
-                            {systemEquipment.length > 0 || (filtersBySystemId[system.id] ?? []).length > 0 ? (
+                            {systemInventoryCount > 0 ? (
                               <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                                 <div className="divide-y divide-gray-200">
                                   {systemEquipment.map((eq) => (
@@ -368,7 +371,7 @@ if (!job) return notFound();
                                       jobId={job.id}
                                     />
                                   ))}
-                                  {(filtersBySystemId[system.id] ?? []).map((filter) => (
+                                  {systemFiltersForInventory.map((filter) => (
                                     <SystemFilterInventoryCard
                                       key={filter.id}
                                       filter={filter}
