@@ -14,7 +14,7 @@ import {
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
 import EquipmentCreateForm from "../_components/EquipmentCreateForm";
-import SystemFiltersCard from "../_components/SystemFiltersCard";
+import SystemFilterInventoryCard from "../_components/SystemFilterInventoryCard";
 import JobSubpageContextHeader from "../_components/JobSubpageContextHeader";
 
 function formatTimeDisplay(time?: string | null) {
@@ -355,9 +355,9 @@ if (!job) return notFound();
                         <div className="space-y-4 p-4">
                           <div>
                             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              Equipment
+                              Inventory
                             </div>
-                            {systemEquipment.length > 0 ? (
+                            {systemEquipment.length > 0 || (filtersBySystemId[system.id] ?? []).length > 0 ? (
                               <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
                                 <div className="divide-y divide-gray-200">
                                   {systemEquipment.map((eq) => (
@@ -368,20 +368,21 @@ if (!job) return notFound();
                                       jobId={job.id}
                                     />
                                   ))}
+                                  {(filtersBySystemId[system.id] ?? []).map((filter) => (
+                                    <SystemFilterInventoryCard
+                                      key={filter.id}
+                                      filter={filter}
+                                      jobId={job.id}
+                                    />
+                                  ))}
                                 </div>
                               </div>
                             ) : (
                               <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                                No equipment records under this system yet.
+                                No equipment or filter records under this system yet.
                               </div>
                             )}
                           </div>
-
-                          <SystemFiltersCard
-                            jobId={job.id}
-                            system={system}
-                            filters={filtersBySystemId[system.id] ?? []}
-                          />
                         </div>
                       </div>
                     );
