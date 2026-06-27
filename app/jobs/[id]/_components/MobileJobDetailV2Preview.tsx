@@ -5,6 +5,7 @@ import MobileJobSchedulePanel from "./MobileJobSchedulePanel";
 import MobileJobTeamNotesPanel from "./MobileJobTeamNotesPanel";
 import MobileJobSharedNotesPanel from "./MobileJobSharedNotesPanel";
 import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";
+import MobileJobServiceFollowUpTool from "./MobileJobServiceFollowUpTool";
 
 function buildLifecyclePreview(props: {
   job: any;
@@ -1009,18 +1010,13 @@ export default function MobileJobDetailV2Preview(props: any) {
                   </Link>
                 ) : null}
                 {isInternalUser && String(job?.job_type ?? "").trim().toLowerCase() === "service" ? (
-                  <Link href={standardJobAnchorHref("mobile-follow-up-job")} className={toolsRowClass}>
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <span className={toolsRowIconClass}>
-                        <ToolIcon className="h-4 w-4" />
-                      </span>
-                      <span className={toolsRowTextClass}>
-                        <span className="block font-semibold text-slate-950">Create Return Visit</span>
-                        <span className="block text-sm font-medium text-slate-600">Open return visit tools in standard view</span>
-                      </span>
-                    </span>
-                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
-                  </Link>
+                  <MobileJobServiceFollowUpTool
+                    {...props}
+                    presentation="v2Tools"
+                    toolsRowClass={toolsRowClass}
+                    toolsRowIconClass={toolsRowIconClass}
+                    toolsRowTextClass={toolsRowTextClass}
+                  />
                 ) : null}
                 <Link href={servicePlanToolHref} className={toolsRowClass}>
                   <span className="flex min-w-0 flex-1 items-center gap-2">

@@ -5,6 +5,7 @@ import MobileJobSchedulePanel from "./MobileJobSchedulePanel";
 import MobileJobTeamNotesPanel from "./MobileJobTeamNotesPanel";
 import MobileJobSharedNotesPanel from "./MobileJobSharedNotesPanel";
 import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";
+import MobileJobServiceFollowUpTool from "./MobileJobServiceFollowUpTool";
 
 type MobileJobDetailCurrentProps = {
   activeWaitingState: any;
@@ -222,7 +223,6 @@ export default function MobileJobDetailCurrent(props: MobileJobDetailCurrentProp
     contractorName,
     createEstimateFromJobHref,
     createInternalInvoiceDraftFromForm,
-    createNextServiceVisitFromForm,
     createRetestJobFromForm,
     currentInterruptState,
     darkButtonClass,
@@ -921,36 +921,7 @@ export default function MobileJobDetailCurrent(props: MobileJobDetailCurrentProp
                     <Link href={createEstimateFromJobHref} className={mobileToolLinkClass}>Create Estimate</Link>
                   ) : null}
                   {isInternalUser && job.job_type === "service" ? (
-                    <details id="mobile-follow-up-job" className="group">
-                      <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
-                        <span className="inline-flex items-center gap-2"><ToolIcon className="h-4.5 w-4.5" />Create Return Visit</span>
-                      </summary>
-                      <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
-                        <form action={createNextServiceVisitFromForm} className="space-y-3">
-                          <input type="hidden" name="job_id" value={job.id} />
-                          <input type="hidden" name="tab" value={tab} />
-                          <input type="hidden" name="visit_intent" value="return_visit" />
-                          <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-follow-up-job`} />
-
-                          <div className="space-y-1">
-                            <label className="text-sm font-semibold text-slate-700">Why is a return visit needed?</label>
-                            <input
-                              type="text"
-                              name="next_visit_reason"
-                              required
-                              maxLength={220}
-                              placeholder="Example: return to complete repair"
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
-                            />
-                            <p className="text-xs leading-5 text-slate-600">This creates an unscheduled office/dispatch item.</p>
-                          </div>
-
-                          <SubmitButton loadingText="Creating..." className={mobileToolLinkClass}>
-                            Create Return Visit
-                          </SubmitButton>
-                        </form>
-                      </div>
-                    </details>
+                    <MobileJobServiceFollowUpTool {...props} />
                   ) : null}
                   {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" && !showMobileEccTestAction ? (
                     <Link href={`/jobs/${job.id}/tests`} className={mobileToolLinkClass}>ECC Test</Link>

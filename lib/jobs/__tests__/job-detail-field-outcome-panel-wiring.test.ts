@@ -12,7 +12,12 @@ const mobileJobDetailCurrentSource = readFileSync(
   "utf8",
 );
 
-const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}`;
+const mobileJobStatusActionSurfaceSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
+  "utf8",
+);
+
+const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
 
 const jobActionsSource = readFileSync(
   resolve(__dirname, "../../actions/job-actions.ts"),
@@ -179,19 +184,19 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("markServicePartOrderedFromForm");
     expect(jobDetailSource).toContain("markServicePartArrivedFromForm");
     expect(jobDetailSource).toContain("markServiceApprovalReceivedFromForm");
-    expect(mobileJobDetailCurrentSource).toContain("Progress: {serviceFollowUpProgressState.progressLabel}");
-    expect(mobileJobDetailCurrentSource).toContain("Mark Part Ordered");
-    expect(mobileJobDetailCurrentSource).toContain("Mark Part Arrived");
-    expect(mobileJobDetailCurrentSource).toContain("Mark Approval Received");
-    expect(mobileJobDetailCurrentSource).toContain("serviceFollowUpProgressState.bridgeActionLabel");
-    expect(mobileJobDetailCurrentSource).toContain('name="return_creation_mode" value="needs_scheduling"');
-    expect(mobileJobDetailCurrentSource).toContain('name="follow_up_bridge_action" value="add_to_scheduling_queue"');
-    expect(mobileJobDetailCurrentSource).toContain("serviceFollowUpProgressState.returnPromptLabel");
+    expect(jobDetailAndCurrentMobileSource).toContain("Progress: {serviceFollowUpProgressState.progressLabel}");
+    expect(jobDetailAndCurrentMobileSource).toContain("Mark Part Ordered");
+    expect(jobDetailAndCurrentMobileSource).toContain("Mark Part Arrived");
+    expect(jobDetailAndCurrentMobileSource).toContain("Mark Approval Received");
+    expect(jobDetailAndCurrentMobileSource).toContain("serviceFollowUpProgressState.bridgeActionLabel");
+    expect(jobDetailAndCurrentMobileSource).toContain('name="return_creation_mode" value="needs_scheduling"');
+    expect(jobDetailAndCurrentMobileSource).toContain('name="follow_up_bridge_action" value="add_to_scheduling_queue"');
+    expect(jobDetailAndCurrentMobileSource).toContain("serviceFollowUpProgressState.returnPromptLabel");
     expect(jobDetailAndCurrentMobileSource).not.toContain("Ready to resume this service visit?");
   });
 
   it("renders continued service follow-up parents as historical after a linked return exists", () => {
-    expect(mobileJobDetailCurrentSource).toContain("Follow-up continued through linked return visit");
+    expect(jobDetailAndCurrentMobileSource).toContain("Follow-up continued through linked return visit");
     expect(jobDetailAndCurrentMobileSource).toContain("Open Linked Return Visit");
     expect(jobDetailSource).toContain("!hasServiceFieldFollowUpPendingInfo");
     expect(jobDetailSource).toContain("isHistoricalServiceFollowUpContinued ? null : getActiveWaitingState");
@@ -221,8 +226,8 @@ describe("job detail field outcome panel wiring", () => {
 
   it("keeps open and on-the-way flow on existing start actions", () => {
     expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
-    expect(mobileJobDetailCurrentSource).toContain(') : !isFieldComplete ? (');
-    expect(mobileJobDetailCurrentSource).toContain(') : isFieldComplete || job.status === "completed" ? (');
+    expect(jobDetailAndCurrentMobileSource).toContain(') : !isFieldComplete ? (');
+    expect(jobDetailAndCurrentMobileSource).toContain(') : isFieldComplete || job.status === "completed" ? (');
   });
 
   it("uses lifecycle copy for active workflow chip instead of showing stale scheduled copy", () => {

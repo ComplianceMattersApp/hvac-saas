@@ -42,7 +42,12 @@ const mobileJobWorkScopePanelSource = readFileSync(
   "utf8",
 );
 
-const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}\n${mobileJobTeamNotesPanelSource}\n${mobileJobSharedNotesPanelSource}\n${mobileJobWorkScopePanelSource}`;
+const mobileJobServiceFollowUpToolSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobServiceFollowUpTool.tsx"),
+  "utf8",
+);
+
+const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}\n${mobileJobTeamNotesPanelSource}\n${mobileJobSharedNotesPanelSource}\n${mobileJobWorkScopePanelSource}\n${mobileJobServiceFollowUpToolSource}`;
 
 const controlsSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/AssignedTeamControls.tsx"),
@@ -136,7 +141,11 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("`/jobs/${job.id}/tests`");
     for (const anchor of standardViewAnchors) {
       expect(currentMobileSurfaceSource).toContain(`id="${anchor}"`);
-      expect(mobileJobDetailV2PreviewSource).toContain(anchor);
+      const previewOrNativeSource =
+        anchor === "mobile-follow-up-job"
+          ? `${mobileJobDetailV2PreviewSource}\n${mobileJobServiceFollowUpToolSource}`
+          : mobileJobDetailV2PreviewSource;
+      expect(previewOrNativeSource).toContain(anchor);
     }
     for (const routePattern of realPreviewWorkspacePatterns) {
       expect(mobileJobDetailV2PreviewSource).toContain(routePattern);
@@ -365,8 +374,17 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("toolsGroupHeadingClass");
     expect(mobileJobDetailV2PreviewSource).toContain("Admin / Records");
     expect(mobileJobDetailV2PreviewSource).toContain("Create Estimate");
-    expect(mobileJobDetailV2PreviewSource).toContain("Create Return Visit");
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-follow-up-job")');
+    expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobServiceFollowUpTool");
+    expect(mobileJobDetailV2PreviewSource).toContain('presentation="v2Tools"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('standardJobAnchorHref("mobile-follow-up-job")');
+    expect(mobileJobServiceFollowUpToolSource).toContain("Create Return Visit");
+    expect(mobileJobServiceFollowUpToolSource).toContain('id="mobile-follow-up-job"');
+    expect(mobileJobServiceFollowUpToolSource).toContain("form action={createNextServiceVisitFromForm}");
+    expect(mobileJobServiceFollowUpToolSource).toContain('name="job_id"');
+    expect(mobileJobServiceFollowUpToolSource).toContain('name="tab"');
+    expect(mobileJobServiceFollowUpToolSource).toContain('name="visit_intent" value="return_visit"');
+    expect(mobileJobServiceFollowUpToolSource).toContain('name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-follow-up-job`}');
+    expect(mobileJobServiceFollowUpToolSource).toContain('name="next_visit_reason"');
     expect(mobileJobDetailV2PreviewSource).toContain("hasServicePlanToolContext");
     expect(mobileJobDetailV2PreviewSource).toContain("markVisitCountedLinkId");
     expect(mobileJobDetailV2PreviewSource).toContain("suggestedNextDueProjection");
