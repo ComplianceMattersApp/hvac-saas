@@ -472,6 +472,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     .slice(0, 3);
   const serviceWorkSummary = String(visitScopeSummary || visitReasonText || "").trim();
   const showServiceWorkLane = isEcc ? companionServiceItems.length > 0 : Boolean(hasVisitScopeDefined || serviceWorkSummary);
+  const showEccWorkScopeLane = isEcc && !showServiceWorkLane && Boolean(hasVisitScopeDefined || serviceWorkSummary);
   const showEccReviewSummary = isEcc && showLinkedRetestCreated;
   const eccReviewSummaryTitle = linkedRetestPassiveHeading || "Linked retest job exists";
   const eccReviewSummaryBody = showLinkedRetestCreated
@@ -725,7 +726,6 @@ export default function MobileJobDetailV2Preview(props: any) {
 
         <section className={previewSectionClass}>
           <div
-            id={!showServiceWorkLane ? "mobile-work-scope-row" : undefined}
             className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between"
           >
             <div className="min-w-0">
@@ -743,11 +743,6 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </div>
               </div>
             </div>
-            {isEcc ? (
-              <a href="#mobile-work-scope" className={previewHeaderActionClass}>
-                Compliance details
-              </a>
-            ) : null}
           </div>
 
           {showEccReviewSummary ? (
@@ -821,10 +816,26 @@ export default function MobileJobDetailV2Preview(props: any) {
               </>
             )}
           </div>
-          {isEcc && !showServiceWorkLane ? (
-            <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
-          ) : null}
         </section>
+
+        {showEccWorkScopeLane ? (
+          <section className={previewSectionClass}>
+            <div id="mobile-work-scope-row" className="flex items-start gap-2">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-700 ring-1 ring-slate-200">
+                <ToolIcon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold leading-tight text-[#071225]">Work Scope</h2>
+                <p className="mt-0.5 text-sm text-slate-600">
+                  Visit scope and Work Items for this job.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <MobileJobWorkScopePanel {...props} presentation="v2InlineBody" />
+            </div>
+          </section>
+        ) : null}
 
         {isEcc && showServiceWorkLane ? (
           <section className={previewSectionClass}>

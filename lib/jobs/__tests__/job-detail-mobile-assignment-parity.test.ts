@@ -156,7 +156,6 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-internal-notes"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-shared-notes"');
-    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
     for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes" && anchor !== "mobile-shared-notes" && anchor !== "mobile-work-scope")) {
       expect(mobileJobDetailV2PreviewSource).not.toContain(`href="#${anchor}"`);
@@ -277,13 +276,17 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("No Work Items saved yet.");
     expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";');
-    expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />');
+    expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobWorkScopePanel {...props} presentation="v2InlineBody" />');
     expect(mobileJobDetailV2PreviewSource).toContain('presentation="v2DisclosurePanel"');
     expect(mobileJobDetailV2PreviewSource).toContain("disclosureLabel={surfaceProfile.labels.workItems}");
     expect(mobileJobDetailV2PreviewSource).toContain('disclosureLabel="Service Work"');
-    expect(mobileJobDetailV2PreviewSource).toContain("{isEcc && !showServiceWorkLane ? (");
-    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
+    expect(mobileJobDetailV2PreviewSource).toContain("const showEccWorkScopeLane =");
+    expect(mobileJobDetailV2PreviewSource).toContain("{showEccWorkScopeLane ? (");
+    expect(mobileJobDetailV2PreviewSource).toContain("Work Scope");
+    expect(mobileJobDetailV2PreviewSource).toContain("Visit scope and Work Items for this job.");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Compliance details");
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2DisclosurePanel"');
+    expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2InlineBody"');
     expect(mobileJobWorkScopePanelSource).toContain('<div id="mobile-work-scope">');
     expect(mobileJobWorkScopePanelSource).not.toContain('<details id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2TargetPanel"');
@@ -293,7 +296,6 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
     expect(mobileJobWorkScopePanelSource).toContain("VisitScopeJobDetailForm");
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
-    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain("<span className={previewPillClass ?? \"\"}>Details</span>");
     expect(mobileJobDetailV2PreviewSource).not.toContain("View work details");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");

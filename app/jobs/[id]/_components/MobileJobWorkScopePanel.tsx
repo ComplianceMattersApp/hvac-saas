@@ -178,6 +178,14 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
     );
   }
 
+  if (presentation === "v2InlineBody") {
+    return (
+      <div id="mobile-work-scope" className="space-y-3 rounded-2xl border border-slate-200 px-3 py-3">
+        <MobileJobWorkScopeBody {...props} />
+      </div>
+    );
+  }
+
   if (presentation === "v2TargetPanel") {
     return (
       <div
