@@ -89,11 +89,11 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
         ) : null}
 
         {canShowEccFailedReasonBanner ? (
-          <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-5 text-rose-950">
+          <div className="mt-3 space-y-2.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-950">
             <details id="mobile-failed-reason-editor" className="group">
               <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
                 <span className="min-w-0">
-                  <span className="block text-xs font-semibold uppercase tracking-[0.08em] text-rose-800">Failed reason</span>
+                  <span className="block text-sm font-semibold uppercase tracking-[0.1em] text-rose-800">Failed reason</span>
                   <span className="mt-1 block font-semibold">{failedReasonBannerText}</span>
                 </span>
                 <span className="shrink-0 rounded-full border border-rose-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-rose-800 group-open:hidden">

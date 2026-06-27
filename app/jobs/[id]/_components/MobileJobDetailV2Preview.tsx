@@ -472,20 +472,8 @@ export default function MobileJobDetailV2Preview(props: any) {
     .slice(0, 3);
   const serviceWorkSummary = String(visitScopeSummary || visitReasonText || "").trim();
   const showServiceWorkLane = isEcc ? companionServiceItems.length > 0 : Boolean(hasVisitScopeDefined || serviceWorkSummary);
-  const showEccReviewSummary =
-    isEcc &&
-    (showLinkedRetestCreated ||
-      showRetestSection ||
-      showCorrectionReviewResolution ||
-      isEccFailedReviewState ||
-      isEccRetestNeededState);
-  const eccReviewSummaryTitle = showLinkedRetestCreated
-    ? linkedRetestPassiveHeading || "Linked retest job exists"
-    : showRetestSection || isEccRetestNeededState
-    ? "Retest needed"
-    : normalizedOpsStatus === "pending_office_review"
-    ? "Office review needed"
-    : "Correction or retest needed";
+  const showEccReviewSummary = isEcc && showLinkedRetestCreated;
+  const eccReviewSummaryTitle = linkedRetestPassiveHeading || "Linked retest job exists";
   const eccReviewSummaryBody = showLinkedRetestCreated
     ? linkedRetestPassiveCopy ||
       "This original ECC job is historical while the linked retest job carries the active work."
