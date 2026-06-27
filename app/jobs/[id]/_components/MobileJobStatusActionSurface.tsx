@@ -224,17 +224,17 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
           ) : showConfirmRetestReady ? (
             <div
               id="mobile-next-service-action"
-              className="space-y-3 rounded-xl border border-orange-200 bg-orange-50/90 px-3.5 py-3 text-sm text-orange-950"
+              className="space-y-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
             >
               <div>
-                <div className="font-semibold">Confirm Retest Ready</div>
-                <p className="mt-1 text-sm leading-6 text-orange-900/90">
+                <div className="text-sm font-semibold uppercase tracking-[0.1em] text-amber-700">Confirm Retest Ready</div>
+                <p className="mt-1 text-sm leading-5 text-amber-900">
                   Confirm corrections are ready for another ECC test visit.
                 </p>
               </div>
               <form action={confirmEccRetestReadyFromForm}>
                 <input type="hidden" name="job_id" value={job.id} />
-                <SubmitButton loadingText="Confirming..." className={`${darkButtonClass} min-h-12 w-full`}>
+                <SubmitButton loadingText="Confirming..." className={`${darkButtonClass} min-h-11 w-full`}>
                   Confirm Retest Ready
                 </SubmitButton>
               </form>

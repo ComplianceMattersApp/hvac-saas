@@ -475,7 +475,6 @@ export default function MobileJobDetailV2Preview(props: any) {
   const showEccReviewSummary =
     isEcc &&
     (showLinkedRetestCreated ||
-      showConfirmRetestReady ||
       showRetestSection ||
       showCorrectionReviewResolution ||
       isEccFailedReviewState ||
@@ -484,8 +483,6 @@ export default function MobileJobDetailV2Preview(props: any) {
     ? linkedRetestPassiveHeading || "Linked retest job exists"
     : showRetestSection || isEccRetestNeededState
     ? "Retest needed"
-    : showConfirmRetestReady
-    ? "Confirm retest readiness"
     : normalizedOpsStatus === "pending_office_review"
     ? "Office review needed"
     : "Correction or retest needed";
