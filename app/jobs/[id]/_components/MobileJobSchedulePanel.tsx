@@ -72,12 +72,21 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
           <UnscheduleButton className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800" />
         ) : null}
 
-        <Link
-          href={closeHref}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
-        >
-          Close
-        </Link>
+        {presentation === "v2TargetPanel" ? (
+          <a
+            href={closeHref}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
+          >
+            Close
+          </a>
+        ) : (
+          <Link
+            href={closeHref}
+            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
+          >
+            Close
+          </Link>
+        )}
       </div>
     </form>
   );
@@ -99,12 +108,12 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
               <div className="mt-1 text-sm font-semibold text-blue-900">{mobileAppointmentTimeLabel}</div>
             ) : null}
           </div>
-          <Link
+          <a
             href={closeHref}
             className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
           >
             Close
-          </Link>
+          </a>
         </div>
         {scheduleForm}
       </section>
