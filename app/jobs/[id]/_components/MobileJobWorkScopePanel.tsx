@@ -151,8 +151,32 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
     tab,
     ToolIcon,
     visitScopeCount,
+    disclosureHelper,
+    disclosureLabel,
+    previewPillClass,
+    previewRowClass,
+    previewRowTextClass,
   } = props;
   const presentation = props.presentation ?? "current";
+
+  if (presentation === "v2DisclosurePanel") {
+    return (
+      <details id="mobile-work-scope" className="group">
+        <summary className={`${previewRowClass ?? ""} cursor-pointer list-none`}>
+          <span className={previewRowTextClass ?? ""}>
+            <span className="block font-semibold text-slate-950">{disclosureLabel ?? "Work details"}</span>
+            <span className="block text-sm text-slate-600">
+              {disclosureHelper ?? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"} recorded`}
+            </span>
+          </span>
+          <span className={previewPillClass ?? ""}>Details</span>
+        </summary>
+        <div className="space-y-3 border-t border-slate-200 px-3 py-3">
+          <MobileJobWorkScopeBody {...props} />
+        </div>
+      </details>
+    );
+  }
 
   if (presentation === "v2TargetPanel") {
     return (

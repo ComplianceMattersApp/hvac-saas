@@ -833,19 +833,19 @@ export default function MobileJobDetailV2Preview(props: any) {
                     No Work Items saved yet.
                   </div>
                 )}
-                <a href="#mobile-work-scope" className={previewRowClass}>
-                  <span className={previewRowTextClass}>
-                    <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
-                    <span className="block text-sm text-slate-600">
-                      {serviceWorkCount > 0 ? `${getVisitScopeCountLabel(serviceWorkCount)} recorded` : "View details"}
-                    </span>
-                  </span>
-                  <span className={previewPillClass}>Details</span>
-                </a>
+                <MobileJobWorkScopePanel
+                  {...props}
+                  presentation="v2DisclosurePanel"
+                  disclosureLabel={surfaceProfile.labels.workItems}
+                  disclosureHelper={serviceWorkCount > 0 ? `${getVisitScopeCountLabel(serviceWorkCount)} recorded` : "View details"}
+                  previewPillClass={previewPillClass}
+                  previewRowClass={previewRowClass}
+                  previewRowTextClass={previewRowTextClass}
+                />
               </>
             )}
           </div>
-          {!isEcc || !showServiceWorkLane ? (
+          {isEcc && !showServiceWorkLane ? (
             <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
           ) : null}
         </section>
@@ -881,15 +881,16 @@ export default function MobileJobDetailV2Preview(props: any) {
                   {item.details ? <div className="mt-1 text-sm leading-5 text-slate-600">{item.details}</div> : null}
                 </div>
               ))}
-              <a href="#mobile-work-scope" className={previewRowClass}>
-                <span className={previewRowTextClass}>
-                  <span className="block font-semibold text-slate-950">Service Work</span>
-                  <span className="block text-sm text-slate-600">{getVisitScopeCountLabel(serviceWorkCount)} recorded</span>
-                </span>
-                <span className={previewPillClass}>Details</span>
-              </a>
+              <MobileJobWorkScopePanel
+                {...props}
+                presentation="v2DisclosurePanel"
+                disclosureLabel="Service Work"
+                disclosureHelper={`${getVisitScopeCountLabel(serviceWorkCount)} recorded`}
+                previewPillClass={previewPillClass}
+                previewRowClass={previewRowClass}
+                previewRowTextClass={previewRowTextClass}
+              />
             </div>
-            <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
           </section>
         ) : null}
 

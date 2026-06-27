@@ -269,8 +269,13 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";');
     expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />');
-    expect(mobileJobDetailV2PreviewSource).toContain("{!isEcc || !showServiceWorkLane ? (");
+    expect(mobileJobDetailV2PreviewSource).toContain('presentation="v2DisclosurePanel"');
+    expect(mobileJobDetailV2PreviewSource).toContain("disclosureLabel={surfaceProfile.labels.workItems}");
+    expect(mobileJobDetailV2PreviewSource).toContain('disclosureLabel="Service Work"');
+    expect(mobileJobDetailV2PreviewSource).toContain("{isEcc && !showServiceWorkLane ? (");
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
+    expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2DisclosurePanel"');
+    expect(mobileJobWorkScopePanelSource).toContain('<details id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2TargetPanel"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain("target:block");
@@ -278,7 +283,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobWorkScopePanelSource).toContain("VisitScopeJobDetailForm");
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
-    expect(mobileJobDetailV2PreviewSource).toContain("<span className={previewPillClass}>Details</span>");
+    expect(mobileJobWorkScopePanelSource).toContain("<span className={previewPillClass ?? \"\"}>Details</span>");
     expect(mobileJobDetailV2PreviewSource).not.toContain("View work details");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
