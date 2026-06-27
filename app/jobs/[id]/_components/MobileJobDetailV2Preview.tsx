@@ -4,6 +4,7 @@ import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";
 import MobileJobSchedulePanel from "./MobileJobSchedulePanel";
 import MobileJobTeamNotesPanel from "./MobileJobTeamNotesPanel";
 import MobileJobSharedNotesPanel from "./MobileJobSharedNotesPanel";
+import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";
 
 function buildLifecyclePreview(props: {
   job: any;
@@ -756,9 +757,9 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </div>
               </div>
             </div>
-            <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewHeaderActionClass}>
+            <a id="mobile-work-scope-row" href="#mobile-work-scope" className={previewHeaderActionClass}>
               {isEcc ? "Compliance details" : "View work details"}
-            </Link>
+            </a>
           </div>
 
           {showEccReviewSummary ? (
@@ -827,7 +828,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                     No Work Items saved yet.
                   </div>
                 )}
-                <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewRowClass}>
+                <a href="#mobile-work-scope" className={previewRowClass}>
                   <span className={previewRowTextClass}>
                     <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
                     <span className="block text-sm text-slate-600">
@@ -835,7 +836,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                     </span>
                   </span>
                   <span className={previewPillClass}>Details</span>
-                </Link>
+                </a>
               </>
             )}
           </div>
@@ -855,9 +856,9 @@ export default function MobileJobDetailV2Preview(props: any) {
                   </div>
                 </div>
               </div>
-              <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewHeaderActionClass}>
+              <a href="#mobile-work-scope" className={previewHeaderActionClass}>
                 View work details
-              </Link>
+              </a>
             </div>
             <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
               {serviceWorkSummary ? (
@@ -872,16 +873,18 @@ export default function MobileJobDetailV2Preview(props: any) {
                   {item.details ? <div className="mt-1 text-sm leading-5 text-slate-600">{item.details}</div> : null}
                 </div>
               ))}
-              <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewRowClass}>
+              <a href="#mobile-work-scope" className={previewRowClass}>
                 <span className={previewRowTextClass}>
                   <span className="block font-semibold text-slate-950">Service Work</span>
                   <span className="block text-sm text-slate-600">{getVisitScopeCountLabel(serviceWorkCount)} recorded</span>
                 </span>
                 <span className={previewPillClass}>Details</span>
-              </Link>
+              </a>
             </div>
           </section>
         ) : null}
+
+        <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
 
         <section className={previewSectionClass}>
           <div className="flex items-start gap-3">

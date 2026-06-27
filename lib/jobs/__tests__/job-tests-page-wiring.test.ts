@@ -22,6 +22,11 @@ const mobileJobSchedulePanelSource = readFileSync(
   "utf8",
 );
 
+const mobileJobWorkScopePanelSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobWorkScopePanel.tsx"),
+  "utf8",
+);
+
 const jobLocationPreviewSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/JobLocationPreview.tsx"),
   "utf8",
@@ -539,14 +544,15 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps visit reason and intake notes below the location preview", () => {
-    expect(mobileJobDetailCurrentSource).toContain("Visit Reason");
+    expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
+    expect(mobileJobWorkScopePanelSource).toContain("Visit Reason");
     expect(jobPageSource).toContain("const visitReasonText =");
-    expect(mobileJobDetailCurrentSource).toContain("{visitReasonText}");
+    expect(mobileJobWorkScopePanelSource).toContain("{visitReasonText}");
     expect(jobPageSource).toContain('id="visit-reason-card"');
-    expect(mobileJobDetailCurrentSource).toContain('id="mobile-visit-reason-card"');
-    expect(mobileJobDetailCurrentSource).toContain("updateJobVisitScopeFromForm");
-    expect(mobileJobDetailCurrentSource).toContain('name="visit_scope_summary"');
-    expect(mobileJobDetailCurrentSource).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
+    expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
+    expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
+    expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_summary"');
+    expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
     expect(jobPageSource).toContain("Customer Concern");
     expect(jobPageSource).toContain("Intake Notes");
     expect(jobPageSource).toContain("whitespace-pre-wrap break-words");
@@ -581,10 +587,11 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps work needed after visit reason on mobile while spanning the desktop grid", () => {
-    const visitReasonIndex = mobileJobDetailCurrentSource.indexOf("Visit Reason");
-    const mobileWorkScopeIndex = mobileJobDetailCurrentSource.indexOf('id="mobile-work-scope"');
+    const visitReasonIndex = mobileJobWorkScopePanelSource.indexOf("Visit Reason");
+    const mobileWorkScopeIndex = mobileJobWorkScopePanelSource.indexOf('id="mobile-work-scope"');
     const mobileAssignedTeamIndex = mobileJobDetailCurrentSource.indexOf("<AssignedTeamControls");
-    const mobileWorkItemsIndex = mobileJobDetailCurrentSource.indexOf(
+    const mobileWorkScopeMountIndex = mobileJobDetailCurrentSource.indexOf("<MobileJobWorkScopePanel");
+    const mobileWorkItemsIndex = mobileJobWorkScopePanelSource.indexOf(
       "{visitScopeItems.map((item: any, index: number) => (",
       visitReasonIndex,
     );
@@ -595,7 +602,8 @@ describe("job detail field operations board layout", () => {
     expect(visitReasonIndex).toBeGreaterThan(-1);
     expect(mobileWorkScopeIndex).toBeGreaterThan(-1);
     expect(mobileAssignedTeamIndex).toBeGreaterThan(-1);
-    expect(mobileAssignedTeamIndex).toBeLessThan(mobileWorkScopeIndex);
+    expect(mobileWorkScopeMountIndex).toBeGreaterThan(-1);
+    expect(mobileAssignedTeamIndex).toBeLessThan(mobileWorkScopeMountIndex);
     expect(mobileWorkItemsIndex).toBeGreaterThan(visitReasonIndex);
     expect(visitScopeIndex).toBeGreaterThan(-1);
     expect(assignedTeamIndex).toBeGreaterThan(-1);
@@ -606,26 +614,19 @@ describe("job detail field operations board layout", () => {
   });
 
   it("shows every saved Work Scope item on mobile without a hidden more-items summary", () => {
-    const mobileWorkScopeStart = mobileJobDetailCurrentSource.indexOf('id="mobile-work-scope"');
-    const mobileNotesStart = mobileJobDetailCurrentSource.indexOf('id="mobile-notes-hub"', mobileWorkScopeStart);
-    const mobileWorkScopeSlice =
-      mobileWorkScopeStart > -1 && mobileNotesStart > mobileWorkScopeStart
-        ? mobileJobDetailCurrentSource.slice(mobileWorkScopeStart, mobileNotesStart)
-        : "";
-
-    expect(mobileWorkScopeSlice).toContain("{visitScopeItems.map((item: any, index: number) => (");
-    expect(mobileWorkScopeSlice).not.toContain("primaryVisitScopeItems.slice(0, 2)");
-    expect(mobileWorkScopeSlice).not.toContain("more work item");
-    expect(mobileWorkScopeSlice).toContain("formatVisitScopeItemKindLabel(item.kind)");
-    expect(mobileWorkScopeSlice).toContain("Number(item.expected_unit_price).toFixed(2)");
+    expect(mobileJobWorkScopePanelSource).toContain("{visitScopeItems.map((item: any, index: number) => (");
+    expect(mobileJobWorkScopePanelSource).not.toContain("primaryVisitScopeItems.slice(0, 2)");
+    expect(mobileJobWorkScopePanelSource).not.toContain("more work item");
+    expect(mobileJobWorkScopePanelSource).toContain("formatVisitScopeItemKindLabel(item.kind)");
+    expect(mobileJobWorkScopePanelSource).toContain("Number(item.expected_unit_price).toFixed(2)");
   });
 
   it("keeps post-build invoice state visible in the mobile Work & Invoice section", () => {
-    const mobileWorkScopeStart = mobileJobDetailCurrentSource.indexOf('id="mobile-work-scope"');
-    const mobileNotesStart = mobileJobDetailCurrentSource.indexOf('id="mobile-notes-hub"', mobileWorkScopeStart);
+    const mobileWorkScopeStart = mobileJobWorkScopePanelSource.lastIndexOf('<section id="mobile-work-scope"');
+    const mobileNotesStart = mobileJobWorkScopePanelSource.indexOf("<MobileJobWorkScopeBody", mobileWorkScopeStart);
     const mobileWorkScopeSlice =
       mobileWorkScopeStart > -1 && mobileNotesStart > mobileWorkScopeStart
-        ? mobileJobDetailCurrentSource.slice(mobileWorkScopeStart, mobileNotesStart)
+        ? mobileJobWorkScopePanelSource.slice(mobileWorkScopeStart, mobileNotesStart)
         : "";
 
     expect(mobileWorkScopeSlice).toContain('id="mobile-invoice-summary-card"');
@@ -638,11 +639,11 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps mobile Visit Reason editing aligned inside the Visit Reason card", () => {
-    const mobileVisitReasonStart = mobileJobDetailCurrentSource.indexOf('id="mobile-visit-reason-card"');
-    const mobileVisitReasonEnd = mobileJobDetailCurrentSource.indexOf("{visitScopeItems.map((item: any, index: number) => (", mobileVisitReasonStart);
+    const mobileVisitReasonStart = mobileJobWorkScopePanelSource.indexOf('id="mobile-visit-reason-card"');
+    const mobileVisitReasonEnd = mobileJobWorkScopePanelSource.indexOf("{visitScopeItems.map((item: any, index: number) => (", mobileVisitReasonStart);
     const mobileVisitReasonSlice =
       mobileVisitReasonStart > -1 && mobileVisitReasonEnd > mobileVisitReasonStart
-        ? mobileJobDetailCurrentSource.slice(mobileVisitReasonStart, mobileVisitReasonEnd)
+        ? mobileJobWorkScopePanelSource.slice(mobileVisitReasonStart, mobileVisitReasonEnd)
         : "";
 
     expect(mobileVisitReasonSlice).toContain('<details className="group">');
@@ -654,11 +655,11 @@ describe("job detail field operations board layout", () => {
   });
 
   it("removes the mobile Tools jump button while preserving lower tools", () => {
-    const mobileWorkScopeStart = mobileJobDetailCurrentSource.indexOf('id="mobile-work-scope"');
-    const mobileNotesStart = mobileJobDetailCurrentSource.indexOf('id="mobile-notes-hub"', mobileWorkScopeStart);
+    const mobileWorkScopeStart = mobileJobWorkScopePanelSource.indexOf('id="mobile-work-scope"');
+    const mobileNotesStart = mobileJobWorkScopePanelSource.indexOf("<MobileJobWorkScopeBody", mobileWorkScopeStart);
     const mobileWorkScopeSlice =
       mobileWorkScopeStart > -1 && mobileNotesStart > mobileWorkScopeStart
-        ? mobileJobDetailCurrentSource.slice(mobileWorkScopeStart, mobileNotesStart)
+        ? mobileJobWorkScopePanelSource.slice(mobileWorkScopeStart, mobileNotesStart)
         : "";
 
     expect(mobileWorkScopeSlice).not.toContain('href="#mobile-tools"');
@@ -680,7 +681,7 @@ describe("job detail field operations board layout", () => {
 
   it("deduplicates mobile Service Location address and navigation actions", () => {
     const mobileLocationStart = mobileJobDetailCurrentSource.indexOf('<div className="text-sm font-semibold text-[#0f1f35]">Service Location</div>');
-    const mobileLocationEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-work-scope"', mobileLocationStart);
+    const mobileLocationEnd = mobileJobDetailCurrentSource.indexOf("<MobileJobWorkScopePanel", mobileLocationStart);
     const mobileLocationSlice =
       mobileLocationStart > -1 && mobileLocationEnd > mobileLocationStart
         ? mobileJobDetailCurrentSource.slice(mobileLocationStart, mobileLocationEnd)

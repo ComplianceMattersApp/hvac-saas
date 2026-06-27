@@ -37,7 +37,12 @@ const mobileJobSharedNotesPanelSource = readFileSync(
   "utf8",
 );
 
-const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}\n${mobileJobTeamNotesPanelSource}\n${mobileJobSharedNotesPanelSource}`;
+const mobileJobWorkScopePanelSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobWorkScopePanel.tsx"),
+  "utf8",
+);
+
+const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}\n${mobileJobTeamNotesPanelSource}\n${mobileJobSharedNotesPanelSource}\n${mobileJobWorkScopePanelSource}`;
 
 const controlsSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/AssignedTeamControls.tsx"),
@@ -142,7 +147,9 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-internal-notes"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-shared-notes"');
-    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes" && anchor !== "mobile-shared-notes")) {
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
+    expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
+    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes" && anchor !== "mobile-shared-notes" && anchor !== "mobile-work-scope")) {
       expect(mobileJobDetailV2PreviewSource).not.toContain(`href="#${anchor}"`);
     }
   });
@@ -259,7 +266,15 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('"Work to Do"');
     expect(mobileJobDetailV2PreviewSource).toContain("Visit reason / summary");
     expect(mobileJobDetailV2PreviewSource).toContain("No Work Items saved yet.");
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-work-scope")');
+    expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
+    expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";');
+    expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />');
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
+    expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2TargetPanel"');
+    expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
+    expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
+    expect(mobileJobWorkScopePanelSource).toContain("VisitScopeJobDetailForm");
+    expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
     expect(mobileJobDetailV2PreviewSource).toContain("View work details");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
