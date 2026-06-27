@@ -269,9 +269,11 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";');
     expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />');
+    expect(mobileJobDetailV2PreviewSource).toContain("{!isEcc || !showServiceWorkLane ? (");
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2TargetPanel"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
+    expect(mobileJobWorkScopePanelSource).toContain("target:block");
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
     expect(mobileJobWorkScopePanelSource).toContain("VisitScopeJobDetailForm");
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");

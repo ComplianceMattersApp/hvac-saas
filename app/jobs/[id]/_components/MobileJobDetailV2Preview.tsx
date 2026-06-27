@@ -840,7 +840,7 @@ export default function MobileJobDetailV2Preview(props: any) {
               </>
             )}
           </div>
-          {!showServiceWorkLane ? (
+          {!isEcc || !showServiceWorkLane ? (
             <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
           ) : null}
         </section>
