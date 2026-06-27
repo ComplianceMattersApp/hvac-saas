@@ -495,7 +495,6 @@ export default function MobileJobDetailV2Preview(props: any) {
       "This original ECC job is historical while the linked retest job carries the active work."
     : failedReasonBannerText ||
       "Review the failed ECC result, correction-review path, or retest action in the standard job view.";
-  const eccReviewSummaryHref = standardJobAnchorHref(showLinkedRetestCreated ? "mobile-tools" : "mobile-next-service-action");
   const serviceWorkLaneTitle = isEcc
     ? "Companion Service Work"
     : isFieldComplete
@@ -773,13 +772,6 @@ export default function MobileJobDetailV2Preview(props: any) {
               <div className="text-sm font-semibold uppercase tracking-[0.1em] text-amber-700">ECC attention</div>
               <div className="mt-1 text-base font-semibold leading-tight">{eccReviewSummaryTitle}</div>
               <p className="mt-1 text-sm leading-5">{eccReviewSummaryBody}</p>
-              <Link
-                href={eccReviewSummaryHref}
-                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
-              >
-                <span>{showLinkedRetestCreated ? "Review retest history" : "Open correction / retest tools"}</span>
-                <ChevronRightIcon className="h-4 w-4" />
-              </Link>
             </div>
           ) : null}
 

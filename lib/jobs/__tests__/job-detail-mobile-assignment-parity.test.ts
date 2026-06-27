@@ -344,9 +344,9 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("const showEccReviewSummary =");
     expect(mobileJobDetailV2PreviewSource).toContain("showCorrectionReviewResolution");
     expect(mobileJobDetailV2PreviewSource).toContain("ECC attention");
-    expect(mobileJobDetailV2PreviewSource).toContain("eccReviewSummaryHref");
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref(showLinkedRetestCreated ? "mobile-tools" : "mobile-next-service-action")');
-    expect(mobileJobDetailV2PreviewSource).toContain("Open correction / retest tools");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("eccReviewSummaryHref");
+    expect(mobileJobDetailV2PreviewSource).not.toContain('standardJobAnchorHref(showLinkedRetestCreated ? "mobile-tools" : "mobile-next-service-action")');
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Open correction / retest tools");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={resolveFailureByCorrectionReviewFromForm}");
   });
 

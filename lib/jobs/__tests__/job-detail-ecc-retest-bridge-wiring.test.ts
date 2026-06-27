@@ -13,12 +13,17 @@ const mobileJobDetailCurrentSource = readFileSync(
   "utf-8",
 );
 
+const mobileJobStatusActionSurfaceSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
+  "utf-8",
+);
+
 const serviceChainSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/DeferredServiceChainPanelBody.tsx"),
   "utf-8",
 );
 
-const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}`;
+const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
 
 describe("job detail ECC retest bridge wiring", () => {
   it("wires confirmed Retest Ready before moving a linked retest to scheduling", () => {
@@ -40,8 +45,8 @@ describe("job detail ECC retest bridge wiring", () => {
   });
 
   it("renders one consolidated Retest Ready card with one copy-equipment control per responsive surface", () => {
-    const mobileRetestIndex = mobileJobDetailCurrentSource.indexOf('id="mobile-next-service-action"', mobileJobDetailCurrentSource.indexOf("Retest Ready"));
-    const mobileRetestBlock = mobileJobDetailCurrentSource.slice(mobileRetestIndex, mobileJobDetailCurrentSource.indexOf(") : isHistoricalServiceFollowUpContinued", mobileRetestIndex));
+    const mobileRetestIndex = mobileJobStatusActionSurfaceSource.indexOf('id="mobile-next-service-action"', mobileJobStatusActionSurfaceSource.indexOf("Retest Ready"));
+    const mobileRetestBlock = mobileJobStatusActionSurfaceSource.slice(mobileRetestIndex, mobileJobStatusActionSurfaceSource.indexOf(") : isHistoricalServiceFollowUpContinued", mobileRetestIndex));
     const desktopRetestIndex = jobDetailSource.indexOf('id="next-service-action"', jobDetailSource.indexOf("{showRetestSection ? ("));
     const desktopRetestBlock = jobDetailSource.slice(desktopRetestIndex, jobDetailSource.indexOf(") : null}", desktopRetestIndex) + 9);
 
