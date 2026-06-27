@@ -3,6 +3,7 @@
 import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";
 import MobileJobSchedulePanel from "./MobileJobSchedulePanel";
 import MobileJobTeamNotesPanel from "./MobileJobTeamNotesPanel";
+import MobileJobSharedNotesPanel from "./MobileJobSharedNotesPanel";
 
 function buildLifecyclePreview(props: {
   job: any;
@@ -911,7 +912,7 @@ export default function MobileJobDetailV2Preview(props: any) {
               </span>
             </a>
             {showSharedNotesCard ? (
-              <Link href={standardJobAnchorHref("mobile-shared-notes")} className={evidenceActionClass}>
+              <a id="mobile-shared-notes-row" href="#mobile-shared-notes" className={evidenceActionClass}>
                 <span className={evidenceActionTopClass}>
                   <span className={evidenceIconClass}>
                     <ChatIcon className="h-4 w-4" />
@@ -923,7 +924,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                   {sharedNotesBadge ? <span className={evidenceBadgeClass}>{sharedNotesBadge}</span> : null}
                   <ChevronRightIcon className="h-5 w-5 text-slate-400" />
                 </span>
-              </Link>
+              </a>
             ) : null}
             <Link href={`/jobs/${job.id}/attachments`} className={evidenceActionClass}>
               <span className={evidenceActionTopClass}>
@@ -938,6 +939,7 @@ export default function MobileJobDetailV2Preview(props: any) {
         </section>
 
         <MobileJobTeamNotesPanel {...props} presentation="v2TargetPanel" />
+        {showSharedNotesCard ? <MobileJobSharedNotesPanel {...props} presentation="v2TargetPanel" /> : null}
 
         <section className={previewSectionClass}>
           <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">

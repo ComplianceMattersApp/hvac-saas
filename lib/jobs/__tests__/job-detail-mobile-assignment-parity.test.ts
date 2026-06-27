@@ -32,7 +32,12 @@ const mobileJobTeamNotesPanelSource = readFileSync(
   "utf8",
 );
 
-const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}\n${mobileJobTeamNotesPanelSource}`;
+const mobileJobSharedNotesPanelSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobSharedNotesPanel.tsx"),
+  "utf8",
+);
+
+const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}\n${mobileJobTeamNotesPanelSource}\n${mobileJobSharedNotesPanelSource}`;
 
 const controlsSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/AssignedTeamControls.tsx"),
@@ -136,7 +141,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`?mobileLayout=v2#');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-internal-notes"');
-    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes")) {
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-shared-notes"');
+    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes" && anchor !== "mobile-shared-notes")) {
       expect(mobileJobDetailV2PreviewSource).not.toContain(`href="#${anchor}"`);
     }
   });
