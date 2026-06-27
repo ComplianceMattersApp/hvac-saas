@@ -280,6 +280,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2TargetPanel"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain("target:block");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("[&:has(#mobile-work-scope:target)_.v2-work-scope-summary]:hidden");
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
     expect(mobileJobWorkScopePanelSource).toContain("VisitScopeJobDetailForm");
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");

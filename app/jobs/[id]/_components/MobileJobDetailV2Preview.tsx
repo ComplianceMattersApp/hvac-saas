@@ -740,7 +740,7 @@ export default function MobileJobDetailV2Preview(props: any) {
 
         <MobileJobStatusActionSurface {...props} />
 
-        <section className={`${previewSectionClass} ${!isEcc ? "[&:has(#mobile-work-scope:target)_.v2-work-scope-summary]:hidden" : ""}`}>
+        <section className={previewSectionClass}>
           <div
             id={!showServiceWorkLane ? "mobile-work-scope-row" : undefined}
             className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between"
@@ -851,7 +851,7 @@ export default function MobileJobDetailV2Preview(props: any) {
         </section>
 
         {isEcc && showServiceWorkLane ? (
-          <section className={`${previewSectionClass} [&:has(#mobile-work-scope:target)_.v2-work-scope-summary]:hidden`}>
+          <section className={previewSectionClass}>
             <div
               id="mobile-work-scope-row"
               className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between"
