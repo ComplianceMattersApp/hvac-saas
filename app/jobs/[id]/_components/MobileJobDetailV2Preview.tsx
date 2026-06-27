@@ -741,7 +741,10 @@ export default function MobileJobDetailV2Preview(props: any) {
         <MobileJobStatusActionSurface {...props} />
 
         <section className={`${previewSectionClass} ${!isEcc ? "[&:has(#mobile-work-scope:target)_.v2-work-scope-summary]:hidden" : ""}`}>
-          <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
+          <div
+            id={!showServiceWorkLane ? "mobile-work-scope-row" : undefined}
+            className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between"
+          >
             <div className="min-w-0">
               <div className="inline-flex min-w-0 items-start gap-2">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
@@ -757,9 +760,11 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </div>
               </div>
             </div>
-            <a id="mobile-work-scope-row" href="#mobile-work-scope" className={previewHeaderActionClass}>
-              {isEcc ? "Compliance details" : "View work details"}
-            </a>
+            {isEcc ? (
+              <a href="#mobile-work-scope" className={previewHeaderActionClass}>
+                Compliance details
+              </a>
+            ) : null}
           </div>
 
           {showEccReviewSummary ? (
@@ -847,7 +852,10 @@ export default function MobileJobDetailV2Preview(props: any) {
 
         {isEcc && showServiceWorkLane ? (
           <section className={`${previewSectionClass} [&:has(#mobile-work-scope:target)_.v2-work-scope-summary]:hidden`}>
-            <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
+            <div
+              id="mobile-work-scope-row"
+              className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between"
+            >
               <div className="min-w-0">
                 <div className="inline-flex min-w-0 items-start gap-2">
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-700 ring-1 ring-slate-200">
@@ -859,9 +867,6 @@ export default function MobileJobDetailV2Preview(props: any) {
                   </div>
                 </div>
               </div>
-              <a href="#mobile-work-scope" className={previewHeaderActionClass}>
-                View work details
-              </a>
             </div>
             <div className="v2-work-scope-summary mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
               {serviceWorkSummary ? (

@@ -277,7 +277,9 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
     expect(mobileJobWorkScopePanelSource).toContain("VisitScopeJobDetailForm");
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
-    expect(mobileJobDetailV2PreviewSource).toContain("View work details");
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
+    expect(mobileJobDetailV2PreviewSource).toContain("<span className={previewPillClass}>Details</span>");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("View work details");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
 
