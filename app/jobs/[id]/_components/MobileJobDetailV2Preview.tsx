@@ -589,15 +589,15 @@ export default function MobileJobDetailV2Preview(props: any) {
                         <ClockIcon className="h-4 w-4" />
                         <span>Schedule</span>
                       </div>
-                      <span className="shrink-0 text-xs font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4">
-                        {job?.scheduled_date ? "Edit" : "Schedule"}
+                      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 ring-1 ring-blue-100 transition-colors group-hover:bg-blue-100">
+                        <ChevronRightIcon className="h-4 w-4" />
                       </span>
                     </div>
-                    <div className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-[#0f1f35] min-[390px]:text-lg">
+                    <div className="mt-1 break-words text-base font-semibold leading-tight text-[#0f1f35] min-[390px]:text-lg">
                       {heroScheduleDateLabel}
                     </div>
                     {mobileAppointmentTimeLabel ? (
-                      <div className="mt-1 inline-flex max-w-full whitespace-nowrap rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold leading-tight text-blue-900 ring-1 ring-blue-100 min-[390px]:text-sm">
+                      <div className="mt-1 inline-flex max-w-full break-words rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold leading-tight text-blue-900 ring-1 ring-blue-100 min-[390px]:text-sm">
                         {mobileAppointmentTimeLabel}
                       </div>
                     ) : null}

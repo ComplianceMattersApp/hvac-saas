@@ -190,9 +190,10 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobSchedulePanel from "./MobileJobSchedulePanel";');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
     expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-v2-schedule-summary"');
-    expect(mobileJobDetailV2PreviewSource).toContain("whitespace-nowrap text-base font-semibold");
+    expect(mobileJobDetailV2PreviewSource).toContain("mt-1 break-words text-base font-semibold");
     expect(mobileJobDetailV2PreviewSource).toContain("{heroScheduleDateLabel}");
-    expect(mobileJobDetailV2PreviewSource).toContain('{job?.scheduled_date ? "Edit" : "Schedule"}');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('{job?.scheduled_date ? "Edit" : "Schedule"}');
+    expect(mobileJobDetailV2PreviewSource).toContain("group-hover:bg-blue-100");
     expect(mobileJobDetailV2PreviewSource).not.toContain('className="group block rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3');
     expect(mobileJobDetailV2PreviewSource).not.toContain('mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full');
     expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobSchedulePanel {...props} presentation="v2TargetPanel" />');
