@@ -94,7 +94,7 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
               <summary className="flex cursor-pointer list-none items-start justify-between gap-3">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold uppercase tracking-[0.1em] text-rose-800">Failed reason</span>
-                  <span className="mt-1 block font-semibold">{failedReasonBannerText}</span>
+                  <span className="mt-1 block font-normal">{failedReasonBannerText}</span>
                 </span>
                 <span className="shrink-0 rounded-full border border-rose-200 bg-white/80 px-2.5 py-1 text-xs font-semibold text-rose-800 group-open:hidden">
                   Edit
