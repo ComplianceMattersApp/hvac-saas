@@ -176,6 +176,7 @@ type MobileJobDetailCurrentProps = {
   ToolIcon: any;
   UnscheduleButton: any;
   updateJobOpsFromForm: any;
+  updateJobOpsDetailsFromForm: any;
   updateJobScheduleFromForm: any;
   updateJobVisitScopeFromForm: any;
   visitReasonText: any;

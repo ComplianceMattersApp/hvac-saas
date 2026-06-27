@@ -54,6 +54,7 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
     SubmitButton,
     surfaceProfile,
     tab,
+    updateJobOpsDetailsFromForm,
   } = props;
 
   return (
@@ -91,9 +92,32 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
           <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-5 text-rose-950">
             <div className="text-xs font-semibold uppercase tracking-[0.08em] text-rose-800">Failed reason</div>
             <div className="mt-1 font-semibold">{failedReasonBannerText}</div>
-            <a href="#job-status" className="mt-1 inline-flex text-xs font-semibold text-rose-800 underline-offset-2 hover:underline">
-              Edit failed reason
-            </a>
+            <details id="mobile-failed-reason-editor" className="group mt-2 rounded-lg border border-rose-200 bg-white/80 p-2.5">
+              <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 text-xs font-semibold text-rose-800 underline-offset-2 hover:underline">
+                <span>Edit failed reason</span>
+                <span className="text-slate-500 group-open:hidden">Open</span>
+                <span className="hidden text-slate-500 group-open:inline">Close</span>
+              </summary>
+              <form action={updateJobOpsDetailsFromForm} className="mt-3 grid gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-failed-reason-editor`} />
+                <label className="text-sm font-semibold text-slate-700">Failed reason banner</label>
+                <textarea
+                  name="next_action_note"
+                  defaultValue={job.next_action_note ?? ""}
+                  maxLength={240}
+                  rows={3}
+                  className="min-h-[6rem] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                  placeholder="Waiting on correction photos"
+                />
+                <p className="text-xs leading-5 text-slate-600">
+                  Shown on internal Failed queue cards so office users know what is needed without opening the job.
+                </p>
+                <SubmitButton loadingText="Saving..." className={`${darkButtonClass} min-h-11 w-full`}>
+                  Save Failed Reason
+                </SubmitButton>
+              </form>
+            </details>
           </div>
         ) : null}
 

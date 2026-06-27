@@ -3708,6 +3708,7 @@ const showCorrectionReviewResolution =
         timingEnabled={timingEnabled}
         ToolIcon={ToolIcon}
         UnscheduleButton={UnscheduleButton}
+        updateJobOpsDetailsFromForm={updateJobOpsDetailsFromForm}
         updateJobOpsFromForm={updateJobOpsFromForm}
         updateJobScheduleFromForm={updateJobScheduleFromForm}
         updateJobVisitScopeFromForm={updateJobVisitScopeFromForm}
