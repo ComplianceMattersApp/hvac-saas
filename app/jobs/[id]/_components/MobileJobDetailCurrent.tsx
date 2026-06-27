@@ -2,6 +2,7 @@
 
 import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";
 import MobileJobSchedulePanel from "./MobileJobSchedulePanel";
+import MobileJobTeamNotesPanel from "./MobileJobTeamNotesPanel";
 
 type MobileJobDetailCurrentProps = {
   activeWaitingState: any;
@@ -1048,45 +1049,7 @@ export default function MobileJobDetailCurrent(props: MobileJobDetailCurrentProp
               </Link>
             </div>
             <div className="mt-3 grid gap-3">
-              <details id="mobile-internal-notes" className="rounded-xl border border-slate-200/80 bg-slate-50/75 px-3 py-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.22)]" open={Boolean(internalNoteBannerMessage)}>
-                <summary className="cursor-pointer list-none">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-2 text-base font-semibold text-slate-950">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white text-slate-600 ring-1 ring-slate-200"><LockIcon className="h-3.5 w-3.5" /></span>
-                      <span>Internal Notes</span>
-                    </div>
-                    <div className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{internalNotesMeta || "Team only"}</div>
-                  </div>
-                </summary>
-                <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-                  {internalNoteBannerMessage ? (
-                    <FlashBanner
-                      type={internalNoteBannerType as "success" | "warning" | "error"}
-                      message={internalNoteBannerMessage}
-                    />
-                  ) : null}
-                  <Suspense fallback={<div className="h-12 animate-pulse rounded-xl bg-slate-100" />}>
-                    <DeferredInternalNoteMentionComposer
-                      jobId={String(job.id)}
-                      tab={tab}
-                      accountOwnerUserId={internalUser.account_owner_user_id}
-                      textareaClassName={`${workspaceTextareaClass} text-base`}
-                      selectClassName={workspaceInputClass}
-                      helperTextClassName="text-sm leading-5 text-slate-500"
-                      buttonClassName={secondaryButtonClass}
-                      returnAnchor="mobile-internal-notes"
-                    />
-                  </Suspense>
-                  <Suspense fallback={<NarrativeNotesBodyFallback />}>
-                    <DeferredInternalNotesBody
-                      jobId={String(job.id)}
-                      timelineJobIds={narrativeScopeJobIds}
-                      hasDirectNarrativeChain={hasDirectNarrativeChain}
-                      emptyStateClassName={workspaceEmptyStateClass}
-                    />
-                  </Suspense>
-                </div>
-              </details>
+              <MobileJobTeamNotesPanel {...props} />
 
               {showSharedNotesCard ? (
                 <details id="mobile-shared-notes" className="rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.22)]" open={Boolean(sharedNoteBannerMessage)}>

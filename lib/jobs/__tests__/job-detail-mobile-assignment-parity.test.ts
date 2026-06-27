@@ -27,7 +27,12 @@ const mobileJobSchedulePanelSource = readFileSync(
   "utf8",
 );
 
-const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}`;
+const mobileJobTeamNotesPanelSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobTeamNotesPanel.tsx"),
+  "utf8",
+);
+
+const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}\n${mobileJobSchedulePanelSource}\n${mobileJobTeamNotesPanelSource}`;
 
 const controlsSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/AssignedTeamControls.tsx"),
@@ -130,7 +135,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}#');
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`?mobileLayout=v2#');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
-    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel")) {
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-internal-notes"');
+    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes")) {
       expect(mobileJobDetailV2PreviewSource).not.toContain(`href="#${anchor}"`);
     }
   });
@@ -495,7 +501,7 @@ describe("mobile job detail assignment parity", () => {
 
   it("styles the mobile Notes & Attachments attachment link as a blue action", () => {
     const notesHubStart = mobileJobDetailCurrentSource.indexOf('id="mobile-notes-hub"');
-    const notesHubEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-internal-notes"', notesHubStart);
+    const notesHubEnd = mobileJobDetailCurrentSource.indexOf("<MobileJobTeamNotesPanel", notesHubStart);
     const notesHub = mobileJobDetailCurrentSource.slice(notesHubStart, notesHubEnd);
 
     expect(notesHubStart).toBeGreaterThan(-1);
