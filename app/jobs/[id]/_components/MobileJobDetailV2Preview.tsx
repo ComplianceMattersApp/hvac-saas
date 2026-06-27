@@ -740,7 +740,7 @@ export default function MobileJobDetailV2Preview(props: any) {
 
         <MobileJobStatusActionSurface {...props} />
 
-        <section className={previewSectionClass}>
+        <section className={`${previewSectionClass} ${!isEcc ? "[&:has(#mobile-work-scope:target)_.v2-work-scope-summary]:hidden" : ""}`}>
           <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
             <div className="min-w-0">
               <div className="inline-flex min-w-0 items-start gap-2">
@@ -777,7 +777,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             </div>
           ) : null}
 
-          <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
+          <div className="v2-work-scope-summary mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
             {isEcc ? (
               <>
                 <Link href={`/jobs/${job.id}/info?f=equipment`} className={previewRowClass}>
@@ -840,10 +840,13 @@ export default function MobileJobDetailV2Preview(props: any) {
               </>
             )}
           </div>
+          {!showServiceWorkLane ? (
+            <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
+          ) : null}
         </section>
 
         {isEcc && showServiceWorkLane ? (
-          <section className={previewSectionClass}>
+          <section className={`${previewSectionClass} [&:has(#mobile-work-scope:target)_.v2-work-scope-summary]:hidden`}>
             <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
               <div className="min-w-0">
                 <div className="inline-flex min-w-0 items-start gap-2">
@@ -860,7 +863,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 View work details
               </a>
             </div>
-            <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
+            <div className="v2-work-scope-summary mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
               {serviceWorkSummary ? (
                 <div className="px-3 py-3">
                   <div className="text-sm font-semibold text-slate-500">Visit reason / summary</div>
@@ -881,10 +884,9 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <span className={previewPillClass}>Details</span>
               </a>
             </div>
+            <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
           </section>
         ) : null}
-
-        <MobileJobWorkScopePanel {...props} presentation="v2TargetPanel" />
 
         <section className={previewSectionClass}>
           <div className="flex items-start gap-3">

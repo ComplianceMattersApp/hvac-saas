@@ -156,20 +156,15 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
 
   if (presentation === "v2TargetPanel") {
     return (
-      <section
+      <div
         id="mobile-work-scope"
-        className="hidden scroll-mt-4 rounded-2xl border border-slate-200/90 bg-white px-3.5 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)] target:block min-[390px]:px-4"
+        className="hidden scroll-mt-4 border-t border-slate-200 pt-4 target:block"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex items-start gap-2">
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-              <ToolIcon className="h-4 w-4" />
-            </span>
-            <div>
-              <div className="text-lg font-semibold text-[#0f1f35]">Work Scope</div>
-              <div className="mt-0.5 text-sm text-slate-600">
-                {visitScopeCount} item{visitScopeCount === 1 ? "" : "s"} added
-              </div>
+          <div>
+            <div className="text-base font-semibold text-[#0f1f35]">Work details</div>
+            <div className="mt-0.5 text-sm text-slate-600">
+              {visitScopeCount} item{visitScopeCount === 1 ? "" : "s"} added
             </div>
           </div>
           <a
@@ -182,7 +177,7 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
         <div className="space-y-3 border-t border-slate-200 pt-3">
           <MobileJobWorkScopeBody {...props} />
         </div>
-      </section>
+      </div>
     );
   }
 
