@@ -308,7 +308,6 @@ export default function MobileJobDetailV2Preview(props: any) {
     closeoutNeeds,
     contractorName,
     createEstimateFromJobHref,
-    failedReasonBannerText,
     FolderIcon,
     hasFullSchedule,
     headerJobTypeLabel,
@@ -493,8 +492,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const eccReviewSummaryBody = showLinkedRetestCreated
     ? linkedRetestPassiveCopy ||
       "This original ECC job is historical while the linked retest job carries the active work."
-    : failedReasonBannerText ||
-      "Review the failed ECC result, correction-review path, or retest action in the standard job view.";
+    : "";
   const serviceWorkLaneTitle = isEcc
     ? "Companion Service Work"
     : isFieldComplete
@@ -771,7 +769,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-amber-950">
               <div className="text-sm font-semibold uppercase tracking-[0.1em] text-amber-700">ECC attention</div>
               <div className="mt-1 text-base font-semibold leading-tight">{eccReviewSummaryTitle}</div>
-              <p className="mt-1 text-sm leading-5">{eccReviewSummaryBody}</p>
+              {eccReviewSummaryBody ? <p className="mt-1 text-sm leading-5">{eccReviewSummaryBody}</p> : null}
             </div>
           ) : null}
 
