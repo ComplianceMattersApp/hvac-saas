@@ -161,7 +161,7 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
 
   if (presentation === "v2DisclosurePanel") {
     return (
-      <details id="mobile-work-scope" className="group">
+      <details id="mobile-work-scope" className="group" open>
         <summary className={`${previewRowClass ?? ""} cursor-pointer list-none`}>
           <span className={previewRowTextClass ?? ""}>
             <span className="block font-semibold text-slate-950">{disclosureLabel ?? "Work details"}</span>
