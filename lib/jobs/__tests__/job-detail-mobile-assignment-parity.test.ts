@@ -275,7 +275,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("{isEcc && !showServiceWorkLane ? (");
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2DisclosurePanel"');
-    expect(mobileJobWorkScopePanelSource).toContain('<details id="mobile-work-scope"');
+    expect(mobileJobWorkScopePanelSource).toContain('<div id="mobile-work-scope">');
+    expect(mobileJobWorkScopePanelSource).not.toContain('<details id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2TargetPanel"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain("target:block");
