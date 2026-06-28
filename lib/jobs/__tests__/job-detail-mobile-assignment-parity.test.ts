@@ -138,7 +138,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}&mobileLayout=v2#');
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";');
-    expect(mobileJobDetailV2PreviewSource).toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
+    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-invoice-summary-card"');
     expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobStatusActionSurface {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain("`/jobs/${job.id}/tests`");
     for (const anchor of standardViewAnchors) {
@@ -158,7 +159,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-internal-notes"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-shared-notes"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
-    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes" && anchor !== "mobile-shared-notes" && anchor !== "mobile-work-scope")) {
+    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel" && anchor !== "mobile-internal-notes" && anchor !== "mobile-shared-notes" && anchor !== "mobile-work-scope" && anchor !== "mobile-next-service-action")) {
       expect(mobileJobDetailV2PreviewSource).not.toContain(`href="#${anchor}"`);
     }
   });
@@ -182,7 +183,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("createRetestJobFromForm");
     expect(mobileJobDetailV2PreviewSource).not.toContain("scheduleRetestNowFromForm");
     expect(mobileJobDetailV2PreviewSource).not.toContain("markInvoiceCompleteFromForm");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("completeDataEntryFromForm");
+    expect(mobileJobDetailV2PreviewSource).toContain("completeDataEntryFromForm");
+    expect(mobileJobDetailV2PreviewSource).toContain("createInternalInvoiceDraftFromForm");
   });
 
   it("keeps the ECC Completion Report visible as a Compliance Work route link", () => {
@@ -397,11 +399,20 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('isEccComplianceActive');
     expect(mobileJobDetailV2PreviewSource).toContain('!isFieldComplete || hasRequiredEccTestAttention || isEccPermitNeededActive || Boolean(closeoutNeeds?.needsCerts)');
     expect(mobileJobDetailV2PreviewSource).toContain('isReadOnlyState');
-    expect(mobileJobDetailV2PreviewSource).toContain('"Review billing, closeout, and history from the standard job view."');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Review billing, closeout, and history from job records."');
+    expect(mobileJobDetailV2PreviewSource).toContain("const v2BillingReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-invoice-summary-card`;");
+    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-invoice-summary-card"');
+    expect(mobileJobDetailV2PreviewSource).toContain("billingPreview.hrefAnchor === \"mobile-invoice-summary-card\"");
+    expect(mobileJobDetailV2PreviewSource).toContain("billingPreview.hrefAnchor === \"mobile-next-service-action\"");
+    expect(mobileJobDetailV2PreviewSource).toContain("form action={completeDataEntryFromForm}");
+    expect(mobileJobDetailV2PreviewSource).toContain('name="return_to" value={v2BillingReturnTo}');
+    expect(mobileJobDetailV2PreviewSource).toContain("form action={createInternalInvoiceDraftFromForm}");
+    expect(mobileJobDetailV2PreviewSource).toContain('name="auto_import_visit_scope_items" value="1"');
+    expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/invoice#invoice-workspace`}');
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-next-service-action"');
     expect(mobileJobDetailV2PreviewSource).not.toContain("props.isEccPermitNeededActive ||\n      Boolean(props.closeoutNeeds?.needsCerts)");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markEccPermitAvailableFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markInvoiceCompleteFromForm}");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={completeDataEntryFromForm}");
   });
 
   it("reuses current mobile ECC failed, correction-review, and retest action surfaces", () => {

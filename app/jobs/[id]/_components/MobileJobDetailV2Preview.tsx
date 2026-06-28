@@ -198,7 +198,7 @@ function buildBillingPreview(props: {
   if (props.isReadOnlyState) {
     return {
       title: "Billing / Closeout",
-      summary: "Review billing, closeout, and history from the standard job view.",
+      summary: "Review billing, closeout, and history from job records.",
       actionLabel: "",
       hrefAnchor: "",
       statusLabel: "Read-only",
@@ -310,15 +310,18 @@ export default function MobileJobDetailV2Preview(props: any) {
     ClipboardIcon,
     ClockIcon,
     closeoutNeeds,
+    completeDataEntryFromForm,
     ContactLoggingQuickActions,
     contractorName,
     createEstimateFromJobHref,
+    createInternalInvoiceDraftFromForm,
     DeferredTimelineBody,
     displayDateLA,
     FolderIcon,
     currentInterruptState,
     hasFullSchedule,
     hasDirectNarrativeChain,
+    hasDirectInvoiceWorkflowAccess,
     headerJobTypeLabel,
     internalInvoiceTruth,
     internalNoteBannerMessage,
@@ -440,6 +443,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
   const v2AssignmentReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-assigned-team`;
+  const v2BillingReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-invoice-summary-card`;
   const v2PermitReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-permit-info`;
   const v2StatusToolsReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-tools`;
   const hasServicePlanToolContext = Boolean(
@@ -482,6 +486,20 @@ export default function MobileJobDetailV2Preview(props: any) {
     isFieldComplete,
     isReadOnlyState,
   });
+  const canShowNativeInvoiceSummaryAction =
+    billingPreview.hrefAnchor === "mobile-invoice-summary-card" && !isReadOnlyState && !isEccComplianceActive;
+  const canShowNativeExternalBillingAction =
+    Boolean(showExternalDataEntryPrompt) && !showPrimaryCloseoutBlockers && !isReadOnlyState && !isEccComplianceActive;
+  const canShowNativeInvoiceWorkspaceLink =
+    canShowNativeInvoiceSummaryAction && Boolean(internalInvoiceTruth);
+  const canShowNativeInvoiceDraftAction =
+    canShowNativeInvoiceSummaryAction &&
+    !internalInvoiceTruth &&
+    Boolean(hasDirectInvoiceWorkflowAccess) &&
+    Boolean(showInternalInvoicePanel) &&
+    !showPrimaryCloseoutBlockers;
+  const canShowNativeStatusActionLink =
+    billingPreview.hrefAnchor === "mobile-next-service-action" && showPrimaryCloseoutBlockers;
   const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);
   const heroAddressDisplay = getHeroAddressDisplay(serviceAddressDisplay, serviceState);
   const heroScheduleDateLabel = getHeroScheduleDateDisplay(job?.scheduled_date, appointmentDateLabel);
@@ -762,7 +780,7 @@ export default function MobileJobDetailV2Preview(props: any) {
 
         <MobileJobStatusActionSurface {...props} />
 
-        <section className={previewSectionClass}>
+        <section id="mobile-invoice-summary-card" className={previewSectionClass}>
           <div
             className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between"
           >
@@ -1084,14 +1102,47 @@ export default function MobileJobDetailV2Preview(props: any) {
               {billingPreview.statusLabel}
             </span>
           </div>
-          {billingPreview.hrefAnchor ? (
+          {canShowNativeExternalBillingAction ? (
+            <form action={completeDataEntryFromForm} className="mt-4">
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="return_to" value={v2BillingReturnTo} />
+              <SubmitButton
+                loadingText="Saving..."
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-amber-950"
+              >
+                Mark External Billing Complete
+              </SubmitButton>
+            </form>
+          ) : canShowNativeInvoiceWorkspaceLink ? (
             <Link
-              href={standardJobAnchorHref(billingPreview.hrefAnchor)}
+              href={`/jobs/${job.id}/invoice#invoice-workspace`}
               className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
             >
               <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
               <ChevronRightIcon className="h-5 w-5" />
             </Link>
+          ) : canShowNativeInvoiceDraftAction ? (
+            <form action={createInternalInvoiceDraftFromForm} className="mt-4">
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="tab" value={tab} />
+              <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+              <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+              <SubmitButton
+                loadingText="Starting..."
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
+              >
+                <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
+                <ChevronRightIcon className="h-5 w-5" />
+              </SubmitButton>
+            </form>
+          ) : canShowNativeStatusActionLink ? (
+            <a
+              href="#mobile-next-service-action"
+              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
+            >
+              <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
+              <ChevronRightIcon className="h-5 w-5" />
+            </a>
           ) : null}
         </section>
 

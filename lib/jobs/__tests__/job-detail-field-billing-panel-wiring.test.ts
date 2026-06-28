@@ -12,7 +12,12 @@ const mobileJobDetailCurrentSource = readFileSync(
   "utf8",
 );
 
-const jobDetailAndCurrentMobileSource = `${source}\n${mobileJobDetailCurrentSource}`;
+const mobileJobStatusActionSurfaceSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
+  "utf8",
+);
+
+const jobDetailAndCurrentMobileSource = `${source}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
 
 describe("job detail field billing panel wiring", () => {
   it("attaches invoice readiness to the Work Items flow", () => {
@@ -130,8 +135,8 @@ describe("job detail field billing panel wiring", () => {
   });
 
   it("uses direct draft creation for invoice-required job detail CTAs instead of a button-to-button link", () => {
-    const mobileCloseoutIndex = mobileJobDetailCurrentSource.indexOf("{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (");
-    const mobileCloseoutSlice = mobileJobDetailCurrentSource.slice(mobileCloseoutIndex, mobileCloseoutIndex + 1400);
+    const mobileCloseoutIndex = mobileJobStatusActionSurfaceSource.indexOf("{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (");
+    const mobileCloseoutSlice = mobileJobStatusActionSurfaceSource.slice(mobileCloseoutIndex, mobileCloseoutIndex + 1400);
     const desktopCloseoutIndex = source.indexOf(
       "{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (",
     );
