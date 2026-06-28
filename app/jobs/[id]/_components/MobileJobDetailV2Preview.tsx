@@ -300,12 +300,14 @@ export default function MobileJobDetailV2Preview(props: any) {
     activeWaitingState,
     appointmentDateLabel,
     assignedTeam,
+    attemptCount,
     billingState,
     ChatIcon,
     ChevronRightIcon,
     ClipboardIcon,
     ClockIcon,
     closeoutNeeds,
+    ContactLoggingQuickActions,
     contractorName,
     createEstimateFromJobHref,
     FolderIcon,
@@ -326,10 +328,12 @@ export default function MobileJobDetailV2Preview(props: any) {
     jobPageInvoiceSummaryText,
     jobWorkbenchAccountLabel,
     jobWorkbenchTitle,
+    lastAttemptLabel,
     Link,
     linkedRetestPassiveCopy,
     linkedRetestPassiveHeading,
     LockIcon,
+    logCustomerContactAttemptFromForm,
     MapPinIcon,
     markVisitCountedAgreementName,
     markVisitCountedLinkId,
@@ -503,6 +507,8 @@ export default function MobileJobDetailV2Preview(props: any) {
   const toolsRowIconClass =
     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200";
   const toolsRowTextClass = "min-w-0 flex-1";
+  const contactLoggingButtonClass =
+    "inline-flex w-full items-center justify-center rounded-xl border border-blue-100 bg-white px-3 py-3 text-sm font-semibold text-blue-800 shadow-[0_12px_24px_-22px_rgba(37,99,235,0.45)] transition-colors hover:bg-blue-50";
   const evidenceActionClass =
     "flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-base font-semibold text-slate-700";
   const evidenceActionTopClass = "flex min-w-0 flex-1 items-center gap-2";
@@ -1004,6 +1010,26 @@ export default function MobileJobDetailV2Preview(props: any) {
                     toolsRowTextClass={toolsRowTextClass}
                   />
                 ) : null}
+                <div className="rounded-xl border border-blue-100 bg-blue-50/35 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 ring-1 ring-blue-100">
+                      <PhoneIcon className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-slate-950">Contact Logging</span>
+                      <span className="block text-sm font-medium leading-5 text-slate-600">
+                        Log attempts only; this does not confirm delivery.
+                      </span>
+                    </span>
+                  </div>
+                  <ContactLoggingQuickActions
+                    jobId={String(job.id)}
+                    attemptCount={attemptCount}
+                    lastAttemptLabel={lastAttemptLabel}
+                    action={logCustomerContactAttemptFromForm}
+                    buttonClassName={contactLoggingButtonClass}
+                  />
+                </div>
                 <Link href={servicePlanToolHref} className={toolsRowClass}>
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <span className={toolsRowIconClass}>

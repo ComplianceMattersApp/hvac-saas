@@ -184,6 +184,28 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("completeDataEntryFromForm");
   });
 
+  it("renders native contact logging in V2 without changing the quick action contract", () => {
+    expect(pageSource).toContain("ContactLoggingQuickActions={ContactLoggingQuickActions}");
+    expect(pageSource).toContain("logCustomerContactAttemptFromForm={logCustomerContactAttemptFromForm}");
+    expect(mobileJobDetailCurrentSource).toContain("<ContactLoggingQuickActions");
+    expect(mobileJobDetailV2PreviewSource).toContain("ContactLoggingQuickActions");
+    expect(mobileJobDetailV2PreviewSource).toContain("Log attempts only; this does not confirm delivery.");
+    expect(mobileJobDetailV2PreviewSource).toContain("action={logCustomerContactAttemptFromForm}");
+    expect(mobileJobDetailV2PreviewSource).toContain("attemptCount={attemptCount}");
+    expect(mobileJobDetailV2PreviewSource).toContain("lastAttemptLabel={lastAttemptLabel}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain('standardJobAnchorHref("contact-logging")');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('href="#contact-logging"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('import { logCustomerContactAttemptFromForm');
+    expect(contactLoggingSource).toContain('id="contact-logging"');
+    expect(contactLoggingSource).toContain('name="job_id"');
+    expect(contactLoggingSource).toContain('name="method" value="call"');
+    expect(contactLoggingSource).toContain('name="method" value="text"');
+    expect(contactLoggingSource).toContain('name="result" value="no_answer"');
+    expect(contactLoggingSource).toContain('name="result" value="sent"');
+    expect(contactLoggingSource).toContain('name="return_to" value={returnTo}');
+    expect(contactLoggingSource).toContain('name="success_banner" value="contact_attempt_logged"');
+  });
+
   it("uses a display-only V2 hero title without mutating source job titles", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function getHeroDisplayTitle");
     expect(mobileJobDetailV2PreviewSource).toContain("const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);");
