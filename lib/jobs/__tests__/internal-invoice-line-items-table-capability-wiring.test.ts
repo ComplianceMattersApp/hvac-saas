@@ -51,7 +51,7 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).toContain("const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded)");
     expect(source).toContain("canAddVisitScopeLine && eligibleVisitScopeItems.length > 0");
     expect(source).toContain("eligibleVisitScopeItems.map((item)");
-    expect(source).toContain("Recommended Path: Start with Work Performed");
+    expect(source).toContain("Recommended Path: Start with Work Items");
     expect(source).toContain("Use Work Items when this charge comes from work completed on the job.");
     expect(source).not.toContain("All available Work Items are already on this draft invoice.");
     expect(source).not.toContain("Already added");
@@ -162,12 +162,12 @@ describe("internal invoice line items table capability wiring", () => {
     expect(manualFormSlice).toContain('name="job_id" value={jobId}');
     expect(manualFormSlice).toContain('name="invoice_id" value={selectedInvoiceId}');
     expect(manualFormSlice).toContain('name="tab" value={tab}');
-    expect(manualFormSlice).toContain('name="item_name"');
+    expect(manualFormSlice).toContain('name="item_name_snapshot"');
     expect(manualFormSlice).toContain('placeholder="Type invoice charge..."');
-    expect(manualFormSlice).toContain('name="item_type"');
+    expect(manualFormSlice).toContain('name="item_type_snapshot"');
     expect(manualFormSlice).toContain('name="quantity"');
     expect(manualFormSlice).toContain('name="unit_price"');
-    expect(manualFormSlice).toContain('name="description"');
+    expect(manualFormSlice).toContain('name="description_snapshot"');
     expect(manualFormSlice).toContain("Add Manual Charge");
   });
 
