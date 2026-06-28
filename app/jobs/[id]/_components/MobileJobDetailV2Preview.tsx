@@ -866,15 +866,13 @@ export default function MobileJobDetailV2Preview(props: any) {
                   </span>
                   <span className={previewPillClass}>Open</span>
                 </Link>
-                {showMobileEccTestAction ? (
-                  <Link href={`/jobs/${job.id}/tests`} className={previewRowClass}>
-                    <span className={previewRowTextClass}>
-                      <span className="block font-semibold text-slate-950">ECC Tests</span>
-                      <span className="block text-sm text-slate-600">Open test workflow</span>
-                    </span>
-                    <span className={previewPillClass}>Open</span>
-                  </Link>
-                ) : null}
+                <Link href={`/jobs/${job.id}/tests`} className={previewRowClass}>
+                  <span className={previewRowTextClass}>
+                    <span className="block font-semibold text-slate-950">ECC Tests</span>
+                    <span className="block text-sm text-slate-600">Open test workflow</span>
+                  </span>
+                  <span className={previewPillClass}>Open</span>
+                </Link>
                 <details id="mobile-permit-info" className="group/permit">
                   <summary className="cursor-pointer list-none">
                     <div className={previewRowClass}>

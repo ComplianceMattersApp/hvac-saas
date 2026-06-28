@@ -200,6 +200,8 @@ describe("mobile job detail assignment parity", () => {
     const testsIndex = mobileJobDetailV2PreviewSource.indexOf("ECC Tests", eccBranchStart);
     const permitIndex = mobileJobDetailV2PreviewSource.indexOf("Permit Information", eccBranchStart);
     const reportIndex = mobileJobDetailV2PreviewSource.indexOf("Completion Report", eccBranchStart);
+    const testsHrefIndex = mobileJobDetailV2PreviewSource.indexOf('href={`/jobs/${job.id}/tests`}', eccBranchStart);
+    const testsLinkBlock = mobileJobDetailV2PreviewSource.slice(testsHrefIndex - 120, testsHrefIndex + 520);
     const reportHrefIndex = mobileJobDetailV2PreviewSource.indexOf("href={eccCompletionReportHref}", eccBranchStart);
     const reportLinkBlock = mobileJobDetailV2PreviewSource.slice(reportHrefIndex - 120, reportHrefIndex + 520);
 
@@ -210,6 +212,10 @@ describe("mobile job detail assignment parity", () => {
     expect(testsIndex).toBeGreaterThan(equipmentIndex);
     expect(permitIndex).toBeGreaterThan(testsIndex);
     expect(reportIndex).toBeGreaterThan(permitIndex);
+    expect(testsHrefIndex).toBeGreaterThan(eccBranchStart);
+    expect(testsHrefIndex).toBeLessThan(serviceBranchStart);
+    expect(testsLinkBlock).toContain('href={`/jobs/${job.id}/tests`}');
+    expect(testsLinkBlock).not.toContain("showMobileEccTestAction");
     expect(reportHrefIndex).toBeGreaterThan(eccBranchStart);
     expect(reportHrefIndex).toBeLessThan(serviceBranchStart);
     expect(reportLinkBlock).toContain("Review test results and photo evidence");
