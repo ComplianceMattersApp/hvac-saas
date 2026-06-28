@@ -314,6 +314,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     contractorName,
     createEstimateFromJobHref,
     DeferredTimelineBody,
+    displayDateLA,
     FolderIcon,
     currentInterruptState,
     hasFullSchedule,
@@ -356,6 +357,10 @@ export default function MobileJobDetailV2Preview(props: any) {
     mobileToolLinkClass,
     narrativeScopeJobIds,
     NarrativeTimelineBodyFallback,
+    permitDateLabel,
+    permitJurisdiction,
+    permitNumber,
+    permitSummaryLabel,
     PhoneIcon,
     primaryButtonClass,
     primaryCloseoutMessage,
@@ -389,6 +394,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     tab,
     SubmitButton,
     TimedJobLocationPreview,
+    timeToTimeInput,
     timingEnabled,
     ToolIcon,
     hasVisitScopeDefined,
@@ -401,6 +407,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     workspaceFieldLabelClass,
     workspaceInputClass,
     updateJobOpsFromForm,
+    updateJobScheduleFromForm,
     JobLocationPreviewFallback,
     sharedNoteBannerMessage,
     sharedNotesMeta,
@@ -433,6 +440,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
   const v2AssignmentReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-assigned-team`;
+  const v2PermitReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-permit-info`;
   const v2StatusToolsReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-tools`;
   const hasServicePlanToolContext = Boolean(
     markVisitCountedLinkId ||
@@ -802,15 +810,100 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <span className={previewPillClass}>Open</span>
                   </Link>
                 ) : null}
-                <Link href={standardJobAnchorHref("mobile-permit-info")} className={previewRowClass}>
-                  <span className={previewRowTextClass}>
-                    <span className="block font-semibold text-slate-950">Permit Information</span>
-                    <span className="block text-sm text-slate-600">
-                      {isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"}
-                    </span>
-                  </span>
-                  <span className={previewPillClass}>{isEccPermitNeededActive ? "Needed" : "Status"}</span>
-                </Link>
+                <details id="mobile-permit-info" className="group/permit">
+                  <summary className="cursor-pointer list-none">
+                    <div className={previewRowClass}>
+                      <span className={previewRowTextClass}>
+                        <span className="block font-semibold text-slate-950">Permit Information</span>
+                        <span className="block text-sm text-slate-600">
+                          {isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"}
+                        </span>
+                      </span>
+                      <span className={previewPillClass}>{isEccPermitNeededActive ? "Needed" : "Status"}</span>
+                    </div>
+                  </summary>
+                  <div className="px-3 pb-3">
+                    <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
+                      <div className="space-y-2">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                          <div className="font-semibold text-slate-600">Permit</div>
+                          <div className="text-base font-semibold text-slate-900">{permitSummaryLabel}</div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                            <div className="font-semibold text-slate-600">Number</div>
+                            <div className="text-base font-semibold text-slate-900">{permitNumber || "Not recorded"}</div>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                            <div className="font-semibold text-slate-600">Jurisdiction</div>
+                            <div className="text-base font-semibold text-slate-900">{permitJurisdiction || "Not recorded"}</div>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm sm:col-span-2">
+                            <div className="font-semibold text-slate-600">Permit Date</div>
+                            <div className="text-base font-semibold text-slate-900">{permitDateLabel || "Not recorded"}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <details id="mobile-permit-edit" className="group/permit-edit mt-3">
+                        <summary className="cursor-pointer list-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-800">
+                          Edit Permit Info
+                        </summary>
+                        <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">
+                          <form action={updateJobScheduleFromForm} className="space-y-3">
+                            <input type="hidden" name="job_id" value={job.id} />
+                            <input type="hidden" name="return_to" value={v2PermitReturnTo} />
+                            <input type="hidden" name="scheduled_date" value={displayDateLA(job.scheduled_date) ?? ""} />
+                            <input type="hidden" name="window_start" value={timeToTimeInput(job.window_start) ?? ""} />
+                            <input type="hidden" name="window_end" value={timeToTimeInput(job.window_end) ?? ""} />
+
+                            <div className="space-y-1">
+                              <label className="text-sm font-semibold text-slate-700">Permit Number</label>
+                              <input
+                                name="permit_number"
+                                defaultValue={job.permit_number ?? ""}
+                                placeholder="Optional"
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-sm font-semibold text-slate-700">Jurisdiction</label>
+                              <input
+                                name="jurisdiction"
+                                defaultValue={(job as any).jurisdiction ?? ""}
+                                placeholder="City or county permit office"
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-sm font-semibold text-slate-700">Permit Date</label>
+                              <input
+                                type="date"
+                                name="permit_date"
+                                defaultValue={(job as any).permit_date ?? ""}
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-2">
+                              <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+                                Save Permit Info
+                              </SubmitButton>
+                              <Link
+                                href={v2PermitReturnTo}
+                                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
+                              >
+                                Cancel
+                              </Link>
+                            </div>
+                          </form>
+                        </div>
+                      </details>
+                    </div>
+                  </div>
+                </details>
                 <Link href={eccCompletionReportHref} className={previewRowClass}>
                   <span className={previewRowTextClass}>
                     <span className="block font-semibold text-slate-950">Completion Report</span>
@@ -1112,20 +1205,6 @@ export default function MobileJobDetailV2Preview(props: any) {
                   </span>
                   <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
                 </Link>
-                {surfaceProfile?.surfaces?.permits ? (
-                  <Link href={standardJobAnchorHref("mobile-permit-info")} className={toolsRowClass}>
-                    <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <span className={toolsRowIconClass}>
-                        <ClipboardIcon className="h-4 w-4" />
-                      </span>
-                      <span className={toolsRowTextClass}>
-                        <span className="block font-semibold text-slate-950">Permit Information</span>
-                        <span className="block text-sm font-medium text-slate-600">Review or edit permit records</span>
-                      </span>
-                    </span>
-                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
-                  </Link>
-                ) : null}
                 <details id="mobile-tools" className="group/status-tools">
                   <summary className="cursor-pointer list-none">
                     <div className={toolsRowClass}>
