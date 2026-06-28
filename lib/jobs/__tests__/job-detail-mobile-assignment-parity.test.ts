@@ -185,6 +185,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("markInvoiceCompleteFromForm");
     expect(mobileJobDetailV2PreviewSource).toContain("completeDataEntryFromForm");
     expect(mobileJobDetailV2PreviewSource).toContain("createInternalInvoiceDraftFromForm");
+    expect(mobileJobDetailV2PreviewSource).toContain("resolveFailureByCorrectionReviewFromForm");
   });
 
   it("keeps the ECC Completion Report visible as a Compliance Work route link", () => {
@@ -426,10 +427,14 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("const showEccReviewSummary =");
     expect(mobileJobDetailV2PreviewSource).toContain("showCorrectionReviewResolution");
     expect(mobileJobDetailV2PreviewSource).toContain("ECC attention");
+    expect(mobileJobDetailV2PreviewSource).toContain("Correction Review");
+    expect(mobileJobDetailV2PreviewSource).toContain("form action={resolveFailureByCorrectionReviewFromForm}");
+    expect(mobileJobDetailV2PreviewSource).toContain('name="job_id" value={job.id}');
+    expect(mobileJobDetailV2PreviewSource).toContain('name="review_note"');
+    expect(mobileJobDetailV2PreviewSource).toContain("Resolve Failure by Correction Review");
     expect(mobileJobDetailV2PreviewSource).not.toContain("eccReviewSummaryHref");
     expect(mobileJobDetailV2PreviewSource).not.toContain('standardJobAnchorHref(showLinkedRetestCreated ? "mobile-tools" : "mobile-next-service-action")');
     expect(mobileJobDetailV2PreviewSource).not.toContain("Open correction / retest tools");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={resolveFailureByCorrectionReviewFromForm}");
   });
 
   it("hardens V2 preview lifecycle exceptions as read-only or attention states", () => {

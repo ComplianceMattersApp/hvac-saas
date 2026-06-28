@@ -315,6 +315,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     contractorName,
     createEstimateFromJobHref,
     createInternalInvoiceDraftFromForm,
+    darkButtonClass,
     DeferredTimelineBody,
     displayDateLA,
     FolderIcon,
@@ -369,6 +370,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     primaryCloseoutMessage,
     recordBlockingPhase,
     releaseAndReevaluateFromForm,
+    resolveFailureByCorrectionReviewFromForm,
     secondaryButtonClass,
     serviceAddressDisplay,
     serviceAddressLine1,
@@ -409,6 +411,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     workspaceEmptyStateClass,
     workspaceFieldLabelClass,
     workspaceInputClass,
+    workspaceTextareaClass,
     updateJobOpsFromForm,
     updateJobScheduleFromForm,
     JobLocationPreviewFallback,
@@ -779,6 +782,38 @@ export default function MobileJobDetailV2Preview(props: any) {
         </section>
 
         <MobileJobStatusActionSurface {...props} />
+
+        {showCorrectionReviewResolution ? (
+          <section className={previewSectionClass}>
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
+                <WarningIcon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold leading-tight text-[#071225]">Correction Review</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Use this only when submitted correction notes/photos are sufficient to resolve the failure without sending a {surfaceProfile.labels.fieldUser.toLowerCase()} back out for a physical retest.
+                </p>
+              </div>
+            </div>
+
+            <form action={resolveFailureByCorrectionReviewFromForm} className="mt-4 space-y-3">
+              <input type="hidden" name="job_id" value={job.id} />
+              <div>
+                <label className={workspaceFieldLabelClass}>Review Note (optional)</label>
+                <textarea
+                  name="review_note"
+                  rows={3}
+                  placeholder="Explain why the failure was resolved by correction review..."
+                  className={workspaceTextareaClass}
+                />
+              </div>
+              <SubmitButton loadingText="Submitting..." className={darkButtonClass}>
+                Resolve Failure by Correction Review
+              </SubmitButton>
+            </form>
+          </section>
+        ) : null}
 
         <section id="mobile-invoice-summary-card" className={previewSectionClass}>
           <div
