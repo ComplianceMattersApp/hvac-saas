@@ -1036,6 +1036,33 @@ const [billingRecipient, setBillingRecipient] = useState<
     [relationshipJobId, relationshipJobs],
   );
 
+  const eligibleActiveRelationshipJobs = useMemo(
+    () => relationshipContext.activeJobs.filter(
+      (job) => String(job.ops_status ?? "").trim().toLowerCase() !== "need_to_schedule",
+    ),
+    [relationshipContext.activeJobs],
+  );
+
+  const relationshipSectionTone: "active" | "complete" | "pending" = isRelationshipPending
+    ? "active"
+    : eligibleActiveRelationshipJobs.length === 0 && relationshipContext.recentJobs.length === 0
+      ? "complete"
+      : relationshipAction !== "new_case"
+        ? "complete"
+        : "active";
+
+  const relationshipSectionSummary = isRelationshipPending
+    ? "Checking for related work..."
+    : relationshipAction === "open_active_job" && selectedRelationshipJob
+      ? `Opening ${relationshipJobTitle(selectedRelationshipJob)}...`
+      : relationshipAction === "create_follow_up" && selectedRelationshipJob
+        ? `Follow-up linked to ${relationshipJobTitle(selectedRelationshipJob)}.`
+        : eligibleActiveRelationshipJobs.length > 0
+          ? `${eligibleActiveRelationshipJobs.length} active job${eligibleActiveRelationshipJobs.length === 1 ? "" : "s"} found for this customer.`
+          : relationshipContext.recentJobs.length > 0
+            ? `${relationshipContext.recentJobs.length} recent visit${relationshipContext.recentJobs.length === 1 ? "" : "s"} found.`
+            : "No related work found. Continuing as a new case.";
+
   const relationshipDecisionReady =
     !shouldShowRelationshipStep || relationshipAction === "new_case" || Boolean(selectedRelationshipJob);
 
@@ -2814,6 +2841,134 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
               </div>
               ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {shouldShowRelationshipStep ? (
+          <section className={guidedSectionShellClass}>
+            {renderGuidedSectionIntro({
+              icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
+              title: "Related Work",
+              description: "Check for existing work before creating a new case.",
+              summary: relationshipSectionSummary,
+              tone: relationshipSectionTone,
+            })}
+            <div className={guidedSectionBodyClass}>
+              {isRelationshipPending ? (
+                <p className="text-sm text-slate-500">Checking for related work...</p>
+              ) : relationshipError ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm">
+                  {relationshipError}
+                </div>
+              ) : (
+                <>
+                  {eligibleActiveRelationshipJobs.length > 0 ? (
+                    <div className={`${guidedSectionInsetClass} space-y-3`}>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Open Active Job</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          This customer already has active work in progress. Open it to continue rather than creating a duplicate.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {eligibleActiveRelationshipJobs.map((job) => (
+                          <button
+                            key={job.id}
+                            type="button"
+                            onClick={() => {
+                              setRelationshipAction("open_active_job");
+                              setRelationshipJobId(job.id);
+                              router.push(`/jobs/${job.id}`);
+                            }}
+                            className="flex w-full flex-col gap-1 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left transition-all hover:border-slate-300 hover:bg-slate-50"
+                          >
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-medium text-slate-900">{relationshipJobTitle(job)}</span>
+                              <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${relationshipOpsTone(job.ops_status)}`}>
+                                {relationshipOpsLabel(job.ops_status)}
+                              </span>
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              {formatRelationshipDate(job.scheduled_date)}
+                              {formatRelationshipWindow(job) ? ` • ${formatRelationshipWindow(job)}` : ""}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {relationshipContext.recentJobs.length > 0 ? (
+                    <div className={`${guidedSectionInsetClass} space-y-3`}>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Create Follow-Up Visit</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          Link this new visit to an existing case to keep service history connected.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        {relationshipContext.recentJobs.map((job) => {
+                          const isSelected = relationshipAction === "create_follow_up" && relationshipJobId === job.id;
+                          return (
+                            <label
+                              key={job.id}
+                              className={[
+                                "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-all",
+                                isSelected
+                                  ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                                  : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                              ].join(" ")}
+                            >
+                              <input
+                                type="radio"
+                                name="_relationshipFollowUpUi"
+                                checked={isSelected}
+                                onChange={() => {
+                                  setRelationshipAction("create_follow_up");
+                                  setRelationshipJobId(job.id);
+                                }}
+                                className="mt-0.5"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className={isSelected ? "block text-sm font-medium text-white" : "block text-sm font-medium text-slate-900"}>
+                                  {relationshipJobTitle(job)}
+                                </span>
+                                <span className={isSelected ? "mt-0.5 block text-xs text-slate-200" : "mt-0.5 block text-xs text-slate-500"}>
+                                  {formatRelationshipDate(job.scheduled_date ?? job.created_at)}
+                                </span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {relationshipAction === "create_follow_up" && selectedRelationshipJob ? (
+                        <p className="text-xs leading-5 text-emerald-700">
+                          Follow-up linked to {relationshipJobTitle(selectedRelationshipJob)}. Continue filling in the details below.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <div className={`${guidedSectionInsetClass} flex items-center justify-between gap-3`}>
+                    <p className="text-xs leading-5 text-slate-500">
+                      Not related to existing work? Continue as a new case.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={resetRelationshipDecision}
+                      className={[
+                        "shrink-0 rounded-xl border px-3 py-2.5 text-sm font-medium transition-all",
+                        relationshipAction === "new_case"
+                          ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
+                      ].join(" ")}
+                    >
+                      Continue as New Case
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </section>
         ) : null}
