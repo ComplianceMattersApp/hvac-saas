@@ -1284,6 +1284,10 @@ function isMobileJobV2OwnerDefaultEnabled() {
   return String(process.env.ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT ?? "").trim().toLowerCase() === "true";
 }
 
+function isMobileJobV2DefaultEnabled() {
+  return String(process.env.ENABLE_MOBILE_JOB_V2_DEFAULT ?? "").trim().toLowerCase() === "true";
+}
+
 function isMobileJobV2AllowlistedUser(user: { id?: string | null; email?: string | null }) {
   const allowedEmails = parseMobileJobV2Allowlist(process.env.MOBILE_JOB_V2_ALLOWED_EMAILS);
   const allowedUserIds = parseMobileJobV2Allowlist(process.env.MOBILE_JOB_V2_ALLOWED_USER_IDS);
@@ -3524,16 +3528,24 @@ const showCorrectionReviewResolution =
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
   const showMobileContractorContext =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
-  const mobileV2OwnerDefaultAllowed =
+  const mobileV2EligibleInternalUser =
     isInternalUser &&
     !hasContractorShadowMembership &&
     String((internalUser as any).status ?? "").trim().toLowerCase() !== "inactive" &&
-    (internalUser as any).active !== false &&
+    (internalUser as any).active !== false;
+  const mobileV2UniversalDefaultAllowed =
+    mobileV2EligibleInternalUser &&
+    isMobileJobV2DefaultEnabled();
+  const mobileV2OwnerDefaultAllowed =
+    mobileV2EligibleInternalUser &&
     isMobileJobV2OwnerDefaultEnabled() &&
     isMobileJobV2AllowlistedUser(user);
+  const mobileV2ExplicitPreviewAllowed =
+    mobileV2EligibleInternalUser &&
+    explicitlyRequestedMobileV2Preview;
   const useMobileV2Preview =
     !forceCurrentMobileLayout &&
-    (explicitlyRequestedMobileV2Preview || mobileV2OwnerDefaultAllowed);
+    (mobileV2ExplicitPreviewAllowed || mobileV2UniversalDefaultAllowed || mobileV2OwnerDefaultAllowed);
   const MobileJobDetailMobileComponent = useMobileV2Preview
     ? MobileJobDetailV2Preview
     : MobileJobDetailCurrent;

@@ -90,7 +90,7 @@ const realPreviewWorkspacePatterns = [
 ];
 
 describe("mobile job detail assignment parity", () => {
-  it("keeps current mobile as default and gates V2 behind explicit preview or owner env allowlist", () => {
+  it("defaults eligible internal mobile users to V2 behind universal or owner env gates while preserving current fallback", () => {
     const mobileSelectionStart = pageSource.indexOf("const MobileJobDetailMobileComponent = useMobileV2Preview");
     const mobileSelection = pageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
 
@@ -100,15 +100,24 @@ describe("mobile job detail assignment parity", () => {
     expect(pageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
     expect(pageSource).toContain('const explicitlyRequestedMobileV2Preview = mobileLayoutMode === "v2";');
     expect(pageSource).toContain('const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";');
+    expect(pageSource).toContain("function isMobileJobV2DefaultEnabled()");
+    expect(pageSource).toContain("process.env.ENABLE_MOBILE_JOB_V2_DEFAULT");
     expect(pageSource).toContain("function isMobileJobV2OwnerDefaultEnabled()");
     expect(pageSource).toContain("process.env.ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT");
     expect(pageSource).toContain("process.env.MOBILE_JOB_V2_ALLOWED_EMAILS");
     expect(pageSource).toContain("process.env.MOBILE_JOB_V2_ALLOWED_USER_IDS");
+    expect(pageSource).toContain("const mobileV2EligibleInternalUser =");
+    expect(pageSource).toContain("isInternalUser &&");
+    expect(pageSource).toContain("!hasContractorShadowMembership &&");
+    expect(pageSource).toContain("const mobileV2UniversalDefaultAllowed =");
+    expect(pageSource).toContain("mobileV2EligibleInternalUser &&\n    isMobileJobV2DefaultEnabled()");
     expect(pageSource).toContain("const mobileV2OwnerDefaultAllowed =");
-    expect(pageSource).toContain("isMobileJobV2OwnerDefaultEnabled() &&");
+    expect(pageSource).toContain("mobileV2EligibleInternalUser &&\n    isMobileJobV2OwnerDefaultEnabled() &&");
     expect(pageSource).toContain("isMobileJobV2AllowlistedUser(user)");
+    expect(pageSource).toContain("const mobileV2ExplicitPreviewAllowed =");
+    expect(pageSource).toContain("mobileV2EligibleInternalUser &&\n    explicitlyRequestedMobileV2Preview");
     expect(pageSource).toContain("!forceCurrentMobileLayout &&");
-    expect(pageSource).toContain("(explicitlyRequestedMobileV2Preview || mobileV2OwnerDefaultAllowed)");
+    expect(pageSource).toContain("(mobileV2ExplicitPreviewAllowed || mobileV2UniversalDefaultAllowed || mobileV2OwnerDefaultAllowed)");
     expect(mobileSelection).toContain("? MobileJobDetailV2Preview");
     expect(mobileSelection).toContain(": MobileJobDetailCurrent");
     expect(pageSource).toContain("<MobileJobDetailMobileComponent");
