@@ -428,6 +428,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     ? "View agreement, visits, and next due details"
     : "Sign customer up for a service plan";
   const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
+  const eccCompletionReportHref = `/jobs/${job.id}/tests?t=completion_report`;
   const isEccComplianceActive =
     isEcc &&
     !isReadOnlyState &&
@@ -781,13 +782,6 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <span className={previewPillClass}>Open</span>
                   </Link>
                 ) : null}
-                <Link href={`/jobs/${job.id}/tests?t=completion_report`} className={previewRowClass}>
-                  <span className={previewRowTextClass}>
-                    <span className="block font-semibold text-slate-950">Completion Report</span>
-                    <span className="block text-sm text-slate-600">Review test results and photo evidence</span>
-                  </span>
-                  <span className={previewPillClass}>Open</span>
-                </Link>
                 <Link href={standardJobAnchorHref("mobile-permit-info")} className={previewRowClass}>
                   <span className={previewRowTextClass}>
                     <span className="block font-semibold text-slate-950">Permit Information</span>
@@ -796,6 +790,13 @@ export default function MobileJobDetailV2Preview(props: any) {
                     </span>
                   </span>
                   <span className={previewPillClass}>{isEccPermitNeededActive ? "Needed" : "Status"}</span>
+                </Link>
+                <Link href={eccCompletionReportHref} className={previewRowClass}>
+                  <span className={previewRowTextClass}>
+                    <span className="block font-semibold text-slate-950">Completion Report</span>
+                    <span className="block text-sm text-slate-600">Review test results and photo evidence</span>
+                  </span>
+                  <span className={previewPillClass}>Open</span>
                 </Link>
               </>
             ) : (

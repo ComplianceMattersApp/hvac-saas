@@ -185,6 +185,39 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("completeDataEntryFromForm");
   });
 
+  it("keeps the ECC Completion Report visible as a Compliance Work route link", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain(
+      "const eccCompletionReportHref = `/jobs/${job.id}/tests?t=completion_report`;",
+    );
+
+    const complianceListStart = mobileJobDetailV2PreviewSource.indexOf(
+      '<div className="v2-work-scope-summary mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">',
+    );
+    const eccBranchStart = mobileJobDetailV2PreviewSource.indexOf("{isEcc ? (", complianceListStart);
+    const serviceBranchStart = mobileJobDetailV2PreviewSource.indexOf(") : (", eccBranchStart);
+    const equipmentIndex = mobileJobDetailV2PreviewSource.indexOf("Equipment", eccBranchStart);
+    const testsIndex = mobileJobDetailV2PreviewSource.indexOf("ECC Tests", eccBranchStart);
+    const permitIndex = mobileJobDetailV2PreviewSource.indexOf("Permit Information", eccBranchStart);
+    const reportIndex = mobileJobDetailV2PreviewSource.indexOf("Completion Report", eccBranchStart);
+    const reportHrefIndex = mobileJobDetailV2PreviewSource.indexOf("href={eccCompletionReportHref}", eccBranchStart);
+    const reportLinkBlock = mobileJobDetailV2PreviewSource.slice(reportHrefIndex - 120, reportHrefIndex + 520);
+
+    expect(complianceListStart).toBeGreaterThan(-1);
+    expect(eccBranchStart).toBeGreaterThan(complianceListStart);
+    expect(serviceBranchStart).toBeGreaterThan(eccBranchStart);
+    expect(equipmentIndex).toBeGreaterThan(eccBranchStart);
+    expect(testsIndex).toBeGreaterThan(equipmentIndex);
+    expect(permitIndex).toBeGreaterThan(testsIndex);
+    expect(reportIndex).toBeGreaterThan(permitIndex);
+    expect(reportHrefIndex).toBeGreaterThan(eccBranchStart);
+    expect(reportHrefIndex).toBeLessThan(serviceBranchStart);
+    expect(reportLinkBlock).toContain("Review test results and photo evidence");
+    expect(reportLinkBlock).not.toContain("showMobileEccTestAction");
+    expect(reportLinkBlock).not.toContain("closeoutNeeds");
+    expect(reportLinkBlock).not.toContain("canShowCertsButton");
+    expect(reportLinkBlock).not.toContain("certs_complete");
+  });
+
   it("renders native contact logging in V2 without changing the quick action contract", () => {
     expect(pageSource).toContain("ContactLoggingQuickActions={ContactLoggingQuickActions}");
     expect(pageSource).toContain("logCustomerContactAttemptFromForm={logCustomerContactAttemptFromForm}");
