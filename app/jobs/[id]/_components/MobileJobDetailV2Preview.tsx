@@ -312,8 +312,10 @@ export default function MobileJobDetailV2Preview(props: any) {
     ContactLoggingQuickActions,
     contractorName,
     createEstimateFromJobHref,
+    DeferredTimelineBody,
     FolderIcon,
     hasFullSchedule,
+    hasDirectNarrativeChain,
     headerJobTypeLabel,
     internalInvoiceTruth,
     internalNoteBannerMessage,
@@ -345,6 +347,8 @@ export default function MobileJobDetailV2Preview(props: any) {
     mobileCustomerHref,
     mobileTextHref,
     mobileToolLinkClass,
+    narrativeScopeJobIds,
+    NarrativeTimelineBodyFallback,
     PhoneIcon,
     primaryCloseoutMessage,
     recordBlockingPhase,
@@ -382,6 +386,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     visitScopeItems,
     visitScopeSummary,
     WarningIcon,
+    workspaceEmptyStateClass,
     JobLocationPreviewFallback,
     sharedNoteBannerMessage,
     sharedNotesMeta,
@@ -1124,18 +1129,44 @@ export default function MobileJobDetailV2Preview(props: any) {
             <div className="space-y-2">
               <div className={toolsGroupHeadingClass}>Admin / Records</div>
               <div className="grid gap-2">
-                <Link href={standardJobAnchorHref("mobile-tools-timeline")} className={toolsRowClass}>
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className={toolsRowIconClass}>
-                      <FolderIcon className="h-4 w-4" />
-                    </span>
-                    <span className={toolsRowTextClass}>
-                      <span className="block font-semibold text-slate-950">Timeline / History</span>
-                      <span className="block text-sm font-medium text-slate-600">Open job history in standard view</span>
-                    </span>
-                  </span>
-                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
-                </Link>
+                <details id="mobile-tools-timeline" className="group/timeline">
+                  <summary className="cursor-pointer list-none">
+                    <div className={toolsRowClass}>
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className={toolsRowIconClass}>
+                          <FolderIcon className="h-4 w-4" />
+                        </span>
+                        <span className={toolsRowTextClass}>
+                          <span className="block font-semibold text-slate-950">Timeline / History</span>
+                          <span className="block text-sm font-medium text-slate-600">Review job history and activity</span>
+                        </span>
+                      </span>
+                      <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open/timeline:rotate-90" />
+                    </div>
+                  </summary>
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+                    <Suspense fallback={<NarrativeTimelineBodyFallback />}>
+                      <DeferredTimelineBody
+                        jobId={String(job.id)}
+                        timelineJobIds={narrativeScopeJobIds}
+                        hasDirectNarrativeChain={hasDirectNarrativeChain}
+                        emptyStateClassName={workspaceEmptyStateClass}
+                        jobSummary={{
+                          id: String(job.id),
+                          status: job.status ?? null,
+                          ops_status: job.ops_status ?? null,
+                          field_complete: Boolean(job.field_complete),
+                          scheduled_date: job.scheduled_date ?? null,
+                          window_start: job.window_start ?? null,
+                          window_end: job.window_end ?? null,
+                          parent_job_id: job.parent_job_id ?? null,
+                          pending_info_reason: job.pending_info_reason ?? null,
+                          on_hold_reason: job.on_hold_reason ?? null,
+                        }}
+                      />
+                    </Suspense>
+                  </div>
+                </details>
             {isInternalUser && serviceLocationEditHref ? (
               <Link href={serviceLocationEditHref} className={toolsRowClass}>
                 <span className="flex min-w-0 flex-1 items-center gap-2">

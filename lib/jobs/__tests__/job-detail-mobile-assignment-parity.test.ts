@@ -460,7 +460,15 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-permit-info")');
     expect(mobileJobDetailV2PreviewSource).toContain("Job Status Tools");
     expect(mobileJobDetailV2PreviewSource).toContain("Timeline / History");
-    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-tools-timeline")');
+    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-tools-timeline"');
+    expect(mobileJobDetailV2PreviewSource).toContain("Review job history and activity");
+    expect(mobileJobDetailV2PreviewSource).toContain("group-open/timeline:rotate-90");
+    expect(mobileJobDetailV2PreviewSource).toContain("<DeferredTimelineBody");
+    expect(mobileJobDetailV2PreviewSource).toContain("timelineJobIds={narrativeScopeJobIds}");
+    expect(mobileJobDetailV2PreviewSource).toContain("hasDirectNarrativeChain={hasDirectNarrativeChain}");
+    expect(mobileJobDetailV2PreviewSource).toContain("emptyStateClassName={workspaceEmptyStateClass}");
+    expect(mobileJobDetailV2PreviewSource).toContain("fallback={<NarrativeTimelineBodyFallback />}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain('standardJobAnchorHref("mobile-tools-timeline")');
     expect(mobileJobDetailV2PreviewSource).toContain("Location & Address");
     expect(mobileJobDetailV2PreviewSource).not.toContain(">Job Tools</span>");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Open tools area");
