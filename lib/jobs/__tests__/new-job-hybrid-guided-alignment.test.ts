@@ -25,12 +25,12 @@ describe("/jobs/new hybrid guided-builder alignment", () => {
     expect(formSource).not.toContain("rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5");
   });
 
-  it("keeps hidden default relationship submission without rendering the chooser", () => {
+  it("renders the relationship-aware chooser with correct option labels", () => {
     expect(formSource).toContain('name="relationship_action" value={shouldShowRelationshipStep ? relationshipAction : "new_case"}');
     expect(formSource).not.toContain("Relationship Path");
-    expect(formSource).not.toContain("Open Active Job");
-    expect(formSource).not.toContain("Create Follow-Up Visit");
-    expect(formSource).not.toContain("Continue as New Case");
-    expect(formSource).not.toContain("Continuing as a new case.");
+    expect(formSource).toContain("Open Active Job");
+    expect(formSource).toContain("Create Follow-Up Visit");
+    expect(formSource).toContain("Continue as New Case");
+    expect(formSource).toContain("Continuing as a new case.");
   });
 });

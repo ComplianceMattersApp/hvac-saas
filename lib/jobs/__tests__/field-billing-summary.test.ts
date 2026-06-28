@@ -624,7 +624,7 @@ describe("FieldBillingSummary", () => {
     });
 
     expect(html).toContain("Repair blower assembly");
-    expect(html).toContain("Source: Visit Scope");
+    expect(html).toContain("Source: Work Items");
     expect(html).toContain("Amount pending");
     expect(html).toContain("$175.00");
     expect(html).not.toContain("Proposed total");

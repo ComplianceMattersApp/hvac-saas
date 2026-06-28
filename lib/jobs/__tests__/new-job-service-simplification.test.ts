@@ -52,10 +52,10 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
     );
   });
 
-  it("does not keep legacy Relationship Path action labels in source", () => {
+  it("renders relationship-aware step with expected option labels", () => {
     expect(formSource).not.toContain("Relationship Path");
-    expect(formSource).not.toContain("Open Active Job");
-    expect(formSource).not.toContain("Create Follow-Up Visit");
-    expect(formSource).not.toContain("Continue as New Case");
+    expect(formSource).toContain("Open Active Job");
+    expect(formSource).toContain("Create Follow-Up Visit");
+    expect(formSource).toContain("Continue as New Case");
   });
 });
