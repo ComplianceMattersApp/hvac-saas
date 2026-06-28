@@ -1265,6 +1265,16 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
   const reviewNoteRaw = formData.get("review_note");
 
   if (typeof jobId !== "string" || !jobId) throw new Error("Missing job_id");
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  const redirectToJob = (): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        returnToRaw,
+        fallbackPath: `/jobs/${jobId}?tab=ops`,
+      }),
+    );
 
   const review_note =
     typeof reviewNoteRaw === "string" && reviewNoteRaw.trim()
@@ -1291,11 +1301,11 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
 
   // Only meaningful on unresolved failed ECC jobs
   if ((job.job_type ?? "").toLowerCase() !== "ecc") {
-    redirect(`/jobs/${jobId}?tab=ops`);
+    redirectToJob();
   }
 
   if (!["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""))) {
-  redirect(`/jobs/${jobId}?tab=ops`);
+  redirectToJob();
   }
   const beforeOps = job.ops_status ?? null;
 
@@ -1338,7 +1348,7 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?tab=ops`);
+  redirectToJob();
 }
 
 export async function markCertsCompleteFromForm(formData: FormData): Promise<void> {

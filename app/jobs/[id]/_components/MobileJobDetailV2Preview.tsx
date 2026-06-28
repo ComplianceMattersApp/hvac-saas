@@ -447,6 +447,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
   const v2AssignmentReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-assigned-team`;
   const v2BillingReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-invoice-summary-card`;
+  const v2CorrectionReviewReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-correction-review`;
   const v2PermitReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-permit-info`;
   const v2StatusToolsReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-tools`;
   const hasServicePlanToolContext = Boolean(
@@ -784,7 +785,7 @@ export default function MobileJobDetailV2Preview(props: any) {
         <MobileJobStatusActionSurface {...props} />
 
         {showCorrectionReviewResolution ? (
-          <section className={previewSectionClass}>
+          <section id="mobile-correction-review" className={previewSectionClass}>
             <div className="flex items-start gap-3">
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700 ring-1 ring-amber-100">
                 <WarningIcon className="h-5 w-5" />
@@ -799,6 +800,7 @@ export default function MobileJobDetailV2Preview(props: any) {
 
             <form action={resolveFailureByCorrectionReviewFromForm} className="mt-4 space-y-3">
               <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="return_to" value={v2CorrectionReviewReturnTo} />
               <div>
                 <label className={workspaceFieldLabelClass}>Review Note (optional)</label>
                 <textarea

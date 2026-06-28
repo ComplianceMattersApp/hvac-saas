@@ -18,6 +18,11 @@ const mobileJobStatusActionSurfaceSource = readFileSync(
   "utf-8",
 );
 
+const jobOpsActionsSource = readFileSync(
+  resolve(__dirname, "../../../lib/actions/job-ops-actions.ts"),
+  "utf-8",
+);
+
 const serviceChainSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/DeferredServiceChainPanelBody.tsx"),
   "utf-8",
@@ -77,5 +82,19 @@ describe("job detail ECC retest bridge wiring", () => {
     expect(jobDetailSource).not.toContain('.neq("ops_status", "closed")');
     expect(serviceChainSource).toContain("retestParentIdsWithActiveChild");
     expect(serviceChainSource).toContain("Linked Retest Created");
+  });
+
+  it("allows correction-review resolution to return to a safe supplied job target", () => {
+    const actionStart = jobOpsActionsSource.indexOf("export async function resolveFailureByCorrectionReviewFromForm");
+    const actionEnd = jobOpsActionsSource.indexOf("export async function markCertsCompleteFromForm", actionStart);
+    const actionBlock = jobOpsActionsSource.slice(actionStart, actionEnd);
+
+    expect(actionStart).toBeGreaterThanOrEqual(0);
+    expect(actionEnd).toBeGreaterThan(actionStart);
+    expect(actionBlock).toContain('const returnToRaw = String(formData.get("return_to") || "").trim();');
+    expect(actionBlock).toContain("buildJobOpsRedirectPath({");
+    expect(actionBlock).toContain("returnToRaw,");
+    expect(actionBlock).toContain("fallbackPath: `/jobs/${jobId}?tab=ops`");
+    expect(actionBlock).toContain("redirectToJob();");
   });
 });

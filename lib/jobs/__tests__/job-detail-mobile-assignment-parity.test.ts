@@ -428,8 +428,11 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("showCorrectionReviewResolution");
     expect(mobileJobDetailV2PreviewSource).toContain("ECC attention");
     expect(mobileJobDetailV2PreviewSource).toContain("Correction Review");
+    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-correction-review"');
+    expect(mobileJobDetailV2PreviewSource).toContain("const v2CorrectionReviewReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-correction-review`;");
     expect(mobileJobDetailV2PreviewSource).toContain("form action={resolveFailureByCorrectionReviewFromForm}");
     expect(mobileJobDetailV2PreviewSource).toContain('name="job_id" value={job.id}');
+    expect(mobileJobDetailV2PreviewSource).toContain('name="return_to" value={v2CorrectionReviewReturnTo}');
     expect(mobileJobDetailV2PreviewSource).toContain('name="review_note"');
     expect(mobileJobDetailV2PreviewSource).toContain("Resolve Failure by Correction Review");
     expect(mobileJobDetailV2PreviewSource).not.toContain("eccReviewSummaryHref");
