@@ -298,6 +298,25 @@ function formatLocationContext(location: LocationLookupRow | null | undefined) {
   return cityStateZip ? `${base}, ${cityStateZip}` : base;
 }
 
+function formatConfirmationScheduledDate(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const parsed = new Date(`${trimmed}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return trimmed;
+  return new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(parsed);
+}
+
+function formatConfirmationScheduledTime(value: string) {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return value.trim();
+  const minute = match[2];
+  let hour = Number(match[1]) % 24;
+  const period = hour >= 12 ? "pm" : "am";
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  return minute === "00" ? `${hour}${period}` : `${hour}:${minute}${period}`;
+}
+
 function relationshipJobTitle(job: RelationshipJobSummary) {
   return String(job.title ?? "").trim() || `Job ${job.id.slice(0, 8)}`;
 }
@@ -763,9 +782,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       ? "Review the compliance job summary, then create it when the required intake details are ready."
       : "Review the work order summary, then create it when the required intake details are ready.";
   const createReadyLabel = productMode === "ecc_hers" ? "Ready to create this ECC job." : `Ready to create this ${surfaceProfile.labels.job.toLowerCase()}.`;
-  const createPendingLabel = productMode === "ecc_hers"
-    ? "Complete the required intake details to create this ECC job."
-    : `Complete the required intake details to create this ${surfaceProfile.labels.job.toLowerCase()}.`;
+  const createPendingLabel = "Complete the required steps above to continue";
   const customerSectionDescription = isCleaningMode
     ? "Select the customer / responsible account and confirm where the cleaning job should happen."
     : isHvacServiceMode
@@ -1049,6 +1066,58 @@ const [billingRecipient, setBillingRecipient] = useState<
           ? "Customer"
           : "Custom billing";
   const createSectionSummary = isSubmitReady ? createReadyLabel : createPendingLabel;
+
+  const confirmationCustomerName = createNewCustomer
+    ? ([newCustomerFirstName, newCustomerLastName].filter(Boolean).join(" ") || "this customer")
+    : (selectedCustomer ? customerDisplayName(selectedCustomer) : "this customer");
+  const confirmationStreet = (createNewCustomer || locationMode === "new"
+    ? newLocationAddressLine1
+    : (selectedLocation?.address_line1 ?? "")
+  ).trim();
+  const confirmationCity = (createNewCustomer || locationMode === "new"
+    ? newLocationCity
+    : (selectedLocation?.city ?? "")
+  ).trim();
+  const confirmationAddress = [confirmationStreet, confirmationCity].filter(Boolean).join(", ") || "the service address";
+  const confirmationJobTypeWithArticle = jobType === "ecc"
+    ? "an ECC / Compliance Test"
+    : isCleaningMode
+      ? "a Cleaning Job"
+      : "a Service Call";
+  const confirmationScheduleClause = scheduledDate
+    ? [
+        formatConfirmationScheduledDate(scheduledDate),
+        windowStart && windowEnd
+          ? `${formatConfirmationScheduledTime(windowStart)}–${formatConfirmationScheduledTime(windowEnd)}`
+          : null,
+      ].filter(Boolean).join(" ")
+    : "";
+  const confirmationSentence = scheduledDate
+    ? `Scheduling ${confirmationJobTypeWithArticle} for ${confirmationCustomerName} at ${confirmationAddress} — ${confirmationScheduleClause}.`
+    : `Creating ${confirmationJobTypeWithArticle} for ${confirmationCustomerName} at ${confirmationAddress}. No date set yet.`;
+  const confirmationWorkItems = visitScopeItems.filter((item) => item.title.trim() || item.details.trim());
+  const confirmationWorkItemsLine = confirmationWorkItems.length === 0
+    ? null
+    : confirmationWorkItems.length === 1 && confirmationWorkItems[0].title.trim()
+      ? `Work: ${confirmationWorkItems[0].title.trim()}`
+      : `${confirmationWorkItems.length} work item${confirmationWorkItems.length === 1 ? "" : "s"} planned`;
+  const confirmationBillingLine = modeSafeJobType === "service"
+    ? (billingRecipientDifferent ? `Billed to: ${billingRecipientLabel}` : null)
+    : billingRecipient === "customer"
+      ? null
+      : `Billed to: ${billingRecipientLabel}`;
+  const confirmationSiteContactLine = siteAccessContactDifferent && siteAccessContactName.trim()
+    ? `Site contact: ${siteAccessContactName.trim()}`
+    : null;
+  const confirmationProjectTypeLine = jobType === "ecc" && projectType
+    ? `Project type: ${projectType.replaceAll("_", " ")}`
+    : null;
+  const confirmationSecondaryDetails = [
+    confirmationWorkItemsLine,
+    confirmationBillingLine,
+    confirmationSiteContactLine,
+    confirmationProjectTypeLine,
+  ].filter((line): line is string => Boolean(line));
 
   const equipmentJson = useMemo(() => {
     // Only send payload when something was actually selected.
@@ -3743,47 +3812,14 @@ const [billingRecipient, setBillingRecipient] = useState<
               tone: createSectionTone,
             })}
             <div className={guidedSectionBodyClass}>
-            <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job</p>
-                <p className="mt-1 font-medium text-slate-900">{jobType === "service" ? "Service" : `ECC (${projectType.replaceAll("_", " ")})`}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Customer</p>
-                <p className="mt-1 font-medium text-slate-900">
-                  {createNewCustomer
-                    ? ([newCustomerFirstName, newCustomerLastName].filter(Boolean).join(" ") || "New customer")
-                    : (selectedCustomer ? customerDisplayName(selectedCustomer) : "Not selected")}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Location</p>
-                <p className="mt-1 font-medium text-slate-900">
-                  {createNewCustomer || locationMode === "new"
-                    ? (newLocationAddressLine1 || "New location")
-                    : (selectedLocation?.address_line1 || "Existing location")}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Schedule</p>
-                <p className="mt-1 font-medium text-slate-900">
-                  {scheduledDate ? `${scheduledDate}${windowStart && windowEnd ? ` ${windowStart}-${windowEnd}` : ""}` : "Unscheduled"}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Billing</p>
-                <p className="mt-1 font-medium text-slate-900">{billingRecipientLabel}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job Scope</p>
-                <p className="mt-1 font-medium text-slate-900">
-                  {visitScopeSummary.trim() || visitScopeItems.find((item) => item.title.trim())?.title.trim() || "Needs review"}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {visitScopeItems.filter((item) => item.title.trim() || item.details.trim()).length} item{visitScopeItems.filter((item) => item.title.trim() || item.details.trim()).length === 1 ? "" : "s"}
-                </p>
-              </div>
-            </div>
+            <p className="text-base font-medium leading-6 text-slate-900">{confirmationSentence}</p>
+            {confirmationSecondaryDetails.length > 0 ? (
+              <ul className="mt-2 space-y-0.5 text-sm text-slate-500">
+                {confirmationSecondaryDetails.map((detail, index) => (
+                  <li key={index}>{detail}</li>
+                ))}
+              </ul>
+            ) : null}
             </div>
           </div>
         ) : null}
