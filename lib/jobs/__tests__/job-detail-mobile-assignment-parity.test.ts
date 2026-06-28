@@ -84,6 +84,7 @@ const standardViewAnchors = [
 const realPreviewWorkspacePatterns = [
   "`/jobs/${job.id}/info?f=equipment`",
   "`/jobs/${job.id}/tests`",
+  "`/jobs/${job.id}/tests?t=completion_report`",
   "`/jobs/${job.id}/attachments`",
   "?tab=service-plans",
 ];

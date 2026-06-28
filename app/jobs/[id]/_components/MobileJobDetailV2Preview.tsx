@@ -781,6 +781,13 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <span className={previewPillClass}>Open</span>
                   </Link>
                 ) : null}
+                <Link href={`/jobs/${job.id}/tests?t=completion_report`} className={previewRowClass}>
+                  <span className={previewRowTextClass}>
+                    <span className="block font-semibold text-slate-950">Completion Report</span>
+                    <span className="block text-sm text-slate-600">Review test results and photo evidence</span>
+                  </span>
+                  <span className={previewPillClass}>Open</span>
+                </Link>
                 <Link href={standardJobAnchorHref("mobile-permit-info")} className={previewRowClass}>
                   <span className={previewRowTextClass}>
                     <span className="block font-semibold text-slate-950">Permit Information</span>
