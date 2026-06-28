@@ -7,6 +7,7 @@ type MarkVisitCountedActionButtonProps = {
   jobId: string;
   linkId: string;
   tab: string;
+  returnTo?: string;
 };
 
 function SubmitInner() {
@@ -27,7 +28,10 @@ export default function MarkVisitCountedActionButton({
   jobId,
   linkId,
   tab,
+  returnTo,
 }: MarkVisitCountedActionButtonProps) {
+  const actionReturnTo = returnTo || `/jobs/${jobId}?tab=${tab}#service-plan-visit-count`;
+
   return (
     <form
       action={markMaintenanceAgreementVisitCountedFromForm}
@@ -44,7 +48,7 @@ export default function MarkVisitCountedActionButton({
     >
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="maintenance_agreement_visit_link_id" value={linkId} />
-      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#service-plan-visit-count`} />
+      <input type="hidden" name="return_to" value={actionReturnTo} />
       <SubmitInner />
     </form>
   );

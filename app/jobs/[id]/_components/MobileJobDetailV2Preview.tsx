@@ -311,6 +311,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     ClockIcon,
     closeoutNeeds,
     completeDataEntryFromForm,
+    ConfirmNextDueDateActionButton,
     ContactLoggingQuickActions,
     contractorName,
     createEstimateFromJobHref,
@@ -319,6 +320,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     DeferredTimelineBody,
     displayDateLA,
     FolderIcon,
+    formatDateOnlyUs,
     currentInterruptState,
     hasFullSchedule,
     hasDirectNarrativeChain,
@@ -351,6 +353,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     LockIcon,
     logCustomerContactAttemptFromForm,
     MapPinIcon,
+    MarkVisitCountedActionButton,
     markVisitCountedAgreementName,
     markVisitCountedLinkId,
     MessageIcon,
@@ -449,6 +452,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const v2BillingReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-invoice-summary-card`;
   const v2CorrectionReviewReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-correction-review`;
   const v2PermitReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-permit-info`;
+  const v2ServicePlanReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-service-plan-actions`;
   const v2StatusToolsReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-tools`;
   const hasServicePlanToolContext = Boolean(
     markVisitCountedLinkId ||
@@ -463,6 +467,12 @@ export default function MobileJobDetailV2Preview(props: any) {
   const servicePlanToolHelper = hasServicePlanToolContext
     ? "View agreement, visits, and next due details"
     : "Sign customer up for a service plan";
+  const canConfirmServicePlanNextDue = Boolean(
+    suggestedNextDueProjection &&
+      !confirmedNextDueContext &&
+      !suggestedNextDueProjection.manualSchedulingRequired &&
+      suggestedNextDueProjection.suggestedNextDueDate,
+  );
   const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
   const eccCompletionReportHref = `/jobs/${job.id}/tests?t=completion_report`;
   const isEccComplianceActive =
@@ -1281,18 +1291,120 @@ export default function MobileJobDetailV2Preview(props: any) {
                     />
                   </div>
                 </details>
-                <Link href={servicePlanToolHref} className={toolsRowClass}>
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className={toolsRowIconClass}>
-                      <ClockIcon className="h-4 w-4" />
+                {hasServicePlanToolContext ? (
+                  <details id="mobile-service-plan-actions" className="group/service-plan">
+                    <summary className="cursor-pointer list-none">
+                      <div className={toolsRowClass}>
+                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <span className={toolsRowIconClass}>
+                            <ClockIcon className="h-4 w-4" />
+                          </span>
+                          <span className={toolsRowTextClass}>
+                            <span className="block font-semibold text-slate-950">Service Plan</span>
+                            <span className="block text-sm font-medium text-slate-600">{servicePlanToolHelper}</span>
+                          </span>
+                        </span>
+                        <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open/service-plan:rotate-90" />
+                      </div>
+                    </summary>
+                    <div className="mt-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">
+                          {markVisitCountedAgreementName || suggestedNextDueProjection?.agreementName || confirmedNextDueContext?.agreementName || "Service Plan"}
+                        </div>
+                        <div className="mt-1 text-sm leading-5 text-slate-600">
+                          Review agreement context or complete available visit-count and next-due actions.
+                        </div>
+                      </div>
+
+                      {markVisitCountedLinkId ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm leading-5 text-emerald-950">
+                          <div className="font-semibold">Visit count review</div>
+                          <div className="mt-1 text-emerald-900">
+                            This completed maintenance visit may count toward {markVisitCountedAgreementName || "the plan"}.
+                          </div>
+                          <div className="mt-3">
+                            <MarkVisitCountedActionButton
+                              jobId={String(job.id)}
+                              linkId={markVisitCountedLinkId}
+                              tab={tab}
+                              returnTo={v2ServicePlanReturnTo}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {suggestedNextDueProjection ? (
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-sm leading-5 text-blue-950">
+                          <div className="font-semibold">Suggested next due date</div>
+                          {confirmedNextDueContext ? (
+                            <>
+                              <div className="mt-1 text-blue-900">
+                                Next due date already confirmed for this counted visit.
+                              </div>
+                              <div className="mt-2 font-semibold text-blue-950">
+                                Confirmed: {formatDateOnlyUs(confirmedNextDueContext.confirmedNextDueDate) || "Manual scheduling required."}
+                              </div>
+                              <div className="mt-1 text-blue-900">
+                                Previous due date: {formatDateOnlyUs(confirmedNextDueContext.baselineNextDueDate) || "Not recorded."}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="mt-1 text-blue-900">
+                                Suggestion only. Confirm updates the Service Plan next due date and does not create a job, schedule, invoice, or payment.
+                              </div>
+                              <div className="mt-2 font-semibold text-blue-950">
+                                {suggestedNextDueProjection.manualSchedulingRequired
+                                  ? "Manual scheduling required."
+                                  : formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
+                              </div>
+                              {suggestedNextDueProjection.seasonalWindowPlaceholder ? (
+                                <div className="mt-1 text-blue-900">
+                                  {suggestedNextDueProjection.seasonalWindowPlaceholder}
+                                </div>
+                              ) : null}
+                              {canConfirmServicePlanNextDue ? (
+                                <div className="mt-3">
+                                  <ConfirmNextDueDateActionButton
+                                    jobId={String(job.id)}
+                                    agreementId={suggestedNextDueProjection.agreementId}
+                                    suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
+                                    baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
+                                    displayDate={formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
+                                    tab={tab}
+                                    returnTo={v2ServicePlanReturnTo}
+                                  />
+                                </div>
+                              ) : null}
+                            </>
+                          )}
+                        </div>
+                      ) : null}
+
+                      <Link
+                        href={servicePlanToolHref}
+                        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                      >
+                        Open Service Plan
+                        <ChevronRightIcon className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  </details>
+                ) : (
+                  <Link href={servicePlanToolHref} className={toolsRowClass}>
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className={toolsRowIconClass}>
+                        <ClockIcon className="h-4 w-4" />
+                      </span>
+                      <span className={toolsRowTextClass}>
+                        <span className="block font-semibold text-slate-950">Service Plan</span>
+                        <span className="block text-sm font-medium text-slate-600">{servicePlanToolHelper}</span>
+                      </span>
                     </span>
-                    <span className={toolsRowTextClass}>
-                      <span className="block font-semibold text-slate-950">Service Plan</span>
-                      <span className="block text-sm font-medium text-slate-600">{servicePlanToolHelper}</span>
-                    </span>
-                  </span>
-                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
-                </Link>
+                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                  </Link>
+                )}
                 <details id="mobile-tools" className="group/status-tools">
                   <summary className="cursor-pointer list-none">
                     <div className={toolsRowClass}>

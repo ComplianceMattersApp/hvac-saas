@@ -174,8 +174,6 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain(".update(");
     expect(mobileJobDetailV2PreviewSource).not.toContain(".upsert(");
     expect(mobileJobDetailV2PreviewSource).not.toContain(".delete(");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<MarkVisitCountedActionButton");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<ConfirmNextDueDateActionButton");
     expect(mobileJobDetailV2PreviewSource).not.toContain("createMaintenanceAgreement");
     expect(mobileJobDetailV2PreviewSource).not.toContain("updateMaintenanceAgreement");
     expect(mobileJobDetailV2PreviewSource).not.toContain("markCertsCompleteFromForm");
@@ -480,6 +478,11 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("suggestedNextDueProjection");
     expect(mobileJobDetailV2PreviewSource).toContain("confirmedNextDueContext");
     expect(mobileJobDetailV2PreviewSource).toContain("servicePlanToolHref");
+    expect(mobileJobDetailV2PreviewSource).toContain("const v2ServicePlanReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-service-plan-actions`;");
+    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-service-plan-actions"');
+    expect(mobileJobDetailV2PreviewSource).toContain("<MarkVisitCountedActionButton");
+    expect(mobileJobDetailV2PreviewSource).toContain("<ConfirmNextDueDateActionButton");
+    expect(mobileJobDetailV2PreviewSource).toContain("returnTo={v2ServicePlanReturnTo}");
     expect(mobileJobDetailV2PreviewSource).toContain("?tab=service-plans");
     expect(mobileJobDetailV2PreviewSource).toContain("&maFocus=");
     expect(mobileJobDetailV2PreviewSource).toContain("Service Plan");
