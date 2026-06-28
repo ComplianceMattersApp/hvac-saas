@@ -483,7 +483,7 @@ export default function InternalInvoiceLineItemsTable({
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">Recommended Path: Start with Work Performed</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">Recommended Path: Start with Work Items</div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
                   Use Work Items when this charge comes from work completed on the job. These can become invoice charges when ready.
                 </div>
@@ -539,7 +539,7 @@ export default function InternalInvoiceLineItemsTable({
                 className={primaryButtonClass}
                 disabled={selectedVisitScopeItemIds.length === 0}
               >
-                Add Work Performed
+                Add from Work Items
               </SubmitButton>
             </div>
           </form>
@@ -869,7 +869,7 @@ export default function InternalInvoiceLineItemsTable({
                       </label>
                       <input
                         id="manual_invoice_item_name"
-                        name="item_name"
+                        name="item_name_snapshot"
                         placeholder="Type invoice charge..."
                         className={workspaceInputClass}
                         required
@@ -879,7 +879,7 @@ export default function InternalInvoiceLineItemsTable({
                       <label htmlFor="manual_invoice_item_type" className={workspaceFieldLabelClass}>
                         Type
                       </label>
-                      <select id="manual_invoice_item_type" name="item_type" className={workspaceInputClass} defaultValue="service">
+                      <select id="manual_invoice_item_type" name="item_type_snapshot" className={workspaceInputClass} defaultValue="service">
                         <option value="service">Service</option>
                         <option value="material">Material</option>
                         <option value="diagnostic">Diagnostic</option>
@@ -921,7 +921,7 @@ export default function InternalInvoiceLineItemsTable({
                       </label>
                       <textarea
                         id="manual_invoice_description"
-                        name="description"
+                        name="description_snapshot"
                         className={`${workspaceInputClass} min-h-[5rem]`}
                         placeholder="Optional charge detail"
                       />

@@ -114,6 +114,7 @@ import {
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
 import { recordInternalInvoicePaymentFromForm } from "@/lib/actions/internal-invoice-payment-actions";
+import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
 import {
   loadScopedInternalJobDetailReadBoundaryOutcome,
   resolveJobDetailActor,
@@ -3060,6 +3061,12 @@ const canSendInvoiceLifecycleAccess = hasInvoiceSendAccess(fieldBillingCapabilit
 const hasProposalEntryWorkflowAccess =
   !hasDirectInvoiceWorkflowAccess
   && (fieldBillingCapabilities.can_select_pricebook_lines || fieldBillingCapabilities.can_convert_visit_scope_to_invoice_line);
+
+const canManageFinancialInvoiceLifecycleOnJobDetail = canManageInvoiceLifecycle({
+  actorUserId: user.id,
+  internalUser,
+  resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+});
 
 const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
 let visitScopeItems = [] as Array<{
@@ -6339,6 +6346,19 @@ const showCorrectionReviewResolution =
         </div>
       </div>
     </div>
+
+    {internalInvoiceTruth?.status === "issued"
+    && canManageFinancialInvoiceLifecycleOnJobDetail
+    && fieldBillingSupplementalInvoiceSnapshots.length === 0 ? (
+      <div className="mt-3">
+        <Link
+          href={`/jobs/${job.id}/invoice#addon-invoice`}
+          className="text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-800 hover:underline"
+        >
+          Need to bill for additional work? Create an add-on invoice →
+        </Link>
+      </div>
+    ) : null}
 
     {latestStripeReceivedPayment && latestStripeReceivedCopy ? (
       <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/85 px-4 py-3 text-sm text-emerald-950">

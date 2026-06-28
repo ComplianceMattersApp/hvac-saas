@@ -908,7 +908,7 @@ export default async function InternalInvoiceWorkspacePage({
         />
 
         {supplementalParentInvoiceId ? (
-          <section className="mt-4 rounded-xl border border-emerald-200/90 bg-emerald-50/60 p-4">
+          <section id="addon-invoice" className="mt-4 rounded-xl border border-emerald-200/90 bg-emerald-50/60 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-900">Add-On Invoice</div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-emerald-950">Create Add-On Invoice</h2>
             <p className="mt-2 text-sm leading-6 text-emerald-900">

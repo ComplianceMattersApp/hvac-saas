@@ -78,7 +78,7 @@ function formatInvoiceReference(invoice: FieldBillingInvoiceSnapshot | null | un
 
 function formatProposalSourceKind(value: FieldChargeProposalRecord["source_kind"]) {
   if (value === "pricebook") return "Pricebook";
-  if (value === "visit_scope") return "Visit Scope";
+  if (value === "visit_scope") return "Work Items";
   return "Manual";
 }
 
@@ -411,7 +411,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
                         <input type="hidden" name="quantity" value="1" />
                       ) : null}
                       <label className="block">
-                        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Visit Scope item</span>
+                        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Work Item</span>
                         <select
                           name="visit_scope_item_id"
                           required
@@ -452,7 +452,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
                     </form>
                   ) : (
                     <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
-                      No Visit Scope items are available for proposal entry.
+                      No Work Items are available for proposal entry.
                     </div>
                   )}
                 </div>

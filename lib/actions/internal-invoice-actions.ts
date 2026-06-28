@@ -1228,9 +1228,11 @@ async function importEligibleVisitScopeItemsToDraftInvoice(params: {
       source_visit_scope_item_id: scopeItemId,
       item_name_snapshot: getTrimmedString(scopeItem.title),
       description_snapshot: getOptionalText(scopeItem.details),
-      item_type_snapshot: 'service',
-      category_snapshot: null,
-      unit_label_snapshot: null,
+      item_type_snapshot: scopeItem.item_type
+        ? normalizeInternalInvoiceItemType(scopeItem.item_type)
+        : 'service',
+      category_snapshot: getOptionalText(scopeItem.category),
+      unit_label_snapshot: getOptionalText(scopeItem.unit_label),
       quantity: formatScaledInt(quantityHundredths, 2),
       unit_price: formatScaledInt(unitPriceCents, 2),
       line_subtotal: formatScaledInt(lineSubtotalCents, 2),
@@ -2367,9 +2369,11 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
       source_visit_scope_item_id: scopeItemId,
       item_name_snapshot: getTrimmedString(scopeItem.title),
       description_snapshot: getOptionalText(scopeItem.details),
-      item_type_snapshot: 'service',
-      category_snapshot: null,
-      unit_label_snapshot: null,
+      item_type_snapshot: scopeItem.item_type
+        ? normalizeInternalInvoiceItemType(scopeItem.item_type)
+        : 'service',
+      category_snapshot: getOptionalText(scopeItem.category),
+      unit_label_snapshot: getOptionalText(scopeItem.unit_label),
       quantity: formatScaledInt(quantityHundredths, 2),
       unit_price: formatScaledInt(unitPriceCents, 2),
       line_subtotal: formatScaledInt(lineSubtotalCents, 2),
