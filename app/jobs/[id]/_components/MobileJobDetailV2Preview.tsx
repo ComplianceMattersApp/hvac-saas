@@ -430,6 +430,16 @@ export default function MobileJobDetailV2Preview(props: any) {
     normalizedOpsStatus === "closed" ||
     normalizedStatus === "cancelled" ||
     Boolean(job?.deleted_at);
+  const isLifecycleClosedOut = Boolean(
+    billingState?.billedTruthSatisfied &&
+      (String(job?.job_type ?? "").trim().toLowerCase() !== "ecc" || job?.certs_complete),
+  );
+  const shouldPulseLifecycleActiveStage =
+    !isReadOnlyState &&
+    normalizedStatus !== "completed" &&
+    !isLifecycleClosedOut &&
+    !isHistoricalServiceFollowUpContinued &&
+    !showLinkedRetestCreated;
   const hasRequiredEccTestAttention =
     String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job);
   const hasScheduleInformation = Boolean(
@@ -773,7 +783,9 @@ export default function MobileJobDetailV2Preview(props: any) {
                       </svg>
                     ) : isActive ? (
                       <>
-                        <span className="absolute inset-0 rounded-full bg-blue-500/15 motion-safe:animate-ping motion-reduce:animate-none" />
+                        {shouldPulseLifecycleActiveStage ? (
+                          <span className="absolute inset-0 rounded-full bg-blue-500/15 motion-safe:animate-ping motion-reduce:animate-none" />
+                        ) : null}
                         <span className="relative h-2.5 w-2.5 rounded-full bg-blue-600" />
                       </>
                     ) : null}

@@ -458,6 +458,14 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('return "Linked active job"');
     expect(mobileJobDetailV2PreviewSource).toContain('"Job cancelled"');
     expect(mobileJobDetailV2PreviewSource).toContain('"Job closed"');
+    expect(mobileJobDetailV2PreviewSource).toContain("const shouldPulseLifecycleActiveStage =");
+    expect(mobileJobDetailV2PreviewSource).toContain("!isReadOnlyState &&");
+    expect(mobileJobDetailV2PreviewSource).toContain('normalizedStatus !== "completed"');
+    expect(mobileJobDetailV2PreviewSource).toContain("!isLifecycleClosedOut &&");
+    expect(mobileJobDetailV2PreviewSource).toContain("!isHistoricalServiceFollowUpContinued &&");
+    expect(mobileJobDetailV2PreviewSource).toContain("!showLinkedRetestCreated");
+    expect(mobileJobDetailV2PreviewSource).toContain("shouldPulseLifecycleActiveStage ? (");
+    expect(mobileJobDetailV2PreviewSource).toContain("motion-safe:animate-ping");
     expect(mobileJobDetailV2PreviewSource).not.toContain('"Open Standard Controls"');
     expect(mobileJobDetailV2PreviewSource).not.toContain('"Open waiting tools"');
     expect(mobileJobDetailV2PreviewSource).not.toContain('anchor: "mobile-tools"');
