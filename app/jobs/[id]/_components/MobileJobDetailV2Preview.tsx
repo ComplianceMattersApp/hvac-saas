@@ -304,6 +304,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     assignedUserIds,
     attemptCount,
     billingState,
+    canShowReleaseAndReevaluate,
     ChatIcon,
     ChevronRightIcon,
     ClipboardIcon,
@@ -314,12 +315,18 @@ export default function MobileJobDetailV2Preview(props: any) {
     createEstimateFromJobHref,
     DeferredTimelineBody,
     FolderIcon,
+    currentInterruptState,
     hasFullSchedule,
     hasDirectNarrativeChain,
     headerJobTypeLabel,
     internalInvoiceTruth,
     internalNoteBannerMessage,
     internalNotesMeta,
+    initialInterruptReason,
+    initialWaitingOtherReason,
+    initialWaitingReasonType,
+    interruptReleaseActionLabel,
+    InterruptStateFields,
     isEccPermitNeededActive,
     isFieldComplete,
     isHistoricalServiceFollowUpContinued,
@@ -350,8 +357,11 @@ export default function MobileJobDetailV2Preview(props: any) {
     narrativeScopeJobIds,
     NarrativeTimelineBodyFallback,
     PhoneIcon,
+    primaryButtonClass,
     primaryCloseoutMessage,
     recordBlockingPhase,
+    releaseAndReevaluateFromForm,
+    secondaryButtonClass,
     serviceAddressDisplay,
     serviceAddressLine1,
     serviceAddressLine2,
@@ -377,6 +387,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     surfaceProfile,
     Suspense,
     tab,
+    SubmitButton,
     TimedJobLocationPreview,
     timingEnabled,
     ToolIcon,
@@ -387,6 +398,9 @@ export default function MobileJobDetailV2Preview(props: any) {
     visitScopeSummary,
     WarningIcon,
     workspaceEmptyStateClass,
+    workspaceFieldLabelClass,
+    workspaceInputClass,
+    updateJobOpsFromForm,
     JobLocationPreviewFallback,
     sharedNoteBannerMessage,
     sharedNotesMeta,
@@ -419,6 +433,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
   const v2AssignmentReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-assigned-team`;
+  const v2StatusToolsReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-tools`;
   const hasServicePlanToolContext = Boolean(
     markVisitCountedLinkId ||
       String(markVisitCountedAgreementName ?? "").trim() ||
@@ -1111,18 +1126,48 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
                   </Link>
                 ) : null}
-                <Link href={standardJobAnchorHref("mobile-tools")} className={toolsRowClass}>
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className={toolsRowIconClass}>
-                      <ToolIcon className="h-4 w-4" />
-                    </span>
-                    <span className={toolsRowTextClass}>
-                      <span className="block font-semibold text-slate-950">Job Status Tools</span>
-                      <span className="block text-sm font-medium text-slate-600">Open status and interrupt tools</span>
-                    </span>
-                  </span>
-                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
-                </Link>
+                <details id="mobile-tools" className="group/status-tools">
+                  <summary className="cursor-pointer list-none">
+                    <div className={toolsRowClass}>
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className={toolsRowIconClass}>
+                          <ToolIcon className="h-4 w-4" />
+                        </span>
+                        <span className={toolsRowTextClass}>
+                          <span className="block font-semibold text-slate-950">Job Status Tools</span>
+                          <span className="block text-sm font-medium text-slate-600">Set or clear waiting and hold blockers</span>
+                        </span>
+                      </span>
+                      <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open/status-tools:rotate-90" />
+                    </div>
+                  </summary>
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+                    <form action={updateJobOpsFromForm} className="space-y-3">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="return_to" value={v2StatusToolsReturnTo} />
+                      <InterruptStateFields
+                        workspaceFieldLabelClass={workspaceFieldLabelClass}
+                        workspaceInputClass={workspaceInputClass}
+                        initialInterruptState={currentInterruptState as "" | "pending_info" | "on_hold" | "waiting"}
+                        initialStatusReason={initialInterruptReason}
+                        initialWaitingReasonType={initialWaitingReasonType}
+                        initialWaitingOtherReason={initialWaitingOtherReason}
+                      />
+                      <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+                        Save Interrupt State
+                      </SubmitButton>
+                    </form>
+                    {canShowReleaseAndReevaluate ? (
+                      <form action={releaseAndReevaluateFromForm} className="mt-3">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="return_to" value={v2StatusToolsReturnTo} />
+                        <SubmitButton loadingText="Updating..." className={secondaryButtonClass}>
+                          {interruptReleaseActionLabel}
+                        </SubmitButton>
+                      </form>
+                    ) : null}
+                  </div>
+                </details>
               </div>
             </div>
 
