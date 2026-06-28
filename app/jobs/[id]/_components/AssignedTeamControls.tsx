@@ -18,6 +18,7 @@ type AssignedTeamControlsProps = {
   fieldUserLabel: string;
   emptyStateClassName: string;
   variant?: "desktop" | "mobile";
+  returnTo?: string;
 };
 
 const desktopUtilityControlClass =
@@ -41,9 +42,10 @@ export default function AssignedTeamControls({
   fieldUserLabel,
   emptyStateClassName,
   variant = "desktop",
+  returnTo: returnToOverride,
 }: AssignedTeamControlsProps) {
   const isMobile = variant === "mobile";
-  const returnTo = `/jobs/${jobId}?tab=${tab}#${isMobile ? "mobile-assigned-team" : "assigned-team"}`;
+  const returnTo = returnToOverride ?? `/jobs/${jobId}?tab=${tab}#${isMobile ? "mobile-assigned-team" : "assigned-team"}`;
   const listClassName = isMobile ? "mt-3 space-y-2" : "mt-3 flex min-w-0 flex-wrap gap-2";
   const assigneeClassName = isMobile
     ? "flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.24)]"
@@ -133,6 +135,7 @@ export default function AssignedTeamControls({
             tab={tab}
             assignedTeam={assignedTeam}
             returnAnchor={isMobile ? "mobile-assigned-team" : "assigned-team"}
+            returnTo={returnToOverride}
           />
         </Suspense>
       ) : null}

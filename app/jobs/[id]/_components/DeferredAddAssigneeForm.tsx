@@ -9,6 +9,7 @@ type DeferredAddAssigneeFormProps = {
   tab: string;
   assignedTeam: ActiveJobAssignmentDisplay[];
   returnAnchor?: string;
+  returnTo?: string;
 };
 
 export default async function DeferredAddAssigneeForm({
@@ -16,6 +17,7 @@ export default async function DeferredAddAssigneeForm({
   tab,
   assignedTeam,
   returnAnchor = "assigned-team",
+  returnTo,
 }: DeferredAddAssigneeFormProps) {
   const supabase = await createClient();
 
@@ -29,6 +31,7 @@ export default async function DeferredAddAssigneeForm({
       assignedTeam={assignedTeam}
       assignableUsers={assignableInternalUsers}
       updateTeamAction={updateJobTeamAssignmentsFromForm}
+      returnTo={returnTo}
     />
   );
 }

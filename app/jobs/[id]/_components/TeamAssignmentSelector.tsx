@@ -16,6 +16,7 @@ type TeamAssignmentSelectorProps = {
   assignedTeam: ActiveJobAssignmentDisplay[];
   assignableUsers: AssignableInternalUser[];
   updateTeamAction: (formData: FormData) => void | Promise<void>;
+  returnTo?: string;
 };
 
 const buttonClass =
@@ -32,6 +33,7 @@ export default function TeamAssignmentSelector({
   assignedTeam,
   assignableUsers,
   updateTeamAction,
+  returnTo,
 }: TeamAssignmentSelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -178,7 +180,7 @@ export default function TeamAssignmentSelector({
           <form action={updateTeamAction}>
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="tab" value={tab} />
-            <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#${returnAnchor}`} />
+            <input type="hidden" name="return_to" value={returnTo ?? `/jobs/${jobId}?tab=${tab}#${returnAnchor}`} />
             <input type="hidden" name="primary_user_id" value={effectivePrimaryUserId} />
             {Array.from(draftSelected).map((userId) => (
               <input key={userId} type="hidden" name="selected_user_ids" value={userId} />

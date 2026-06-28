@@ -133,7 +133,8 @@ describe("mobile job detail assignment parity", () => {
   it("keeps V2 preview anchor CTAs routed to standard current mobile anchors or real workspaces", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;');
     expect(mobileJobDetailV2PreviewSource).toContain("const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("mobileLayout=v2");
+    expect(mobileJobDetailV2PreviewSource).not.toContain('href={`?mobileLayout=v2#');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}&mobileLayout=v2#');
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";');
     expect(mobileJobDetailV2PreviewSource).toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
@@ -152,7 +153,6 @@ describe("mobile job detail assignment parity", () => {
     }
     expect(mobileJobDetailV2PreviewSource).toContain("servicePlanToolHref = mobileCustomerHref");
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}#');
-    expect(mobileJobDetailV2PreviewSource).not.toContain('href={`?mobileLayout=v2#');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-internal-notes"');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-shared-notes"');
@@ -443,6 +443,27 @@ describe("mobile job detail assignment parity", () => {
     expect(mobilePanel).toContain("isInternalUser={isInternalUser}");
     expect(mobilePanel).toContain("assignedTeam={assignedTeam}");
     expect(mobilePanel).toContain("assignedUserIds={assignedUserIds}");
+  });
+
+  it("renders native Team Assignment in V2 as a collapsed tools panel with V2 return", () => {
+    expect(pageSource).toContain("AssignedTeamControls={AssignedTeamControls}");
+    expect(mobileJobDetailV2PreviewSource).toContain("AssignedTeamControls");
+    expect(mobileJobDetailV2PreviewSource).toContain("assignedUserIds");
+    expect(mobileJobDetailV2PreviewSource).toContain('className="group/team-assignment"');
+    expect(mobileJobDetailV2PreviewSource).toContain("Team Assignment");
+    expect(mobileJobDetailV2PreviewSource).toContain("View or change assigned field team");
+    expect(mobileJobDetailV2PreviewSource).toContain("group-open/team-assignment:rotate-90");
+    expect(mobileJobDetailV2PreviewSource).toContain("const v2AssignmentReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-assigned-team`;");
+    expect(mobileJobDetailV2PreviewSource).toContain("returnTo={v2AssignmentReturnTo}");
+    expect(mobileJobDetailV2PreviewSource).toContain('variant="mobile"');
+    expect(controlsSource).toContain("returnTo?: string");
+    expect(controlsSource).toContain("returnTo: returnToOverride");
+    expect(controlsSource).toContain("returnToOverride ?? `/jobs/${jobId}?tab=${tab}#${isMobile ? \"mobile-assigned-team\" : \"assigned-team\"}`");
+    expect(controlsSource).toContain("returnTo={returnToOverride}");
+    expect(addAssigneeSource).toContain("returnTo?: string");
+    expect(addAssigneeSource).toContain("returnTo={returnTo}");
+    expect(teamSelectorSource).toContain("returnTo?: string");
+    expect(teamSelectorSource).toContain('name="return_to" value={returnTo ?? `/jobs/${jobId}?tab=${tab}#${returnAnchor}`}');
   });
 
   it("omits the redundant lower mobile tools jump to the visible assignment card", () => {

@@ -300,6 +300,8 @@ export default function MobileJobDetailV2Preview(props: any) {
     activeWaitingState,
     appointmentDateLabel,
     assignedTeam,
+    AssignedTeamControls,
+    assignedUserIds,
     attemptCount,
     billingState,
     ChatIcon,
@@ -411,6 +413,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   });
   const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
+  const v2AssignmentReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-assigned-team`;
   const hasServicePlanToolContext = Boolean(
     markVisitCountedLinkId ||
       String(markVisitCountedAgreementName ?? "").trim() ||
@@ -1034,6 +1037,38 @@ export default function MobileJobDetailV2Preview(props: any) {
                       lastAttemptLabel={lastAttemptLabel}
                       action={logCustomerContactAttemptFromForm}
                       buttonClassName={contactLoggingButtonClass}
+                    />
+                  </div>
+                </details>
+                <details className="group/team-assignment">
+                  <summary className="cursor-pointer list-none">
+                    <div className={toolsRowClass}>
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className={toolsRowIconClass}>
+                          <ToolIcon className="h-4 w-4" />
+                        </span>
+                        <span className={toolsRowTextClass}>
+                          <span className="block font-semibold text-slate-950">Team Assignment</span>
+                          <span className="block text-sm font-medium text-slate-600">
+                            View or change assigned field team
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open/team-assignment:rotate-90" />
+                    </div>
+                  </summary>
+                  <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+                    <AssignedTeamControls
+                      jobId={String(job.id)}
+                      tab={tab}
+                      assignedTeam={assignedTeam}
+                      assignedUserIds={assignedUserIds}
+                      isInternalUser={isInternalUser}
+                      fieldTeamLabel={surfaceProfile.labels.fieldTeam}
+                      fieldUserLabel={surfaceProfile.labels.fieldUser}
+                      emptyStateClassName="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600"
+                      variant="mobile"
+                      returnTo={v2AssignmentReturnTo}
                     />
                   </div>
                 </details>
