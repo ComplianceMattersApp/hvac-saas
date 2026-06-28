@@ -1010,26 +1010,33 @@ export default function MobileJobDetailV2Preview(props: any) {
                     toolsRowTextClass={toolsRowTextClass}
                   />
                 ) : null}
-                <div className="rounded-xl border border-blue-100 bg-blue-50/35 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
-                  <div className="flex min-w-0 items-start gap-2">
-                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-blue-700 ring-1 ring-blue-100">
-                      <PhoneIcon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block font-semibold text-slate-950">Contact Logging</span>
-                      <span className="block text-sm font-medium leading-5 text-slate-600">
-                        Log attempts only; this does not confirm delivery.
+                <details className="group/contact-log">
+                  <summary className="cursor-pointer list-none">
+                    <div className={toolsRowClass}>
+                      <span className="flex min-w-0 flex-1 items-center gap-2">
+                        <span className={toolsRowIconClass}>
+                          <PhoneIcon className="h-4 w-4" />
+                        </span>
+                        <span className={toolsRowTextClass}>
+                          <span className="block font-semibold text-slate-950">Contact Log</span>
+                          <span className="block text-sm font-medium text-slate-600">
+                            Record call, text, or no-answer attempt
+                          </span>
+                        </span>
                       </span>
-                    </span>
+                      <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open/contact-log:rotate-90" />
+                    </div>
+                  </summary>
+                  <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/35 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
+                    <ContactLoggingQuickActions
+                      jobId={String(job.id)}
+                      attemptCount={attemptCount}
+                      lastAttemptLabel={lastAttemptLabel}
+                      action={logCustomerContactAttemptFromForm}
+                      buttonClassName={contactLoggingButtonClass}
+                    />
                   </div>
-                  <ContactLoggingQuickActions
-                    jobId={String(job.id)}
-                    attemptCount={attemptCount}
-                    lastAttemptLabel={lastAttemptLabel}
-                    action={logCustomerContactAttemptFromForm}
-                    buttonClassName={contactLoggingButtonClass}
-                  />
-                </div>
+                </details>
                 <Link href={servicePlanToolHref} className={toolsRowClass}>
                   <span className="flex min-w-0 flex-1 items-center gap-2">
                     <span className={toolsRowIconClass}>

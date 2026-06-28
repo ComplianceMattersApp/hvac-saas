@@ -189,7 +189,10 @@ describe("mobile job detail assignment parity", () => {
     expect(pageSource).toContain("logCustomerContactAttemptFromForm={logCustomerContactAttemptFromForm}");
     expect(mobileJobDetailCurrentSource).toContain("<ContactLoggingQuickActions");
     expect(mobileJobDetailV2PreviewSource).toContain("ContactLoggingQuickActions");
-    expect(mobileJobDetailV2PreviewSource).toContain("Log attempts only; this does not confirm delivery.");
+    expect(mobileJobDetailV2PreviewSource).toContain('className="group/contact-log"');
+    expect(mobileJobDetailV2PreviewSource).toContain("Contact Log");
+    expect(mobileJobDetailV2PreviewSource).toContain("Record call, text, or no-answer attempt");
+    expect(mobileJobDetailV2PreviewSource).toContain("group-open/contact-log:rotate-90");
     expect(mobileJobDetailV2PreviewSource).toContain("action={logCustomerContactAttemptFromForm}");
     expect(mobileJobDetailV2PreviewSource).toContain("attemptCount={attemptCount}");
     expect(mobileJobDetailV2PreviewSource).toContain("lastAttemptLabel={lastAttemptLabel}");
