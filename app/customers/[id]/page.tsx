@@ -67,7 +67,7 @@ import {
   type MaintenanceAgreementBillingPeriodReadModelRow,
 } from "@/lib/maintenance-agreements/billing-period-read-model";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
-import { MaintenanceAgreementCadenceFields } from "@/components/maintenance-agreements/MaintenanceAgreementCadenceFields";
+import { ServicePlanCreateFlow } from "@/components/maintenance-agreements/ServicePlanCreateFlow";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
@@ -596,7 +596,6 @@ export default async function CustomerDetailPage(props: {
     maSaved?: string;
     maError?: string;
     maFocus?: string;
-    maTemplate?: string;
     banner?: string;
     rcSaved?: string;
     rcError?: string;
@@ -626,7 +625,6 @@ export default async function CustomerDetailPage(props: {
   const maintenanceAgreementSaved = String(sp.maSaved ?? "").trim().toLowerCase();
   const maintenanceAgreementError = String(sp.maError ?? "").trim();
   const maintenanceAgreementFocusId = String(sp.maFocus ?? "").trim();
-  const maintenanceAgreementTemplateId = String(sp.maTemplate ?? "").trim();
   const billingPeriodBanner = String(sp.banner ?? "").trim().toLowerCase();
   const roleContactSaved = String(sp.rcSaved ?? "").trim() === "1";
   const roleContactError = String(sp.rcError ?? "").trim() === "1";
@@ -1013,20 +1011,6 @@ export default async function CustomerDetailPage(props: {
       agreementTemplates = [];
     }
   }
-  const selectedAgreementTemplate =
-    agreementTemplates.find((template) => template.id === maintenanceAgreementTemplateId) ?? null;
-  const createAgreementTypeDefault =
-    selectedAgreementTemplate
-    && MAINTENANCE_AGREEMENT_TYPES.includes(selectedAgreementTemplate.agreement_type as any)
-      ? selectedAgreementTemplate.agreement_type
-      : "maintenance";
-  const createAgreementFrequencyDefault =
-    selectedAgreementTemplate
-    && MAINTENANCE_AGREEMENT_FREQUENCIES.includes(selectedAgreementTemplate.frequency as any)
-      ? selectedAgreementTemplate.frequency
-      : "quarterly";
-  const createAgreementVisitScopeSummaryDefault = selectedAgreementTemplate?.default_visit_scope_summary ?? "";
-  const createAgreementVisitScopeItemsDefault = selectedAgreementTemplate?.default_visit_scope_items ?? [];
   const createAgreementStartDateDefault = new Date().toISOString().slice(0, 10);
   const createAgreementLocationOptions = locations
     .map((loc) => ({
@@ -3083,109 +3067,21 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
 
-            <details className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <summary className="cursor-pointer text-sm font-medium text-slate-900">
-                Add Maintenance Agreement
-              </summary>
-              <form method="get" action={customerPath} className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                <input type="hidden" name="tab" value="service-plans" />
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Start from template</label>
-                  <select
-                    name="maTemplate"
-                    defaultValue={selectedAgreementTemplate?.id ?? ""}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    <option value="">No template (manual)</option>
-                    {agreementTemplates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.template_name} ({String(template.agreement_type).replace(/_/g, " ")} • {String(template.frequency).replace(/_/g, " ")})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button
-                  type="submit"
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
-                >
-                  Load Template
-                </button>
-              </form>
-              {selectedAgreementTemplate ? (
-                <p className="mt-2 text-xs text-slate-600">
-                  Template packages standardize agreement details. Using template: {selectedAgreementTemplate.template_name}.
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-slate-500">
-                  Manual mode stays available. Selecting a template only prefills fields and does not create records until you save.
-                </p>
-              )}
-              <form action={createAgreementAction} className="mt-4 grid gap-3 md:grid-cols-2">
-                <input type="hidden" name="customer_id" value={customerId} />
-                <input type="hidden" name="source_template_id" value={selectedAgreementTemplate?.id ?? ""} />
-
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Name</label>
-                  <input
-                    name="agreement_name"
-                    required
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-
-                <input type="hidden" name="agreement_type" value={createAgreementTypeDefault} />
-
-                <MaintenanceAgreementCadenceFields
-                  initialFrequency={createAgreementFrequencyDefault}
-                  initialStartDate={createAgreementStartDateDefault}
-                />
-
-                {createAgreementSingleLocationId ? (
-                  <input type="hidden" name="primary_location_id" value={createAgreementSingleLocationId} />
-                ) : (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-700">Primary Location (Optional)</label>
-                    <select
-                      name="primary_location_id"
-                      defaultValue=""
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                    >
-                      <option value="">No primary location</option>
-                      {createAgreementLocationOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-700">What's Included (Optional)</label>
-                  <VisitScopeBuilder
-                    jobType="service"
-                    summaryName="default_visit_scope_summary"
-                    itemsName="default_visit_scope_items_json"
-                    initialSummary={createAgreementVisitScopeSummaryDefault}
-                    initialItems={createAgreementVisitScopeItemsDefault}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                  >
-                    Save Maintenance Agreement
-                  </button>
-                </div>
-              </form>
-            </details>
+            <div className="mb-4">
+              <ServicePlanCreateFlow
+                templates={agreementTemplates}
+                createAction={createAgreementAction}
+                customerId={customerId}
+                initialStartDate={createAgreementStartDateDefault}
+                locationOptions={createAgreementLocationOptions}
+                singleLocationId={createAgreementSingleLocationId}
+              />
+            </div>
 
             {customerAgreements.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6">
                 <p className="text-sm text-slate-500">No maintenance agreements yet.</p>
-                <p className="mt-1 text-xs text-slate-400">Use Add Maintenance Agreement to create one for this customer.</p>
+                <p className="mt-1 text-xs text-slate-400">Use the Add service plan button above to create one.</p>
               </div>
             ) : (
               <div className="space-y-2">
