@@ -670,9 +670,12 @@ async function expectRedirectError(work: () => Promise<unknown>) {
   return String(calls[calls.length - 1]?.[0] ?? "");
 }
 
-const { createMaintenanceAgreement, updateMaintenanceAgreement } = await import(
-  "@/lib/maintenance-agreements/agreement-actions"
-);
+const {
+  createMaintenanceAgreement,
+  updateMaintenanceAgreement,
+  cancelMaintenanceAgreementFromForm,
+  deleteMaintenanceAgreementDraftFromForm,
+} = await import("@/lib/maintenance-agreements/agreement-actions");
 
 describe("maintenance agreement actions", () => {
   beforeEach(() => {
@@ -845,6 +848,7 @@ describe("maintenance agreement actions", () => {
       agreement_type: "service_plan",
       frequency: "annual",
       renewal_date: null,
+      status: "active",
       default_visit_scope_items: [
         {
           title: "Inspect condenser coil",
@@ -1752,5 +1756,309 @@ describe("autoCountMaintenanceAgreementVisitsForCompletedServiceJob", () => {
     expect(result.countedLinks).toBe(2);
     expect(admin._updateCalls).toHaveLength(2);
     expect(admin._visitLinks.every((row) => row.count_status === "counted")).toBe(true);
+  });
+});
+
+function makeTerminalActionsAdminClient(params?: {
+  agreementStatus?: string;
+  agreementFound?: boolean;
+  updateSucceeds?: boolean;
+  countedLinksCount?: number;
+  deleteLinksError?: string | null;
+  deleteAgreementError?: string | null;
+}) {
+  const status = params?.agreementStatus ?? "active";
+  const agreementFound = params?.agreementFound ?? true;
+  const updateSucceeds = params?.updateSucceeds ?? true;
+  const countedLinksCount = params?.countedLinksCount ?? 0;
+  const deleteLinksError = params?.deleteLinksError ?? null;
+  const deleteAgreementError = params?.deleteAgreementError ?? null;
+
+  const updateCalls: unknown[] = [];
+  const deleteCalls: string[] = [];
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "maintenance_agreements") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: agreementFound
+                    ? { id: "agr-1", customer_id: "cust-1", status }
+                    : null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+          update: vi.fn((payload: unknown) => {
+            updateCalls.push(payload);
+            const eqChain = {
+              eq: vi.fn(() => eqChain),
+              select: vi.fn(() => ({
+                maybeSingle: vi.fn(async () =>
+                  updateSucceeds ? { data: { id: "agr-1" }, error: null } : { data: null, error: null },
+                ),
+              })),
+            };
+            return { eq: vi.fn(() => eqChain) };
+          }),
+          delete: vi.fn(() => {
+            deleteCalls.push(table);
+            const eqChain = {
+              eq: vi.fn(() => eqChain),
+            };
+            return { eq: vi.fn(() => eqChain), error: deleteAgreementError ? { message: deleteAgreementError } : null };
+          }),
+        };
+      }
+
+      if (table === "maintenance_agreement_visits") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                limit: vi.fn(async () => ({
+                  data: Array.from({ length: countedLinksCount }, (_, i) => ({ id: `link-${i}` })),
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+          delete: vi.fn(() => {
+            deleteCalls.push(table);
+            const chain = {
+              eq: vi.fn(() => chain),
+              neq: vi.fn(() =>
+                deleteLinksError ? { error: { message: deleteLinksError } } : { error: null },
+              ),
+            };
+            return { eq: vi.fn(() => chain) };
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table in terminal actions admin client: ${table}`);
+    }),
+    _updateCalls: updateCalls,
+    _deleteCalls: deleteCalls,
+  };
+}
+
+describe("cancelMaintenanceAgreementFromForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: "user-1",
+        role: "admin",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    const authClient = makeSupabaseClient();
+    createClientMock.mockResolvedValue(authClient);
+  });
+
+  it("cancels an active agreement and revalidates", async () => {
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementStatus: "active" }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await cancelMaintenanceAgreementFromForm(fd);
+    expect(result).toEqual({ success: true });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/customers/cust-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/service-plans");
+  });
+
+  it("cancels a paused agreement", async () => {
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementStatus: "paused" }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await cancelMaintenanceAgreementFromForm(fd);
+    expect(result).toEqual({ success: true });
+  });
+
+  it("rejects already-cancelled agreement", async () => {
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementStatus: "cancelled" }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await cancelMaintenanceAgreementFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("cancelled");
+  });
+
+  it("rejects draft agreement", async () => {
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementStatus: "draft" }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await cancelMaintenanceAgreementFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("draft");
+  });
+
+  it("rejects mismatched account scope (agreement not found)", async () => {
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementFound: false }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-other");
+
+    const result = await cancelMaintenanceAgreementFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("not found");
+  });
+
+  it("rejects non-admin internal role", async () => {
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: "tech-1",
+        role: "field_tech",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient());
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await cancelMaintenanceAgreementFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("Owner/admin");
+  });
+
+  it("rejects disabled flag", async () => {
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(false);
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await cancelMaintenanceAgreementFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("unavailable");
+    expect(createAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("does not mutate link rows", async () => {
+    const admin = makeTerminalActionsAdminClient({ agreementStatus: "active" });
+    createAdminClientMock.mockReturnValue(admin);
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    await cancelMaintenanceAgreementFromForm(fd);
+    expect(admin._deleteCalls).toHaveLength(0);
+  });
+});
+
+describe("deleteMaintenanceAgreementDraftFromForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: "user-1",
+        role: "admin",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    const authClient = makeSupabaseClient();
+    createClientMock.mockResolvedValue(authClient);
+  });
+
+  it("deletes draft with no links and revalidates", async () => {
+    createAdminClientMock.mockReturnValue(
+      makeTerminalActionsAdminClient({ agreementStatus: "draft", countedLinksCount: 0 }),
+    );
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await deleteMaintenanceAgreementDraftFromForm(fd);
+    expect(result).toEqual({ success: true });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/customers/cust-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/service-plans");
+  });
+
+  it("deletes draft and cleans up non-counted links first", async () => {
+    const admin = makeTerminalActionsAdminClient({
+      agreementStatus: "draft",
+      countedLinksCount: 0,
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await deleteMaintenanceAgreementDraftFromForm(fd);
+    expect(result).toEqual({ success: true });
+    // visit links table deleted before agreement table
+    const visitDeleteIdx = admin._deleteCalls.indexOf("maintenance_agreement_visits");
+    const agreementDeleteIdx = admin._deleteCalls.indexOf("maintenance_agreements");
+    expect(visitDeleteIdx).toBeGreaterThanOrEqual(0);
+    expect(agreementDeleteIdx).toBeGreaterThan(visitDeleteIdx);
+  });
+
+  it("rejects non-draft status", async () => {
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementStatus: "active" }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await deleteMaintenanceAgreementDraftFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("active");
+  });
+
+  it("rejects draft with counted links and directs to cancel instead", async () => {
+    createAdminClientMock.mockReturnValue(
+      makeTerminalActionsAdminClient({ agreementStatus: "draft", countedLinksCount: 1 }),
+    );
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await deleteMaintenanceAgreementDraftFromForm(fd);
+    expect(result.success).toBe(false);
+    const errMsg = (result as { success: false; error: string }).error;
+    expect(errMsg).toContain("counted visits");
+    expect(errMsg).toContain("Cancel it instead");
+  });
+
+  it("rejects mismatched account scope", async () => {
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementFound: false }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-other");
+
+    const result = await deleteMaintenanceAgreementDraftFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("not found");
+  });
+
+  it("rejects non-admin internal role", async () => {
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: "tech-1",
+        role: "field_tech",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    createAdminClientMock.mockReturnValue(makeTerminalActionsAdminClient({ agreementStatus: "draft" }));
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await deleteMaintenanceAgreementDraftFromForm(fd);
+    expect(result.success).toBe(false);
+    expect((result as { success: false; error: string }).error).toContain("Owner/admin");
+  });
+
+  it("rejects disabled flag", async () => {
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(false);
+    const fd = new FormData();
+    fd.set("agreement_id", "agr-1");
+
+    const result = await deleteMaintenanceAgreementDraftFromForm(fd);
+    expect(result.success).toBe(false);
+    expect(createAdminClientMock).not.toHaveBeenCalled();
   });
 });

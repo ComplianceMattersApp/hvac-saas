@@ -420,6 +420,7 @@ export async function createMaintenanceAgreement(
     start_date: startDateResult.value,
     renewal_date: renewalDateResult.value,
     primary_location_id: primaryLocationId,
+    status: "active" as const,
     ...(sourceTemplateId
       ? {
           source_template_id: sourceTemplateId,
@@ -1454,4 +1455,186 @@ export async function confirmMaintenanceAgreementNextDueDateFromForm(formData: F
   revalidatePath(`/service-plans`);
   revalidatePath(`/customers/${agreementCustomerId}`);
   redirectWithBanner("confirm_next_due_saved");
+}
+
+export async function cancelMaintenanceAgreementFromForm(
+  formData: FormData,
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!isMaintenanceAgreementsEnabled()) {
+    return { success: false, error: "Maintenance Agreements are currently unavailable." };
+  }
+
+  const supabase = await createClient();
+  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];
+  try {
+    const authz = await requireInternalUser({ supabase });
+    internalUser = authz.internalUser;
+  } catch {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const userId = cleanString(internalUser.user_id);
+  const accountOwnerUserId = cleanString(internalUser.account_owner_user_id);
+  if (!userId || !accountOwnerUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  if (!canManageMaintenanceAgreementPolicy({ actorUserId: userId, internalUser })) {
+    return {
+      success: false,
+      error: "Owner/admin internal role required for Service Plan management.",
+    };
+  }
+
+  const agreementId = cleanString(formData.get("agreement_id"));
+  if (!agreementId) {
+    return { success: false, error: "Agreement ID is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: agreement, error: fetchErr } = await admin
+    .from("maintenance_agreements")
+    .select("id, customer_id, status")
+    .eq("id", agreementId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (fetchErr) return { success: false, error: fetchErr.message };
+  if (!agreement?.id) {
+    return {
+      success: false,
+      error: "Service plan not found or does not belong to this account.",
+    };
+  }
+
+  const currentStatus = cleanString(agreement.status).toLowerCase();
+  if (currentStatus !== "active" && currentStatus !== "paused") {
+    return {
+      success: false,
+      error: `Cannot cancel a service plan with status '${currentStatus}'. Only active or paused plans can be cancelled.`,
+    };
+  }
+
+  const customerId = cleanString(agreement.customer_id);
+
+  const { data: updated, error: updateErr } = await admin
+    .from("maintenance_agreements")
+    .update({
+      status: "cancelled",
+      updated_by_user_id: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", agreementId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .select("id")
+    .maybeSingle();
+
+  if (updateErr) return { success: false, error: updateErr.message };
+  if (!updated?.id) return { success: false, error: "Failed to cancel service plan." };
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath(`/service-plans`);
+
+  return { success: true };
+}
+
+export async function deleteMaintenanceAgreementDraftFromForm(
+  formData: FormData,
+): Promise<{ success: true } | { success: false; error: string }> {
+  if (!isMaintenanceAgreementsEnabled()) {
+    return { success: false, error: "Maintenance Agreements are currently unavailable." };
+  }
+
+  const supabase = await createClient();
+  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];
+  try {
+    const authz = await requireInternalUser({ supabase });
+    internalUser = authz.internalUser;
+  } catch {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const userId = cleanString(internalUser.user_id);
+  const accountOwnerUserId = cleanString(internalUser.account_owner_user_id);
+  if (!userId || !accountOwnerUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  if (!canManageMaintenanceAgreementPolicy({ actorUserId: userId, internalUser })) {
+    return {
+      success: false,
+      error: "Owner/admin internal role required for Service Plan management.",
+    };
+  }
+
+  const agreementId = cleanString(formData.get("agreement_id"));
+  if (!agreementId) {
+    return { success: false, error: "Agreement ID is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: agreement, error: fetchErr } = await admin
+    .from("maintenance_agreements")
+    .select("id, customer_id, status")
+    .eq("id", agreementId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (fetchErr) return { success: false, error: fetchErr.message };
+  if (!agreement?.id) {
+    return {
+      success: false,
+      error: "Service plan not found or does not belong to this account.",
+    };
+  }
+
+  const currentStatus = cleanString(agreement.status).toLowerCase();
+  if (currentStatus !== "draft") {
+    return {
+      success: false,
+      error: `Cannot delete a service plan with status '${currentStatus}'. Only draft plans can be deleted.`,
+    };
+  }
+
+  // Block delete if any counted visit links exist
+  const { data: countedLinks, error: countedErr } = await admin
+    .from("maintenance_agreement_visits")
+    .select("id")
+    .eq("agreement_id", agreementId)
+    .eq("count_status", "counted")
+    .limit(1);
+
+  if (countedErr) return { success: false, error: countedErr.message };
+  if (countedLinks && countedLinks.length > 0) {
+    return {
+      success: false,
+      error: "This plan has counted visits and cannot be deleted. Cancel it instead.",
+    };
+  }
+
+  const customerId = cleanString(agreement.customer_id);
+
+  // Remove non-counted visit links before deleting the agreement
+  const { error: deleteLinksErr } = await admin
+    .from("maintenance_agreement_visits")
+    .delete()
+    .eq("agreement_id", agreementId)
+    .neq("count_status", "counted");
+
+  if (deleteLinksErr) return { success: false, error: deleteLinksErr.message };
+
+  const { error: deleteErr } = await admin
+    .from("maintenance_agreements")
+    .delete()
+    .eq("id", agreementId)
+    .eq("account_owner_user_id", accountOwnerUserId);
+
+  if (deleteErr) return { success: false, error: deleteErr.message };
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath(`/service-plans`);
+
+  return { success: true };
 }

@@ -38,6 +38,8 @@ import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agr
 import {
   createMaintenanceAgreementFromForm,
   updateMaintenanceAgreementFromForm,
+  cancelMaintenanceAgreementFromForm,
+  deleteMaintenanceAgreementDraftFromForm,
 } from "@/lib/maintenance-agreements/agreement-actions";
 import {
   cancelMaintenanceAgreementBillingPeriodFromForm,
@@ -68,6 +70,7 @@ import {
 } from "@/lib/maintenance-agreements/billing-period-read-model";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
 import { ServicePlanCreateFlow } from "@/components/maintenance-agreements/ServicePlanCreateFlow";
+import ServicePlanTerminalActions from "@/components/maintenance-agreements/ServicePlanTerminalActions";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
@@ -3143,9 +3146,26 @@ export default async function CustomerDetailPage(props: {
                     not_scheduled: "Not Scheduled",
                     inactive: "Inactive",
                   } as const;
-                  const statusBadge = agr.status === "active"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-slate-100 text-slate-600";
+                  const statusBadgeClass: Record<string, string> = {
+                    active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+                    draft: "border-slate-200 bg-slate-100 text-slate-500",
+                    paused: "border-amber-200 bg-amber-50 text-amber-700",
+                    cancelled: "border-red-200 bg-red-50 text-red-600",
+                    expired: "border-slate-200 bg-slate-100 text-slate-500",
+                  };
+                  const statusBadge =
+                    statusBadgeClass[String(agr.status).toLowerCase()] ??
+                    "border-slate-200 bg-slate-100 text-slate-500";
+                  const statusLabel: Record<string, string> = {
+                    active: "Active",
+                    draft: "Draft",
+                    paused: "Paused",
+                    cancelled: "Cancelled",
+                    expired: "Expired",
+                  };
+                  const agrStatusLabel =
+                    statusLabel[String(agr.status).toLowerCase()] ??
+                    String(agr.status).replace(/_/g, " ");
                   const agreementBillingPeriods = billingPeriodsByAgreementId.get(agr.id) ?? [];
 
                   return (
@@ -3171,7 +3191,7 @@ export default async function CustomerDetailPage(props: {
                                 statusBadge,
                               ].join(" ")}
                             >
-                              {String(agr.status).charAt(0).toUpperCase() + String(agr.status).slice(1)}
+                              {agrStatusLabel}
                             </span>
                             <span className="text-xs text-slate-500">
                               {normalizedAgreementType}
@@ -3202,12 +3222,14 @@ export default async function CustomerDetailPage(props: {
                               No due date
                             </span>
                           )}
-                          <Link
-                            href={`/jobs/new?source=customer&customer_id=${customerId}&maintenance_agreement_id=${agr.id}`}
-                            className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                          >
-                            Create Work Order
-                          </Link>
+                          {agr.status !== "cancelled" && agr.status !== "expired" ? (
+                            <Link
+                              href={`/jobs/new?source=customer&customer_id=${customerId}&maintenance_agreement_id=${agr.id}`}
+                              className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                            >
+                              Create Work Order
+                            </Link>
+                          ) : null}
                         </div>
                       </div>
 
@@ -4238,6 +4260,13 @@ export default async function CustomerDetailPage(props: {
                           </div>
                         </form>
                       </details>
+
+                      <ServicePlanTerminalActions
+                        agreementId={agr.id}
+                        status={String(agr.status ?? "")}
+                        cancelAction={cancelMaintenanceAgreementFromForm}
+                        deleteAction={deleteMaintenanceAgreementDraftFromForm}
+                      />
                     </div>
                   );
                 })}
