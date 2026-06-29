@@ -616,11 +616,11 @@ function toUpdateParams(formData: FormData): UpdateMaintenanceAgreementParams {
 export async function createMaintenanceAgreementFromForm(customerPath: string, formData: FormData) {
   const result = await createMaintenanceAgreement(toCreateParams(formData));
   if (!result.success) {
-    redirect(`${customerPath}?maError=${encodeURIComponent(result.error)}`);
+    redirect(`${customerPath}?tab=service-plans&maError=${encodeURIComponent(result.error)}`);
   }
 
   revalidatePath(customerPath);
-  redirect(`${customerPath}?maSaved=created`);
+  redirect(`${customerPath}?tab=service-plans&maSaved=created&maFocus=${encodeURIComponent(result.agreementId)}`);
 }
 
 export async function updateMaintenanceAgreementFromForm(customerPath: string, formData: FormData) {

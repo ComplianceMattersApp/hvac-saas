@@ -67,6 +67,7 @@ import {
   type MaintenanceAgreementBillingPeriodReadModelRow,
 } from "@/lib/maintenance-agreements/billing-period-read-model";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
+import { MaintenanceAgreementCadenceFields } from "@/components/maintenance-agreements/MaintenanceAgreementCadenceFields";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
@@ -1026,7 +1027,15 @@ export default async function CustomerDetailPage(props: {
       : "quarterly";
   const createAgreementVisitScopeSummaryDefault = selectedAgreementTemplate?.default_visit_scope_summary ?? "";
   const createAgreementVisitScopeItemsDefault = selectedAgreementTemplate?.default_visit_scope_items ?? [];
-  const createAgreementInternalNotesDefault = selectedAgreementTemplate?.internal_notes_default ?? "";
+  const createAgreementStartDateDefault = new Date().toISOString().slice(0, 10);
+  const createAgreementLocationOptions = locations
+    .map((loc) => ({
+      id: String(loc.id ?? loc.location_id ?? "").trim(),
+      label: locationDisplayName(loc),
+    }))
+    .filter((option) => option.id);
+  const createAgreementSingleLocationId =
+    createAgreementLocationOptions.length === 1 ? createAgreementLocationOptions[0].id : null;
 
   let customerBillingPeriods: MaintenanceAgreementBillingPeriodReadModelRow[] = [];
   const billingPeriodsByAgreementId = new Map<string, MaintenanceAgreementBillingPeriodReadModelRow[]>();
@@ -3094,103 +3103,41 @@ export default async function CustomerDetailPage(props: {
                   />
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Type</label>
-                  <select
-                    name="agreement_type"
-                    defaultValue={createAgreementTypeDefault}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    {MAINTENANCE_AGREEMENT_TYPES.map((value) => (
-                      <option key={value} value={value}>
-                        {value.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <input type="hidden" name="agreement_type" value={createAgreementTypeDefault} />
 
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Frequency</label>
-                  <select
-                    name="frequency"
-                    defaultValue={createAgreementFrequencyDefault}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    {MAINTENANCE_AGREEMENT_FREQUENCIES.map((value) => (
-                      <option key={value} value={value}>
-                        {value.replace(/_/g, " ")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <MaintenanceAgreementCadenceFields
+                  initialFrequency={createAgreementFrequencyDefault}
+                  initialStartDate={createAgreementStartDateDefault}
+                />
 
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Next Due Date</label>
-                  <input
-                    type="date"
-                    name="next_due_date"
-                    required
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Start Date</label>
-                  <input
-                    type="date"
-                    name="start_date"
-                    required
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Renewal Date (Optional)</label>
-                  <input
-                    type="date"
-                    name="renewal_date"
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Primary Location (Optional)</label>
-                  <select
-                    name="primary_location_id"
-                    defaultValue=""
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  >
-                    <option value="">No primary location</option>
-                    {locations.map((loc) => {
-                      const locId = String(loc.id ?? loc.location_id ?? "").trim();
-                      if (!locId) return null;
-                      return (
-                        <option key={locId} value={locId}>
-                          {locationDisplayName(loc)}
+                {createAgreementSingleLocationId ? (
+                  <input type="hidden" name="primary_location_id" value={createAgreementSingleLocationId} />
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">Primary Location (Optional)</label>
+                    <select
+                      name="primary_location_id"
+                      defaultValue=""
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                    >
+                      <option value="">No primary location</option>
+                      {createAgreementLocationOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
                         </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope / Work Items (Optional)</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">What's Included (Optional)</label>
                   <VisitScopeBuilder
                     jobType="service"
                     summaryName="default_visit_scope_summary"
                     itemsName="default_visit_scope_items_json"
                     initialSummary={createAgreementVisitScopeSummaryDefault}
                     initialItems={createAgreementVisitScopeItemsDefault}
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Internal Notes (Optional)</label>
-                  <textarea
-                    name="internal_notes"
-                    rows={3}
-                    defaultValue={createAgreementInternalNotesDefault}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                   />
                 </div>
 
@@ -3337,6 +3284,20 @@ export default async function CustomerDetailPage(props: {
                           </Link>
                         </div>
                       </div>
+
+                      {maintenanceAgreementSaved === "created" && maintenanceAgreementFocusId === agr.id ? (
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3">
+                          <p className="text-sm text-blue-900">
+                            Plan created. Ready to schedule the first visit?
+                          </p>
+                          <Link
+                            href={`/jobs/new?source=customer&customer_id=${customerId}&maintenance_agreement_id=${agr.id}`}
+                            className="inline-flex items-center rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-medium text-white hover:bg-blue-700"
+                          >
+                            Create Work Order
+                          </Link>
+                        </div>
+                      ) : null}
 
                       <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">
                         <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
@@ -4319,7 +4280,7 @@ export default async function CustomerDetailPage(props: {
                               </div>
 
                               <div className="md:col-span-2">
-                                <label className="mb-1 block text-xs font-medium text-slate-700">Default Visit Scope / Work Items (Optional)</label>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">What's Included (Optional)</label>
                                 <VisitScopeBuilder
                                   jobType="service"
                                   summaryName="default_visit_scope_summary"

@@ -594,6 +594,55 @@ Current Program Status Note (May 2026)
 - 9A-15A records template management, create-from-template prefill, provenance snapshot, duplicate-template flow, template package lock metadata, strict create-time package values, server-side locked-field update enforcement, and read-only locked-package rendering on customer profile.
 - 9A-15A boundaries stay closed: no automatic jobs, no recurrence engine, no invoice/payment/autopay changes, no visit-count mutation, no next-due mutation, no portal/SMS/QBO changes, and manual Service Plan creation remains available.
 
+- **9A-16C Pre-Implementation Audit (completed 2026-06-28):**
+  - 9A-15A spans four commits, not one: `d5b6a33` (Slice A foundation), `7afde6a` (provenance Slice E), `a5ea752` (locking prep Slice L1), `cb86976` (production drift repair). Commit `a8ca9b0` cited in the spine is only the closing read-only-rendering commit and contains no migration — audit against all four.
+  - Table name confirmed: `maintenance_agreement_templates`
+  - Column list confirmed: `id`, `account_owner_user_id`, `template_name`, `agreement_type`, `frequency`, `default_visit_scope_summary`, `default_visit_scope_items` (jsonb array, default `[]`), `internal_notes_default`, `lifecycle_status` (text, default `'active'`), `locked_field_keys` (jsonb array, default the 5 required keys), `lock_policy_version` (integer, default `1`), `created_by_user_id`, `updated_by_user_id`, `created_at`, `updated_at`
+  - `is_active` vs `status`: neither — it's `lifecycle_status` (text), constrained to `'active' | 'archived'`. Deactivate action and picker filter must key off `lifecycle_status`, not a boolean.
+  - `sort_order`: does not exist on the templates table. Reorder UI is out of scope for V1 unless a 9A-16C migration adds it.
+  - `default_visit_scope_items` (Work Items JSON) on template: yes, exists (jsonb, NOT NULL, default `[]`, array-typed via check constraint). Work Items can be in the 9A-16C create form without a migration.
+  - RLS INSERT policy: exists — `maintenance_agreement_templates_insert_account_scope` (account-scoped, requires `created_by_user_id`/`updated_by_user_id` = `auth.uid()`).
+  - RLS UPDATE policy: exists — `maintenance_agreement_templates_update_account_scope` (account-scoped, requires `updated_by_user_id` = `auth.uid()`).
+  - RLS DELETE policy: absent — confirmed. No DELETE policy in any of the four migrations.
+  - SELECT policy: account-scoped via `internal_users` join on `account_owner_user_id`, requires actor `is_active = true`.
+  - Existing template read helpers: `listMaintenanceAgreementTemplatesForAccount` already exists in `lib/maintenance-agreements/template-read-model.ts` (not `listServicePlanTemplatesForAccount` as referenced in 9A-16B planning — use the existing name, do not duplicate).
+  - Locked fields on update: `agreement_name`, `agreement_type`, `frequency`, `default_visit_scope_summary`, `default_visit_scope_items` (the 5 keys in `MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS`, `lib/maintenance-agreements/template-read-model.ts`). Enforcement lives in `lib/maintenance-agreements/agreement-actions.ts` (`getLockedFieldUpdateDiffs`/`getActiveTemplateLockedFieldKeys`).
+  - Locked-field error response shape: `success: false`, `error: "maintenance_agreement_locked_field_update_blocked: This Service Plan was created from a locked template package. Duplicate or edit the template to change package details."` — the error string is prefixed with the stable code `maintenance_agreement_locked_field_update_blocked` followed by `: ` and a human-readable message; 9A-16C UI should split on the prefix to detect this case reliably.
+  - Migration required for 9A-16C: no — table, columns, RLS INSERT/UPDATE, and Work Items JSON already exist. Only add a migration if `sort_order` (reorder UI) is brought into V1 scope.
+
+- **Group 9A-16A — Service Plan Create Form Simplification (corrected, grounded in audit):**
+  - No corrections required from the audit — 9A-16A is pure create-form UI and does not touch the template table.
+  - Scope: `app/customers/[id]/page.tsx` and any co-located maintenance agreement form component. No schema, no server action, no migration changes — the `agreement-actions.ts` field contract is unchanged.
+  - Collapse `agreement_type` + `frequency` into one human-readable cadence selector ("1× per year / 2× per year / 4× per year / Monthly / Custom"); both fields still submit to the server action unchanged.
+  - Default `start_date` to today on create.
+  - `next_due_date` becomes a client-derived preview on create (start_date + cadence), submitted as a hidden field; stays a normal editable input on edit.
+  - `renewal_date` becomes a client-derived preview on create (start_date + 12 months), submitted as a hidden field; stays editable on edit.
+  - Auto-select `primary_location_id` silently when the customer has exactly one location on create; show the picker normally at 2+ locations; always show the picker on edit.
+  - Rename label "Default visit scope summary" → "What's included" on both create and edit.
+  - Remove `internal_notes` from the create form only — stays on edit.
+  - After successful create (`maSaved=created`), show a prompt on the new agreement card: "Plan created. Ready to schedule the first visit?" with a "Create work order" button wired to the existing Create Work Order prefill flow.
+
+- **Group 9A-16B — Corrections from Audit (Template Picker on Create):**
+  - Use the existing `listMaintenanceAgreementTemplatesForAccount` (`lib/maintenance-agreements/template-read-model.ts`) — do not add `listServicePlanTemplatesForAccount`, do not modify `read-model.ts`. No new read-path code needed; call the helper server-side directly.
+  - Picker filters `lifecycle_status = 'active'` (already handled by the helper) — never `is_active`/`status`.
+  - Template card fields: Name = `template_name` (not `agreement_name`), Cadence = `frequency` (same mapping as 9A-16A), What's included = `default_visit_scope_summary`.
+  - Prefill mapping on template selection: `agreement_name` ← `template.template_name` (editable); cadence selector ← `template.frequency`; `agreement_type` (hidden) ← `template.agreement_type`; `default_visit_scope_summary` ← same; `default_visit_scope_items` ← `template.default_visit_scope_items` (sanitize through the same normalization path as 9A-13A before the Work Items component); `source_template_id` (hidden) ← `template.id`.
+  - Test obligation narrowed to: picker renders with mocked template data, empty-state renders correctly, correct prefill values passed to the form on selection. No read-helper test obligation (already exists, already tested).
+
+- **Group 9A-16C — Corrections from Audit (full corrected spec, Template Management Admin Page):**
+  - Route `/ops/admin/service-plan-templates` and Admin Center card entry unchanged. Table name is `maintenance_agreement_templates` throughout — no `service_plan_templates` references.
+  - List row: `template_name`, human-readable cadence from `frequency`, `default_visit_scope_summary` truncated to one line, status badge "Active"/"Archived" (from `lifecycle_status`), row actions Edit | Archive (if active) | Restore (if archived). No drag handle, no reorder — `sort_order` does not exist, omit entirely.
+  - Create/edit fields: Template name → `template_name` (required); Cadence (segmented control, same mapping as 9A-16A) → `frequency` + `agreement_type` (required); What's included (optional textarea) → `default_visit_scope_summary`; Default work items (optional, same Work Items surface as agreements) → `default_visit_scope_items` jsonb array, no migration needed; Internal notes (optional) → `internal_notes_default`, label "Internal notes (default)", not shown to customers; Status (edit-mode only) toggles Active/Archived, defaults to `'active'` on create. No price field, no sort order field.
+  - New file `lib/maintenance-agreements/template-actions.ts`, all writes via `createAdminClient()`, account-scoped, fail closed on scope mismatch:
+    - `createServicePlanTemplateFromForm` — admin-only; required `template_name`/`frequency`/`agreement_type`; sets `lifecycle_status='active'`, `created_by_user_id`/`updated_by_user_id = auth.uid()`; revalidates `/ops/admin/service-plan-templates`.
+    - `updateServicePlanTemplateFromForm` — admin-only, validates account scope; mutable fields limited to `template_name`/`default_visit_scope_summary`/`default_visit_scope_items`/`internal_notes_default`; rejects changes to `frequency`/`agreement_type` (locked per `MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS`) with a `maintenance_agreement_locked_field_update_blocked:`-prefixed error; sets `updated_by_user_id`; revalidates the admin route.
+    - `archiveServicePlanTemplateFromForm` — sets `lifecycle_status='archived'`, no delete, does not touch agreements created from the template; revalidates admin route + `/service-plans`.
+    - `restoreServicePlanTemplateFromForm` — sets `lifecycle_status='active'`; revalidates both surfaces.
+    - No `reorderServicePlanTemplatesFromForm` — `sort_order` doesn't exist, omit entirely.
+  - RLS: INSERT/UPDATE policies already exist — no migration required unless `sort_order` is pulled into scope (it is not).
+  - New tests in `lib/maintenance-agreements/__tests__/template-actions.test.ts` covering create (required fields, scope mismatch, default active status), update (allowed fields, locked-field rejection with correct error prefix, scope mismatch), archive (status flip, no agreement mutation), restore (status flip). No migration test (no migration).
+  - Non-goal confirmed by audit: no `sort_order`/reorder UI anywhere in 9A-16C.
+
 - Group 9A-13B-C Safe Confirm Write (agreement + link metadata idempotency truth) is complete and pushed in commit `3e8c769` with 9A-13B-C1 browser smoke closeout:
   - confirm now writes both surfaces on success: `maintenance_agreements.next_due_date` and `maintenance_agreement_visits` confirmation metadata (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`)
   - link metadata is the idempotency truth: counted link can confirm once; repeat confirm from same counted link is blocked with `confirm_next_due_already_confirmed`
