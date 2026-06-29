@@ -661,6 +661,15 @@ Current Program Status Note (May 2026)
   - **Validation:** `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (188/188), `npx.cmd tsc --noEmit` clean, `git diff --check` exit 0 (pre-existing CRLF warnings only). Browser smoke: manual.
   - **Boundaries preserved:** no schema changes, no migration, no server action changes, no new read helper. `ENABLE_MAINTENANCE_AGREEMENTS` gate unchanged (ServicePlanCreateFlow only rendered inside the flag-gated block).
 
+- **Group 9A-16C — Template Management Admin Page — CLOSED** (commit `09caa72`):
+  - New route `app/ops/admin/service-plan-templates/page.tsx`. Admin/Owner only via `requireAdminOrRedirect()` (mirrors `app/ops/admin/page.tsx` pattern). Redirects to `/ops/admin` if flag off.
+  - **Template list:** all templates (active + archived) sorted by `created_at` ascending. Row shows name, cadence label, summary truncated 1 line, Active/Archived badge, Edit link (→ `?action=edit&tplId=<id>`), Archive/Restore inline form buttons.
+  - **Forms:** URL-param driven — `?action=create` renders `TemplateCreateForm`; `?action=edit&tplId=<id>` renders `TemplateEditForm`. Edit form shows cadence as read-only ("Cadence cannot be changed after creation."). Both forms use `VisitScopeBuilder` with `summaryName="default_visit_scope_summary"` / `itemsName="default_visit_scope_items_json"` for the combined summary + work-items section.
+  - **Form actions** added to `lib/maintenance-agreements/template-actions.ts`: `createServicePlanTemplateFromForm`, `updateServicePlanTemplateFromForm` (blocks frequency/agreement_type changes with `maintenance_agreement_locked_field_update_blocked:` prefix redirect), `archiveServicePlanTemplateFromForm`, `restoreServicePlanTemplateFromForm`. Auth via `createClient()` + DB writes via `createAdminClient()`.
+  - **Admin Center:** "Service plan templates" card added to `app/ops/admin/page.tsx` under `isMaintenanceAgreementsEnabled()` guard.
+  - **Validation:** `npx.cmd vitest run lib/maintenance-agreements/__tests__` 196/196 (8 new form-action tests, 12 prior passing), `npx.cmd tsc --noEmit` clean, `git diff --check` exit 0. Browser smoke: manual.
+  - **No schema changes, no migrations.** Full end-to-end loop from 9A-16B `ServicePlanCreateFlow` empty-state "Set up templates" link to this page is now closed.
+
 - Group 9A-13B-C Safe Confirm Write (agreement + link metadata idempotency truth) is complete and pushed in commit `3e8c769` with 9A-13B-C1 browser smoke closeout:
   - confirm now writes both surfaces on success: `maintenance_agreements.next_due_date` and `maintenance_agreement_visits` confirmation metadata (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`)
   - link metadata is the idempotency truth: counted link can confirm once; repeat confirm from same counted link is blocked with `confirm_next_due_already_confirmed`
