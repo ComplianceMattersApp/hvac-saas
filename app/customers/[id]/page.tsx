@@ -1083,6 +1083,26 @@ export default async function CustomerDetailPage(props: {
     }
   }
 
+  const planLinkedJobIds = new Set<string>();
+  if (maintenanceAgreementsEnabled && workJobIds.length > 0) {
+    try {
+      const { data: planLinkRows } = await supabase
+        .from("maintenance_agreement_visits")
+        .select("job_id")
+        .eq("account_owner_user_id", visibilityScope.accountOwnerUserId)
+        .in("job_id", workJobIds)
+        .eq("link_source", "service_plan_prefill")
+        .neq("count_status", "reversed")
+        .limit(500);
+      for (const row of planLinkRows ?? []) {
+        const jid = String((row as { job_id?: unknown }).job_id ?? "").trim();
+        if (jid) planLinkedJobIds.add(jid);
+      }
+    } catch {
+      // fail safely — badge is non-critical
+    }
+  }
+
   // Estimates: load only for internal viewers when estimates are enabled
   let customerEstimates: EstimateListItem[] = [];
   const estimatesEnabled = isEstimatesEnabled();
@@ -2809,6 +2829,11 @@ export default async function CustomerDetailPage(props: {
                                   >
                                     {jobStatusLabel}
                                   </span>
+                                  {maintenanceAgreementsEnabled && planLinkedJobIds.has(String(job.id ?? "")) ? (
+                                    <span className="inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+                                      Service Plan
+                                    </span>
+                                  ) : null}
                                 </div>
 
                                 <div className="text-sm text-slate-600">
@@ -2908,6 +2933,11 @@ export default async function CustomerDetailPage(props: {
                                 >
                                   {jobStatusLabel}
                                 </span>
+                                {maintenanceAgreementsEnabled && planLinkedJobIds.has(String(job.id ?? "")) ? (
+                                  <span className="inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+                                    Service Plan
+                                  </span>
+                                ) : null}
                               </div>
 
                               <div className="text-sm text-slate-600">

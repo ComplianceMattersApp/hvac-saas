@@ -2298,6 +2298,7 @@ export default async function JobDetailPage({
       return {
         markVisitCountedLinkId: null as string | null,
         markVisitCountedAgreementName: null as string | null,
+        planLinkContext: null as { agreementId: string; agreementName: string } | null,
         suggestedNextDueProjection: null as {
           agreementName: string;
           agreementId: string;
@@ -2427,9 +2428,20 @@ export default async function JobDetailPage({
       }
     }
 
+    const firstNonReversedLink = maintenanceLinks.find(
+      (link) => String(link.count_status ?? "").trim().toLowerCase() !== "reversed",
+    );
+    const planLinkContext = firstNonReversedLink
+      ? {
+          agreementId: String(firstNonReversedLink.agreement_id ?? "").trim(),
+          agreementName: suggestedNextDueProjection?.agreementName ?? "Service Plan",
+        }
+      : null;
+
     return {
       markVisitCountedLinkId,
       markVisitCountedAgreementName,
+      planLinkContext,
       suggestedNextDueProjection,
       confirmedNextDueContext,
     };
@@ -2474,6 +2486,7 @@ export default async function JobDetailPage({
   const {
     markVisitCountedLinkId,
     markVisitCountedAgreementName,
+    planLinkContext,
     suggestedNextDueProjection,
     confirmedNextDueContext,
   } = maintenanceAgreementResult;
@@ -3774,6 +3787,19 @@ const showCorrectionReviewResolution =
           {headerJobTypeLabel}
         </div>
       </div>
+      {maintenanceAgreementsEnabled && planLinkContext && planLinkContext.agreementId && job.customer_id ? (
+        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
+          <span className="inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800">
+            Service Plan Visit
+          </span>
+          <Link
+            href={`/customers/${job.customer_id}?tab=service-plans&maFocus=${planLinkContext.agreementId}#maintenance-agreement-${planLinkContext.agreementId}`}
+            className="font-medium text-blue-600 hover:underline"
+          >
+            {planLinkContext.agreementName}
+          </Link>
+        </div>
+      ) : null}
     </div>
     <div id="field-status-actions" className="relative flex w-full flex-col gap-2.5 overflow-hidden rounded-2xl border border-blue-100 bg-white p-3 shadow-[0_20px_40px_-31px_rgba(29,78,216,0.36)] xl:items-stretch">
       <span className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
