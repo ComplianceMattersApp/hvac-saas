@@ -17,6 +17,7 @@ import {
   isAskComplianceMattersEnabled,
   isHelpGapReviewQueueEnabled,
 } from "@/lib/help-assistant/help-assistant-flags";
+import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireAdminOrRedirect() {
@@ -293,6 +294,17 @@ export default async function OpsAdminPage() {
         { label: "Contractors", href: "/ops/admin/contractors" },
         { label: "Intake proposals", href: "/ops/admin/contractor-intake-submissions" },
       ],
+    });
+  }
+
+  if (isMaintenanceAgreementsEnabled()) {
+    workspaceCards.push({
+      title: "Service plan templates",
+      description:
+        "Create and manage the plan templates your team uses when setting up new service plans.",
+      href: "/ops/admin/service-plan-templates",
+      ctaLabel: "Manage templates",
+      enabled: true,
     });
   }
 

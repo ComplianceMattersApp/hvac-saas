@@ -1,6 +1,8 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
@@ -466,4 +468,191 @@ export async function duplicateMaintenanceAgreementTemplate(
   }
 
   return { success: true, templateId: cleanString(duplicatedTemplate.id) };
+}
+
+const TEMPLATE_FORM_LOCKED_FIELD_ERROR = "maintenance_agreement_locked_field_update_blocked";
+const ADMIN_ROUTE = "/ops/admin/service-plan-templates";
+
+async function resolveFormMutationScope(): Promise<
+  | { success: true; accountOwnerUserId: string; userId: string }
+  | never
+> {
+  if (!isMaintenanceAgreementsEnabled()) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Maintenance Agreements are currently unavailable.")}`);
+  }
+
+  const supabase = await createClient();
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Active internal user required.")}`);
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const userId = cleanString(authz.userId);
+
+  if (!canManageMaintenanceAgreementPolicy({ actorUserId: userId, internalUser: authz.internalUser })) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Owner/admin internal role required for Service Plan template management.")}`);
+  }
+
+  return { success: true, accountOwnerUserId, userId };
+}
+
+export async function createServicePlanTemplateFromForm(formData: FormData): Promise<void> {
+  const scope = await resolveFormMutationScope();
+
+  const templateName = normalizeMaintenanceAgreementTemplateName(formData.get("template_name"));
+  if (!templateName) {
+    redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent("Template name is required.")}`);
+  }
+
+  const agreementType = cleanString(formData.get("agreement_type")).toLowerCase() || "maintenance";
+  if (!MAINTENANCE_AGREEMENT_TYPES.includes(agreementType as any)) {
+    redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent("Agreement type is invalid.")}`);
+  }
+
+  const frequency = cleanString(formData.get("frequency")).toLowerCase();
+  if (!MAINTENANCE_AGREEMENT_FREQUENCIES.includes(frequency as any)) {
+    redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent("Frequency is invalid.")}`);
+  }
+
+  const defaultVisitScopeSummary = sanitizeVisitScopeSummary(formData.get("default_visit_scope_summary"));
+  const scopeItemsResult = parseVisitScopeItemsJson(formData.get("default_visit_scope_items_json"));
+  if (!scopeItemsResult.ok) {
+    redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent(scopeItemsResult.error)}`);
+  }
+  const internalNotesDefault = normalizeMaintenanceAgreementTemplateInternalNotes(formData.get("internal_notes_default"));
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("maintenance_agreement_templates")
+    .insert({
+      account_owner_user_id: scope.accountOwnerUserId,
+      template_name: templateName,
+      agreement_type: agreementType,
+      frequency,
+      default_visit_scope_summary: defaultVisitScopeSummary,
+      default_visit_scope_items: scopeItemsResult.value,
+      internal_notes_default: internalNotesDefault,
+      lifecycle_status: "active",
+      created_by_user_id: scope.userId,
+      updated_by_user_id: scope.userId,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data?.id) {
+    redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent(error?.message ?? "Failed to create template.")}`);
+  }
+
+  revalidatePath(ADMIN_ROUTE);
+  redirect(`${ADMIN_ROUTE}?notice=template_created`);
+}
+
+export async function updateServicePlanTemplateFromForm(formData: FormData): Promise<void> {
+  const scope = await resolveFormMutationScope();
+
+  const templateId = cleanString(formData.get("template_id"));
+  if (!templateId) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Template id is required.")}`);
+  }
+
+  const submittedFrequency = cleanString(formData.get("frequency"));
+  const submittedAgreementType = cleanString(formData.get("agreement_type"));
+  if (submittedFrequency || submittedAgreementType) {
+    redirect(
+      `${ADMIN_ROUTE}?action=edit&tplId=${encodeURIComponent(templateId)}&error=${encodeURIComponent(
+        `${TEMPLATE_FORM_LOCKED_FIELD_ERROR}: Cadence cannot be changed after a template is created.`,
+      )}`,
+    );
+  }
+
+  const templateName = normalizeMaintenanceAgreementTemplateName(formData.get("template_name"));
+  if (!templateName) {
+    redirect(`${ADMIN_ROUTE}?action=edit&tplId=${encodeURIComponent(templateId)}&error=${encodeURIComponent("Template name is required.")}`);
+  }
+
+  const defaultVisitScopeSummary = sanitizeVisitScopeSummary(formData.get("default_visit_scope_summary"));
+  const scopeItemsResult = parseVisitScopeItemsJson(formData.get("default_visit_scope_items_json"));
+  if (!scopeItemsResult.ok) {
+    redirect(`${ADMIN_ROUTE}?action=edit&tplId=${encodeURIComponent(templateId)}&error=${encodeURIComponent(scopeItemsResult.error)}`);
+  }
+  const internalNotesDefault = normalizeMaintenanceAgreementTemplateInternalNotes(formData.get("internal_notes_default"));
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("maintenance_agreement_templates")
+    .update({
+      template_name: templateName,
+      default_visit_scope_summary: defaultVisitScopeSummary,
+      default_visit_scope_items: scopeItemsResult.value,
+      internal_notes_default: internalNotesDefault,
+      updated_by_user_id: scope.userId,
+    })
+    .eq("id", templateId)
+    .eq("account_owner_user_id", scope.accountOwnerUserId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirect(`${ADMIN_ROUTE}?action=edit&tplId=${encodeURIComponent(templateId)}&error=${encodeURIComponent(error.message ?? "Failed to update template.")}`);
+  }
+  if (!data?.id) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Template is out of scope.")}`);
+  }
+
+  revalidatePath(ADMIN_ROUTE);
+  redirect(`${ADMIN_ROUTE}?notice=template_updated`);
+}
+
+export async function archiveServicePlanTemplateFromForm(formData: FormData): Promise<void> {
+  const scope = await resolveFormMutationScope();
+
+  const templateId = cleanString(formData.get("template_id"));
+  if (!templateId) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Template id is required.")}`);
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("maintenance_agreement_templates")
+    .update({ lifecycle_status: "archived", updated_by_user_id: scope.userId })
+    .eq("id", templateId)
+    .eq("account_owner_user_id", scope.accountOwnerUserId);
+
+  if (error) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent(error.message ?? "Failed to archive template.")}`);
+  }
+
+  revalidatePath(ADMIN_ROUTE);
+  revalidatePath("/service-plans");
+  redirect(`${ADMIN_ROUTE}?notice=template_archived`);
+}
+
+export async function restoreServicePlanTemplateFromForm(formData: FormData): Promise<void> {
+  const scope = await resolveFormMutationScope();
+
+  const templateId = cleanString(formData.get("template_id"));
+  if (!templateId) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Template id is required.")}`);
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("maintenance_agreement_templates")
+    .update({ lifecycle_status: "active", updated_by_user_id: scope.userId })
+    .eq("id", templateId)
+    .eq("account_owner_user_id", scope.accountOwnerUserId);
+
+  if (error) {
+    redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent(error.message ?? "Failed to restore template.")}`);
+  }
+
+  revalidatePath(ADMIN_ROUTE);
+  revalidatePath("/service-plans");
+  redirect(`${ADMIN_ROUTE}?notice=template_restored`);
 }
