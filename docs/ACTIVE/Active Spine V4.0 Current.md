@@ -670,6 +670,15 @@ Current Program Status Note (May 2026)
   - **Validation:** `npx.cmd vitest run lib/maintenance-agreements/__tests__` 196/196 (8 new form-action tests, 12 prior passing), `npx.cmd tsc --noEmit` clean, `git diff --check` exit 0. Browser smoke: manual.
   - **No schema changes, no migrations.** Full end-to-end loop from 9A-16B `ServicePlanCreateFlow` empty-state "Set up templates" link to this page is now closed.
 
+- **Group 9A-16E — Plan Lifecycle: Active Default, Cancel, Delete Draft, Status Badge — CLOSED** (commit `81dd35b`):
+  - **Step 1 — Default status fix:** `createMaintenanceAgreement` now explicitly inserts `status: 'active'`. Previously relied on DB default (`'draft'`); all new agreements now start active.
+  - **Step 2 — Cancel action:** `cancelMaintenanceAgreementFromForm` in `agreement-actions.ts`. Precondition: status is `active` or `paused`. Sets `status = 'cancelled'` via `createAdminClient`. Does not touch `maintenance_agreement_visits` rows. Revalidates `/customers/{customerId}` and `/service-plans`. Returns `{ success }` | `{ error }`.
+  - **Step 3 — Delete draft action:** `deleteMaintenanceAgreementDraftFromForm` in `agreement-actions.ts`. Preconditions: status is `draft`; no `count_status = 'counted'` visit links (returns error directing to cancel instead). Deletes non-counted links then the agreement row, both via `createAdminClient`. Revalidates same paths.
+  - **Step 4 — Status badge standardization:** expanded `statusBadge` from a 2-state ternary to a full 5-state color map (active=green, paused=yellow, cancelled=red, draft/expired=grey). Status label uses a display map. `Create Work Order` link hidden when status is `cancelled` or `expired`.
+  - **`ServicePlanTerminalActions`** new `"use client"` component (`components/maintenance-agreements/ServicePlanTerminalActions.tsx`). Shows "Cancel plan" (active/paused) or "Delete draft" (draft) below `Edit Details`. Inline confirmation panel before firing. On success: `router.refresh()`. On error: inline error banner. Returns null for terminal/non-actionable statuses.
+  - **Validation:** 211/211 vitest (50 in agreement-actions.test.ts — 15 new), tsc clean, `git diff --check` exit 0. Browser smoke: manual.
+  - **No schema changes, no migrations, no RLS changes.**
+
 - Group 9A-13B-C Safe Confirm Write (agreement + link metadata idempotency truth) is complete and pushed in commit `3e8c769` with 9A-13B-C1 browser smoke closeout:
   - confirm now writes both surfaces on success: `maintenance_agreements.next_due_date` and `maintenance_agreement_visits` confirmation metadata (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`)
   - link metadata is the idempotency truth: counted link can confirm once; repeat confirm from same counted link is blocked with `confirm_next_due_already_confirmed`
