@@ -35,10 +35,16 @@ describe("customer service-plan template prefill wiring", () => {
     expect(componentSource).toContain('itemsName="default_visit_scope_items_json"');
   });
 
-  it("empty state renders correctly with manual create and set-up-templates options", () => {
-    expect(componentSource).toContain("No plan templates set up yet");
-    expect(componentSource).toContain("Create manually");
+  it("picker has correct structure: scratch-first, template section, manage link", () => {
+    // Primary option is always rendered first
+    expect(componentSource).toContain("Create new service plan");
+    // Template section label
+    expect(componentSource).toContain("Or choose a template");
+    // Empty-state hint when no templates exist
+    expect(componentSource).toContain("No templates set up yet");
+    // Admin-only links present in source (gated by isAdmin at runtime)
     expect(componentSource).toContain("Set up templates");
+    expect(componentSource).toContain("Manage templates");
     expect(componentSource).toContain("/ops/admin/service-plan-templates");
   });
 

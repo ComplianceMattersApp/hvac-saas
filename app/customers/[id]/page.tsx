@@ -1116,6 +1116,7 @@ export default async function CustomerDetailPage(props: {
   let canManageBillingPeriods = false;
   let canManageSavedPaymentMethodSetup = false;
   let customerSavedPaymentMethods: CustomerSavedPaymentMethodRow[] = [];
+  let isTemplateAdmin = false;
 
   if (isInternalViewer) {
     try {
@@ -1129,6 +1130,7 @@ export default async function CustomerDetailPage(props: {
         resourceAccountOwnerUserId: visibilityScope.accountOwnerUserId,
       });
       canManageSavedPaymentMethodSetup = canManageBillingPeriods;
+      isTemplateAdmin = iu.role === "admin";
 
       if (canViewPaymentHistory) {
         customerPaymentHistory = await listCustomerPaymentHistory({
@@ -3078,6 +3080,7 @@ export default async function CustomerDetailPage(props: {
                 initialStartDate={createAgreementStartDateDefault}
                 locationOptions={createAgreementLocationOptions}
                 singleLocationId={createAgreementSingleLocationId}
+                isAdmin={isTemplateAdmin}
               />
             </div>
 

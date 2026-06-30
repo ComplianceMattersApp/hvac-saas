@@ -23,6 +23,7 @@ type Props = {
   initialStartDate: string;
   locationOptions: LocationOption[];
   singleLocationId: string | null;
+  isAdmin: boolean;
 };
 
 export function ServicePlanCreateFlow({
@@ -32,6 +33,7 @@ export function ServicePlanCreateFlow({
   initialStartDate,
   locationOptions,
   singleLocationId,
+  isAdmin,
 }: Props) {
   const [step, setStep] = useState<"closed" | "picker" | "form">("closed");
   const [selectedTemplate, setSelectedTemplate] = useState<MaintenanceAgreementTemplateRow | null>(null);
@@ -85,7 +87,7 @@ export function ServicePlanCreateFlow({
           <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <h2 className="text-sm font-semibold text-slate-900">
-                {step === "picker" ? "Choose a template" : "New service plan"}
+                New service plan
               </h2>
               <button
                 type="button"
@@ -99,30 +101,19 @@ export function ServicePlanCreateFlow({
 
             {step === "picker" && (
               <div className="max-h-[70vh] overflow-y-auto p-5">
-                {!hasTemplates ? (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-                    <p className="text-sm font-medium text-slate-700">No plan templates set up yet.</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Create a plan manually, or set up templates to prefill future agreements.
-                    </p>
-                    <div className="mt-4 flex flex-wrap justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={openBlankForm}
-                        className="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                      >
-                        Create manually
-                      </button>
-                      <Link
-                        href="/ops/admin/service-plan-templates"
-                        className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Set up templates
-                      </Link>
-                    </div>
-                  </div>
-                ) : (
+                {/* Primary option — always first */}
+                <button
+                  type="button"
+                  onClick={openBlankForm}
+                  className="w-full rounded-lg border border-slate-900 bg-slate-900 px-4 py-3.5 text-left text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-1"
+                >
+                  Create new service plan
+                </button>
+
+                {/* Template section */}
+                {hasTemplates ? (
                   <>
+                    <div className="mt-4 mb-2.5 text-xs font-medium text-slate-500">Or choose a template</div>
                     <div className="grid gap-2.5">
                       {templates.map((t) => (
                         <button
@@ -143,17 +134,32 @@ export function ServicePlanCreateFlow({
                         </button>
                       ))}
                     </div>
-                    <div className="mt-4 border-t border-slate-200 pt-4 text-center">
-                      <button
-                        type="button"
-                        onClick={openBlankForm}
-                        className="text-sm text-slate-500 hover:text-slate-700 hover:underline"
-                      >
-                        Or create without a template
-                      </button>
-                    </div>
                   </>
+                ) : (
+                  <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                    No templates set up yet.{" "}
+                    {isAdmin ? (
+                      <Link
+                        href="/ops/admin/service-plan-templates"
+                        className="font-medium text-blue-600 hover:underline"
+                      >
+                        Set up templates
+                      </Link>
+                    ) : null}
+                  </div>
                 )}
+
+                {/* Footer — admin-only template management link */}
+                {isAdmin ? (
+                  <div className="mt-4 border-t border-slate-100 pt-3">
+                    <Link
+                      href="/ops/admin/service-plan-templates"
+                      className="text-xs text-slate-400 hover:text-slate-600 hover:underline"
+                    >
+                      Manage templates
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             )}
 
