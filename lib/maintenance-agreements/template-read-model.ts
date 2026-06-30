@@ -140,6 +140,58 @@ function parseTemplateRow(raw: any): MaintenanceAgreementTemplateRow {
   };
 }
 
+export type TemplateChecklistItem = {
+  id: string;
+  item_label: string;
+  default_guidance: string | null;
+  sort_order: number;
+};
+
+type ListChecklistItemsParams = {
+  supabase: SupabaseLike;
+  accountOwnerUserId: string | null | undefined;
+  templateId?: string | null;
+  agreementId?: string | null;
+};
+
+function parseChecklistItemRow(raw: any): TemplateChecklistItem {
+  return {
+    id: cleanString(raw?.id),
+    item_label: cleanString(raw?.item_label),
+    default_guidance: cleanString(raw?.default_guidance) || null,
+    sort_order: Number.isInteger(Number(raw?.sort_order)) ? Number(raw.sort_order) : 0,
+  };
+}
+
+export async function listChecklistItemsForTemplate(
+  params: ListChecklistItemsParams,
+): Promise<TemplateChecklistItem[]> {
+  const accountOwnerUserId = cleanString(params.accountOwnerUserId);
+  if (!accountOwnerUserId) return [];
+
+  let query = params.supabase
+    .from("maintenance_agreement_template_checklist_items")
+    .select("id, item_label, default_guidance, sort_order")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(50);
+
+  if (params.templateId) {
+    query = query.eq("template_id", params.templateId);
+  } else if (params.agreementId) {
+    query = query.eq("agreement_id", params.agreementId);
+  } else {
+    return [];
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map(parseChecklistItemRow);
+}
+
 export async function listMaintenanceAgreementTemplatesForAccount(
   params: ListMaintenanceAgreementTemplatesParams,
 ): Promise<MaintenanceAgreementTemplateRow[]> {

@@ -14,6 +14,8 @@ import {
   restoreServicePlanTemplateFromForm,
 } from "@/lib/maintenance-agreements/template-actions";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
+import ChecklistItemBuilder, { type ChecklistDraftItem } from "@/components/jobs/ChecklistItemBuilder";
+import { listChecklistItemsForTemplate, type TemplateChecklistItem } from "@/lib/maintenance-agreements/template-read-model";
 
 const CADENCE_OPTIONS = [
   { label: "1× per year", frequency: "annual" },
@@ -74,7 +76,13 @@ async function requireAdminOrRedirect() {
   }
 }
 
-function TemplateCreateForm({ action }: { action: typeof createServicePlanTemplateFromForm }) {
+function TemplateCreateForm({
+  action,
+  initialChecklistItems = [],
+}: {
+  action: typeof createServicePlanTemplateFromForm;
+  initialChecklistItems?: ChecklistDraftItem[];
+}) {
   return (
     <div className={panelClass}>
       <div className="mb-4 flex items-center justify-between">
@@ -127,6 +135,17 @@ function TemplateCreateForm({ action }: { action: typeof createServicePlanTempla
         </div>
 
         <div>
+          <label className={labelClass}>Checklist items — optional</label>
+          <p className="mb-1.5 text-xs text-slate-500">
+            These items prefill on every job created from this template. Technicians check them off and can add notes during the visit.
+          </p>
+          <ChecklistItemBuilder
+            initialItems={initialChecklistItems}
+            itemsName="checklist_items_json"
+          />
+        </div>
+
+        <div>
           <label className={labelClass}>Internal notes — default (optional)</label>
           <p className="mb-1 text-xs text-slate-500">
             For your team only. Prefills when creating a plan from this template.
@@ -150,9 +169,11 @@ function TemplateCreateForm({ action }: { action: typeof createServicePlanTempla
 function TemplateEditForm({
   template,
   action,
+  initialChecklistItems = [],
 }: {
   template: MaintenanceAgreementTemplateRow;
   action: typeof updateServicePlanTemplateFromForm;
+  initialChecklistItems?: ChecklistDraftItem[];
 }) {
   const cadenceLabel = CADENCE_LABELS[template.frequency] ?? template.frequency;
 
@@ -208,6 +229,17 @@ function TemplateEditForm({
             itemsName="default_visit_scope_items_json"
             initialSummary=""
             initialItems={template.default_visit_scope_items}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Checklist items — optional</label>
+          <p className="mb-1.5 text-xs text-slate-500">
+            These items prefill on every job created from this template. Technicians check them off and can add notes during the visit.
+          </p>
+          <ChecklistItemBuilder
+            initialItems={initialChecklistItems}
+            itemsName="checklist_items_json"
           />
         </div>
 
@@ -351,6 +383,19 @@ export default async function ServicePlanTemplatesPage(props: { searchParams: Se
     ? sortedTemplates.find((t) => t.id === tplId) ?? null
     : null;
 
+  let editingChecklistItems: TemplateChecklistItem[] = [];
+  if (editingTemplate) {
+    try {
+      editingChecklistItems = await listChecklistItemsForTemplate({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        templateId: editingTemplate.id,
+      });
+    } catch {
+      editingChecklistItems = [];
+    }
+  }
+
   const noticeText = notice ? (NOTICE_TEXT[notice] ?? null) : null;
 
   const archiveAction = archiveServicePlanTemplateFromForm;
@@ -394,11 +439,19 @@ export default async function ServicePlanTemplatesPage(props: { searchParams: Se
       ) : null}
 
       {action === "create" ? (
-        <TemplateCreateForm action={createServicePlanTemplateFromForm} />
+        <TemplateCreateForm action={createServicePlanTemplateFromForm} initialChecklistItems={[]} />
       ) : null}
 
       {editingTemplate ? (
-        <TemplateEditForm template={editingTemplate} action={updateServicePlanTemplateFromForm} />
+        <TemplateEditForm
+          template={editingTemplate}
+          action={updateServicePlanTemplateFromForm}
+          initialChecklistItems={editingChecklistItems.map((item) => ({
+            id: item.id,
+            item_label: item.item_label,
+            default_guidance: item.default_guidance ?? "",
+          }))}
+        />
       ) : null}
 
       <div className={panelClass}>

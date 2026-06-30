@@ -757,6 +757,100 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
   }
 }
 
+export async function copyChecklistItemsToJob(params: {
+  agreementId: string;
+  jobId: string;
+  createdByUserId: string;
+  accountOwnerUserId?: string;
+}): Promise<boolean> {
+  try {
+    if (!isMaintenanceAgreementsEnabled()) {
+      return false;
+    }
+
+    const agreementId = cleanString(params.agreementId);
+    const jobId = cleanString(params.jobId);
+    const createdByUserId = cleanString(params.createdByUserId);
+
+    if (!agreementId || !jobId || !createdByUserId) {
+      return false;
+    }
+
+    const admin = createAdminClient();
+
+    let accountOwnerUserId = cleanString(params.accountOwnerUserId ?? "");
+    if (!accountOwnerUserId) {
+      const { data: internalUserRow, error: internalUserErr } = await admin
+        .from("internal_users")
+        .select("account_owner_user_id, is_active")
+        .eq("user_id", createdByUserId)
+        .maybeSingle();
+
+      if (internalUserErr || !internalUserRow?.account_owner_user_id || internalUserRow.is_active === false) {
+        return false;
+      }
+      accountOwnerUserId = cleanString(internalUserRow.account_owner_user_id);
+    }
+
+    // Resolve source template from agreement's provenance snapshot
+    const { data: agreement, error: agreementErr } = await admin
+      .from("maintenance_agreements")
+      .select("id, account_owner_user_id, source_template_id")
+      .eq("id", agreementId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+
+    if (agreementErr || !agreement?.id) {
+      return false;
+    }
+
+    const sourceTemplateId = cleanString(agreement.source_template_id ?? "");
+    if (!sourceTemplateId) {
+      // No template — no checklist items to copy.
+      return true;
+    }
+
+    const { data: templateItems, error: itemsErr } = await admin
+      .from("maintenance_agreement_template_checklist_items")
+      .select("id, item_label, sort_order")
+      .eq("template_id", sourceTemplateId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(50);
+
+    if (itemsErr) {
+      return false;
+    }
+
+    const items = Array.isArray(templateItems) ? templateItems : [];
+    if (items.length === 0) {
+      return true;
+    }
+
+    const { error: insertErr } = await admin
+      .from("job_checklist_item_completions")
+      .insert(
+        items.map((item: { id: string; item_label: string; sort_order: number }) => ({
+          account_owner_user_id: accountOwnerUserId,
+          job_id: jobId,
+          source_item_id: item.id,
+          item_label: item.item_label,
+          sort_order: item.sort_order,
+          is_completed: false,
+        })),
+      );
+
+    if (insertErr) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export type AutoCountMaintenanceAgreementVisitsResult = {
   evaluatedLinks: number;
   eligibleLinks: number;
@@ -1636,5 +1730,68 @@ export async function deleteMaintenanceAgreementDraftFromForm(
   revalidatePath(`/customers/${customerId}`);
   revalidatePath(`/service-plans`);
 
+  return { success: true };
+}
+
+export async function updateJobChecklistItemCompletionFromForm(
+  formData: FormData,
+): Promise<{ success: boolean; error?: string }> {
+  "use server";
+
+  if (!isMaintenanceAgreementsEnabled()) {
+    return { success: false, error: "Feature not enabled." };
+  }
+
+  const supabase = await createClient();
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch {
+    return { success: false, error: "Not authenticated." };
+  }
+  const { internalUser } = authz;
+  const userId = cleanString(internalUser.user_id);
+  const accountOwnerUserId = cleanString(internalUser.account_owner_user_id);
+  if (!userId || !accountOwnerUserId) {
+    return { success: false, error: "Access denied." };
+  }
+
+  const itemId = cleanString(formData.get("item_id"));
+  const jobId = cleanString(formData.get("job_id"));
+  const isCompletedRaw = cleanString(formData.get("is_completed"));
+  const notes = cleanString(formData.get("notes")) || null;
+
+  if (!itemId || !jobId) {
+    return { success: false, error: "Missing item_id or job_id." };
+  }
+
+  const isCompleted = isCompletedRaw === "true" || isCompletedRaw === "1";
+
+  const updatePayload = isCompleted
+    ? {
+        is_completed: true,
+        notes,
+        completed_by_user_id: userId,
+        completed_at: new Date().toISOString(),
+      }
+    : {
+        is_completed: false,
+        notes,
+        completed_by_user_id: null,
+        completed_at: null,
+      };
+
+  const { error } = await supabase
+    .from("job_checklist_item_completions")
+    .update(updatePayload)
+    .eq("id", itemId)
+    .eq("job_id", jobId)
+    .eq("account_owner_user_id", accountOwnerUserId);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
   return { success: true };
 }

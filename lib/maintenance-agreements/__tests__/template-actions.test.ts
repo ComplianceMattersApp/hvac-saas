@@ -193,9 +193,20 @@ const {
 function makeAdminClient() {
   const insertCalls: unknown[] = [];
   const updateCalls: unknown[] = [];
+  const deleteCalls: unknown[] = [];
+
+  const makeDeleteChain = (table: string) => {
+    const chain: any = {
+      eq: vi.fn((_col: string, _val: unknown) => {
+        deleteCalls.push({ table });
+        return chain;
+      }),
+    };
+    return chain;
+  };
 
   const client = {
-    from: vi.fn((_table: string) => ({
+    from: vi.fn((table: string) => ({
       insert: vi.fn((payload: unknown) => {
         insertCalls.push(payload);
         return {
@@ -222,9 +233,11 @@ function makeAdminClient() {
 
         return { eq: vi.fn(() => eqChain) };
       }),
+      delete: vi.fn(() => makeDeleteChain(table)),
     })),
     _insertCalls: insertCalls,
     _updateCalls: updateCalls,
+    _deleteCalls: deleteCalls,
   };
 
   return client;
@@ -473,6 +486,8 @@ describe("maintenance agreement template actions", () => {
   it("updates template in scoped account", async () => {
     const supabase = makeSupabaseClient();
     createClientMock.mockResolvedValue(supabase);
+    const adminClient = makeAdminClient();
+    createAdminClientMock.mockReturnValue(adminClient);
 
     const result = await updateMaintenanceAgreementTemplate({
       templateId: "tpl-1",

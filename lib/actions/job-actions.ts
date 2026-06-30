@@ -15,6 +15,7 @@ import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
 import {
   autoCountMaintenanceAgreementVisitsForCompletedServiceJob,
+  copyChecklistItemsToJob,
   createMaintenanceAgreementVisitLinkFromJobCreation,
 } from "@/lib/maintenance-agreements/agreement-actions";
 import {
@@ -9389,6 +9390,12 @@ function canContractorWriteEvent(event_type: string) {
       createdByUserId: userId,
       accountOwnerUserId: canonicalOwnerUserId,
     });
+    await copyChecklistItemsToJob({
+      agreementId: maintenanceAgreementIdRaw,
+      jobId: created.id,
+      createdByUserId: userId,
+      accountOwnerUserId: canonicalOwnerUserId,
+    });
   }
 
   await postCreate(created.id, followUpServiceCaseId ? "customer_follow_up" : "customer");
@@ -9728,6 +9735,12 @@ if (existingCustomerId && !existingLocationId) {
       createdByUserId: userId,
       accountOwnerUserId: canonicalOwnerUserId,
     });
+    await copyChecklistItemsToJob({
+      agreementId: maintenanceAgreementIdRaw,
+      jobId: created.id,
+      createdByUserId: userId,
+      accountOwnerUserId: canonicalOwnerUserId,
+    });
   }
 
   await postCreate(created.id, "customer_new_location");
@@ -9875,6 +9888,12 @@ try {
 // Attempt to create maintenance agreement visit link if this job came from service plan prefill
 if (maintenanceAgreementIdRaw && userId) {
   await createMaintenanceAgreementVisitLinkFromJobCreation({
+    agreementId: maintenanceAgreementIdRaw,
+    jobId: created.id,
+    createdByUserId: userId,
+    accountOwnerUserId: canonicalOwnerUserId,
+  });
+  await copyChecklistItemsToJob({
     agreementId: maintenanceAgreementIdRaw,
     jobId: created.id,
     createdByUserId: userId,

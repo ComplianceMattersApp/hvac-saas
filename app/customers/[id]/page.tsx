@@ -56,8 +56,10 @@ import {
   MAINTENANCE_AGREEMENT_TYPES,
   listMaintenanceAgreementsForCustomer,
   summarizeMaintenanceAgreementVisitLinksForAgreement,
+  getMostRecentCountedVisitChecklistSummary,
   classifyMaintenanceAgreementDueState,
   type MaintenanceAgreementVisitLinkSummary,
+  type MostRecentCountedVisitChecklistSummary,
   type MaintenanceAgreementRow,
 } from "@/lib/maintenance-agreements/read-model";
 import {
@@ -1067,6 +1069,30 @@ export default async function CustomerDetailPage(props: {
       }
     } catch {
       // Fail safe for environments where visit-link projection is unavailable.
+    }
+  }
+
+  const agreementChecklistRollupById = new Map<string, MostRecentCountedVisitChecklistSummary>();
+  if (maintenanceAgreementsEnabled && customerAgreements.length > 0) {
+    try {
+      const rollupRows = await Promise.all(
+        customerAgreements.map(async (agreement) => {
+          const rollup = await getMostRecentCountedVisitChecklistSummary({
+            supabase,
+            accountOwnerUserId: visibilityScope.accountOwnerUserId,
+            agreementId: agreement.id,
+          });
+          return [agreement.id, rollup] as const;
+        }),
+      );
+
+      for (const [agreementId, rollup] of rollupRows) {
+        if (rollup) {
+          agreementChecklistRollupById.set(agreementId, rollup);
+        }
+      }
+    } catch {
+      // Fail safe for environments where checklist summary is unavailable.
     }
   }
 
@@ -3111,6 +3137,7 @@ export default async function CustomerDetailPage(props: {
                   );
                   const templateSnapshotItemsCount = readTemplateSnapshotItemsCount(templateSnapshot);
                   const visitLinkSummary = agreementVisitSummaryById.get(agr.id);
+                  const checklistRollup = agreementChecklistRollupById.get(agr.id) ?? null;
                   const defaultPlanItems = sanitizeAgreementDefaultVisitScopeItems(
                     agr.default_visit_scope_items,
                   );
@@ -3213,6 +3240,11 @@ export default async function CustomerDetailPage(props: {
                             <div className="text-xs text-slate-400">
                               {visitLinkSummary.used_visits} of {visitLinkSummary.total_links}{" "}
                               {visitLinkSummary.total_links === 1 ? "visit" : "visits"} used
+                            </div>
+                          ) : null}
+                          {checklistRollup && checklistRollup.total_items > 0 ? (
+                            <div className="text-xs text-slate-400">
+                              Last visit: {checklistRollup.completed_items}/{checklistRollup.total_items} checklist items completed
                             </div>
                           ) : null}
                         </div>

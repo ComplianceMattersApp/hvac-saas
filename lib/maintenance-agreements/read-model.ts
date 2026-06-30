@@ -1297,3 +1297,47 @@ export async function summarizeMaintenanceAgreementsForAccount(
 
   return summary;
 }
+
+export type MostRecentCountedVisitChecklistSummary = {
+  total_items: number;
+  completed_items: number;
+};
+
+export async function getMostRecentCountedVisitChecklistSummary(params: {
+  supabase: SupabaseLike;
+  accountOwnerUserId: string | null | undefined;
+  agreementId: string | null | undefined;
+}): Promise<MostRecentCountedVisitChecklistSummary | null> {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  const agreementId = toCleanString(params.agreementId);
+  if (!accountOwnerUserId || !agreementId) return null;
+
+  // Most recently counted visit for this agreement (by counted_at per owner decision).
+  const { data: visitRow, error: visitErr } = await params.supabase
+    .from("maintenance_agreement_visits")
+    .select("job_id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("agreement_id", agreementId)
+    .eq("count_status", "counted")
+    .order("counted_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (visitErr || !visitRow?.job_id) return null;
+
+  const jobId = toCleanString(visitRow.job_id);
+
+  const { data: items, error: itemsErr } = await params.supabase
+    .from("job_checklist_item_completions")
+    .select("is_completed")
+    .eq("job_id", jobId)
+    .eq("account_owner_user_id", accountOwnerUserId);
+
+  if (itemsErr) return null;
+  if (!Array.isArray(items) || items.length === 0) return null;
+
+  const total = items.length;
+  const completed = items.filter((row: { is_completed?: boolean }) => row.is_completed === true).length;
+
+  return { total_items: total, completed_items: completed };
+}

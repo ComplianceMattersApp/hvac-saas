@@ -127,6 +127,7 @@ import {
   projectMaintenanceAgreementSuggestedNextDue,
   projectMaintenanceAgreementVisitCountReview,
 } from "@/lib/maintenance-agreements/read-model";
+import { updateJobChecklistItemCompletionFromForm } from "@/lib/maintenance-agreements/agreement-actions";
 
 import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
@@ -2490,6 +2491,42 @@ export default async function JobDetailPage({
     suggestedNextDueProjection,
     confirmedNextDueContext,
   } = maintenanceAgreementResult;
+
+  // Checklist items (Phase 1, desktop/admin only, gated on feature flag + isInternalUser)
+  type JobChecklistItem = {
+    id: string;
+    item_label: string;
+    sort_order: number;
+    is_completed: boolean;
+    notes: string | null;
+    completed_by_user_id: string | null;
+    completed_at: string | null;
+  };
+  let jobChecklistItems: JobChecklistItem[] = [];
+  if (isMaintenanceAgreementsEnabled() && isInternalUser) {
+    try {
+      const { data: checklistRows } = await supabase
+        .from("job_checklist_item_completions")
+        .select("id, item_label, sort_order, is_completed, notes, completed_by_user_id, completed_at")
+        .eq("job_id", String(job.id ?? ""))
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(50);
+      if (Array.isArray(checklistRows)) {
+        jobChecklistItems = checklistRows.map((row: any) => ({
+          id: String(row.id ?? ""),
+          item_label: String(row.item_label ?? ""),
+          sort_order: Number(row.sort_order ?? 0),
+          is_completed: Boolean(row.is_completed),
+          notes: row.notes ? String(row.notes) : null,
+          completed_by_user_id: row.completed_by_user_id ? String(row.completed_by_user_id) : null,
+          completed_at: row.completed_at ? String(row.completed_at) : null,
+        }));
+      }
+    } catch {
+      jobChecklistItems = [];
+    }
+  }
 
   const contractorBilling = billingPartyReads.contractorBilling;
   const customerBilling = billingPartyReads.customerBilling;
@@ -5032,6 +5069,74 @@ const showCorrectionReviewResolution =
               No work items added yet.
             </div>
           )}
+
+          {isMaintenanceAgreementsEnabled() && jobChecklistItems.length > 0 ? (
+            <div className="mt-4 space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Visit checklist
+              </div>
+              <div className="space-y-1.5">
+                {jobChecklistItems.map((item) => {
+                  const itemId = item.id;
+                  const itemJobId = String(job.id ?? "");
+                  const itemIsCompleted = item.is_completed;
+                  const itemNotes = item.notes ?? "";
+                  const checklistToggleAction = async (_formData: FormData) => {
+                    "use server";
+                    const fd = new FormData();
+                    fd.set("item_id", itemId);
+                    fd.set("job_id", itemJobId);
+                    fd.set("is_completed", itemIsCompleted ? "false" : "true");
+                    fd.set("notes", itemNotes);
+                    await updateJobChecklistItemCompletionFromForm(fd);
+                  };
+                  return (
+                    <div
+                      key={item.id}
+                      className={[
+                        "rounded-lg border px-3 py-2.5 transition-colors",
+                        item.is_completed
+                          ? "border-green-200 bg-green-50/70"
+                          : "border-slate-200 bg-white",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <form action={checklistToggleAction} className="mt-0.5 shrink-0">
+                          <button
+                            type="submit"
+                            aria-label={item.is_completed ? "Mark incomplete" : "Mark complete"}
+                            className={[
+                              "flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border text-xs font-bold transition-colors",
+                              item.is_completed
+                                ? "border-green-500 bg-green-500 text-white"
+                                : "border-slate-300 bg-white text-transparent hover:border-green-400",
+                            ].join(" ")}
+                          >
+                            ✓
+                          </button>
+                        </form>
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className={[
+                              "text-sm",
+                              item.is_completed
+                                ? "text-slate-500 line-through"
+                                : "text-slate-900",
+                            ].join(" ")}
+                          >
+                            {item.item_label}
+                          </div>
+                          {item.notes ? (
+                            <div className="mt-0.5 text-xs text-slate-500">{item.notes}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
         </div>
       </div>

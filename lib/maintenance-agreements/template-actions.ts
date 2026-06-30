@@ -26,6 +26,36 @@ type TemplateMutationResult =
   | { success: true; templateId: string }
   | { success: false; error: string };
 
+type ChecklistItemInput = {
+  item_label: string;
+  default_guidance: string | null;
+  sort_order: number;
+};
+
+function parseChecklistItemsJson(value: unknown): { ok: true; value: ChecklistItemInput[] } | { ok: false; error: string } {
+  const normalized = cleanString(value);
+  if (!normalized) return { ok: true, value: [] };
+
+  try {
+    const parsed = JSON.parse(normalized);
+    if (!Array.isArray(parsed)) return { ok: true, value: [] };
+
+    const items: ChecklistItemInput[] = [];
+    for (const raw of parsed) {
+      const label = cleanString(raw?.item_label);
+      if (!label) continue;
+      items.push({
+        item_label: label.slice(0, 200),
+        default_guidance: cleanString(raw?.default_guidance).slice(0, 500) || null,
+        sort_order: Number.isInteger(Number(raw?.sort_order)) ? Number(raw.sort_order) : items.length,
+      });
+    }
+    return { ok: true, value: items.slice(0, 30) };
+  } catch {
+    return { ok: false, error: "Checklist items must be valid JSON." };
+  }
+}
+
 type CreateMaintenanceAgreementTemplateParams = {
   templateName: string;
   agreementType: string;
@@ -33,10 +63,12 @@ type CreateMaintenanceAgreementTemplateParams = {
   defaultVisitScopeSummary?: string | null;
   defaultVisitScopeItemsJson?: string | null;
   internalNotesDefault?: string | null;
+  checklistItemsJson?: string | null;
 };
 
 type UpdateMaintenanceAgreementTemplateParams = CreateMaintenanceAgreementTemplateParams & {
   templateId: string;
+  checklistItemsJson?: string | null;
 };
 
 type ArchiveMaintenanceAgreementTemplateParams = {
@@ -227,6 +259,11 @@ export async function createMaintenanceAgreementTemplate(
     params.internalNotesDefault,
   );
 
+  const checklistItemsResult = parseChecklistItemsJson(params.checklistItemsJson);
+  if (!checklistItemsResult.ok) {
+    return { success: false, error: checklistItemsResult.error };
+  }
+
   const { data, error } = await scope.supabase
     .from("maintenance_agreement_templates")
     .insert({
@@ -248,7 +285,27 @@ export async function createMaintenanceAgreementTemplate(
     return { success: false, error: error?.message ?? "Failed to create maintenance agreement template." };
   }
 
-  return { success: true, templateId: cleanString(data.id) };
+  const templateId = cleanString(data.id);
+
+  if (checklistItemsResult.value.length > 0) {
+    const admin = createAdminClient();
+    await admin
+      .from("maintenance_agreement_template_checklist_items")
+      .insert(
+        checklistItemsResult.value.map((item) => ({
+          account_owner_user_id: scope.accountOwnerUserId,
+          template_id: templateId,
+          item_label: item.item_label,
+          default_guidance: item.default_guidance,
+          sort_order: item.sort_order,
+          created_by_user_id: scope.userId,
+        })),
+      );
+    // Non-fatal: checklist items failing to insert does not roll back the template.
+    // Items can be re-added on edit.
+  }
+
+  return { success: true, templateId };
 }
 
 export async function updateMaintenanceAgreementTemplate(
@@ -292,6 +349,11 @@ export async function updateMaintenanceAgreementTemplate(
     params.internalNotesDefault,
   );
 
+  const checklistItemsResult = parseChecklistItemsJson(params.checklistItemsJson);
+  if (!checklistItemsResult.ok) {
+    return { success: false, error: checklistItemsResult.error };
+  }
+
   const { data, error } = await scope.supabase
     .from("maintenance_agreement_templates")
     .update({
@@ -313,6 +375,30 @@ export async function updateMaintenanceAgreementTemplate(
   }
   if (!data?.id) {
     return { success: false, error: "Maintenance agreement template is out of scope." };
+  }
+
+  const admin = createAdminClient();
+  // Delete-and-reinsert: checklist items are template-level definitions (not historical records).
+  // No lock applies to checklist items since they are new in V1.
+  await admin
+    .from("maintenance_agreement_template_checklist_items")
+    .delete()
+    .eq("template_id", templateId)
+    .eq("account_owner_user_id", scope.accountOwnerUserId);
+
+  if (checklistItemsResult.value.length > 0) {
+    await admin
+      .from("maintenance_agreement_template_checklist_items")
+      .insert(
+        checklistItemsResult.value.map((item) => ({
+          account_owner_user_id: scope.accountOwnerUserId,
+          template_id: templateId,
+          item_label: item.item_label,
+          default_guidance: item.default_guidance,
+          sort_order: item.sort_order,
+          created_by_user_id: scope.userId,
+        })),
+      );
   }
 
   return { success: true, templateId: cleanString(data.id) };
@@ -526,6 +612,10 @@ export async function createServicePlanTemplateFromForm(formData: FormData): Pro
     redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent(scopeItemsResult.error)}`);
   }
   const internalNotesDefault = normalizeMaintenanceAgreementTemplateInternalNotes(formData.get("internal_notes_default"));
+  const checklistItemsResult = parseChecklistItemsJson(formData.get("checklist_items_json"));
+  if (!checklistItemsResult.ok) {
+    redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent(checklistItemsResult.error)}`);
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -547,6 +637,22 @@ export async function createServicePlanTemplateFromForm(formData: FormData): Pro
 
   if (error || !data?.id) {
     redirect(`${ADMIN_ROUTE}?action=create&error=${encodeURIComponent(error?.message ?? "Failed to create template.")}`);
+  }
+
+  if (checklistItemsResult.value.length > 0) {
+    await admin
+      .from("maintenance_agreement_template_checklist_items")
+      .insert(
+        checklistItemsResult.value.map((item) => ({
+          account_owner_user_id: scope.accountOwnerUserId,
+          template_id: data.id,
+          item_label: item.item_label,
+          default_guidance: item.default_guidance,
+          sort_order: item.sort_order,
+          created_by_user_id: scope.userId,
+        })),
+      );
+    // Non-fatal: items failing here do not block the template creation redirect.
   }
 
   revalidatePath(ADMIN_ROUTE);
@@ -582,6 +688,10 @@ export async function updateServicePlanTemplateFromForm(formData: FormData): Pro
     redirect(`${ADMIN_ROUTE}?action=edit&tplId=${encodeURIComponent(templateId)}&error=${encodeURIComponent(scopeItemsResult.error)}`);
   }
   const internalNotesDefault = normalizeMaintenanceAgreementTemplateInternalNotes(formData.get("internal_notes_default"));
+  const checklistItemsResult = parseChecklistItemsJson(formData.get("checklist_items_json"));
+  if (!checklistItemsResult.ok) {
+    redirect(`${ADMIN_ROUTE}?action=edit&tplId=${encodeURIComponent(templateId)}&error=${encodeURIComponent(checklistItemsResult.error)}`);
+  }
 
   const admin = createAdminClient();
   const { data, error } = await admin
@@ -603,6 +713,28 @@ export async function updateServicePlanTemplateFromForm(formData: FormData): Pro
   }
   if (!data?.id) {
     redirect(`${ADMIN_ROUTE}?error=${encodeURIComponent("Template is out of scope.")}`);
+  }
+
+  // Delete-and-reinsert checklist items (template definitions, not historical records).
+  await admin
+    .from("maintenance_agreement_template_checklist_items")
+    .delete()
+    .eq("template_id", templateId)
+    .eq("account_owner_user_id", scope.accountOwnerUserId);
+
+  if (checklistItemsResult.value.length > 0) {
+    await admin
+      .from("maintenance_agreement_template_checklist_items")
+      .insert(
+        checklistItemsResult.value.map((item) => ({
+          account_owner_user_id: scope.accountOwnerUserId,
+          template_id: templateId,
+          item_label: item.item_label,
+          default_guidance: item.default_guidance,
+          sort_order: item.sort_order,
+          created_by_user_id: scope.userId,
+        })),
+      );
   }
 
   revalidatePath(ADMIN_ROUTE);
