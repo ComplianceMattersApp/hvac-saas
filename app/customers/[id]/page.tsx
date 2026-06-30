@@ -3245,17 +3245,18 @@ export default async function CustomerDetailPage(props: {
                         open={
                           agr.status === "draft" ||
                           (maintenanceAgreementSaved === "created" &&
-                            maintenanceAgreementFocusId === agr.id)
+                            maintenanceAgreementFocusId === agr.id &&
+                            agr.status === "active")
                         }
                         className="mt-3"
                       >
-                        <summary className="cursor-pointer select-none list-none text-xs font-medium text-slate-500 hover:text-slate-700 [&::-webkit-details-marker]:hidden">
+                        <summary className="cursor-pointer select-none text-xs font-medium text-slate-500 hover:text-slate-700">
                           Plan details
                         </summary>
 
                         <div className="mt-3 space-y-3">
 
-                      {maintenanceAgreementSaved === "created" && maintenanceAgreementFocusId === agr.id ? (
+                      {maintenanceAgreementSaved === "created" && maintenanceAgreementFocusId === agr.id && agr.status === "active" ? (
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3">
                           <p className="text-sm text-blue-900">
                             Plan created. Ready to schedule the first visit?
