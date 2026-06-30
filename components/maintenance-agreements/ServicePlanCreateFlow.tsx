@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { MaintenanceAgreementTemplateRow, TemplateChecklistItem } from "@/lib/maintenance-agreements/template-read-model";
 import { MaintenanceAgreementCadenceFields } from "./MaintenanceAgreementCadenceFields";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
+import ChecklistItemBuilder from "@/components/jobs/ChecklistItemBuilder";
 
 const CADENCE_LABELS: Record<string, string> = {
   annual: "1× per year",
@@ -251,29 +252,40 @@ export function ServicePlanCreateFlow({
                     />
                   </div>
 
-                  {selectedTemplate && (templateChecklistItems[selectedTemplate.id]?.length ?? 0) > 0 ? (
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">
-                        Checklist items
-                      </label>
-                      <div className="space-y-1">
-                        {templateChecklistItems[selectedTemplate.id].map((item, idx) => (
-                          <div
-                            key={item.id || idx}
-                            className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2"
-                          >
-                            <div className="text-xs font-medium text-slate-800">{item.item_label}</div>
-                            {item.default_guidance ? (
-                              <div className="mt-0.5 text-xs text-slate-500">{item.default_guidance}</div>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                      <p className="mt-1.5 text-[11px] text-slate-400">
-                        These items will be copied onto the job when a visit is scheduled.
-                      </p>
-                    </div>
-                  ) : null}
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Checklist items (optional)
+                    </label>
+                    <ChecklistItemBuilder
+                      key={`checklist-${formKey}`}
+                      initialItems={
+                        selectedTemplate
+                          ? (templateChecklistItems[selectedTemplate.id] ?? []).map((item) => ({
+                              id: item.id,
+                              item_label: item.item_label,
+                              default_guidance: item.default_guidance ?? "",
+                            }))
+                          : []
+                      }
+                      itemsName="checklist_items_json"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      Internal notes
+                    </label>
+                    <p className="mb-1 text-xs text-slate-500">
+                      Visible to your team only, not the customer.
+                    </p>
+                    <textarea
+                      key={`notes-${formKey}`}
+                      name="internal_notes"
+                      rows={2}
+                      defaultValue={selectedTemplate?.internal_notes_default ?? ""}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                    />
+                  </div>
 
                   <div className="flex items-center gap-3 pt-1">
                     <button

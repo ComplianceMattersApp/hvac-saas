@@ -89,6 +89,9 @@ function makeAdminClient(params?: {
   const agreementFound = params?.agreementFound ?? true;
   const agreementOverrides = params?.agreementOverrides ?? {};
 
+  const checklistInsertCalls: unknown[] = [];
+  const checklistDeleteCalls: unknown[] = [];
+
   return {
     from: vi.fn((table: string) => {
       if (table === "customers") {
@@ -178,8 +181,25 @@ function makeAdminClient(params?: {
         };
       }
 
+      if (table === "maintenance_agreement_template_checklist_items") {
+        return {
+          insert: vi.fn((payload: unknown) => {
+            checklistInsertCalls.push(payload);
+            return Promise.resolve({ error: null });
+          }),
+          delete: vi.fn(() => {
+            const eqChain: any = { eq: vi.fn(() => eqChain) };
+            // Track the delete call by recording when eq chain is invoked
+            checklistDeleteCalls.push({});
+            return eqChain;
+          }),
+        };
+      }
+
       throw new Error(`Unexpected admin table ${table}`);
     }),
+    _checklistInsertCalls: checklistInsertCalls,
+    _checklistDeleteCalls: checklistDeleteCalls,
   };
 }
 
@@ -1213,6 +1233,135 @@ describe("maintenance agreement actions", () => {
     expect(supabase._updateCalls[0]).not.toHaveProperty("template_locked_field_keys");
     expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_snapshot_applied_at");
     expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_snapshot");
+  });
+
+  it("writes agreement-scoped checklist items after agreement insert", async () => {
+    const supabase = makeSupabaseClient();
+    const admin = makeAdminClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Manual Plan",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-09-01",
+      startDate: "2026-06-01",
+      checklistItemsJson: JSON.stringify([
+        { item_label: "Check filter", default_guidance: "Replace if dirty", sort_order: 0 },
+        { item_label: "Clean coil", default_guidance: null, sort_order: 1 },
+      ]),
+    });
+
+    expect(result).toEqual({ success: true, agreementId: "agr-1" });
+    expect(admin._checklistInsertCalls).toHaveLength(1);
+    expect(admin._checklistInsertCalls[0]).toMatchObject([
+      { agreement_id: "agr-1", item_label: "Check filter", default_guidance: "Replace if dirty", sort_order: 0 },
+      { agreement_id: "agr-1", item_label: "Clean coil", default_guidance: null, sort_order: 1 },
+    ]);
+    // template_id must not be set — agreement_id is the FK
+    expect((admin._checklistInsertCalls[0] as any[])[0]).not.toHaveProperty("template_id");
+  });
+
+  it("persists internal_notes when provided at agreement creation", async () => {
+    const supabase = makeSupabaseClient();
+    const admin = makeAdminClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(admin);
+
+    await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Spring Plan",
+      agreementType: "maintenance",
+      frequency: "annual",
+      nextDueDate: "2027-06-01",
+      startDate: "2026-06-01",
+      internalNotes: "Customer prefers morning appointments.",
+    });
+
+    expect(supabase._insertCalls[0]).toMatchObject({
+      internal_notes: "Customer prefers morning appointments.",
+    });
+  });
+
+  it("prefills internal_notes from template internal_notes_default on template-path create", async () => {
+    const supabase = makeSupabaseClient();
+    const admin = makeAdminClient({
+      templateOverrides: { internal_notes_default: "Default from template." },
+    });
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(admin);
+
+    // Template path: toCreateParams reads internal_notes from formData,
+    // and the form prefills it from selectedTemplate.internal_notes_default.
+    // Simulate what the form now does: pass the template default as internalNotes.
+    await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Will Be Ignored",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-09-01",
+      startDate: "2026-06-01",
+      sourceTemplateId: "tpl-1",
+      internalNotes: "Default from template.",
+    });
+
+    expect(supabase._insertCalls[0]).toMatchObject({
+      internal_notes: "Default from template.",
+    });
+  });
+
+  it("delete-and-reinserts agreement-scoped checklist items on update", async () => {
+    const supabase = makeSupabaseClient();
+    const admin = makeAdminClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await updateMaintenanceAgreement({
+      agreementId: "agr-1",
+      customerId: "cust-1",
+      agreementName: "Updated Plan",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-12-01",
+      startDate: "2026-06-01",
+      status: "active",
+      checklistItemsJson: JSON.stringify([
+        { item_label: "Inspect refrigerant", default_guidance: null, sort_order: 0 },
+      ]),
+    });
+
+    expect(result).toEqual({ success: true, agreementId: "agr-1" });
+    // Delete ran
+    expect(admin._checklistDeleteCalls).toHaveLength(1);
+    // Reinsert ran with new item
+    expect(admin._checklistInsertCalls).toHaveLength(1);
+    expect(admin._checklistInsertCalls[0]).toMatchObject([
+      { agreement_id: "agr-1", item_label: "Inspect refrigerant", sort_order: 0 },
+    ]);
+  });
+
+  it("skips checklist delete-reinsert on update when param not provided", async () => {
+    const supabase = makeSupabaseClient();
+    const admin = makeAdminClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(admin);
+
+    // No checklistItemsJson passed — existing programmatic callers
+    await updateMaintenanceAgreement({
+      agreementId: "agr-1",
+      customerId: "cust-1",
+      agreementName: "Plan",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-12-01",
+      startDate: "2026-06-01",
+      status: "active",
+    });
+
+    expect(admin._checklistDeleteCalls).toHaveLength(0);
+    expect(admin._checklistInsertCalls).toHaveLength(0);
   });
 });
 

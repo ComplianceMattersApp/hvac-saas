@@ -214,9 +214,10 @@ describe("copyChecklistItemsToJob", () => {
     ]);
   });
 
-  it("returns true (non-blocking) when there is no source_template_id on the agreement", async () => {
+  it("returns true with no inserts when agreement has no template and no agreement-scoped items", async () => {
     const admin = makeAdminClient({
       agreementRow: { id: "agr-1", account_owner_user_id: "owner-1", source_template_id: null },
+      templateItems: [],
     });
     createAdminClientMock.mockReturnValue(admin);
 
@@ -229,6 +230,31 @@ describe("copyChecklistItemsToJob", () => {
 
     expect(result).toBe(true);
     expect(admin._insertCalls).toHaveLength(0);
+  });
+
+  it("copies agreement-scoped checklist items to job when no source_template_id", async () => {
+    const admin = makeAdminClient({
+      agreementRow: { id: "agr-1", account_owner_user_id: "owner-1", source_template_id: null },
+      templateItems: [
+        { id: "ci-1", item_label: "Check capacitor", sort_order: 0 },
+        { id: "ci-2", item_label: "Flush condensate drain", sort_order: 1 },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await copyChecklistItemsToJob({
+      agreementId: "agr-1",
+      jobId: "job-1",
+      createdByUserId: "user-1",
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result).toBe(true);
+    expect(admin._insertCalls).toHaveLength(1);
+    expect(admin._insertCalls[0]).toMatchObject([
+      { job_id: "job-1", source_item_id: "ci-1", item_label: "Check capacitor", is_completed: false },
+      { job_id: "job-1", source_item_id: "ci-2", item_label: "Flush condensate drain", is_completed: false },
+    ]);
   });
 
   it("returns true (non-blocking) when template has no checklist items", async () => {

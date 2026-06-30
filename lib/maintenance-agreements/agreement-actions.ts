@@ -20,6 +20,34 @@ type MutationResult =
   | { success: true; agreementId: string }
   | { success: false; error: string };
 
+type ChecklistItemInput = {
+  item_label: string;
+  default_guidance: string | null;
+  sort_order: number;
+};
+
+function parseChecklistItemsJson(value: unknown): ChecklistItemInput[] {
+  const normalized = cleanString(value);
+  if (!normalized) return [];
+  try {
+    const parsed = JSON.parse(normalized);
+    if (!Array.isArray(parsed)) return [];
+    const items: ChecklistItemInput[] = [];
+    for (const raw of parsed) {
+      const label = cleanString(raw?.item_label);
+      if (!label) continue;
+      items.push({
+        item_label: label.slice(0, 200),
+        default_guidance: cleanString(raw?.default_guidance).slice(0, 500) || null,
+        sort_order: Number.isInteger(Number(raw?.sort_order)) ? Number(raw.sort_order) : items.length,
+      });
+    }
+    return items.slice(0, 30);
+  } catch {
+    return [];
+  }
+}
+
 type CreateMaintenanceAgreementParams = {
   customerId: string;
   agreementName: string;
@@ -33,6 +61,7 @@ type CreateMaintenanceAgreementParams = {
   defaultVisitScopeSummary?: string | null;
   defaultVisitScopeItemsJson?: string | null;
   internalNotes?: string | null;
+  checklistItemsJson?: string | null;
 };
 
 type UpdateMaintenanceAgreementParams = CreateMaintenanceAgreementParams & {
@@ -452,6 +481,23 @@ export async function createMaintenanceAgreement(
     return { success: false, error: error?.message ?? "Failed to create maintenance agreement." };
   }
 
+  const checklistItems = parseChecklistItemsJson(params.checklistItemsJson);
+  if (checklistItems.length > 0) {
+    await scope.admin
+      .from("maintenance_agreement_template_checklist_items")
+      .insert(
+        checklistItems.map((item) => ({
+          account_owner_user_id: scope.accountOwnerUserId,
+          agreement_id: String(data.id),
+          item_label: item.item_label,
+          default_guidance: item.default_guidance,
+          sort_order: item.sort_order,
+          created_by_user_id: scope.userId,
+        })),
+      );
+    // Non-fatal: checklist items failing to insert does not roll back the agreement.
+  }
+
   return { success: true, agreementId: String(data.id) };
 }
 
@@ -586,6 +632,31 @@ export async function updateMaintenanceAgreement(
     return { success: false, error: "Maintenance agreement is out of scope for this customer." };
   }
 
+  // Only touch checklist items when the caller explicitly passed the param
+  // (distinguishes programmatic callers without the field from form submissions with an empty field)
+  if (params.checklistItemsJson !== undefined) {
+    const checklistItems = parseChecklistItemsJson(params.checklistItemsJson);
+    await scope.admin
+      .from("maintenance_agreement_template_checklist_items")
+      .delete()
+      .eq("agreement_id", agreementId)
+      .eq("account_owner_user_id", scope.accountOwnerUserId);
+    if (checklistItems.length > 0) {
+      await scope.admin
+        .from("maintenance_agreement_template_checklist_items")
+        .insert(
+          checklistItems.map((item) => ({
+            account_owner_user_id: scope.accountOwnerUserId,
+            agreement_id: agreementId,
+            item_label: item.item_label,
+            default_guidance: item.default_guidance,
+            sort_order: item.sort_order,
+            created_by_user_id: scope.userId,
+          })),
+        );
+    }
+  }
+
   return { success: true, agreementId: String(data.id) };
 }
 
@@ -603,6 +674,7 @@ function toCreateParams(formData: FormData): CreateMaintenanceAgreementParams {
     defaultVisitScopeSummary: nullableString(formData.get("default_visit_scope_summary")),
     defaultVisitScopeItemsJson: nullableString(formData.get("default_visit_scope_items_json")),
     internalNotes: nullableString(formData.get("internal_notes")),
+    checklistItemsJson: nullableString(formData.get("checklist_items_json")),
   };
 }
 
@@ -805,15 +877,16 @@ export async function copyChecklistItemsToJob(params: {
     }
 
     const sourceTemplateId = cleanString(agreement.source_template_id ?? "");
-    if (!sourceTemplateId) {
-      // No template — no checklist items to copy.
-      return true;
-    }
+
+    // Template-sourced plans: look up items by template_id.
+    // Manually-built plans: look up items by agreement_id.
+    const filterColumn = sourceTemplateId ? "template_id" : "agreement_id";
+    const filterValue = sourceTemplateId || agreementId;
 
     const { data: templateItems, error: itemsErr } = await admin
       .from("maintenance_agreement_template_checklist_items")
       .select("id, item_label, sort_order")
-      .eq("template_id", sourceTemplateId)
+      .eq(filterColumn, filterValue)
       .eq("account_owner_user_id", accountOwnerUserId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true })

@@ -1097,6 +1097,29 @@ export default async function CustomerDetailPage(props: {
     }
   }
 
+  const agreementChecklistItemsById = new Map<string, TemplateChecklistItem[]>();
+  if (maintenanceAgreementsEnabled && customerAgreements.length > 0) {
+    try {
+      const checklistRows = await Promise.all(
+        customerAgreements.map(async (agr) => {
+          const items = await listChecklistItemsForTemplate({
+            supabase,
+            accountOwnerUserId: visibilityScope.accountOwnerUserId,
+            agreementId: agr.id,
+          });
+          return [agr.id, items] as const;
+        }),
+      );
+      for (const [agrId, items] of checklistRows) {
+        if (items.length > 0) {
+          agreementChecklistItemsById.set(agrId, items);
+        }
+      }
+    } catch {
+      // Fail safe
+    }
+  }
+
   const agreementChecklistRollupById = new Map<string, MostRecentCountedVisitChecklistSummary>();
   if (maintenanceAgreementsEnabled && customerAgreements.length > 0) {
     try {
@@ -3164,6 +3187,7 @@ export default async function CustomerDetailPage(props: {
                   const templateSnapshotItemsCount = readTemplateSnapshotItemsCount(templateSnapshot);
                   const visitLinkSummary = agreementVisitSummaryById.get(agr.id);
                   const checklistRollup = agreementChecklistRollupById.get(agr.id) ?? null;
+                  const agrChecklistItems = agreementChecklistItemsById.get(agr.id) ?? [];
                   const defaultPlanItems = sanitizeAgreementDefaultVisitScopeItems(
                     agr.default_visit_scope_items,
                   );
@@ -3400,6 +3424,32 @@ export default async function CustomerDetailPage(props: {
                           ) : (
                             <div className="mt-2 text-xs text-slate-500">
                               No default Work Items saved for this plan yet.
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Checklist
+                          </div>
+                          {agrChecklistItems.length > 0 ? (
+                            <ul className="mt-2 space-y-1.5 text-xs text-slate-700">
+                              {agrChecklistItems.map((item) => (
+                                <li key={item.id}>
+                                  <div className="font-medium text-slate-900">{item.item_label}</div>
+                                  {item.default_guidance ? (
+                                    <div className="text-slate-600">
+                                      {item.default_guidance.length > 120
+                                        ? `${item.default_guidance.slice(0, 120).trimEnd()}...`
+                                        : item.default_guidance}
+                                    </div>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className="mt-2 text-xs text-slate-500">
+                              No checklist items saved for this plan yet.
                             </div>
                           )}
                         </div>
