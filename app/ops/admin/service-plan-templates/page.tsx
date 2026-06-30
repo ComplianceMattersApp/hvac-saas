@@ -103,9 +103,23 @@ function TemplateCreateForm({ action }: { action: typeof createServicePlanTempla
 
         <div>
           <label className={labelClass}>{"What's included (optional)"}</label>
+          <textarea
+            name="default_visit_scope_summary"
+            rows={3}
+            placeholder="e.g. Annual AC tune-up, filter check, safety inspection."
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Default work items (optional)</label>
+          <p className="mb-1.5 text-xs text-slate-500">
+            These work items prefill automatically every time this template is used to create a new service plan.
+          </p>
           <VisitScopeBuilder
             jobType="service"
-            summaryName="default_visit_scope_summary"
+            summaryName="__unused_scope_summary__"
+            hideSummaryField={true}
             itemsName="default_visit_scope_items_json"
             initialSummary=""
             initialItems={[]}
@@ -174,11 +188,25 @@ function TemplateEditForm({
 
         <div>
           <label className={labelClass}>{"What's included (optional)"}</label>
+          <textarea
+            name="default_visit_scope_summary"
+            rows={3}
+            defaultValue={template.default_visit_scope_summary ?? ""}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Default work items (optional)</label>
+          <p className="mb-1.5 text-xs text-slate-500">
+            These work items prefill automatically every time this template is used to create a new service plan.
+          </p>
           <VisitScopeBuilder
             jobType="service"
-            summaryName="default_visit_scope_summary"
+            summaryName="__unused_scope_summary__"
+            hideSummaryField={true}
             itemsName="default_visit_scope_items_json"
-            initialSummary={template.default_visit_scope_summary ?? ""}
+            initialSummary=""
             initialItems={template.default_visit_scope_items}
           />
         </div>

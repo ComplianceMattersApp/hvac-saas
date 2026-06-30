@@ -581,6 +581,29 @@ describe("service plan template form actions", () => {
       created_by_user_id: "user-1",
       updated_by_user_id: "user-1",
       account_owner_user_id: "owner-1",
+      default_visit_scope_summary: "Seasonal tune-up",
+      default_visit_scope_items: [{ title: "Inspect coil", details: null }],
+    });
+  });
+
+  it("createServicePlanTemplateFromForm persists default_visit_scope_items from work items json", async () => {
+    const workItems = [
+      { title: "Inspect coil", details: "Clean as needed", kind: "primary" },
+      { title: "Replace filter", details: "", kind: "primary" },
+    ];
+    const formData = new FormData();
+    formData.set("template_name", "AC Plan with Items");
+    formData.set("agreement_type", "maintenance");
+    formData.set("frequency", "annual");
+    formData.set("default_visit_scope_items_json", JSON.stringify(workItems));
+
+    await expect(createServicePlanTemplateFromForm(formData)).rejects.toThrow("REDIRECT:");
+    expect(adminClient._insertCalls).toHaveLength(1);
+    expect(adminClient._insertCalls[0]).toMatchObject({
+      default_visit_scope_items: [
+        { title: "Inspect coil", details: "Clean as needed" },
+        { title: "Replace filter", details: null },
+      ],
     });
   });
 
@@ -624,9 +647,27 @@ describe("service plan template form actions", () => {
     expect(adminClient._updateCalls[0]).toMatchObject({
       template_name: "Updated Name",
       updated_by_user_id: "user-1",
+      default_visit_scope_summary: "Updated summary",
+      default_visit_scope_items: [],
     });
     expect(adminClient._updateCalls[0]).not.toHaveProperty("frequency");
     expect(adminClient._updateCalls[0]).not.toHaveProperty("agreement_type");
+  });
+
+  it("updateServicePlanTemplateFromForm updates default_visit_scope_items correctly", async () => {
+    const updatedItems = [
+      { title: "Check refrigerant levels", details: "Log pressure readings", kind: "primary" },
+    ];
+    const formData = new FormData();
+    formData.set("template_id", "tpl-1");
+    formData.set("template_name", "Updated Template");
+    formData.set("default_visit_scope_items_json", JSON.stringify(updatedItems));
+
+    await expect(updateServicePlanTemplateFromForm(formData)).rejects.toThrow("REDIRECT:");
+    expect(adminClient._updateCalls).toHaveLength(1);
+    expect(adminClient._updateCalls[0]).toMatchObject({
+      default_visit_scope_items: [{ title: "Check refrigerant levels", details: "Log pressure readings" }],
+    });
   });
 
   it("updateServicePlanTemplateFromForm rejects attempt to change frequency with locked-field prefix", async () => {

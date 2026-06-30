@@ -3206,22 +3206,30 @@ export default async function CustomerDetailPage(props: {
                               Primary location: {primaryLocationLabel}
                             </div>
                           ) : null}
+                          {visitLinkSummary && visitLinkSummary.total_links > 0 ? (
+                            <div className="text-xs text-slate-400">
+                              {visitLinkSummary.used_visits} of {visitLinkSummary.total_links}{" "}
+                              {visitLinkSummary.total_links === 1 ? "visit" : "visits"} used
+                            </div>
+                          ) : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs">
-                          {agr.next_due_date ? (
-                            <span
-                              className={[
-                                "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
-                                dueStateBadge[dueState],
-                              ].join(" ")}
-                            >
-                              {dueStateLabel[dueState]} &mdash; {formatDate(agr.next_due_date)}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
-                              No due date
-                            </span>
-                          )}
+                          {dueState !== "inactive" ? (
+                            agr.next_due_date ? (
+                              <span
+                                className={[
+                                  "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                                  dueStateBadge[dueState],
+                                ].join(" ")}
+                              >
+                                {dueStateLabel[dueState]} &mdash; {formatDate(agr.next_due_date)}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+                                No due date
+                              </span>
+                            )
+                          ) : null}
                           {agr.status !== "cancelled" && agr.status !== "expired" ? (
                             <Link
                               href={`/jobs/new?source=customer&customer_id=${customerId}&maintenance_agreement_id=${agr.id}`}
@@ -3232,6 +3240,20 @@ export default async function CustomerDetailPage(props: {
                           ) : null}
                         </div>
                       </div>
+
+                      <details
+                        open={
+                          agr.status === "draft" ||
+                          (maintenanceAgreementSaved === "created" &&
+                            maintenanceAgreementFocusId === agr.id)
+                        }
+                        className="mt-3"
+                      >
+                        <summary className="cursor-pointer select-none list-none text-xs font-medium text-slate-500 hover:text-slate-700 [&::-webkit-details-marker]:hidden">
+                          Plan details
+                        </summary>
+
+                        <div className="mt-3 space-y-3">
 
                       {maintenanceAgreementSaved === "created" && maintenanceAgreementFocusId === agr.id ? (
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3">
@@ -4267,6 +4289,8 @@ export default async function CustomerDetailPage(props: {
                         cancelAction={cancelMaintenanceAgreementFromForm}
                         deleteAction={deleteMaintenanceAgreementDraftFromForm}
                       />
+                        </div>{/* end mt-3 space-y-3 */}
+                      </details>
                     </div>
                   );
                 })}
