@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { MaintenanceAgreementTemplateRow } from "@/lib/maintenance-agreements/template-read-model";
+import type { MaintenanceAgreementTemplateRow, TemplateChecklistItem } from "@/lib/maintenance-agreements/template-read-model";
 import { MaintenanceAgreementCadenceFields } from "./MaintenanceAgreementCadenceFields";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
 
@@ -24,6 +24,7 @@ type Props = {
   locationOptions: LocationOption[];
   singleLocationId: string | null;
   isAdmin: boolean;
+  templateChecklistItems?: Record<string, TemplateChecklistItem[]>;
 };
 
 export function ServicePlanCreateFlow({
@@ -34,6 +35,7 @@ export function ServicePlanCreateFlow({
   locationOptions,
   singleLocationId,
   isAdmin,
+  templateChecklistItems = {},
 }: Props) {
   const [step, setStep] = useState<"closed" | "picker" | "form">("closed");
   const [selectedTemplate, setSelectedTemplate] = useState<MaintenanceAgreementTemplateRow | null>(null);
@@ -129,6 +131,11 @@ export function ServicePlanCreateFlow({
                           {t.default_visit_scope_summary ? (
                             <div className="mt-1.5 line-clamp-2 text-xs text-slate-600">
                               {t.default_visit_scope_summary}
+                            </div>
+                          ) : null}
+                          {(templateChecklistItems[t.id]?.length ?? 0) > 0 ? (
+                            <div className="mt-1 text-xs text-slate-400">
+                              Includes {templateChecklistItems[t.id].length} checklist item{templateChecklistItems[t.id].length === 1 ? "" : "s"}
                             </div>
                           ) : null}
                         </button>
@@ -243,6 +250,30 @@ export function ServicePlanCreateFlow({
                       initialItems={selectedTemplate?.default_visit_scope_items ?? []}
                     />
                   </div>
+
+                  {selectedTemplate && (templateChecklistItems[selectedTemplate.id]?.length ?? 0) > 0 ? (
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        Checklist items
+                      </label>
+                      <div className="space-y-1">
+                        {templateChecklistItems[selectedTemplate.id].map((item, idx) => (
+                          <div
+                            key={item.id || idx}
+                            className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2"
+                          >
+                            <div className="text-xs font-medium text-slate-800">{item.item_label}</div>
+                            {item.default_guidance ? (
+                              <div className="mt-0.5 text-xs text-slate-500">{item.default_guidance}</div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-slate-400">
+                        These items will be copied onto the job when a visit is scheduled.
+                      </p>
+                    </div>
+                  ) : null}
 
                   <div className="flex items-center gap-3 pt-1">
                     <button

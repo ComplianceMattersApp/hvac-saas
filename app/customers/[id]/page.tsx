@@ -63,8 +63,10 @@ import {
   type MaintenanceAgreementRow,
 } from "@/lib/maintenance-agreements/read-model";
 import {
+  listChecklistItemsForTemplate,
   listMaintenanceAgreementTemplatesForAccount,
   type MaintenanceAgreementTemplateRow,
+  type TemplateChecklistItem,
 } from "@/lib/maintenance-agreements/template-read-model";
 import {
   listMaintenanceAgreementBillingPeriodsForCustomer,
@@ -1014,6 +1016,29 @@ export default async function CustomerDetailPage(props: {
       });
     } catch {
       agreementTemplates = [];
+    }
+  }
+
+  const templateChecklistItems: Record<string, TemplateChecklistItem[]> = {};
+  if (maintenanceAgreementsEnabled && agreementTemplates.length > 0) {
+    try {
+      const checklistRows = await Promise.all(
+        agreementTemplates.map(async (tpl) => {
+          const items = await listChecklistItemsForTemplate({
+            supabase,
+            accountOwnerUserId: visibilityScope.accountOwnerUserId,
+            templateId: tpl.id,
+          });
+          return [tpl.id, items] as const;
+        }),
+      );
+      for (const [templateId, items] of checklistRows) {
+        if (items.length > 0) {
+          templateChecklistItems[templateId] = items;
+        }
+      }
+    } catch {
+      // Fail safe — empty record leaves the picker looking exactly as before
     }
   }
   const createAgreementStartDateDefault = new Date().toISOString().slice(0, 10);
@@ -3107,6 +3132,7 @@ export default async function CustomerDetailPage(props: {
                 locationOptions={createAgreementLocationOptions}
                 singleLocationId={createAgreementSingleLocationId}
                 isAdmin={isTemplateAdmin}
+                templateChecklistItems={templateChecklistItems}
               />
             </div>
 
