@@ -51,6 +51,14 @@ const BANNER_COPY: Record<string, string> = {
   service_approval_received_saved: "Approval marked as received.",
   service_approval_received_wrong_follow_up: "This job isn't currently waiting on approval.",
   service_follow_up_progress_invalid_state: "Job is not in the right state for this action.",
+  // interrupt / hold state
+  ops_status_saved: "Hold placed — job is now waiting.",
+  ops_status_already_saved: "No change — job is already in that state.",
+  interrupt_state_required: "Select a hold type before saving.",
+  pending_info_reason_required: "A reason is required when marking Pending Info.",
+  on_hold_reason_required: "A reason is required when placing on hold.",
+  waiting_reason_required: "Select a waiting type before saving.",
+  waiting_other_reason_required: "Describe the reason when selecting Other.",
   // auth
   not_authorized: "You're not authorized to perform this action.",
   not_eligible: "This action isn't available for this job.",
@@ -79,6 +87,12 @@ const GUARD_SLUGS = new Set([
   "visit_scope_required",
   "service_part_ordered_wrong_follow_up",
   "service_approval_received_wrong_follow_up",
+  "ops_status_already_saved",
+  "interrupt_state_required",
+  "pending_info_reason_required",
+  "on_hold_reason_required",
+  "waiting_reason_required",
+  "waiting_other_reason_required",
 ]);
 
 function classifySlug(slug: string): "success" | "guard" {

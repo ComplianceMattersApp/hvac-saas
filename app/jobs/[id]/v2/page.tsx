@@ -29,6 +29,8 @@ import {
   markEccPermitAvailableFromForm,
   markCertsCompleteFromForm,
   markInvoiceCompleteFromForm,
+  updateJobOpsFromForm,
+  releaseAndReevaluateFromForm,
 } from "@/lib/actions/job-ops-actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
@@ -53,6 +55,7 @@ import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import ScrollSpyNav, { type NavItem } from "./_components/ScrollSpyNav";
 import AlertBanner from "./_components/AlertBanner";
 import FinishOutcomeCards from "./_components/FinishOutcomeCards";
+import InterruptionHub from "./_components/InterruptionHub";
 import RecordsTabs, { type RecordTab } from "./_components/RecordsTabs";
 import SchedulePanel from "./_components/SchedulePanel";
 import NoteComposer from "./_components/NoteComposer";
@@ -1714,7 +1717,7 @@ export default async function JobDetailV2Page({
               </div>
             </div>
 
-            {/* EveryStep sync */}
+            {/* EveryStep sync — interruption hub */}
             <div>
               <div style={{ ...S.fieldLabel, marginBottom: "10px" }}>EveryStep sync</div>
               {waitingState ? (
@@ -1770,35 +1773,50 @@ export default async function JobDetailV2Page({
                       </ImmediateSubmitButton>
                     </form>
                   ) : null}
-                </div>
-              ) : (
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "11px",
-                    border: "1px dashed oklch(0.88 0.006 250)",
-                    background: "oklch(0.985 0.003 250)",
-                  }}
-                >
-                  <div
-                    style={{ fontSize: "13px", fontWeight: 600, color: "oklch(0.4 0.02 262)" }}
-                  >
-                    No active wait
-                  </div>
+                  {/* Release / resume */}
                   <div
                     style={{
-                      fontSize: "12.5px",
-                      lineHeight: 1.55,
-                      color: "oklch(0.55 0.015 262)",
-                      marginTop: "5px",
+                      marginTop: "14px",
+                      paddingTop: "12px",
+                      borderTop: "1px solid oklch(0.88 0.1 70)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
                     }}
                   >
-                    Field waits appear here when the tech flags{" "}
-                    <strong style={{ color: "oklch(0.45 0.02 262)" }}>Parts Needed</strong>{" "}
-                    or <strong style={{ color: "oklch(0.45 0.02 262)" }}>Approval Needed</strong> — every step
-                    (ordered → arrived → released) stays synced. Admin holds also surface here when active.
+                    <span style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)" }}>
+                      Resume job when hold is resolved.
+                    </span>
+                    <form action={releaseAndReevaluateFromForm}>
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <ImmediateSubmitButton
+                        pendingText="Releasing…"
+                        className=""
+                        style={{
+                          height: "30px",
+                          padding: "0 14px",
+                          borderRadius: "7px",
+                          border: "1px solid oklch(0.72 0.15 70)",
+                          background: "#fff",
+                          color: "oklch(0.5 0.12 65)",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        } as React.CSSProperties}
+                      >
+                        Release Hold
+                      </ImmediateSubmitButton>
+                    </form>
                   </div>
                 </div>
+              ) : (
+                <InterruptionHub
+                  jobId={jobId}
+                  returnTo={returnTo}
+                  action={updateJobOpsFromForm}
+                />
               )}
             </div>
           </div>

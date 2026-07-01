@@ -2224,6 +2224,7 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
   await releaseAndReevaluate(jobId, "job_detail", authz.userId, "releaseAndReevaluateFromForm");
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
@@ -2626,6 +2627,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   if (eventErr) throw new Error(eventErr.message);
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
   redirectToOpsSection("ops_status_saved");
