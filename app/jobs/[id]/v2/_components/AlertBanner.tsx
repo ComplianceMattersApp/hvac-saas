@@ -51,6 +51,9 @@ const BANNER_COPY: Record<string, string> = {
   service_approval_received_saved: "Approval marked as received.",
   service_approval_received_wrong_follow_up: "This job isn't currently waiting on approval.",
   service_follow_up_progress_invalid_state: "Job is not in the right state for this action.",
+  // follow-up metadata
+  ops_details_saved: "Follow-up saved.",
+  ops_details_already_saved: "No change — already up to date.",
   // interrupt / hold state
   ops_status_saved: "Hold placed — job is now waiting.",
   ops_status_already_saved: "No change — job is already in that state.",
@@ -87,6 +90,7 @@ const GUARD_SLUGS = new Set([
   "visit_scope_required",
   "service_part_ordered_wrong_follow_up",
   "service_approval_received_wrong_follow_up",
+  "ops_details_already_saved",
   "ops_status_already_saved",
   "interrupt_state_required",
   "pending_info_reason_required",

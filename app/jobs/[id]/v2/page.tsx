@@ -31,6 +31,7 @@ import {
   markInvoiceCompleteFromForm,
   updateJobOpsFromForm,
   releaseAndReevaluateFromForm,
+  updateJobOpsDetailsFromForm,
 } from "@/lib/actions/job-ops-actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
@@ -249,6 +250,7 @@ const JOB_V2_SELECT = `
   scheduled_date, window_start, window_end, on_the_way_at,
   field_complete, certs_complete, invoice_complete,
   ops_status, pending_info_reason, on_hold_reason,
+  follow_up_date, next_action_note, action_required_by,
   permit_number, jurisdiction, permit_date,
   billing_recipient, billing_name, billing_email,
   billing_disposition,
@@ -1720,7 +1722,7 @@ export default async function JobDetailV2Page({
             {/* EveryStep sync — interruption hub */}
             <div>
               <div style={{ ...S.fieldLabel, marginBottom: "10px" }}>EveryStep sync</div>
-              {waitingState ? (
+              {waitingState !== null ? (
                 <div
                   style={{
                     padding: "16px",
@@ -1811,6 +1813,69 @@ export default async function JobDetailV2Page({
                     </form>
                   </div>
                 </div>
+              ) : opsStatus === "on_hold" && String(job.on_hold_reason ?? "").trim() ? (
+                // on_hold with unstructured reason (parseWaitingStateReason returned null)
+                <div
+                  style={{
+                    padding: "16px",
+                    borderRadius: "11px",
+                    border: "1px solid oklch(0.88 0.05 75)",
+                    background: "oklch(0.97 0.03 75)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: S.mono,
+                      fontSize: "10px",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      fontWeight: 600,
+                      color: "oklch(0.5 0.12 65)",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    On Hold
+                  </div>
+                  <div style={{ fontSize: "13px", fontWeight: 600, color: "oklch(0.4 0.02 262)" }}>
+                    {String(job.on_hold_reason ?? "").trim()}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: "14px",
+                      paddingTop: "12px",
+                      borderTop: "1px solid oklch(0.88 0.1 70)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)" }}>
+                      Resume job when hold is resolved.
+                    </span>
+                    <form action={releaseAndReevaluateFromForm}>
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <ImmediateSubmitButton
+                        pendingText="Releasing…"
+                        className=""
+                        style={{
+                          height: "30px",
+                          padding: "0 14px",
+                          borderRadius: "7px",
+                          border: "1px solid oklch(0.72 0.15 70)",
+                          background: "#fff",
+                          color: "oklch(0.5 0.12 65)",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        } as React.CSSProperties}
+                      >
+                        Release Hold
+                      </ImmediateSubmitButton>
+                    </form>
+                  </div>
+                </div>
               ) : (
                 <InterruptionHub
                   jobId={jobId}
@@ -1819,6 +1884,99 @@ export default async function JobDetailV2Page({
                 />
               )}
             </div>
+          </div>
+
+          {/* next action / follow-up metadata */}
+          <div style={{ marginTop: "24px", paddingTop: "22px", borderTop: "1px solid oklch(0.93 0.005 250)" }}>
+            <div style={{ ...S.fieldLabel, marginBottom: "14px" }}>Next action</div>
+            <form action={updateJobOpsDetailsFromForm}>
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="return_to" value={returnTo} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                <div>
+                  <div style={S.fieldLabel}>Action Required By</div>
+                  <select
+                    name="action_required_by"
+                    defaultValue={String(job.action_required_by ?? "")}
+                    style={{
+                      width: "100%",
+                      height: "34px",
+                      borderRadius: "8px",
+                      border: "1px solid oklch(0.88 0.006 250)",
+                      padding: "0 10px",
+                      fontSize: "12.5px",
+                      fontFamily: "inherit",
+                      color: "oklch(0.33 0.02 262)",
+                      background: "#fff",
+                      appearance: "auto",
+                    } as React.CSSProperties}
+                  >
+                    <option value="">—</option>
+                    <option value="rater">Rater</option>
+                    <option value="contractor">Contractor</option>
+                    <option value="customer">Customer</option>
+                  </select>
+                </div>
+                <div>
+                  <div style={S.fieldLabel}>Follow-up Date</div>
+                  <input
+                    type="date"
+                    name="follow_up_date"
+                    defaultValue={String(job.follow_up_date ?? "")}
+                    style={{
+                      width: "100%",
+                      height: "34px",
+                      borderRadius: "8px",
+                      border: "1px solid oklch(0.88 0.006 250)",
+                      padding: "0 10px",
+                      fontSize: "12.5px",
+                      fontFamily: "inherit",
+                      color: "oklch(0.33 0.02 262)",
+                      background: "#fff",
+                      boxSizing: "border-box",
+                    } as React.CSSProperties}
+                  />
+                </div>
+              </div>
+              <div style={{ marginBottom: "10px" }}>
+                <div style={S.fieldLabel}>Next Action Note</div>
+                <textarea
+                  name="next_action_note"
+                  defaultValue={String(job.next_action_note ?? "")}
+                  rows={3}
+                  placeholder="What needs to happen next?"
+                  style={{
+                    width: "100%",
+                    borderRadius: "8px",
+                    border: "1px solid oklch(0.88 0.006 250)",
+                    padding: "8px 10px",
+                    fontSize: "12.5px",
+                    fontFamily: "inherit",
+                    color: "oklch(0.33 0.02 262)",
+                    background: "#fff",
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                  } as React.CSSProperties}
+                />
+              </div>
+              <button
+                type="submit"
+                style={{
+                  height: "34px",
+                  padding: "0 16px",
+                  borderRadius: "8px",
+                  border: "1px solid oklch(0.85 0.04 255)",
+                  background: "oklch(0.97 0.02 255)",
+                  color: "oklch(0.45 0.14 255)",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Save Follow Up
+              </button>
+            </form>
           </div>
 
           {/* service chain */}

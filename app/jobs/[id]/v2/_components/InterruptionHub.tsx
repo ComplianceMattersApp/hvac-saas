@@ -7,44 +7,42 @@ type ServerAction = (formData: FormData) => void | Promise<void>;
 
 type ModeId = "on_hold" | "waiting_on_part" | "waiting_on_approval" | "waiting_on_info";
 
+// pendingInfoPrefix matches WAITING_STATE_LABELS in lib/utils/ops-status.ts exactly —
+// parseWaitingStateReason uses this prefix to resolve blockerType for step-tracker logic.
 const MODES: Array<{
   id: ModeId;
   label: string;
   desc: string;
-  placeholder: string | null;
-  interruptState: string;
-  waitingStateType?: string;
+  placeholder: string;
+  pendingInfoPrefix: string | null; // null → on_hold path; string → pending_info path
 }> = [
   {
     id: "on_hold",
     label: "On Hold",
     desc: "Admin hold — office decides next step.",
     placeholder: "Why on hold? e.g. pending supervisor decision…",
-    interruptState: "on_hold",
+    pendingInfoPrefix: null,
   },
   {
     id: "waiting_on_part",
     label: "Waiting on Part",
     desc: "Material needed — enables ordered → arrived tracking.",
-    placeholder: null,
-    interruptState: "waiting",
-    waitingStateType: "waiting_on_part",
+    placeholder: "Which part? e.g. blower motor, capacitor…",
+    pendingInfoPrefix: "Waiting on part",
   },
   {
     id: "waiting_on_approval",
     label: "Waiting on Approval",
     desc: "Customer or stakeholder approval required.",
-    placeholder: null,
-    interruptState: "waiting",
-    waitingStateType: "waiting_on_customer_approval",
+    placeholder: "Whose approval? e.g. homeowner, property manager…",
+    pendingInfoPrefix: "Waiting on customer approval",
   },
   {
     id: "waiting_on_info",
     label: "Waiting on Info",
     desc: "Need more information before work can continue.",
-    placeholder: null,
-    interruptState: "waiting",
-    waitingStateType: "waiting_on_information",
+    placeholder: "What info? e.g. access code, scope clarification…",
+    pendingInfoPrefix: "Waiting on information",
   },
 ];
 
@@ -70,6 +68,14 @@ export default function InterruptionHub({
   };
 
   const sel = MODES.find((m) => m.id === mode) ?? null;
+
+  const isOnHold = sel?.pendingInfoPrefix === null;
+  const interruptState = isOnHold ? "on_hold" : "pending_info";
+  const statusReason = isOnHold
+    ? reason.trim() || "On hold — office decision needed."
+    : sel
+      ? `${sel.pendingInfoPrefix}: ${reason.trim() || sel.pendingInfoPrefix!}`
+      : "";
 
   return (
     <div>
@@ -136,46 +142,27 @@ export default function InterruptionHub({
         >
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="return_to" value={returnTo} />
-          <input type="hidden" name="interrupt_state" value={sel.interruptState} />
-          {sel.waitingStateType ? (
-            <input type="hidden" name="waiting_state_type" value={sel.waitingStateType} />
-          ) : null}
-          {/* on_hold: status_reason carries user text (or default fallback) */}
-          {sel.interruptState === "on_hold" ? (
-            <input type="hidden" name="status_reason" value={reason.trim() || "On hold — office decision needed."} />
-          ) : null}
+          <input type="hidden" name="interrupt_state" value={interruptState} />
+          <input type="hidden" name="status_reason" value={statusReason} />
 
-          {sel.placeholder ? (
-            <input
-              type="text"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={sel.placeholder}
-              style={{
-                flex: 1,
-                height: "32px",
-                borderRadius: "7px",
-                border: "1px solid oklch(0.88 0.1 70)",
-                padding: "0 10px",
-                fontSize: "12.5px",
-                fontFamily: "inherit",
-                color: "oklch(0.33 0.02 262)",
-                background: "#fff",
-                minWidth: 0,
-              } as React.CSSProperties}
-            />
-          ) : (
-            <span
-              style={{
-                flex: 1,
-                fontSize: "12.5px",
-                fontWeight: 500,
-                color: "oklch(0.5 0.12 65)",
-              }}
-            >
-              {sel.label} — confirm to place.
-            </span>
-          )}
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={sel.placeholder}
+            style={{
+              flex: 1,
+              height: "32px",
+              borderRadius: "7px",
+              border: "1px solid oklch(0.88 0.1 70)",
+              padding: "0 10px",
+              fontSize: "12.5px",
+              fontFamily: "inherit",
+              color: "oklch(0.33 0.02 262)",
+              background: "#fff",
+              minWidth: 0,
+            } as React.CSSProperties}
+          />
 
           <ImmediateSubmitButton
             pendingText="Saving…"

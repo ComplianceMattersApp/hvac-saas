@@ -1894,6 +1894,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   const changes = buildOpsChanges(before, after);
   if (changes.length === 0) {
     revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/v2`, "page");
     redirectToOpsSection("ops_details_already_saved");
   }
 
@@ -1918,6 +1919,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   if (eventErr) throw new Error(eventErr.message);
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   redirectToOpsSection("ops_details_saved");
 }
