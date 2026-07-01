@@ -101,6 +101,18 @@ Label row + "+ Add Work".
 - **Closeout readiness:** bordered list of *Field work complete · Certs / compliance · Billing resolved*, each = status dot + label + detail + status pill. Values/colors change by state (e.g. field = "Pending"/amber in scheduling, "On site"/blue in progress). Closeout blockers must stay visible without hiding field/certs blockers.
 - **Invoice bar:** "Ready to invoice" label + big mono total (`$0.00` scheduling / `$485.00` in progress) + **Mark Externally Billed** (outline) and **Create Invoice** (dark) buttons. Billing controls must be gated by existing capabilities; external billing stays separate from internal invoice workflow; payment controls stay with issued-invoice/payment state.
 
+#### Billing display states (state-derived)
+The action bar must derive from billing status and must never contradict the Closeout "Billing resolved" row — both read the same underlying signal (`buildJobBillingStateReadModel`). Never show "Ready to invoice / Create Invoice / Mark Externally Billed" once billing is already resolved.
+
+| State | Condition | Bar renders |
+|---|---|---|
+| **Unresolved** | No invoice, or only a voided invoice | "Ready to invoice $X" + Mark Externally Billed (internal-invoicing accounts only) + Create Invoice |
+| **Draft** | Primary invoice exists with status `draft` | "Draft invoice · $X" + Continue Invoice (no Create, no External) |
+| **Issued / sent / paid** | Primary invoice status `issued` | "Invoice #N · $X · Issued" + View Invoice (no create/external buttons) |
+| **Externally billed** | `billing_disposition = "externally_billed"` | "Marked externally billed" summary row; no total, no action buttons (optional Undo only if the capability exists) |
+| **No-charge** | `billing_disposition = "no_charge"` | "Marked no-charge" summary row; no total, no action buttons |
+| **Voided** | Primary invoice voided (treated as absent) | Same as Unresolved — actionable again |
+
 ### Follow-Up & Service Chain
 Label + `EVERYSTEP` badge. 2-column grid:
 - **Schedule a next visit:** **Create Return Visit** (blue outline) vs **Create Callback** (plain). Explainer: a *return* continues unresolved work and links to this visit; a *callback* opens a new issue after completion and leaves original history intact. (Return-needed work goes to office/dispatch first, not directly into tech backlog.)
@@ -157,6 +169,7 @@ Replace the prototype's `jobState` prop with **real job status** and derive per-
 - **Dead-code sweep** (the page grew by accretion — leave cruft behind on the new route, don't port it): remove unused hash-target panels, duplicate note/contact/timeline render paths, orphaned handlers, unreachable status branches, and components the redesign obsoletes.
 - **Performance:** derive status/blocker/gating once (server or one memoized selector) rather than recomputing per section; lazy-load below-the-fold, tab-gated Records panels (timeline/attachments/equipment); defer the map and tests workspace until opened.
 - **Preserve** existing Records hash-target IDs and deep-link behavior in the first cut.
+- **Work & Billing action bar is state-derived:** must agree with the Closeout "Billing resolved" row at all times — never show "Ready to invoice / Create Invoice / Mark Externally Billed" once billing is resolved (draft, issued, disposition, or no-charge). The two signals must read from the same source (`billedTruthSatisfied` from `buildJobBillingStateReadModel`) and must never disagree.
 
 ## Design Tokens
 Colors are authored in **oklch** (lift verbatim for fidelity; convert to your token system as needed).
