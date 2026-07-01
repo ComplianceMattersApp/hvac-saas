@@ -36,6 +36,8 @@ import DeferredAddAssigneeForm from "../_components/DeferredAddAssigneeForm";
 import ChangeServiceLocationForm from "../_components/ChangeServiceLocationForm";
 import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
+import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
@@ -245,7 +247,7 @@ const JOB_V2_SELECT = `
   ops_status, pending_info_reason, on_hold_reason,
   permit_number, jurisdiction, permit_date,
   billing_recipient, billing_name, billing_email,
-  billing_recipient, billing_name,
+  billing_disposition,
   job_notes,
   created_at, deleted_at,
   locations:location_id (
@@ -317,7 +319,7 @@ export default async function JobDetailV2Page({
 
   // ── supplemental queries ──────────────────────────────────────────────────
 
-  const [assignmentMap, contractorRows, { data: customerLocationsRaw }] = await Promise.all([
+  const [assignmentMap, contractorRows, { data: customerLocationsRaw }, billingMode, { data: primaryInvoiceRaw }] = await Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
       ? getContractors(accountOwnerUserId)
@@ -330,6 +332,14 @@ export default async function JobDetailV2Page({
           .eq("owner_user_id", accountOwnerUserId)
           .order("created_at", { ascending: true })
       : Promise.resolve({ data: [] }),
+    resolveBillingModeByAccountOwnerId({ supabase, accountOwnerUserId }),
+    supabase
+      .from("internal_invoices")
+      .select("id, status, invoice_display_number, invoice_number, issued_at, total_cents")
+      .eq("job_id", jobId)
+      .eq("invoice_kind", "primary")
+      .neq("status", "void")
+      .maybeSingle(),
   ]);
 
   const customerLocations: Array<{ id: string; label: string }> = (customerLocationsRaw ?? []).map(
@@ -361,6 +371,29 @@ export default async function JobDetailV2Page({
   const fieldComplete = Boolean(job.field_complete);
   const certsComplete = Boolean(job.certs_complete);
   const invoiceComplete = Boolean(job.invoice_complete);
+
+  // ── billing state ─────────────────────────────────────────────────────────
+  const billingDisposition = normalizeJobBillingDisposition((job as any).billing_disposition ?? null);
+  const billingState = buildJobBillingStateReadModel({
+    billingMode,
+    invoiceComplete: job.invoice_complete,
+    internalInvoice: primaryInvoiceRaw
+      ? {
+          status: primaryInvoiceRaw.status,
+          invoice_number: primaryInvoiceRaw.invoice_number ?? null,
+          issued_at: primaryInvoiceRaw.issued_at ?? null,
+        }
+      : null,
+    billingDisposition: (job as any).billing_disposition ?? null,
+  });
+  const billedTruthSatisfied = billingState.billedTruthSatisfied;
+
+  // invoice display helpers
+  const invoiceCents = Number(primaryInvoiceRaw?.total_cents ?? 0);
+  const invoiceTotalFormatted = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoiceCents / 100);
+  const invoiceDisplayRef = primaryInvoiceRaw?.invoice_display_number
+    ? `Invoice #${primaryInvoiceRaw.invoice_display_number}`
+    : "Invoice";
 
   const isFieldActive = status === "in_process";
   const isEnRoute = status === "on_the_way";
@@ -410,7 +443,7 @@ export default async function JobDetailV2Page({
     window_start: job.window_start,
     field_complete: job.field_complete,
     certs_complete: job.certs_complete,
-    invoice_complete: job.invoice_complete,
+    invoice_complete: billedTruthSatisfied,
     job_type: jobType,
     permit_number: job.permit_number,
     ecc_test_runs: (job.ecc_test_runs ?? []) as Array<{ is_completed: boolean | null }>,
@@ -1348,11 +1381,37 @@ export default async function JobDetailV2Page({
                 : []),
               {
                 label: "Billing resolved",
-                detail: invoiceComplete ? "Invoice closed" : "No invoice issued or external mark",
-                dot: invoiceComplete ? "oklch(0.58 0.13 150)" : "oklch(0.7 0.02 262)",
-                value: invoiceComplete ? "Done" : "Open",
-                valueBg: invoiceComplete ? "oklch(0.95 0.04 150)" : "oklch(0.96 0.004 250)",
-                valueFg: invoiceComplete ? "oklch(0.45 0.13 150)" : "oklch(0.55 0.015 262)",
+                detail: billedTruthSatisfied
+                  ? (billingDisposition === "no_charge"
+                      ? "Marked no-charge"
+                      : billingDisposition === "externally_billed"
+                        ? "Marked externally billed"
+                        : billingState.internalInvoiceStatus === "issued"
+                          ? "Invoice issued"
+                          : "Invoice closed")
+                  : (billingState.internalInvoiceStatus === "draft"
+                      ? "Draft invoice in progress"
+                      : "No invoice issued or external mark"),
+                dot: billedTruthSatisfied
+                  ? "oklch(0.58 0.13 150)"
+                  : billingState.internalInvoiceStatus === "draft"
+                    ? "oklch(0.66 0.14 68)"
+                    : "oklch(0.7 0.02 262)",
+                value: billedTruthSatisfied
+                  ? "Done"
+                  : billingState.internalInvoiceStatus === "draft"
+                    ? "Draft"
+                    : "Open",
+                valueBg: billedTruthSatisfied
+                  ? "oklch(0.95 0.04 150)"
+                  : billingState.internalInvoiceStatus === "draft"
+                    ? "oklch(0.97 0.045 75)"
+                    : "oklch(0.96 0.004 250)",
+                valueFg: billedTruthSatisfied
+                  ? "oklch(0.45 0.13 150)"
+                  : billingState.internalInvoiceStatus === "draft"
+                    ? "oklch(0.5 0.1 65)"
+                    : "oklch(0.55 0.015 262)",
               },
             ].map((row) => (
               <div
@@ -1397,48 +1456,73 @@ export default async function JobDetailV2Page({
             ))}
           </div>
 
-          {/* invoice bar */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "space-between",
-            }}
-          >
-            <div>
-              <div style={S.fieldLabel}>Ready to invoice</div>
-              <div
+          {/* invoice bar — state-derived; must agree with Closeout "Billing resolved" row above */}
+          {billingDisposition ? (
+            // externally_billed or no_charge — resolved, no further action
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                padding: "16px 20px",
+                borderRadius: "11px",
+                border: "1px solid oklch(0.88 0.05 150)",
+                background: "oklch(0.97 0.025 150)",
+              }}
+            >
+              <span
                 style={{
-                  fontFamily: S.mono,
-                  fontSize: "26px",
-                  fontWeight: 600,
-                  marginTop: "2px",
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: "oklch(0.58 0.13 150)",
+                  flexShrink: 0,
                 }}
-              >
-                {invoiceTotal}
-              </div>
+              />
+              <span style={{ fontSize: "13.5px", fontWeight: 600, color: "oklch(0.45 0.13 150)" }}>
+                {billingDisposition === "no_charge"
+                  ? "Marked no-charge — no billing action needed."
+                  : "Marked externally billed — billing recorded outside EveryStep."}
+              </span>
             </div>
-            <div style={{ display: "flex", gap: "8px" }}>
+          ) : billingState.internalInvoiceStatus === "issued" ? (
+            // issued invoice — view only, no create/external buttons
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+              <div>
+                <div style={S.fieldLabel}>{invoiceDisplayRef} · Issued</div>
+                <div style={{ fontFamily: S.mono, fontSize: "26px", fontWeight: 600, color: "oklch(0.45 0.13 150)", marginTop: "2px" }}>
+                  {invoiceTotalFormatted}
+                </div>
+              </div>
               <Link
                 href={`/jobs/${jobId}/invoice`}
                 style={{
                   height: "42px",
                   padding: "0 18px",
                   borderRadius: "10px",
-                  border: "1px solid oklch(0.9 0.006 250)",
-                  background: "#fff",
+                  border: "1px solid oklch(0.88 0.05 150)",
+                  background: "oklch(0.97 0.025 150)",
                   fontSize: "13px",
                   fontWeight: 600,
-                  cursor: "pointer",
                   fontFamily: "inherit",
-                  color: "oklch(0.32 0.02 262)",
+                  color: "oklch(0.45 0.13 150)",
                   textDecoration: "none",
                   display: "inline-flex",
                   alignItems: "center",
                 }}
               >
-                Mark Externally Billed
+                View Invoice
               </Link>
+            </div>
+          ) : billingState.internalInvoiceStatus === "draft" ? (
+            // draft invoice — continue, no create/external buttons
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+              <div>
+                <div style={S.fieldLabel}>Draft invoice</div>
+                <div style={{ fontFamily: S.mono, fontSize: "26px", fontWeight: 600, marginTop: "2px" }}>
+                  {invoiceTotalFormatted}
+                </div>
+              </div>
               <Link
                 href={`/jobs/${jobId}/invoice`}
                 style={{
@@ -1450,17 +1534,68 @@ export default async function JobDetailV2Page({
                   color: "#fff",
                   fontSize: "13.5px",
                   fontWeight: 600,
-                  cursor: "pointer",
                   fontFamily: "inherit",
                   textDecoration: "none",
                   display: "inline-flex",
                   alignItems: "center",
                 }}
               >
-                Create Invoice
+                Continue Invoice
               </Link>
             </div>
-          </div>
+          ) : (
+            // unresolved — full action bar (missing invoice or void → actionable again)
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+              <div>
+                <div style={S.fieldLabel}>Ready to invoice</div>
+                <div style={{ fontFamily: S.mono, fontSize: "26px", fontWeight: 600, marginTop: "2px" }}>
+                  {invoiceTotal}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {billingState.usesInternalInvoicing ? (
+                  <Link
+                    href={`/jobs/${jobId}/invoice`}
+                    style={{
+                      height: "42px",
+                      padding: "0 18px",
+                      borderRadius: "10px",
+                      border: "1px solid oklch(0.9 0.006 250)",
+                      background: "#fff",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      fontFamily: "inherit",
+                      color: "oklch(0.32 0.02 262)",
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                    }}
+                  >
+                    Mark Externally Billed
+                  </Link>
+                ) : null}
+                <Link
+                  href={`/jobs/${jobId}/invoice`}
+                  style={{
+                    height: "42px",
+                    padding: "0 22px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "oklch(0.27 0.02 262)",
+                    color: "#fff",
+                    fontSize: "13.5px",
+                    fontWeight: 600,
+                    fontFamily: "inherit",
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {billingState.usesInternalInvoicing ? "Create Invoice" : "Manage Billing"}
+                </Link>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* ── FOLLOW-UP & SERVICE CHAIN ─────────────────────────────────────── */}
