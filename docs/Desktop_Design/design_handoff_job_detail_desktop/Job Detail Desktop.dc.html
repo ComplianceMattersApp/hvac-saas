@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  html { scroll-behavior: smooth; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: oklch(0.88 0.006 250); border-radius: 9px; }
+</style>
+</helmet>
+
+<div style="min-height:100vh; background:oklch(0.975 0.004 250); font-family:'IBM Plex Sans',system-ui,sans-serif; color:oklch(0.27 0.02 262); -webkit-font-smoothing:antialiased;">
+  <div style="max-width:1300px; margin:0 auto; padding:0 28px; display:grid; grid-template-columns:minmax(0,1fr) 290px; gap:32px; align-items:start;">
+
+    <!-- ============ ONE CONTINUOUS SHEET ============ -->
+    <div style="background:#fff; border:1px solid oklch(0.91 0.006 250); border-radius:16px; margin:24px 0 64px; padding:0 40px;">
+
+      <!-- alert / feedback strip -->
+      <sc-if value="{{ showAlert }}" hint-placeholder-val="{{ true }}">
+        <div style="margin-top:20px; display:flex; align-items:center; gap:12px; padding:11px 16px; border-radius:11px; background:oklch(0.97 0.03 150); border:1px solid oklch(0.89 0.05 150);">
+          <span style="width:7px; height:7px; border-radius:50%; background:oklch(0.6 0.14 150); flex:none;"></span>
+          <span style="flex:1; font-size:13px; font-weight:500; color:oklch(0.4 0.05 150);">{{ alertText }}</span>
+          <button onClick="{{ dismissAlert }}" style="border:none; background:none; cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:oklch(0.5 0.04 150);">Dismiss</button>
+        </div>
+      </sc-if>
+
+      <!-- header band -->
+      <div style="padding:32px 0 28px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.06em; font-weight:600; color:oklch(0.55 0.015 262); margin-bottom:9px;"><span style="color:oklch(0.55 0.17 255);">Ops</span> &nbsp;/&nbsp; Jobs &nbsp;/&nbsp; <span style="color:oklch(0.4 0.02 262);">#1118</span></div>
+        <h1 style="margin:0; font-size:28px; font-weight:700; letter-spacing:-0.015em;">ECC Alteration &mdash; Antioch</h1>
+      </div>
+
+      <!-- BRIEF -->
+      <section data-jobsection="brief" data-screen-label="Job Brief" style="padding:30px 0; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600; margin-bottom:20px;">Job Brief</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px 48px;">
+          <sc-for list="{{ brief }}" as="f" hint-placeholder-count="4">
+            <div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600; margin-bottom:7px;">{{ f.label }}</div>
+              <div style="font-size:14.5px; line-height:1.55; color:oklch(0.33 0.02 262);">{{ f.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <!-- PEOPLE & PLACE -->
+      <section data-jobsection="people" data-screen-label="People & Place" style="padding:30px 0; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600; margin-bottom:20px;">People &amp; Place</div>
+        <div style="display:grid; grid-template-columns:1fr 320px; gap:40px;">
+          <div>
+            <div style="font-size:19px; font-weight:700;">Lawrence Stringer</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:oklch(0.55 0.015 262); margin-top:4px;">9255228718 &middot; larrysc<span>&#64;</span>netzero.net</div>
+            <div style="display:flex; gap:8px; margin-top:14px;">
+              <button style="height:36px; padding:0 18px; border-radius:9px; border:1px solid oklch(0.9 0.006 250); background:oklch(0.98 0.003 250); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Call</button>
+              <button style="height:36px; padding:0 18px; border-radius:9px; border:1px solid oklch(0.9 0.006 250); background:oklch(0.98 0.003 250); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Text</button>
+              <button style="height:36px; padding:0 18px; border-radius:9px; border:1px solid oklch(0.9 0.006 250); background:oklch(0.98 0.003 250); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Email</button>
+            </div>
+
+            <!-- contact logging: single full-width row, by the phone -->
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid oklch(0.93 0.005 250); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+              <div style="display:flex; align-items:baseline; gap:12px;">
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600;">Contact logging</span>
+                <span style="font-size:13px; font-weight:600;">8 attempts <span style="font-weight:400; color:oklch(0.6 0.015 262);">&middot; last 06-22 10:55 AM</span></span>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button style="height:32px; padding:0 12px; border-radius:8px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.4 0.02 262);">No Answer</button>
+                <button style="height:32px; padding:0 12px; border-radius:8px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.4 0.02 262);">Sent Text</button>
+                <button style="height:32px; padding:0 12px; border-radius:8px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.4 0.02 262);">Reached</button>
+              </div>
+            </div>
+
+            <!-- contractor / billing -->
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid oklch(0.93 0.005 250);">
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600; margin-bottom:6px;">Contractor / Billing</div>
+              <div style="font-size:14px; font-weight:600;">Same Day Heating and Air &mdash; Fairfield</div>
+            </div>
+
+            <div style="margin-top:22px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600;">Assigned team</div>
+                <button style="border:none; background:none; cursor:pointer; font-size:12px; font-weight:600; color:oklch(0.5 0.13 255); font-family:inherit; padding:0;">Manage</button>
+              </div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <sc-for list="{{ team }}" as="m" hint-placeholder-count="2">
+                  <div style="display:flex; align-items:center; gap:9px; padding:7px 12px 7px 8px; border-radius:30px; background:oklch(0.985 0.003 250); border:1px solid oklch(0.93 0.005 250);">
+                    <span style="width:26px; height:26px; border-radius:50%; background:oklch(0.95 0.02 255); color:oklch(0.45 0.12 255); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">{{ m.initials }}</span>
+                    <span style="font-size:13px; font-weight:600;">{{ m.name }}</span>
+                    <sc-if value="{{ m.primary }}" hint-placeholder-val="{{ true }}"><span style="font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; color:oklch(0.55 0.14 150); letter-spacing:0.04em;">PRIMARY</span></sc-if>
+                  </div>
+                </sc-for>
+                <button style="display:flex; align-items:center; gap:6px; padding:7px 14px; border-radius:30px; background:#fff; border:1px dashed oklch(0.84 0.01 255); cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; color:oklch(0.5 0.13 255);">+ Add</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="position:relative; height:172px; border-radius:12px; overflow:hidden; background:repeating-linear-gradient(135deg, oklch(0.93 0.01 250) 0 14px, oklch(0.95 0.008 250) 14px 28px);">
+              <div style="position:absolute; top:10px; left:10px; font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; font-weight:600; color:oklch(0.5 0.02 262); background:rgba(255,255,255,0.85); padding:4px 8px; border-radius:6px;">Street view</div>
+              <div style="position:absolute; left:10px; right:10px; bottom:10px; background:oklch(0.27 0.02 262); color:#fff; padding:8px 11px; border-radius:9px; font-size:12px; font-weight:600;">4824 Belford Peak Way, Antioch, CA 94531</div>
+            </div>
+            <div style="display:flex; gap:14px; margin-top:12px;">
+              <a href="#" style="font-size:12.5px; font-weight:600; color:oklch(0.5 0.13 255); text-decoration:none;">Navigate</a>
+              <a href="#" style="font-size:12.5px; font-weight:600; color:oklch(0.5 0.13 255); text-decoration:none;">Open in Maps</a>
+              <a href="#" style="font-size:12.5px; font-weight:600; color:oklch(0.55 0.015 262); text-decoration:none;">Change location</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- JOB MEMORY / NOTES -->
+      <section data-jobsection="notes" data-screen-label="Job Memory" style="padding:30px 0; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600;">Job Memory</div>
+          <a href="#records" style="font-size:12.5px; font-weight:600; color:oklch(0.5 0.13 255); text-decoration:none;">View full timeline &rarr;</a>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:18px;">
+          <div style="flex:1; height:42px; display:flex; align-items:center; padding:0 14px; border:1px solid oklch(0.91 0.006 250); border-radius:10px; font-size:13px; color:oklch(0.62 0.015 262);">Add a note&hellip;</div>
+          <div style="display:flex; padding:3px; border-radius:9px; background:oklch(0.96 0.004 250); border:1px solid oklch(0.92 0.006 250);">
+            <span style="padding:6px 12px; border-radius:7px; font-size:12px; font-weight:600; background:#fff; color:oklch(0.4 0.13 255); box-shadow:0 1px 1px rgba(0,0,0,0.04);">Internal</span>
+            <span style="padding:6px 12px; border-radius:7px; font-size:12px; font-weight:600; color:oklch(0.55 0.015 262);">Shared</span>
+          </div>
+          <button style="height:42px; padding:0 20px; border-radius:10px; border:none; background:oklch(0.27 0.02 262); color:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">Save</button>
+        </div>
+        <sc-for list="{{ notes }}" as="n" hint-placeholder-count="2">
+          <div style="display:flex; gap:14px; padding:14px 0; border-top:1px solid oklch(0.96 0.004 250);">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; font-weight:600; letter-spacing:0.06em; padding:4px 8px; border-radius:5px; height:fit-content; background:{{ n.tagBg }}; color:{{ n.tagFg }};">{{ n.audience }}</span>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:13.5px; line-height:1.55; color:oklch(0.35 0.02 262);">{{ n.body }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:oklch(0.6 0.015 262); margin-top:6px;">{{ n.meta }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </section>
+
+      <!-- FIELD -->
+      <section data-jobsection="field" data-screen-label="Field & Finish" style="padding:30px 0; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600;">Field &amp; Finish</div>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.06em; font-weight:600; color:oklch(0.5 0.13 255); background:oklch(0.96 0.025 255); padding:3px 8px; border-radius:6px;">EVERYSTEP</span>
+        </div>
+        <div style="font-size:13px; color:oklch(0.5 0.015 262); margin-bottom:18px;">{{ fieldIntro }}</div>
+
+        <!-- field status track -->
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px;">
+          <sc-for list="{{ fieldSteps }}" as="s" hint-placeholder-count="3">
+            <div style="{{ s.cardStyle }}">
+              <div style="{{ s.tagStyle }}">{{ s.tagText }}</div>
+              <div style="font-size:14px; font-weight:700; margin-top:6px; color:{{ s.titleColor }};">{{ s.title }}</div>
+              <div style="font-size:12px; margin-top:3px; color:{{ s.detailColor }};">{{ s.detail }}</div>
+            </div>
+          </sc-for>
+        </div>
+
+        <!-- interactive finish (in progress) -->
+        <sc-if value="{{ fieldStarted }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px;">
+            <sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="4">
+              <button style="{{ o.cardStyle }}" onClick="{{ o.onSelect }}">
+                <span style="{{ o.dot }}"></span>
+                <span style="font-size:13.5px; font-weight:700; color:oklch(0.27 0.02 262); margin-top:8px;">{{ o.label }}</span>
+                <span style="font-size:11.5px; line-height:1.4; color:oklch(0.5 0.015 262); margin-top:4px;">{{ o.desc }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ selectedOutcome }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:14px; padding:14px 16px; border-radius:11px; background:{{ routePanelBg }}; border:1px solid {{ routePanelBorder }}; display:flex; align-items:center; gap:14px;">
+              <div style="flex:1;"><div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; font-weight:600; color:{{ routeTone }};">{{ routeHeading }}</div><div style="font-size:13px; color:oklch(0.35 0.02 262); margin-top:4px;">{{ routeDetail }}</div></div>
+              <button style="height:40px; padding:0 20px; border-radius:10px; border:none; background:{{ routeTone }}; color:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; flex:none;">{{ routeCta }}</button>
+            </div>
+          </sc-if>
+        </sc-if>
+
+        <!-- gated finish (not started) -->
+        <sc-if value="{{ fieldNotStarted }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:9px; background:oklch(0.96 0.004 250); margin-bottom:12px;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; font-weight:600; letter-spacing:0.08em; color:oklch(0.55 0.015 262); border:1px solid oklch(0.88 0.006 250); padding:3px 7px; border-radius:5px;">LOCKED</span>
+            <span style="font-size:12.5px; color:oklch(0.5 0.015 262);">Finish outcomes unlock at Step 3, once the visit is in progress.</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; opacity:0.5; pointer-events:none;">
+            <sc-for list="{{ outcomes }}" as="o" hint-placeholder-count="4">
+              <div style="{{ o.cardStyle }}">
+                <span style="{{ o.dot }}"></span>
+                <span style="font-size:13.5px; font-weight:700; color:oklch(0.27 0.02 262); margin-top:8px;">{{ o.label }}</span>
+                <span style="font-size:11.5px; line-height:1.4; color:oklch(0.5 0.015 262); margin-top:4px;">{{ o.desc }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </section>
+
+      <!-- WORK & BILLING -->
+      <section data-jobsection="billing" data-screen-label="Work & Billing" style="padding:30px 0; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600;">Work &amp; Billing</div>
+          <button style="height:34px; padding:0 14px; border-radius:8px; border:1px solid oklch(0.85 0.04 255); background:oklch(0.97 0.02 255); color:oklch(0.45 0.14 255); font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit;">+ Add Work</button>
+        </div>
+        <sc-if value="{{ hasWork }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-bottom:20px;">
+            <sc-for list="{{ workItems }}" as="w" hint-placeholder-count="2">
+              <div style="display:flex; align-items:center; gap:14px; padding:13px 0; border-top:1px solid oklch(0.96 0.004 250);">
+                <div style="flex:1; min-width:0;"><div style="font-size:13.5px; font-weight:600;">{{ w.name }}</div><div style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:oklch(0.6 0.015 262); margin-top:2px;">{{ w.detail }}</div></div>
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px; background:{{ w.sBg }}; color:{{ w.sFg }};">{{ w.status }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; width:78px; text-align:right;">{{ w.price }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noWork }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:22px; text-align:center; border:1px dashed oklch(0.88 0.006 250); border-radius:11px; color:oklch(0.55 0.015 262); font-size:13px; margin-bottom:20px;">No work items yet &mdash; add work performed, then price it before invoicing.</div>
+        </sc-if>
+
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600; margin-bottom:10px;">Closeout readiness</div>
+        <div style="border:1px solid oklch(0.93 0.005 250); border-radius:11px; overflow:hidden; margin-bottom:20px;">
+          <sc-for list="{{ closeout }}" as="c" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:12px; padding:13px 16px; border-bottom:1px solid oklch(0.96 0.004 250);">
+              <span style="width:9px; height:9px; border-radius:50%; background:{{ c.dot }}; flex:none;"></span>
+              <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">{{ c.label }}</div><div style="font-size:12px; color:oklch(0.55 0.015 262); margin-top:1px;">{{ c.detail }}</div></div>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px; background:{{ c.bg }}; color:{{ c.fg }};">{{ c.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex; align-items:flex-end; justify-content:space-between;">
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600;">Ready to invoice</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:26px; font-weight:600; margin-top:2px;">{{ invoiceTotal }}</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button style="height:42px; padding:0 18px; border-radius:10px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Mark Externally Billed</button>
+            <button style="height:42px; padding:0 22px; border-radius:10px; border:none; background:oklch(0.27 0.02 262); color:#fff; font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit;">Create Invoice</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- FOLLOW-UP & SERVICE CHAIN -->
+      <section data-jobsection="followup" data-screen-label="Follow-Up & Service Chain" style="padding:30px 0; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600;">Follow-Up &amp; Service Chain</div>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.06em; font-weight:600; color:oklch(0.5 0.13 255); background:oklch(0.96 0.025 255); padding:3px 8px; border-radius:6px;">EVERYSTEP</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:48px;">
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600; margin-bottom:10px;">Schedule a next visit</div>
+            <div style="display:flex; gap:8px;">
+              <button style="height:38px; padding:0 16px; border-radius:9px; border:1px solid oklch(0.85 0.04 255); background:oklch(0.97 0.02 255); color:oklch(0.45 0.14 255); font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">Create Return Visit</button>
+              <button style="height:38px; padding:0 16px; border-radius:9px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Create Callback</button>
+            </div>
+            <div style="font-size:12px; line-height:1.5; color:oklch(0.55 0.015 262); margin-top:12px;">A <strong style="color:oklch(0.4 0.02 262);">return</strong> continues unresolved work and links to this visit. A <strong style="color:oklch(0.4 0.02 262);">callback</strong> opens a new issue after completion &mdash; original job history stays intact.</div>
+          </div>
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600; margin-bottom:10px;">EveryStep sync</div>
+            <div style="padding:16px; border-radius:11px; border:1px dashed oklch(0.88 0.006 250); background:oklch(0.985 0.003 250);">
+              <div style="font-size:13px; font-weight:600; color:oklch(0.4 0.02 262);">No active hold</div>
+              <div style="font-size:12.5px; line-height:1.55; color:oklch(0.55 0.015 262); margin-top:5px;">When the field flags <strong style="color:oklch(0.45 0.02 262);">Parts Needed</strong> or <strong style="color:oklch(0.45 0.02 262);">Approval Needed</strong>, the tracker appears here &mdash; every step (ordered &rarr; arrived &rarr; released) stays synced to this job and the next visit.</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:24px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:oklch(0.62 0.015 262); font-weight:600; margin-bottom:12px;">Service chain</div>
+          <div style="display:flex; align-items:center; gap:14px; padding:13px 0; border-top:1px solid oklch(0.96 0.004 250);">
+            <span style="width:8px; height:8px; border-radius:50%; background:oklch(0.55 0.17 255); flex:none;"></span>
+            <div style="flex:1;"><div style="font-size:13.5px; font-weight:600;">Visit 1 &mdash; ECC Alteration <span style="font-weight:400; color:oklch(0.6 0.015 262);">(this job)</span></div><div style="font-size:12.5px; color:oklch(0.55 0.015 262); margin-top:2px;">Current visit in the linked service case</div></div>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:oklch(0.6 0.015 262);">#1118</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMPLIANCE -->
+      <section data-jobsection="compliance" data-screen-label="ECC & Compliance" style="padding:30px 0; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:18px;"><div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600;">ECC &amp; Compliance</div></div>
+        <div style="border:1px solid oklch(0.93 0.005 250); border-radius:11px; overflow:hidden;">
+          <sc-for list="{{ compliance }}" as="c" hint-placeholder-count="4">
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:1px solid oklch(0.95 0.004 250);">
+              <span style="font-size:13.5px; font-weight:500; color:oklch(0.38 0.02 262);">{{ c.label }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px; background:{{ c.bg }}; color:{{ c.fg }};">{{ c.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:14px;">
+          <button style="height:38px; padding:0 18px; border-radius:9px; border:none; background:oklch(0.55 0.17 255); color:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit;">Open Tests Workspace</button>
+          <button style="height:38px; padding:0 18px; border-radius:9px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Add Permit Number</button>
+        </div>
+      </section>
+
+      <!-- RECORDS -->
+      <section data-jobsection="records" data-screen-label="Records" style="padding:30px 0 36px; border-top:1px solid oklch(0.93 0.005 250); scroll-margin-top:20px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.55 0.015 262); font-weight:600; margin-bottom:16px;">Records</div>
+        <div style="display:flex; gap:2px; border-bottom:1px solid oklch(0.93 0.005 250); overflow-x:auto;">
+          <sc-for list="{{ recTabs }}" as="t" hint-placeholder-count="6">
+            <button style="{{ t.style }}" onClick="{{ t.onSelect }}">{{ t.label }}<span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; padding:2px 6px; border-radius:5px; background:{{ t.countBg }}; color:{{ t.countFg }};">{{ t.count }}</span></button>
+          </sc-for>
+        </div>
+        <div style="padding-top:16px;">
+          <sc-for list="{{ activeTabRows }}" as="r" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:14px; padding:13px 0; border-bottom:1px solid oklch(0.96 0.004 250);">
+              <span style="width:8px; height:8px; border-radius:50%; background:{{ r.dot }}; flex:none;"></span>
+              <div style="flex:1; min-width:0;"><div style="font-size:13.5px; font-weight:600;">{{ r.primary }}</div><div style="font-size:12.5px; color:oklch(0.55 0.015 262); margin-top:2px;">{{ r.secondary }}</div></div>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:oklch(0.6 0.015 262); flex:none;">{{ r.meta }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ PINNED COMMAND RAIL ============ -->
+    <aside style="position:sticky; top:0; align-self:start; padding:24px 0; max-height:100vh; overflow-y:auto;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:0.14em; text-transform:uppercase; color:oklch(0.6 0.015 262); font-weight:600;">Job #1118</div>
+      <div style="display:flex; align-items:center; gap:7px; margin-top:10px;">
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; padding:4px 8px; border-radius:6px; background:oklch(0.95 0.03 255); color:oklch(0.5 0.13 255);">ECC</span>
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; padding:4px 9px; border-radius:6px; background:{{ statusBg }}; color:{{ statusFg }}; display:flex; align-items:center; gap:6px;"><span style="width:6px;height:6px;border-radius:50%;background:{{ statusDot }};"></span>{{ statusLabel }}</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-top:16px;">
+        <button style="height:42px; border-radius:10px; border:none; background:oklch(0.55 0.17 255); color:#fff; font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit; box-shadow:0 1px 2px rgba(40,80,180,0.25);">{{ railPrimaryLabel }}</button>
+        <div style="display:flex; gap:8px;">
+          <button style="flex:1; height:38px; border-radius:9px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Schedule</button>
+          <button style="flex:1; height:38px; border-radius:9px; border:1px solid oklch(0.9 0.006 250); background:#fff; font-size:12.5px; font-weight:600; cursor:pointer; font-family:inherit; color:oklch(0.32 0.02 262);">Tests</button>
+        </div>
+      </div>
+
+      <nav style="margin-top:24px; display:flex; flex-direction:column; gap:1px;">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="6">
+          <a href="{{ n.href }}" style="{{ n.style }}"><span style="{{ n.bar }}"></span>{{ n.label }}</a>
+        </sc-for>
+      </nav>
+
+      <div style="margin-top:24px; padding-top:18px; border-top:1px solid oklch(0.91 0.006 250);">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:9.5px; letter-spacing:0.1em; text-transform:uppercase; font-weight:600; color:oklch(0.5 0.12 65); margin-bottom:12px;">{{ blockerHeading }}</div>
+        <div style="display:flex; flex-direction:column; gap:9px;">
+          <sc-for list="{{ blockers }}" as="b" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:9px; font-size:12.5px; font-weight:500; color:oklch(0.45 0.025 262);"><span style="width:6px;height:6px;border-radius:50%;background:oklch(0.72 0.15 70);flex:none;"></span>{{ b }}</div>
+          </sc-for>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1300,&quot;height&quot;:1000},&quot;jobState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;scheduling&quot;,&quot;in_progress&quot;],&quot;default&quot;:&quot;scheduling&quot;,&quot;tsType&quot;:&quot;'scheduling'|'in_progress'&quot;,&quot;section&quot;:&quot;Demo state&quot;,&quot;label&quot;:&quot;Job lifecycle state&quot;}}">
+class Component extends DCLogic {
+  state = { outcome: null, tab: 'timeline', active: 'brief', alert: true };
+
+  componentDidMount() {
+    this._io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) this.setState({ active: e.target.dataset.jobsection }); });
+    }, { rootMargin: '-12% 0px -78% 0px', threshold: 0 });
+    requestAnimationFrame(() => {
+      document.querySelectorAll('[data-jobsection]').forEach(el => this._io.observe(el));
+    });
+  }
+  componentWillUnmount() { this._io && this._io.disconnect(); }
+
+  renderVals() {
+    const BORDER = 'oklch(0.92 0.006 250)';
+    const ACCENT = 'oklch(0.55 0.17 255)';
+    const inProg = (this.props.jobState || 'scheduling') === 'in_progress';
+
+    // ---- jump nav ----
+    const navDefs = [
+      { id:'brief', label:'Job Brief' }, { id:'people', label:'People & Place' },
+      { id:'notes', label:'Job Memory' }, { id:'field', label:'Field & Finish' },
+      { id:'billing', label:'Work & Billing' }, { id:'followup', label:'Follow-Up & Chain' },
+      { id:'compliance', label:'Compliance' }, { id:'records', label:'Records' },
+    ];
+    const nav = navDefs.map(n => {
+      const a = this.state.active === n.id;
+      return {
+        ...n,
+        href: '#' + n.id,
+        style: `display:flex; align-items:center; gap:11px; padding:8px 10px; border-radius:8px; text-decoration:none; font-size:13px; font-weight:600; cursor:pointer; color:${a ? 'oklch(0.4 0.13 255)' : 'oklch(0.5 0.02 262)'};`,
+        bar: `width:3px; height:14px; border-radius:3px; flex:none; background:${a ? ACCENT : 'oklch(0.9 0.006 250)'};`,
+      };
+    });
+
+    // ---- field status track ----
+    const stepDefs = inProg
+      ? [ ['On the Way','Tech departed for the site','done'], ['On Site & Working','Notes, photos, work items captured','done'], ['Finish & Report','Submit an EveryStep outcome','now'] ]
+      : [ ['On the Way','Tech heads out once scheduled','now'], ['On Site & Working','Capture notes, photos, work items','todo'], ['Finish & Report','Submit an EveryStep outcome','todo'] ];
+    const fieldSteps = stepDefs.map((s, i) => {
+      const [title, detail, st] = s;
+      const card = st === 'now'
+        ? 'padding:14px; border-radius:11px; border:1px solid oklch(0.85 0.04 255); background:oklch(0.97 0.02 255);'
+        : st === 'done'
+          ? 'padding:14px; border-radius:11px; border:1px solid oklch(0.88 0.05 150); background:oklch(0.98 0.025 150);'
+          : 'padding:14px; border-radius:11px; border:1px solid oklch(0.93 0.005 250);';
+      const tagColor = st === 'now' ? 'oklch(0.5 0.13 255)' : st === 'done' ? 'oklch(0.5 0.13 150)' : 'oklch(0.62 0.015 262)';
+      const tagText = st === 'now' ? `STEP ${i+1} \u00b7 NOW` : st === 'done' ? `STEP ${i+1} \u00b7 DONE` : `STEP ${i+1}`;
+      return {
+        title, detail, cardStyle: card, tagText,
+        tagStyle: `font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:0.08em; color:${tagColor};`,
+        titleColor: st === 'todo' ? 'oklch(0.45 0.02 262)' : 'oklch(0.27 0.02 262)',
+        detailColor: st === 'now' ? 'oklch(0.5 0.015 262)' : 'oklch(0.6 0.015 262)',
+      };
+    });
+
+    // ---- finish outcomes ----
+    const outcomeDefs = [
+      { id:'done',     label:'Work Completed',    desc:'Ready for closeout & billing.',        tone:'oklch(0.58 0.13 150)', heading:'Routes to closeout', detail:'Job stays with you for invoice & certs review before it can close.', cta:'Complete Visit' },
+      { id:'parts',    label:'Parts Needed',      desc:'Flag a return, tie to next visit.',    tone:'oklch(0.66 0.14 68)',  heading:'Routes to office \u00b7 waiting on part', detail:'A return visit is suggested to dispatch. Mark part ordered \u2192 arrived to release.', cta:'Submit & Flag Return' },
+      { id:'approval', label:'Approval Needed',   desc:'Customer must approve to continue.',    tone:'oklch(0.66 0.14 68)',  heading:'Routes to office \u00b7 waiting on approval', detail:'Office follows up with the customer. Job releases when approval is received.', cta:'Submit for Approval' },
+      { id:'unable',   label:'Unable to Complete',desc:'Needs an office decision.',             tone:'oklch(0.58 0.18 25)',  heading:'Routes to office \u00b7 waiting on information', detail:'No return is auto-created. Dispatch decides the next step from the queue.', cta:'Submit Outcome' },
+    ];
+    const outcomes = outcomeDefs.map(o => {
+      const sel = this.state.outcome === o.id;
+      return {
+        ...o,
+        onSelect: () => this.setState({ outcome: o.id }),
+        cardStyle: `cursor:pointer; text-align:left; display:flex; flex-direction:column; align-items:flex-start; padding:14px; border-radius:11px; font-family:inherit; transition:all .12s; background:${sel ? `color-mix(in oklch, ${o.tone} 9%, white)` : '#fff'}; border:1px solid ${sel ? o.tone : BORDER}; box-shadow:${sel ? `0 0 0 1px ${o.tone}` : 'none'};`,
+        dot: `width:9px; height:9px; border-radius:50%; background:${o.tone};`,
+      };
+    });
+    const sel = outcomeDefs.find(o => o.id === this.state.outcome);
+
+    // ---- records (timeline branches by state) ----
+    const G='oklch(0.7 0.02 262)', AM='oklch(0.66 0.14 68)', BL='oklch(0.55 0.17 255)', GN='oklch(0.58 0.13 150)';
+    const baseTimeline = [
+      { dot:BL, primary:'Job created from Ops queue',     secondary:'ECC alteration logged \u2014 contractor Same Day Heating', meta:'06-20 09:12' },
+      { dot:AM, primary:'Contact attempt \u2014 no answer', secondary:'Customer call, voicemail left',                          meta:'06-22 10:55' },
+      { dot:GN, primary:'Contractor note added',           secondary:'Equipment model numbers recorded',                       meta:'06-22 14:30' },
+    ];
+    const progTimeline = baseTimeline.concat([
+      { dot:BL, primary:'Marked On the Way', secondary:'Tech Eddie C. en route',                meta:'06-30 08:05' },
+      { dot:BL, primary:'Arrived on site',   secondary:'Visit started',                          meta:'06-30 08:40' },
+      { dot:GN, primary:'Work items captured', secondary:'ECC verification + duct diagnostic',   meta:'06-30 09:10' },
+    ]);
+    const recordData = {
+      timeline:{ rows: inProg ? progTimeline : baseTimeline },
+      attachments:{ rows:[{dot:G,primary:'No attachments yet',secondary:'Drag installation photos or PDFs here',meta:'0 files'}] },
+      equipment:{ rows:[{dot:G,primary:'No equipment items',secondary:'Models in contractor note not yet linked',meta:'0 items'}] },
+      ecc:{ rows:[{dot:AM,primary:'No test runs recorded',secondary:'Permit number required before tests',meta:'0 runs'}] },
+      permit:{ rows:[{dot:AM,primary:'Permit number not added',secondary:'Jurisdiction & issue date pending',meta:'Not recorded'}] },
+      followup:{ rows:[{dot:BL,primary:'Maintenance follow-up',secondary:'For customer \u2014 next due date suggested',meta:'Due 06-25'}] },
+      chain:{ rows:[{dot:GN,primary:'Visit 1 \u2014 ECC Alteration (this job)',secondary:'Current visit in the linked service case',meta:'#1118'}] },
+    };
+    const recDefs = [
+      { id:'timeline', label:'Timeline', count:String(recordData.timeline.rows.length) },
+      { id:'attachments', label:'Attachments', count:'0' }, { id:'equipment', label:'Equipment', count:'0' },
+      { id:'ecc', label:'ECC', count:'0 runs' }, { id:'permit', label:'Permit', count:'\u2014' },
+      { id:'followup', label:'Follow-Up', count:'1' }, { id:'chain', label:'Service Chain', count:'1' },
+    ];
+    const recTabs = recDefs.map(t => {
+      const a = this.state.tab === t.id;
+      return {
+        ...t,
+        onSelect: () => this.setState({ tab: t.id }),
+        style: `display:inline-flex; align-items:center; gap:7px; padding:9px 14px 11px; margin-bottom:-1px; border:none; background:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:600; white-space:nowrap; color:${a ? 'oklch(0.27 0.02 262)' : 'oklch(0.55 0.015 262)'}; border-bottom:2px solid ${a ? ACCENT : 'transparent'};`,
+        countBg: a ? 'oklch(0.96 0.025 255)' : 'oklch(0.96 0.004 250)',
+        countFg: a ? 'oklch(0.5 0.13 255)' : 'oklch(0.6 0.015 262)',
+      };
+    });
+    const active = recordData[this.state.tab] || recordData.timeline;
+
+    // ---- state-driven content ----
+    const blockers = inProg ? ['No permit number', '0 tests complete'] : ['Not scheduled', 'No permit number', '0 tests complete'];
+    const workItems = inProg ? [
+      { name:'ECC alteration verification', detail:'Permit-required compliance test', status:'Captured', price:'$285.00', sBg:'oklch(0.95 0.04 150)', sFg:'oklch(0.45 0.13 150)' },
+      { name:'Duct leakage diagnostic',      detail:'Companion service item',          status:'Captured', price:'$200.00', sBg:'oklch(0.95 0.04 150)', sFg:'oklch(0.45 0.13 150)' },
+    ] : [];
+
+    return {
+      nav, recTabs, outcomes, fieldSteps,
+      showAlert: this.state.alert,
+      alertText: inProg ? 'Arrived on site \u00b7 06-30 8:40 AM' : 'Note saved \u00b7 06-30 9:14 AM',
+      dismissAlert: () => this.setState({ alert: false }),
+
+      statusLabel: inProg ? 'IN PROGRESS \u00b7 ON SITE' : 'NEEDS SCHEDULE',
+      statusBg: inProg ? 'oklch(0.96 0.025 255)' : 'oklch(0.96 0.05 75)',
+      statusFg: inProg ? 'oklch(0.5 0.13 255)' : 'oklch(0.5 0.12 65)',
+      statusDot: inProg ? 'oklch(0.55 0.17 255)' : 'oklch(0.72 0.15 70)',
+      railPrimaryLabel: inProg ? 'Finish Visit' : 'Mark On the Way',
+      blockers,
+      blockerHeading: `${blockers.length} item${blockers.length === 1 ? '' : 's'} block closeout`,
+
+      fieldIntro: inProg
+        ? 'Tech is on site. When the work is done, submit an outcome below \u2014 it routes the job from here.'
+        : "This visit hasn't started yet. Field status moves through these steps \u2014 the finish outcomes open at the end.",
+      fieldStarted: inProg,
+      fieldNotStarted: !inProg,
+
+      notes: [
+        { audience:'CONTRACTOR', tagBg:'oklch(0.96 0.05 75)',  tagFg:'oklch(0.5 0.12 65)',  body:'Condenser GA5SAN56000W \u00b7 Furnace 811SB60110M21 \u00b7 Coil CVAMA6021XMA. Once I get installation photos, will upload.', meta:'Same Day Heating \u00b7 06-22 2:30 PM' },
+        { audience:'INTERNAL',   tagBg:'oklch(0.96 0.025 255)', tagFg:'oklch(0.5 0.13 255)', body:'Awaiting permit number from contractor before we can schedule the ECC test.', meta:'Eddie C. \u00b7 06-21 4:10 PM' },
+      ],
+
+      hasWork: inProg,
+      noWork: !inProg,
+      workItems,
+      invoiceTotal: inProg ? '$485.00' : '$0.00',
+      closeout: inProg ? [
+        { label:'Field work complete', detail:'Tech on site, finishing now',        dot:'oklch(0.55 0.17 255)', value:'On site', bg:'oklch(0.96 0.025 255)', fg:'oklch(0.5 0.13 255)' },
+        { label:'Certs / compliance',  detail:'Tests & certificate not complete',    dot:'oklch(0.66 0.14 68)',  value:'Blocked', bg:'oklch(0.96 0.05 75)', fg:'oklch(0.5 0.12 65)' },
+        { label:'Billing resolved',    detail:'No invoice issued or external mark',   dot:'oklch(0.7 0.02 262)',  value:'Open',    bg:'oklch(0.96 0.004 250)', fg:'oklch(0.55 0.015 262)' },
+      ] : [
+        { label:'Field work complete', detail:'Visit not yet finished in the field', dot:'oklch(0.66 0.14 68)', value:'Pending', bg:'oklch(0.96 0.05 75)', fg:'oklch(0.5 0.12 65)' },
+        { label:'Certs / compliance',  detail:'Tests & certificate not complete',    dot:'oklch(0.66 0.14 68)', value:'Blocked', bg:'oklch(0.96 0.05 75)', fg:'oklch(0.5 0.12 65)' },
+        { label:'Billing resolved',    detail:'No invoice issued or external mark',   dot:'oklch(0.7 0.02 262)', value:'Open',    bg:'oklch(0.96 0.004 250)', fg:'oklch(0.55 0.015 262)' },
+      ],
+
+      brief: [
+        { label:'Visit Reason',     value:'ECC alteration \u2014 Antioch. Verify altered HVAC scope for compliance.' },
+        { label:'Customer Concern', value:'Replacement equipment installed; needs ECC verification & certificate.' },
+        { label:'Service Details',  value:'Single-family residence. Contractor-coordinated install, billed externally.' },
+        { label:'Work Summary',     value: inProg ? 'On site \u2014 alteration verified; duct leakage diagnostic captured.' : 'Pending field visit \u2014 no work items captured yet.' },
+      ],
+      team: [
+        { name:'Eddie Castellanos', initials:'EC', primary:true },
+        { name:'Terry Castellanos', initials:'TC', primary:false },
+      ],
+      selectedOutcome: !!sel,
+      routeTone: sel ? sel.tone : ACCENT,
+      routePanelBg: sel ? `color-mix(in oklch, ${sel.tone} 7%, white)` : '#fff',
+      routePanelBorder: sel ? `color-mix(in oklch, ${sel.tone} 35%, white)` : BORDER,
+      routeHeading: sel ? sel.heading : '',
+      routeDetail: sel ? sel.detail : '',
+      routeCta: sel ? sel.cta : '',
+      compliance: [
+        { label:'Permit number', value:'Missing', bg:'oklch(0.96 0.05 75)',  fg:'oklch(0.5 0.12 65)' },
+        { label:'Tests complete', value:'0 runs', bg:'oklch(0.96 0.05 75)',  fg:'oklch(0.5 0.12 65)' },
+        { label:'Certs sent',     value:'Not yet', bg:'oklch(0.96 0.004 250)', fg:'oklch(0.55 0.015 262)' },
+        { label:'Retest',         value:'N/A',     bg:'oklch(0.96 0.004 250)', fg:'oklch(0.55 0.015 262)' },
+      ],
+      activeTabRows: active.rows,
+    };
+  }
+}
+</script>
+</body>
+</html>
