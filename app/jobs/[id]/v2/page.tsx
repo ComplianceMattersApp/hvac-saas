@@ -178,7 +178,8 @@ function deriveStatusPill(
 
 type FieldStepState = "done" | "now" | "todo";
 
-function deriveFieldSteps(status: string): [FieldStepState, FieldStepState, FieldStepState] {
+function deriveFieldSteps(status: string, fieldComplete: boolean): [FieldStepState, FieldStepState, FieldStepState] {
+  if (fieldComplete || status === "completed" || status === "cancelled") return ["done", "done", "done"];
   if (status === "in_process") return ["done", "done", "now"];
   if (status === "on_the_way") return ["now", "todo", "todo"];
   return ["now", "todo", "todo"];
@@ -398,9 +399,10 @@ export default async function JobDetailV2Page({
   const isFieldActive = status === "in_process";
   const isEnRoute = status === "on_the_way";
   const visitStarted = isFieldActive || isEnRoute;
+  const isTerminal = fieldComplete || status === "completed" || status === "cancelled";
 
   const statusPill = deriveStatusPill(status, opsStatus);
-  const fieldSteps = deriveFieldSteps(status);
+  const fieldSteps = deriveFieldSteps(status, fieldComplete);
 
   const visitScopeItems = sanitizeVisitScopeItems(job.visit_scope_items);
   const invoiceTotal = formatVisitScopeTotal(visitScopeItems);
@@ -463,30 +465,35 @@ export default async function JobDetailV2Page({
   const hasDirectNarrativeChain = Boolean(parentJobId);
 
   // brief fields
+  const visitReasonText = String(job.service_visit_reason ?? job.title ?? "").trim();
+  const jobTitleText = String(job.title ?? "").trim();
   const briefFields: Array<{ label: string; value: string }> = [
     {
       label: "Visit Reason",
-      value: String(job.service_visit_reason ?? job.title ?? "").trim() || "—",
+      value: visitReasonText || "—",
     },
-    {
-      label: "Customer Concern",
-      value: String(job.service_visit_outcome ?? "").trim() || "Not yet captured.",
-    },
+    // Show Customer Concern only when the job title differs from the visit reason
+    ...(jobTitleText && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase()
+      ? [{ label: "Customer Concern", value: jobTitleText }]
+      : []),
     {
       label: "Service Details",
       value: String(job.service_visit_type ?? "").trim() || "—",
     },
     {
       label: "Work Summary",
-      value: visitStarted
-        ? String(job.visit_scope_summary ?? "").trim() || "On site — work in progress."
-        : String(job.visit_scope_summary ?? "").trim() || "Pending field visit — no work items captured yet.",
+      value: isTerminal
+        ? String(job.visit_scope_summary ?? "").trim() || "Visit submitted — no summary captured."
+        : visitStarted
+          ? String(job.visit_scope_summary ?? "").trim() || "On site — work in progress."
+          : String(job.visit_scope_summary ?? "").trim() || "Pending field visit — no work items captured yet.",
     },
   ];
 
   // ECC test run counts
-  const eccRuns = (job.ecc_test_runs ?? []) as Array<{ is_completed: boolean | null }>;
+  const eccRuns = (job.ecc_test_runs ?? []) as Array<{ is_completed: boolean | null; computed_pass: boolean | null; override_pass: boolean | null }>;
   const completedEccRuns = eccRuns.filter((r) => r.is_completed).length;
+  const hasFailedEccRun = eccRuns.some((r) => r.is_completed && r.computed_pass === false);
 
   // return URL for actions
   const returnTo = `/jobs/${jobId}/v2`;
@@ -986,9 +993,11 @@ export default async function JobDetailV2Page({
             </span>
           </div>
           <div style={{ fontSize: "13px", color: "oklch(0.33 0.02 262)", marginBottom: "18px" }}>
-            {visitStarted
-              ? "Tech is on site. When the work is done, submit an outcome below — it routes the job from here."
-              : "This visit hasn't started yet. Field status moves through these steps — the finish outcomes open at the end."}
+            {isTerminal
+              ? "All field steps complete — visit outcome was submitted."
+              : visitStarted
+                ? "Tech is on site. When the work is done, submit an outcome below — it routes the job from here."
+                : "This visit hasn't started yet. Field status moves through these steps — the finish outcomes open at the end."}
           </div>
 
           {/* status track: 3 cards */}
@@ -1002,9 +1011,9 @@ export default async function JobDetailV2Page({
           >
             {(
               [
-                { title: "On the Way", detail: isEnRoute ? "En route to the site" : visitStarted ? "Tech departed for the site" : "Tech heads out once scheduled" },
-                { title: "On Site & Working", detail: isFieldActive ? "Notes, photos, work items captured" : "Capture notes, photos, work items" },
-                { title: "Finish & Report", detail: "Submit an EveryStep outcome" },
+                { title: "On the Way", detail: isTerminal ? "Tech arrived on site" : isEnRoute ? "En route to the site" : visitStarted ? "Tech departed for the site" : "Tech heads out once scheduled" },
+                { title: "On Site & Working", detail: isTerminal ? "Work captured on site" : isFieldActive ? "Notes, photos, work items captured" : "Capture notes, photos, work items" },
+                { title: "Finish & Report", detail: isTerminal ? "EveryStep outcome submitted" : "Submit an EveryStep outcome" },
               ] as const
             ).map((step, i) => {
               const state = fieldSteps[i];
@@ -1774,7 +1783,7 @@ export default async function JobDetailV2Page({
                   <div
                     style={{ fontSize: "13px", fontWeight: 600, color: "oklch(0.4 0.02 262)" }}
                   >
-                    No active hold
+                    No active wait
                   </div>
                   <div
                     style={{
@@ -1784,10 +1793,10 @@ export default async function JobDetailV2Page({
                       marginTop: "5px",
                     }}
                   >
-                    When the field flags <strong style={{ color: "oklch(0.45 0.02 262)" }}>Parts Needed</strong>{" "}
-                    or <strong style={{ color: "oklch(0.45 0.02 262)" }}>Approval Needed</strong>, the tracker
-                    appears here — every step (ordered → arrived → released) stays synced to this job and
-                    the next visit.
+                    Field waits appear here when the tech flags{" "}
+                    <strong style={{ color: "oklch(0.45 0.02 262)" }}>Parts Needed</strong>{" "}
+                    or <strong style={{ color: "oklch(0.45 0.02 262)" }}>Approval Needed</strong> — every step
+                    (ordered → arrived → released) stays synced. Admin holds also surface here when active.
                   </div>
                 </div>
               )}
@@ -1862,11 +1871,13 @@ export default async function JobDetailV2Page({
                   value: certsComplete ? "Sent" : "Not yet",
                   isOk: certsComplete,
                 },
-                {
-                  label: "Retest",
-                  value: opsStatus === "retest_needed" ? "Required" : "N/A",
-                  isOk: opsStatus !== "retest_needed",
-                },
+                ...(opsStatus === "retest_needed" || hasFailedEccRun
+                  ? [{
+                      label: "Retest",
+                      value: opsStatus === "retest_needed" ? "Required" : "N/A",
+                      isOk: opsStatus !== "retest_needed",
+                    }]
+                  : []),
               ].map((row) => (
                 <div
                   key={row.label}
@@ -2140,7 +2151,7 @@ export default async function JobDetailV2Page({
         <div
           style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}
         >
-          {!fieldComplete && (
+          {!isTerminal && (
             <form action={advanceStatusAction}>
               <input type="hidden" name="job_id" value={jobId} />
               <input type="hidden" name="return_to" value={returnTo} />
@@ -2158,14 +2169,16 @@ export default async function JobDetailV2Page({
             </form>
           )}
           <div style={{ display: "flex", gap: "8px" }}>
-            <SchedulePanel
-              jobId={jobId}
-              returnTo={returnTo}
-              scheduledDate={String(job.scheduled_date ?? "")}
-              windowStart={String(job.window_start ?? "")}
-              windowEnd={String(job.window_end ?? "")}
-              action={updateJobScheduleFromForm}
-            />
+            {!isTerminal ? (
+              <SchedulePanel
+                jobId={jobId}
+                returnTo={returnTo}
+                scheduledDate={String(job.scheduled_date ?? "")}
+                windowStart={String(job.window_start ?? "")}
+                windowEnd={String(job.window_end ?? "")}
+                action={updateJobScheduleFromForm}
+              />
+            ) : null}
             {isEccJob ? (
               <Link
                 href={`/jobs/${jobId}/tests`}
