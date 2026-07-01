@@ -1558,6 +1558,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/ops/closeout-queue`);
   revalidatePath(`/reports/closeout`);
@@ -1657,6 +1658,7 @@ export async function markEccPermitAvailableFromForm(formData: FormData): Promis
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/ops/closeout-queue`);
   revalidatePath(`/portal/jobs/${jobId}`);
@@ -1806,6 +1808,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/ops/closeout-queue`);
   redirectToJob({ notice: successNotice || undefined });
@@ -2374,6 +2377,7 @@ async function markServiceFollowUpProgressFromForm(
   if (eventErr) throw new Error(eventErr.message);
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   redirectToFollowUp(action.successBanner);
 }
@@ -2637,12 +2641,14 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
   const jobId = jobIdRaw.trim();
 
   const tab = String(formData.get("tab") || "info").trim() || "info";
+  const returnToRaw = String(formData.get("return_to") || "").trim();
   const partsNote = String(formData.get("parts_note") || "").trim();
 
   const redirectToFieldOutcome = (banner?: string): never =>
     redirect(
       buildJobOpsRedirectPath({
         jobId,
+        returnToRaw,
         fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
         banner,
       }),
@@ -2791,6 +2797,7 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
   });
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
@@ -2807,12 +2814,14 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
   const jobId = jobIdRaw.trim();
 
   const tab = String(formData.get("tab") || "info").trim() || "info";
+  const returnToRaw = String(formData.get("return_to") || "").trim();
   const approvalNote = String(formData.get("approval_note") || "").trim();
 
   const redirectToFieldOutcome = (banner?: string): never =>
     redirect(
       buildJobOpsRedirectPath({
         jobId,
+        returnToRaw,
         fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
         banner,
       }),
@@ -2961,6 +2970,7 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
   });
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
@@ -2977,12 +2987,14 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
   const jobId = jobIdRaw.trim();
 
   const tab = String(formData.get("tab") || "info").trim() || "info";
+  const returnToRaw = String(formData.get("return_to") || "").trim();
   const unableNote = String(formData.get("unable_note") || "").trim();
 
   const redirectToFieldOutcome = (banner?: string): never =>
     redirect(
       buildJobOpsRedirectPath({
         jobId,
+        returnToRaw,
         fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
         banner,
       }),
@@ -3131,6 +3143,7 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
   });
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${jobId}`);
@@ -3314,6 +3327,7 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
 
   const jobId = formData.get("job_id");
   if (typeof jobId !== "string" || !jobId) throw new Error("Missing job_id");
+  const returnToRaw = String(formData.get("return_to") || "").trim();
 
   const {
     data: { user },
@@ -3505,6 +3519,7 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
   if (eventErr) throw new Error(eventErr.message);
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
-  redirect(`/jobs/${jobId}?banner=field_complete`);
+  redirect(buildJobOpsRedirectPath({ jobId, returnToRaw, fallbackPath: `/jobs/${jobId}`, banner: "field_complete" }));
 }

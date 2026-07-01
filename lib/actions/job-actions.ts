@@ -3611,6 +3611,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${sourceJobId}`, "page");
+  revalidatePath(`/jobs/${sourceJobId}/v2`, "page");
   revalidatePath(`/jobs/${created.id}`, "page");
   revalidatePath("/ops", "page");
   revalidatePath("/jobs", "page");
@@ -3802,6 +3803,7 @@ export async function createCallbackVisitFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${sourceJobId}`, "page");
+  revalidatePath(`/jobs/${sourceJobId}/v2`, "page");
   revalidatePath(`/jobs/${created.id}`, "page");
   revalidatePath("/ops", "page");
   revalidatePath("/jobs", "page");
@@ -9915,6 +9917,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
   const tab = normalizeJobTab(String(formData.get("tab") || ""));
+  const returnToRaw = String(formData.get("return_to") || "").trim();
   const fieldStatusAnchor = "field-status-actions";
 
   if (!id) throw new Error("Job ID is required");
@@ -10571,6 +10574,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   console.log("[ADVANCE_STATUS_PREREVALIDATE]", { jobId: id, current, next });
   revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/jobs/${id}/v2`, "page");
   revalidatePath(`/jobs`);
   revalidatePath(`/ops`);
   revalidatePath(`/portal`);
@@ -10578,6 +10582,13 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   _ftCompletePhase("revalidation");
 
   console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_updated", current, next });
+  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+    const target = new URL(returnToRaw, "https://app.local");
+    target.searchParams.set("banner", "status_updated");
+    target.searchParams.set("rv", Date.now().toString());
+    _ftEmit("success", `${target.pathname}?${target.searchParams.toString()}`);
+    redirect(`${target.pathname}?${target.searchParams.toString()}`);
+  }
   _ftEmit("success", buildJobRedirect({ banner: "status_updated" }));
   redirect(
     buildJobRedirect({

@@ -291,6 +291,7 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   completePhase("revalidateJobPath");
 
   returnToPresent = !!safeReturnTo;
