@@ -32,11 +32,13 @@ export default function ChangeServiceLocationForm({
   currentLocationId,
   jobId,
   locations,
+  returnTo,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   currentLocationId: string;
   jobId: string;
   locations: SavedServiceLocation[];
+  returnTo?: string;
 }) {
   const [selectedLocationId, setSelectedLocationId] = useState(currentLocationId);
   const hasDifferentSelection = Boolean(
@@ -46,6 +48,7 @@ export default function ChangeServiceLocationForm({
   return (
     <form action={action} className="space-y-2">
       <input type="hidden" name="job_id" value={jobId} />
+      {returnTo && <input type="hidden" name="return_to" value={returnTo} />}
       <label className="grid gap-1 text-xs font-medium text-slate-700">
         Saved service location
         <select

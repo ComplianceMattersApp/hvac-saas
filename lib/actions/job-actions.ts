@@ -5388,6 +5388,7 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath("/ops");
   revalidatePath("/ops/field");
   revalidatePath(`/calendar`);
@@ -5456,6 +5457,7 @@ export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath("/ops");
   revalidatePath("/ops/field");
   revalidatePath(`/calendar`);
@@ -5496,6 +5498,7 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath("/ops");
   revalidatePath("/ops/field");
   revalidatePath(`/calendar`);
@@ -5704,6 +5707,7 @@ export async function updateJobTeamAssignmentsFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath("/ops");
   revalidatePath("/ops/field");
   revalidatePath(`/calendar`);
@@ -11052,6 +11056,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/jobs/${id}/v2`, "page");
   revalidatePath(`/ops`);
   revalidatePath(`/calendar`);
   revalidatePath(`/portal`);
@@ -11126,10 +11131,20 @@ export async function changeJobServiceLocationFromForm(formData: FormData) {
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
   const nextLocationId = String(formData.get("location_id") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+
+  function buildLocationRedirect(banner: string) {
+    if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+      const target = new URL(returnToRaw, "https://app.local");
+      target.searchParams.set("banner", banner);
+      return `${target.pathname}?${target.searchParams.toString()}`;
+    }
+    return `/jobs/${id}?banner=${banner}#job-location`;
+  }
 
   if (!id) throw new Error("Job ID is required");
   if (!nextLocationId) {
-    redirect(`/jobs/${id}?banner=service_location_change_invalid#job-location`);
+    redirect(buildLocationRedirect("service_location_change_invalid"));
   }
 
   const supabase = await createClient();
@@ -11152,13 +11167,13 @@ export async function changeJobServiceLocationFromForm(formData: FormData) {
 
   if (jobErr) throw jobErr;
   if (!job?.id || !job.customer_id) {
-    redirect(`/jobs/${id}?banner=service_location_change_invalid#job-location`);
+    redirect(buildLocationRedirect("service_location_change_invalid"));
   }
 
   const currentLocationId = String(job.location_id ?? "").trim();
   const customerId = String(job.customer_id ?? "").trim();
   if (currentLocationId && currentLocationId === nextLocationId) {
-    redirect(`/jobs/${id}?banner=service_location_already_selected#job-location`);
+    redirect(buildLocationRedirect("service_location_already_selected"));
   }
 
   const { data: nextLocation, error: nextLocationErr } = await supabase
@@ -11170,7 +11185,7 @@ export async function changeJobServiceLocationFromForm(formData: FormData) {
 
   if (nextLocationErr) throw nextLocationErr;
   if (!nextLocation?.id || String(nextLocation.customer_id ?? "").trim() !== customerId) {
-    redirect(`/jobs/${id}?banner=service_location_change_invalid#job-location`);
+    redirect(buildLocationRedirect("service_location_change_invalid"));
   }
 
   const { error: updateErr } = await supabase
@@ -11213,11 +11228,12 @@ export async function changeJobServiceLocationFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/jobs/${id}/v2`, "page");
   revalidatePath(`/customers/${customerId}`);
   if (currentLocationId) revalidatePath(`/locations/${currentLocationId}`);
   revalidatePath(`/locations/${nextLocationId}`);
 
-  redirect(`/jobs/${id}?banner=service_location_updated#job-location`);
+  redirect(buildLocationRedirect("service_location_updated"));
 }
 
 // Job timeline event writers: public_note + internal_note
@@ -11266,6 +11282,7 @@ export async function addPublicNoteFromForm(formData: FormData) {
   if (duplicateErr) throw duplicateErr;
   if (recentDuplicate?.id) {
     revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/v2`, "page");
     revalidatePath(`/ops`);
     redirect(
       buildPublicNoteRedirectPath({
@@ -11287,6 +11304,7 @@ export async function addPublicNoteFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   redirect(
     buildPublicNoteRedirectPath({
@@ -11432,6 +11450,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
       has_tagged_user_ids: taggedUserIds.length > 0,
     });
     revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/v2`, "page");
     revalidatePath(`/ops`);
     refresh();
     return;
@@ -11567,6 +11586,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
 
     if (mentionBanner) {
       revalidatePath(`/jobs/${jobId}`);
+      revalidatePath(`/jobs/${jobId}/v2`, "page");
       revalidatePath(`/ops`);
       redirect(
         buildInternalNoteRedirectPath({
@@ -11588,6 +11608,7 @@ export async function addInternalNoteFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
   redirect(
     buildInternalNoteRedirectPath({

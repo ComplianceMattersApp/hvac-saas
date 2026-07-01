@@ -12,6 +12,11 @@ import {
   getContractors,
   createNextServiceVisitFromForm,
   createCallbackVisitFromForm,
+  updateJobScheduleFromForm,
+  addInternalNoteFromForm,
+  addPublicNoteFromForm,
+  updateJobVisitScopeFromForm,
+  changeJobServiceLocationFromForm,
 } from "@/lib/actions/job-actions";
 import {
   markJobFieldCompleteFromForm,
@@ -27,6 +32,8 @@ import {
 } from "@/lib/actions/job-ops-actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
+import DeferredAddAssigneeForm from "../_components/DeferredAddAssigneeForm";
+import ChangeServiceLocationForm from "../_components/ChangeServiceLocationForm";
 import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
@@ -45,6 +52,8 @@ import ScrollSpyNav, { type NavItem } from "./_components/ScrollSpyNav";
 import AlertBanner from "./_components/AlertBanner";
 import FinishOutcomeCards from "./_components/FinishOutcomeCards";
 import RecordsTabs, { type RecordTab } from "./_components/RecordsTabs";
+import SchedulePanel from "./_components/SchedulePanel";
+import NoteComposer from "./_components/NoteComposer";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -307,12 +316,30 @@ export default async function JobDetailV2Page({
 
   // ── supplemental queries ──────────────────────────────────────────────────
 
-  const [assignmentMap, contractorRows] = await Promise.all([
+  const [assignmentMap, contractorRows, { data: customerLocationsRaw }] = await Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
       ? getContractors(accountOwnerUserId)
       : Promise.resolve([] as Array<{ id: string; business_name: string | null; display_name: string | null }>),
+    job.customer_id
+      ? supabase
+          .from("locations")
+          .select("id, address_line1, city, state, zip, postal_code")
+          .eq("customer_id", job.customer_id)
+          .eq("owner_user_id", accountOwnerUserId)
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [] }),
   ]);
+
+  const customerLocations: Array<{ id: string; label: string }> = (customerLocationsRaw ?? []).map(
+    (loc: any) => ({
+      id: String(loc.id),
+      label: [loc.address_line1, loc.city, loc.state, loc.zip ?? loc.postal_code]
+        .map((v: any) => String(v ?? "").trim())
+        .filter(Boolean)
+        .join(", ") || "Unknown address",
+    }),
+  );
 
   const assignedTeam = assignmentMap[jobId] ?? [];
   const contractor = job.contractor_id
@@ -663,21 +690,6 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   <div style={S.fieldLabel}>Assigned team</div>
-                  <Link
-                    href={`/jobs/${jobId}?tab=info#assigned-team`}
-                    style={{
-                      border: "none",
-                      background: "none",
-                      cursor: "pointer",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "oklch(0.5 0.13 255)",
-                      fontFamily: "inherit",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Manage
-                  </Link>
                 </div>
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                   {assignedTeam.map((member) => (
@@ -728,27 +740,15 @@ export default async function JobDetailV2Page({
                       ) : null}
                     </div>
                   ))}
-                  <Link
-                    href={`/jobs/${jobId}?tab=info#assigned-team`}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      padding: "7px 14px",
-                      borderRadius: "30px",
-                      background: "#fff",
-                      border: "1px dashed oklch(0.84 0.01 255)",
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      color: "oklch(0.5 0.13 255)",
-                      textDecoration: "none",
-                    }}
-                  >
-                    + Add
-                  </Link>
                 </div>
+              <Suspense fallback={null}>
+                <DeferredAddAssigneeForm
+                  jobId={jobId}
+                  tab="info"
+                  assignedTeam={assignedTeam}
+                  returnTo={returnTo}
+                />
+              </Suspense>
               </div>
             </div>
 
@@ -840,18 +840,18 @@ export default async function JobDetailV2Page({
                         Open in Maps
                       </a>
                     ) : null}
-                    <Link
-                      href={`/jobs/${jobId}?tab=info#change-location`}
-                      style={{
-                        fontSize: "12.5px",
-                        fontWeight: 600,
-                        color: "oklch(0.55 0.015 262)",
-                        textDecoration: "none",
-                      }}
-                    >
-                      Change location
-                    </Link>
                   </div>
+                  {customerLocations.length > 1 && (
+                    <div style={{ marginTop: "10px" }}>
+                      <ChangeServiceLocationForm
+                        action={changeJobServiceLocationFromForm}
+                        currentLocationId={location?.id ?? ""}
+                        jobId={jobId}
+                        locations={customerLocations}
+                        returnTo={returnTo}
+                      />
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -886,82 +886,14 @@ export default async function JobDetailV2Page({
             </a>
           </div>
 
-          {/* note composer — links to existing notes flow */}
-          <div
-            style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "18px" }}
-          >
-            <Link
-              href={`/jobs/${jobId}?tab=info#internal-notes`}
-              style={{
-                flex: 1,
-                height: "42px",
-                display: "flex",
-                alignItems: "center",
-                padding: "0 14px",
-                border: "1px solid oklch(0.91 0.006 250)",
-                borderRadius: "10px",
-                fontSize: "13px",
-                color: "oklch(0.62 0.015 262)",
-                textDecoration: "none",
-                cursor: "text",
-              }}
-            >
-              Add a note…
-            </Link>
-            <div
-              style={{
-                display: "flex",
-                padding: "3px",
-                borderRadius: "9px",
-                background: "oklch(0.96 0.004 250)",
-                border: "1px solid oklch(0.92 0.006 250)",
-              }}
-            >
-              <span
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: "7px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  background: "#fff",
-                  color: "oklch(0.4 0.13 255)",
-                  boxShadow: "0 1px 1px rgba(0,0,0,0.04)",
-                }}
-              >
-                Internal
-              </span>
-              <span
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: "7px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  color: "oklch(0.55 0.015 262)",
-                }}
-              >
-                Shared
-              </span>
-            </div>
-            <Link
-              href={`/jobs/${jobId}?tab=info#internal-notes`}
-              style={{
-                height: "42px",
-                padding: "0 20px",
-                borderRadius: "10px",
-                border: "none",
-                background: "oklch(0.27 0.02 262)",
-                color: "#fff",
-                fontSize: "13px",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                display: "inline-flex",
-                alignItems: "center",
-                textDecoration: "none",
-              }}
-            >
-              Save
-            </Link>
+          {/* note composer */}
+          <div style={{ marginBottom: "18px" }}>
+            <NoteComposer
+              jobId={jobId}
+              returnTo={returnTo}
+              internalAction={addInternalNoteFromForm}
+              publicAction={addPublicNoteFromForm}
+            />
           </div>
 
           {/* notes feed — deferred */}
@@ -1233,26 +1165,52 @@ export default async function JobDetailV2Page({
             }}
           >
             <div style={S.sectionLabel}>Work &amp; Billing</div>
-            <Link
-              href={`/jobs/${jobId}?tab=info#visit-scope`}
-              style={{
-                height: "34px",
-                padding: "0 14px",
-                borderRadius: "8px",
-                border: "1px solid oklch(0.85 0.04 255)",
-                background: "oklch(0.97 0.02 255)",
-                color: "oklch(0.45 0.14 255)",
-                fontSize: "12.5px",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-              }}
-            >
-              + Add Work
-            </Link>
+            <form action={updateJobVisitScopeFromForm} style={{ display: "inline" }}>
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="tab" value="info" />
+              <input type="hidden" name="return_to" value={returnTo} />
+              <input
+                type="hidden"
+                name="visit_scope_items_json"
+                value={JSON.stringify(visitScopeItems)}
+              />
+              <input
+                type="text"
+                name="visit_scope_summary"
+                defaultValue={String(job.visit_scope_summary ?? "")}
+                placeholder="Add / update work summary…"
+                style={{
+                  height: "34px",
+                  padding: "0 10px",
+                  borderRadius: "8px",
+                  border: "1px solid oklch(0.85 0.04 255)",
+                  background: "oklch(0.97 0.02 255)",
+                  color: "oklch(0.27 0.02 262)",
+                  fontSize: "12.5px",
+                  fontFamily: "inherit",
+                  width: "220px",
+                  outline: "none",
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  height: "34px",
+                  padding: "0 12px",
+                  marginLeft: "6px",
+                  borderRadius: "8px",
+                  border: "1px solid oklch(0.85 0.04 255)",
+                  background: "oklch(0.97 0.02 255)",
+                  color: "oklch(0.45 0.14 255)",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                Save
+              </button>
+            </form>
           </div>
 
           {/* work items */}
@@ -2035,27 +1993,14 @@ export default async function JobDetailV2Page({
             </form>
           )}
           <div style={{ display: "flex", gap: "8px" }}>
-            <Link
-              href={`/jobs/${jobId}?tab=info#schedule`}
-              style={{
-                flex: 1,
-                height: "38px",
-                borderRadius: "9px",
-                border: "1px solid oklch(0.9 0.006 250)",
-                background: "#fff",
-                fontSize: "12.5px",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                color: "oklch(0.32 0.02 262)",
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              Schedule
-            </Link>
+            <SchedulePanel
+              jobId={jobId}
+              returnTo={returnTo}
+              scheduledDate={String(job.scheduled_date ?? "")}
+              windowStart={String(job.window_start ?? "")}
+              windowEnd={String(job.window_end ?? "")}
+              action={updateJobScheduleFromForm}
+            />
             {isEccJob ? (
               <Link
                 href={`/jobs/${jobId}/tests`}
