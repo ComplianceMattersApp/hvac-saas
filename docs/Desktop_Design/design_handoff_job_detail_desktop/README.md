@@ -7,7 +7,20 @@ The redesign replaces the current accreted layout (nested same-styled cards, wea
 
 The page serves a mixed audience: field techs/raters (run the visit), office/dispatch (responsibility, scheduling, exceptions, returns/callbacks), billing/AR/owner (invoicing & closeout), and ECC/HERS/compliance users (permit, tests, certs, retest).
 
-> **Goal:** ship this as a **parallel V2 route** (e.g. `/jobs/[id]/v2` or behind a feature flag) — do **not** modify the live page. Once the V2 is verified across real job states and roles, cut over and keep the old page one release for rollback.
+> **Goal:** ship this as a **parallel V2 route** (e.g. `/jobs/[id]/v2` or behind a feature flag) — do **not** modify the live page. Once the V2 is verified across real job states and roles, cut over and keep the old page one release for rollback. **V1 is slated to become obsolete** — V2 is the intended permanent replacement, so build every path (including action redirects) as if V2 is the destination, not a preview.
+
+## Action return paths (mutations must stay on V2)
+**Symptom to avoid:** performing an action on V2 (close/finish job, save note, assign, invoice, log contact) bounces the user back to the old `/jobs/[id]` page. This happens because the shared server actions `redirect('/jobs/${id}')` on success — the read surface is V2 but the write path points home. In a real beta this kicks testers out of the exact thing they're testing.
+
+**Requirement:** every mutation reachable from the V2 page must return the user to the **V2** route.
+
+Implement whichever fits the codebase; prefer the one that survives the V1→obsolete cutover:
+
+1. **Preferred — thread a return path through the shared action.** Add a `returnTo` (hidden form field) or `?from=v2` param that each action reads, and redirect to it on success (default `/jobs/${id}` when absent). One handler serves both routes; V2 users land on `/jobs/${id}/v2`, everyone else on the old page. This is the safe parallel-route pattern and needs no logic change at cutover.
+2. **If actions are not shared** (V2 has its own action module) — hardcode success redirects to `/jobs/${id}/v2`.
+3. **Post-cutover simplification** — once V1 is retired, the canonical `/jobs/[id]` route *is* this design; collapse `/v2` back to `/jobs/[id]`, point all redirects there, and add a redirect/alias from any lingering `/v2` links. Until then, keep V2 self-contained.
+
+**Coverage checklist — audit every mutation for its success redirect:** finish/closeout, mark on-the-way / undo, schedule, save note (internal & shared), contact-logging outcomes, team assign/remove/set-primary, create/issue/void invoice, mark externally billed / no-charge, record payment, create return / callback visit, EveryStep part-ordered/arrived & approval-received, permit/cert/test actions. Each must resolve back to the V2 route (or the threaded `returnTo`). Also check client-side `router.push`/`<Link>` targets and any `revalidatePath('/jobs/[id]')` calls — add the `/v2` path to revalidation so the V2 view refreshes after a mutation.
 
 ## About the Design Files
 The files in this bundle are **design references created in HTML** — a prototype showing the intended look and behavior. They are **not production code to copy directly**.
@@ -136,6 +149,11 @@ Replace the prototype's `jobState` prop with **real job status** and derive per-
 ## Acceptance criteria
 - **State-derived rendering:** verified across needs-schedule, in-progress, waiting-on-part, approval-needed, completed-pending-closeout, ECC failed/retest, cancelled/archived — **no premature/out-of-state step is ever shown as actionable.**
 - **Roles:** correct for field, dispatch, billing, ECC (contractors are redirected to the portal, not this page).
+- **Input completeness (standing check, not one-off):** every mutation reachable from V2 — *including nested/expanded UI, deferred panels, and second-level actions inside components, not just top-level buttons* — must collect and submit **every field its server action requires**. A control that submits with a missing required field lands on a guard banner (`*_required` / `*_invalid`) instead of performing the task. Audit the *form behind the button*, not just that the button exists. (Regression seen: "Add Permit Number" fired the permit-save action with no permit value → `permit_number_required`.)
+- **No V2→V1 leaks on guard paths:** redirect audits must cover **guard/rejection redirects**, not just success paths. Every guard redirect (`schedule_required`, `ecc_test_required`, auth, etc.) must honor `return_to` and keep the user on `/jobs/${id}/v2`, falling back to the V1 path only when `return_to` is absent. The ECC "not yet tested" guard is the *normal* state of most ECC jobs before the rater runs tests — it fires constantly, so it must never bounce to V1.
+- **Guard banners must be visually distinct from success banners:** the V2 alert strip renders success in green and guard/rejection (`*_required`, `*_invalid`, `not_eligible`, `not_authorized`, wrong-state) in amber/red. A silent rejection must never look like a confirmation. (This is *why* the permit regression was invisible — a rejection read as success.) When a mutation's success and failure both return `?banner=X`, the distinct styling + copy must let the user tell them apart.
+- **Contact-method integrity:** contact-logging outcomes submit the correct `method` — "Sent Text" → `method="text"`, call outcomes → `method="call"`. Do not log a text as a call (corrupts contact history and call/text reporting).
+- **Preserve EveryStep detail (do not canned-string it):** Parts Needed / Approval Needed / Unable to Complete each collect an **optional free-text note** (which part, whose approval, why unable) — default to the constant only when the tech leaves it blank. A fixed hidden note on every outcome throws away exactly the micro-detail this product exists to capture.
 - **Dead-code sweep** (the page grew by accretion — leave cruft behind on the new route, don't port it): remove unused hash-target panels, duplicate note/contact/timeline render paths, orphaned handlers, unreachable status branches, and components the redesign obsoletes.
 - **Performance:** derive status/blocker/gating once (server or one memoized selector) rather than recomputing per section; lazy-load below-the-fold, tab-gated Records panels (timeline/attachments/equipment); defer the map and tests workspace until opened.
 - **Preserve** existing Records hash-target IDs and deep-link behavior in the first cut.

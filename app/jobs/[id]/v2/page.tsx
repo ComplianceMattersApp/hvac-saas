@@ -54,6 +54,7 @@ import FinishOutcomeCards from "./_components/FinishOutcomeCards";
 import RecordsTabs, { type RecordTab } from "./_components/RecordsTabs";
 import SchedulePanel from "./_components/SchedulePanel";
 import NoteComposer from "./_components/NoteComposer";
+import PermitForm from "./_components/PermitForm";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -399,7 +400,7 @@ export default async function JobDetailV2Page({
     .join(" ")
     .trim() || "Customer";
 
-  const jobDisplayRef = formatJobDisplayReference(job.job_display_number ?? "");
+  const jobDisplayRef = formatJobDisplayReference({ jobDisplayNumber: job.job_display_number, jobId: job.id });
 
   // closeout blockers
   const blockers = deriveBlockers({
@@ -477,10 +478,12 @@ export default async function JobDetailV2Page({
   // ── render ─────────────────────────────────────────────────────────────────
 
   return (
+    <div style={{ background: "oklch(0.975 0.004 250)", minHeight: "100vh" }}>
     <div
       style={{
         maxWidth: "1300px",
         margin: "0 auto",
+        padding: "0 28px",
         display: "grid",
         gridTemplateColumns: "minmax(0,1fr) 290px",
         gap: "32px",
@@ -500,7 +503,7 @@ export default async function JobDetailV2Page({
         }}
       >
         {/* alert / feedback strip */}
-        {bannerMessage ? <AlertBanner message={bannerMessage} /> : null}
+        {bannerMessage ? <AlertBanner slug={bannerMessage} /> : null}
 
         {/* header band */}
         <div style={{ padding: "32px 0 28px" }}>
@@ -571,7 +574,7 @@ export default async function JobDetailV2Page({
                 style={{
                   fontFamily: S.mono,
                   fontSize: "12.5px",
-                  color: "oklch(0.55 0.015 262)",
+                  color: "oklch(0.33 0.02 262)",
                   marginTop: "4px",
                 }}
               >
@@ -638,10 +641,15 @@ export default async function JobDetailV2Page({
                       "Sent Text": "sent_text",
                       Reached: "reached",
                     } as const;
+                    const methodMap = {
+                      "No Answer": "call",
+                      "Sent Text": "text",
+                      Reached: "call",
+                    } as const;
                     return (
                       <form key={label} action={logCustomerContactAttemptFromForm}>
                         <input type="hidden" name="job_id" value={jobId} />
-                        <input type="hidden" name="method" value="call" />
+                        <input type="hidden" name="method" value={methodMap[label]} />
                         <input type="hidden" name="result" value={resultMap[label]} />
                         <input type="hidden" name="return_to" value={returnTo} />
                         <input type="hidden" name="success_banner" value="contact_attempt_logged" />
@@ -944,7 +952,7 @@ export default async function JobDetailV2Page({
               EVERYSTEP
             </span>
           </div>
-          <div style={{ fontSize: "13px", color: "oklch(0.5 0.015 262)", marginBottom: "18px" }}>
+          <div style={{ fontSize: "13px", color: "oklch(0.33 0.02 262)", marginBottom: "18px" }}>
             {visitStarted
               ? "Tech is on site. When the work is done, submit an outcome below — it routes the job from here."
               : "This visit hasn't started yet. Field status moves through these steps — the finish outcomes open at the end."}
@@ -1485,27 +1493,65 @@ export default async function JobDetailV2Page({
             {/* schedule a next visit */}
             <div>
               <div style={{ ...S.fieldLabel, marginBottom: "10px" }}>Schedule a next visit</div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <form action={createReturnVisitAction}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <form action={createReturnVisitAction} style={{ display: "flex", gap: "6px" }}>
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="return_to" value={returnTo} />
+                  <input
+                    type="text"
+                    name="next_visit_reason"
+                    defaultValue={String(job.service_visit_reason ?? job.title ?? "").trim()}
+                    placeholder="Reason for return visit…"
+                    required
+                    style={{
+                      flex: 1,
+                      height: "34px",
+                      borderRadius: "8px",
+                      border: "1px solid oklch(0.88 0.006 250)",
+                      padding: "0 10px",
+                      fontSize: "12.5px",
+                      fontFamily: "inherit",
+                      color: "oklch(0.27 0.02 262)",
+                      background: "#fff",
+                      minWidth: 0,
+                    }}
+                  />
                   <ImmediateSubmitButton
                     pendingText="Creating…"
                     className=""
                     style={S.outlineBtn(true) as React.CSSProperties}
                   >
-                    Create Return Visit
+                    Return Visit
                   </ImmediateSubmitButton>
                 </form>
-                <form action={createCallbackAction}>
+                <form action={createCallbackAction} style={{ display: "flex", gap: "6px" }}>
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="return_to" value={returnTo} />
+                  <input
+                    type="text"
+                    name="callback_visit_reason"
+                    defaultValue={String(job.service_visit_reason ?? job.title ?? "").trim()}
+                    placeholder="Reason for callback…"
+                    required
+                    style={{
+                      flex: 1,
+                      height: "34px",
+                      borderRadius: "8px",
+                      border: "1px solid oklch(0.88 0.006 250)",
+                      padding: "0 10px",
+                      fontSize: "12.5px",
+                      fontFamily: "inherit",
+                      color: "oklch(0.27 0.02 262)",
+                      background: "#fff",
+                      minWidth: 0,
+                    }}
+                  />
                   <ImmediateSubmitButton
                     pendingText="Creating…"
                     className=""
                     style={S.outlineBtn(false) as React.CSSProperties}
                   >
-                    Create Callback
+                    Callback
                   </ImmediateSubmitButton>
                 </form>
               </div>
@@ -1739,28 +1785,12 @@ export default async function JobDetailV2Page({
               >
                 Open Tests Workspace
               </Link>
-              <form action={markEccPermitAvailableFromForm}>
-                <input type="hidden" name="job_id" value={jobId} />
-                <input type="hidden" name="return_to" value={returnTo} />
-                <ImmediateSubmitButton
-                  pendingText="Saving…"
-                  className=""
-                  style={{
-                    height: "38px",
-                    padding: "0 18px",
-                    borderRadius: "9px",
-                    border: "1px solid oklch(0.9 0.006 250)",
-                    background: "#fff",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    color: "oklch(0.32 0.02 262)",
-                  } as React.CSSProperties}
-                >
-                  Add Permit Number
-                </ImmediateSubmitButton>
-              </form>
+              <PermitForm
+                jobId={jobId}
+                returnTo={returnTo}
+                currentPermitNumber={isValidEccPermitNumber(job.permit_number) ? String(job.permit_number) : null}
+                action={markEccPermitAvailableFromForm}
+              />
             </div>
           </section>
         ) : null}
@@ -1924,7 +1954,7 @@ export default async function JobDetailV2Page({
             fontWeight: 600,
           }}
         >
-          Job {jobDisplayRef}
+          {jobDisplayRef}
         </div>
 
         {/* status pills */}
@@ -2094,6 +2124,7 @@ export default async function JobDetailV2Page({
           </div>
         )}
       </aside>
+    </div>
     </div>
   );
 }

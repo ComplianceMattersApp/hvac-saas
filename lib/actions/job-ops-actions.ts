@@ -3387,6 +3387,12 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
 
     if (!hasMeaningfulCompletedRun) {
       revalidatePath(`/jobs/${jobId}`);
+      revalidatePath(`/jobs/${jobId}/v2`, "page");
+      if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+        const target = new URL(returnToRaw, "https://app.local");
+        target.searchParams.set("banner", "ecc_test_required");
+        redirect(`${target.pathname}?${target.searchParams.toString()}`);
+      }
       redirect(`/jobs/${jobId}?notice=ecc_test_required`);
     }
   }
@@ -3394,6 +3400,10 @@ export async function markJobFieldCompleteFromForm(formData: FormData): Promise<
   // Idempotent: already field-complete
   if (beforeFieldComplete) {
     revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/v2`, "page");
+    if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+      redirect(returnToRaw);
+    }
     redirect(`/jobs/${jobId}`);
   }
 

@@ -3032,12 +3032,9 @@ export async function updateJobVisitScopeFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${jobId}`, "page");
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath("/jobs", "page");
   revalidatePath("/ops", "page");
-  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
-    const [pathOnly] = returnToRaw.split("?");
-    if (pathOnly) revalidatePath(pathOnly, "page");
-  }
 
   refresh();
   redirectToJobWithBanner({
@@ -9927,6 +9924,21 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   if (!id) throw new Error("Job ID is required");
 
   const buildJobRedirect = (params: Record<string, string>) => {
+    if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
+      const target = new URL(returnToRaw, "https://app.local");
+      for (const [key, value] of Object.entries(params)) {
+        // V1 uses ?notice= and ?schedule_required=1 for guard params; V2 reads ?banner=.
+        // Remap when targeting a return_to path so guard messages show on V2.
+        if (key === "notice") {
+          target.searchParams.set("banner", value);
+        } else if (key === "schedule_required") {
+          target.searchParams.set("banner", "schedule_required");
+        } else {
+          target.searchParams.set(key, value);
+        }
+      }
+      return `${target.pathname}?${target.searchParams.toString()}`;
+    }
     const query = new URLSearchParams();
     query.set("tab", tab);
     for (const [key, value] of Object.entries(params)) {
@@ -10171,6 +10183,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "on_the_way_stamp", current, next });
       _ftEmit("no-op:status_already_updated", buildJobRedirect({ banner: "status_already_updated" }));
       revalidatePath(`/jobs/${id}`);
+      revalidatePath(`/jobs/${id}/v2`, "page");
       revalidatePath(`/jobs`);
       revalidatePath(`/ops`);
       revalidatePath(`/portal`);
@@ -10322,6 +10335,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "else", current, next });
       _ftEmit("no-op:status_already_updated", buildJobRedirect({ banner: "status_already_updated" }));
       revalidatePath(`/jobs/${id}`);
+      revalidatePath(`/jobs/${id}/v2`, "page");
       revalidatePath(`/jobs`);
       revalidatePath(`/ops`);
       revalidatePath(`/portal`);

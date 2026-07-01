@@ -54,6 +54,24 @@ const OUTCOMES: OutcomeDef[] = [
   },
 ];
 
+const NOTE_FIELD: Partial<Record<OutcomeDef["id"], string>> = {
+  parts: "parts_note",
+  approval: "approval_note",
+  unable: "unable_note",
+};
+
+const NOTE_DEFAULT: Partial<Record<OutcomeDef["id"], string>> = {
+  parts: "Parts needed — flagged from field.",
+  approval: "Approval needed — flagged from field.",
+  unable: "Unable to complete — flagged from field.",
+};
+
+const NOTE_PLACEHOLDER: Partial<Record<OutcomeDef["id"], string>> = {
+  parts: "Which part? e.g. blower motor, capacitor…",
+  approval: "Whose approval? e.g. homeowner, HOA, property manager…",
+  unable: "Why unable? e.g. no access, needs permit, needs electrical work…",
+};
+
 const CARD_BORDER = "oklch(0.92 0.006 250)";
 
 function colorMixWithWhite(oklchColor: string, percent: number) {
@@ -78,6 +96,7 @@ export default function FinishOutcomeCards({
   unableAction,
 }: FinishOutcomeCardsProps) {
   const [selected, setSelected] = useState<OutcomeDef["id"] | null>(null);
+  const [noteText, setNoteText] = useState("");
 
   const actionMap: Record<OutcomeDef["id"], ServerAction> = {
     done: completeAction,
@@ -86,7 +105,19 @@ export default function FinishOutcomeCards({
     unable: unableAction,
   };
 
+  const handleSelect = (id: OutcomeDef["id"]) => {
+    if (selected === id) {
+      setSelected(null);
+    } else {
+      setSelected(id);
+      setNoteText("");
+    }
+  };
+
   const sel = OUTCOMES.find((o) => o.id === selected) ?? null;
+  const noteField = sel ? NOTE_FIELD[sel.id] : undefined;
+  const noteDefault = sel ? NOTE_DEFAULT[sel.id] : undefined;
+  const notePlaceholder = sel ? NOTE_PLACEHOLDER[sel.id] : undefined;
 
   return (
     <div>
@@ -97,7 +128,7 @@ export default function FinishOutcomeCards({
             <button
               key={o.id}
               type="button"
-              onClick={() => setSelected(isSelected ? null : o.id)}
+              onClick={() => handleSelect(o.id)}
               style={{
                 cursor: "pointer",
                 textAlign: "left",
@@ -157,66 +188,90 @@ export default function FinishOutcomeCards({
             background: colorMixWithWhite(sel.tone, 7),
             border: `1px solid ${colorMixWithWhite(sel.tone, 35)}`,
             display: "flex",
-            alignItems: "center",
-            gap: "14px",
+            flexDirection: "column",
+            gap: "10px",
           }}
         >
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="return_to" value={returnTo} />
-          {sel.id === "parts" ? (
-            <input type="hidden" name="parts_note" value="Parts needed — flagged from field." />
-          ) : null}
-          {sel.id === "approval" ? (
-            <input type="hidden" name="approval_note" value="Approval needed — flagged from field." />
-          ) : null}
-          {sel.id === "unable" ? (
-            <input type="hidden" name="unable_note" value="Unable to complete — flagged from field." />
+
+          {/* Note field: hidden carries the value (typed text or fallback constant) */}
+          {noteField && noteDefault ? (
+            <input
+              type="hidden"
+              name={noteField}
+              value={noteText.trim() || noteDefault}
+            />
           ) : null}
 
-          <div style={{ flex: 1 }}>
-            <div
-              style={{
-                fontFamily: "var(--font-ibm-plex-mono), monospace",
-                fontSize: "10px",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                fontWeight: 600,
-                color: sel.tone,
-              }}
-            >
-              {sel.heading}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-ibm-plex-mono), monospace",
+                  fontSize: "10px",
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  fontWeight: 600,
+                  color: sel.tone,
+                }}
+              >
+                {sel.heading}
+              </div>
+              <div
+                style={{
+                  fontSize: "13px",
+                  color: "oklch(0.35 0.02 262)",
+                  marginTop: "4px",
+                }}
+              >
+                {sel.detail}
+              </div>
             </div>
-            <div
+
+            <ImmediateSubmitButton
+              pendingText="Submitting..."
+              className=""
               style={{
+                height: "40px",
+                padding: "0 20px",
+                borderRadius: "10px",
+                border: "none",
+                background: sel.tone,
+                color: "#fff",
                 fontSize: "13px",
-                color: "oklch(0.35 0.02 262)",
-                marginTop: "4px",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                flexShrink: 0,
+                whiteSpace: "nowrap",
               }}
             >
-              {sel.detail}
-            </div>
+              {sel.cta}
+            </ImmediateSubmitButton>
           </div>
 
-          <ImmediateSubmitButton
-            pendingText="Submitting..."
-            className=""
-            style={{
-              height: "40px",
-              padding: "0 20px",
-              borderRadius: "10px",
-              border: "none",
-              background: sel.tone,
-              color: "#fff",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              flexShrink: 0,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {sel.cta}
-          </ImmediateSubmitButton>
+          {/* Optional free-text note for non-complete outcomes */}
+          {notePlaceholder ? (
+            <input
+              type="text"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder={notePlaceholder}
+              style={{
+                width: "100%",
+                height: "32px",
+                borderRadius: "7px",
+                border: `1px solid ${colorMixWithWhite(sel.tone, 50)}`,
+                padding: "0 10px",
+                fontSize: "12.5px",
+                fontFamily: "inherit",
+                color: "oklch(0.33 0.02 262)",
+                background: "#fff",
+                boxSizing: "border-box",
+              }}
+            />
+          ) : null}
         </form>
       ) : null}
     </div>
