@@ -216,14 +216,17 @@ export default async function DeferredServiceChainPanelBody({
 	}
 
 	return (
-		<div className="max-h-96 space-y-2 overflow-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
+		<div className="relative max-h-96 space-y-2 overflow-auto pl-7 pr-1 sm:max-h-none sm:overflow-visible sm:pl-8 sm:pr-0">
+			<div aria-hidden="true" className="absolute bottom-4 left-3 top-4 w-px bg-slate-200 sm:left-3.5" />
 			{serviceChainJobs.map((visit: any, idx: number) => {
 				const visitId = String(visit.id ?? "").trim();
+				const parentVisitId = String((visit as any)?.parent_job_id ?? "").trim();
 				const followUpProgress = serviceFollowUpProgressByJob.get(visitId);
 				const isContinuedParent = Boolean(followUpProgress?.continuedThroughChildJobId);
 				const isLinkedRetestParent =
 					isEccJobType((visit as any)?.job_type) && retestParentIdsWithActiveChild.has(visitId);
 				const isContinuationChild = continuedParentIdByChildId.has(visitId);
+				const isLinkedChildVisit = Boolean(parentVisitId);
 				const isCurrent = visit.id === currentJobId;
 				const isCurrentActive = isCurrent && !isContinuedParent && !isLinkedRetestParent;
 				const visitLabel = serviceChainVisitLabel(visit, idx);
@@ -241,11 +244,34 @@ export default async function DeferredServiceChainPanelBody({
 				return (
 					<div
 						key={visit.id}
-						className={[
-							"rounded-xl border p-3.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]",
-							isCurrentActive || isContinuationChild ? "border-slate-900/90 bg-slate-50" : "border-slate-200/80 bg-white",
-						].join(" ")}
+						className={["relative", isLinkedChildVisit ? "ml-5 sm:ml-7" : ""].join(" ")}
 					>
+						<span
+							aria-hidden="true"
+							className={[
+								"absolute top-6 h-px bg-slate-300",
+								isLinkedChildVisit ? "-left-[2.75rem] w-11 sm:-left-[3.25rem] sm:w-[3.25rem]" : "-left-4 w-4 sm:-left-[1.125rem] sm:w-[1.125rem]",
+							].join(" ")}
+						/>
+						<span
+							aria-hidden="true"
+							className={[
+								"absolute top-[1.15rem] h-3 w-3 rounded-full border-2 bg-white",
+								isCurrentActive || isContinuationChild ? "border-blue-600" : isLinkedChildVisit ? "border-slate-500" : "border-slate-300",
+								isLinkedChildVisit ? "-left-[2.95rem] sm:-left-[3.45rem]" : "-left-[1.25rem] sm:-left-[1.375rem]",
+							].join(" ")}
+						/>
+						<div
+							className={[
+								"rounded-xl border p-3.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.35)]",
+								isCurrentActive || isContinuationChild ? "border-slate-900/90 bg-slate-50" : "border-slate-200/80 bg-white",
+							].join(" ")}
+						>
+							{isLinkedChildVisit ? (
+								<div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+									Linked to previous visit
+								</div>
+							) : null}
 						<div className="flex items-start justify-between gap-3">
 							<div className="min-w-0">
 								<div className="flex flex-wrap items-center gap-2">
@@ -314,6 +340,7 @@ export default async function DeferredServiceChainPanelBody({
 								</Link>
 							) : null}
 						</div>
+					</div>
 					</div>
 				);
 			})}
