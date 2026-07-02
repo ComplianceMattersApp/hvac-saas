@@ -31,8 +31,10 @@ import {
   markInvoiceCompleteFromForm,
   releaseAndReevaluateFromForm,
   updateJobOpsDetailsFromForm,
+  updateJobOpsFromForm,
 } from "@/lib/actions/job-ops-actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
+import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import DeferredAddAssigneeForm from "../_components/DeferredAddAssigneeForm";
 import ChangeServiceLocationForm from "../_components/ChangeServiceLocationForm";
@@ -60,6 +62,7 @@ import RecordsTabs, { type RecordTab } from "./_components/RecordsTabs";
 import SchedulePanel from "./_components/SchedulePanel";
 import NoteComposer from "./_components/NoteComposer";
 import PermitForm from "./_components/PermitForm";
+import InterruptionHub from "./_components/InterruptionHub";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -337,7 +340,14 @@ export default async function JobDetailV2Page({
 
   // ── supplemental queries ──────────────────────────────────────────────────
 
-  const [assignmentMap, contractorRows, { data: customerLocationsRaw }, billingMode, { data: primaryInvoiceRaw }] = await Promise.all([
+  const [
+    assignmentMap,
+    contractorRows,
+    { data: customerLocationsRaw },
+    billingMode,
+    { data: primaryInvoiceRaw },
+    contactAttemptsResult,
+  ] = await Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
       ? getContractors(accountOwnerUserId)
@@ -358,6 +368,13 @@ export default async function JobDetailV2Page({
       .eq("invoice_kind", "primary")
       .neq("status", "void")
       .maybeSingle(),
+    supabase
+      .from("job_events")
+      .select("created_at", { count: "exact" })
+      .eq("job_id", jobId)
+      .eq("event_type", "customer_attempt")
+      .order("created_at", { ascending: false })
+      .limit(1),
   ]);
 
   const customerLocations: Array<{ id: string; label: string }> = (customerLocationsRaw ?? []).map(
@@ -534,6 +551,27 @@ export default async function JobDetailV2Page({
     return `/estimates/new?${params.toString()}`;
   })();
 
+  // contact attempts
+  const contactAttemptCount = Number(contactAttemptsResult.count ?? 0);
+  const latestAttemptAt = contactAttemptsResult.data?.[0]?.created_at ?? null;
+  const contactAttemptLabel = contactAttemptCount > 0
+    ? `${contactAttemptCount} attempt${contactAttemptCount === 1 ? "" : "s"}${latestAttemptAt ? ` · last ${formatRecentAttemptDateTime(String(latestAttemptAt))}` : ""}`
+    : "No attempts yet";
+
+  // next action sentence (drives the rail NEXT ACTION group)
+  const nextActionSentence = (() => {
+    if (status === "cancelled") return "This job has been cancelled.";
+    if (!fieldComplete) {
+      if (status === "in_process") return "Visit in progress — finish and submit when work is done.";
+      if (status === "on_the_way") return "Tech is en route — mark on site when arrived.";
+      return "Schedule and dispatch to start this job.";
+    }
+    if (closeoutNeeds.needsCerts && closeoutNeeds.needsInvoice) return "Field work complete — send certs and invoice to close this job.";
+    if (closeoutNeeds.needsCerts) return "Field work complete — send certs to close this job.";
+    if (closeoutNeeds.needsInvoice) return "Invoice needed — send to close out billing.";
+    return "All done — this job is fully closed out.";
+  })();
+
   // equipment rows
   const equipmentRows = ((job as any).job_equipment ?? []) as Array<{
     id: string;
@@ -601,90 +639,32 @@ export default async function JobDetailV2Page({
 
         {/* header band */}
         <div style={{ padding: "32px 0 28px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "20px" }}>
-            <div style={{ minWidth: 0 }}>
-              <div
-                style={{
-                  fontFamily: S.mono,
-                  fontSize: "11px",
-                  letterSpacing: "0.06em",
-                  fontWeight: 600,
-                  color: "oklch(0.55 0.015 262)",
-                  marginBottom: "9px",
-                }}
-              >
-                <Link href="/ops" style={{ color: "oklch(0.55 0.17 255)", textDecoration: "none" }}>
-                  Ops
-                </Link>
-                {" "}/ Jobs / <span style={{ color: "oklch(0.4 0.02 262)" }}>{jobDisplayRef}</span>
-              </div>
-              <h1
-                style={{
-                  margin: 0,
-                  fontSize: "28px",
-                  fontWeight: 700,
-                  letterSpacing: "-0.015em",
-                  color: "oklch(0.27 0.02 262)",
-                }}
-              >
-                {job.title}
-              </h1>
-            </div>
-            {contractorName ? (
-              <div
-                style={{
-                  flexShrink: 0,
-                  padding: "12px 16px",
-                  borderRadius: "11px",
-                  background: "oklch(0.97 0.03 75)",
-                  border: "1px solid oklch(0.88 0.1 70)",
-                  minWidth: "160px",
-                }}
-              >
-                <div
-                  style={{
-                    fontFamily: S.mono,
-                    fontSize: "9.5px",
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: "oklch(0.55 0.1 65)",
-                    fontWeight: 600,
-                    marginBottom: "5px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "7px",
-                  }}
-                >
-                  Contractor / Billing
-                  {isEccJob ? (
-                    <span
-                      style={{
-                        fontSize: "8.5px",
-                        fontWeight: 700,
-                        padding: "2px 5px",
-                        borderRadius: "4px",
-                        background: "oklch(0.92 0.07 70)",
-                        color: "oklch(0.42 0.1 65)",
-                        letterSpacing: "0.04em",
-                      }}
-                    >
-                      ECC · EXTERNAL
-                    </span>
-                  ) : null}
-                </div>
-                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.35 0.02 262)" }}>
-                  {contractorName}
-                </div>
-                <div style={{ fontSize: "11.5px", color: "oklch(0.6 0.015 262)", marginTop: "2px" }}>
-                  {billingDisposition === "externally_billed"
-                    ? "Externally billed"
-                    : billingDisposition === "no_charge"
-                      ? "No charge"
-                      : "See billing section"}
-                </div>
-              </div>
-            ) : null}
+          <div
+            style={{
+              fontFamily: S.mono,
+              fontSize: "11px",
+              letterSpacing: "0.06em",
+              fontWeight: 600,
+              color: "oklch(0.55 0.015 262)",
+              marginBottom: "9px",
+            }}
+          >
+            <Link href="/ops" style={{ color: "oklch(0.55 0.17 255)", textDecoration: "none" }}>
+              Ops
+            </Link>
+            {" "}/ Jobs / <span style={{ color: "oklch(0.4 0.02 262)" }}>{jobDisplayRef}</span>
           </div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "28px",
+              fontWeight: 700,
+              letterSpacing: "-0.015em",
+              color: "oklch(0.27 0.02 262)",
+            }}
+          >
+            {job.title}
+          </h1>
         </div>
 
         {/* ── JOB BRIEF ─────────────────────────────────────────────────────── */}
@@ -694,19 +674,69 @@ export default async function JobDetailV2Page({
           style={S.section}
         >
           <div style={{ ...S.sectionLabel, marginBottom: "20px" }}>Job Brief</div>
+          {/* 2×2 grid: Visit Reason / Customer Concern / Contractor / Billing */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px 48px" }}>
+            <div>
+              <div style={S.fieldLabel}>Visit Reason</div>
+              <div style={S.fieldValue}>{visitReasonText || "—"}</div>
+            </div>
+            <div>
+              <div style={S.fieldLabel}>Customer Concern</div>
+              <div style={S.fieldValue}>
+                {jobTitleText && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase()
+                  ? jobTitleText
+                  : "—"}
+              </div>
+            </div>
+            <div>
+              <div style={S.fieldLabel}>Contractor</div>
+              <div style={S.fieldValue}>{contractorName || "—"}</div>
+            </div>
+            <div>
+              <div style={S.fieldLabel}>Billing</div>
+              <div style={{ ...S.fieldValue, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <span>
+                  {billingDisposition === "externally_billed"
+                    ? "Externally billed"
+                    : billingDisposition === "no_charge"
+                      ? "No charge"
+                      : "See billing section"}
+                </span>
+                {billingDisposition === "externally_billed" ? (
+                  <span
+                    style={{
+                      fontFamily: S.mono,
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      background: "oklch(0.96 0.05 75)",
+                      color: "oklch(0.48 0.12 65)",
+                    }}
+                  >
+                    EXTERNAL
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          {/* full-width Work Summary */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "24px 48px",
+              marginTop: "20px",
+              paddingTop: "18px",
+              borderTop: "1px solid oklch(0.93 0.005 250)",
             }}
           >
-            {briefFields.map((f) => (
-              <div key={f.label}>
-                <div style={S.fieldLabel}>{f.label}</div>
-                <div style={S.fieldValue}>{f.value}</div>
-              </div>
-            ))}
+            <div style={S.fieldLabel}>Work Summary</div>
+            <div style={{ ...S.fieldValue, lineHeight: 1.65 }}>
+              {isTerminal
+                ? String(job.visit_scope_summary ?? "").trim() || "Visit submitted — no summary captured."
+                : visitStarted
+                  ? String(job.visit_scope_summary ?? "").trim() || "On site — work in progress."
+                  : String(job.visit_scope_summary ?? "").trim() || "Pending field visit — no work items captured yet."}
+            </div>
           </div>
         </section>
 
@@ -787,6 +817,9 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   Contact Logging
+                  <span style={{ fontWeight: 400, letterSpacing: "0", textTransform: "none", fontSize: "11px", color: "oklch(0.58 0.015 262)", marginLeft: "6px" }}>
+                    {contactAttemptLabel}
+                  </span>
                 </span>
                 <div style={{ display: "flex", gap: "6px" }}>
                   {(["No Answer", "Sent Text", "Reached"] as const).map((label) => {
@@ -1804,7 +1837,7 @@ export default async function JobDetailV2Page({
             </span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "48px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: "40px" }}>
             {/* schedule a next visit */}
             <div>
               <div style={{ ...S.fieldLabel, marginBottom: "10px" }}>Schedule a next visit</div>
@@ -2019,30 +2052,29 @@ export default async function JobDetailV2Page({
                   <div
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "10px",
+                      fontSize: "9.5px",
                       fontWeight: 600,
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
-                      color: "oklch(0.65 0.015 262)",
-                      padding: "5px 10px",
+                      color: "oklch(0.58 0.015 262)",
+                      padding: "4px 9px",
                       borderRadius: "6px",
                       background: "oklch(0.97 0.004 250)",
                       border: "1px solid oklch(0.92 0.006 250)",
-                      display: "inline-block",
-                      marginBottom: "10px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      marginBottom: "12px",
                     }}
                   >
+                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "oklch(0.72 0.015 262)", flexShrink: 0 }} />
                     No active hold
                   </div>
-                  <div
-                    style={{
-                      fontSize: "12.5px",
-                      lineHeight: 1.55,
-                      color: "oklch(0.55 0.015 262)",
-                    }}
-                  >
-                    When the field flags a hold, its tracker activates here — ordered → arrived → released stays synced to this job and the next visit.
-                  </div>
+                  <InterruptionHub
+                    jobId={jobId}
+                    returnTo={returnTo}
+                    action={updateJobOpsFromForm}
+                  />
                 </div>
               )}
             </div>
@@ -2551,12 +2583,12 @@ export default async function JobDetailV2Page({
           position: "sticky",
           top: "72px",
           alignSelf: "start",
-          padding: "24px 0",
+          padding: "24px 0 32px",
           maxHeight: "calc(100vh - 80px)",
           overflowY: "auto",
         }}
       >
-        {/* job id */}
+        {/* identity */}
         <div
           style={{
             fontFamily: S.mono,
@@ -2614,28 +2646,132 @@ export default async function JobDetailV2Page({
           </span>
         </div>
 
-        {/* primary actions */}
+        {/* NEXT ACTION group */}
         <div
-          style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "16px" }}
+          style={{
+            marginTop: "18px",
+            paddingBottom: "18px",
+            borderBottom: "1px solid oklch(0.91 0.006 250)",
+          }}
         >
-          {!isTerminal && (
-            <form action={advanceStatusAction}>
-              <input type="hidden" name="job_id" value={jobId} />
-              <input type="hidden" name="return_to" value={returnTo} />
-              <ImmediateSubmitButton
-                pendingText="Updating…"
-                className=""
-                style={S.primaryBtn as React.CSSProperties}
+          {/* amber label */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              marginBottom: "8px",
+            }}
+          >
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: "oklch(0.72 0.15 70)",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontFamily: S.mono,
+                fontSize: "9.5px",
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "oklch(0.5 0.12 65)",
+              }}
+            >
+              Next Action
+            </span>
+          </div>
+          {/* plain-language sentence */}
+          <div
+            style={{
+              fontSize: "13.5px",
+              lineHeight: 1.5,
+              color: "oklch(0.32 0.02 262)",
+              fontWeight: 500,
+              marginBottom: "14px",
+            }}
+          >
+            {nextActionSentence}
+          </div>
+          {/* stacked action buttons */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+            {/* Primary button */}
+            {!isTerminal ? (
+              <form action={advanceStatusAction}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="return_to" value={returnTo} />
+                <ImmediateSubmitButton
+                  pendingText="Updating…"
+                  className=""
+                  style={{
+                    ...(S.primaryBtn as React.CSSProperties),
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  {status === "in_process"
+                    ? "Finish Visit"
+                    : status === "on_the_way"
+                      ? "Mark On Site"
+                      : "Mark On the Way"}
+                </ImmediateSubmitButton>
+              </form>
+            ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton ? (
+              <form action={markCertsCompleteFromForm}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="return_to" value={returnTo} />
+                <ImmediateSubmitButton
+                  pendingText="Saving…"
+                  className=""
+                  style={{
+                    ...(S.primaryBtn as React.CSSProperties),
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  Send Certs
+                </ImmediateSubmitButton>
+              </form>
+            ) : fieldComplete && closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
+              <form action={markInvoiceCompleteFromForm}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="return_to" value={returnTo} />
+                <ImmediateSubmitButton
+                  pendingText="Saving…"
+                  className=""
+                  style={{
+                    ...(S.primaryBtn as React.CSSProperties),
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  Send Invoice
+                </ImmediateSubmitButton>
+              </form>
+            ) : fieldComplete ? (
+              <div
+                style={{
+                  padding: "9px 13px",
+                  borderRadius: "9px",
+                  border: "1px solid oklch(0.88 0.06 150)",
+                  background: "oklch(0.97 0.03 150)",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "oklch(0.42 0.1 150)",
+                  textAlign: "center",
+                }}
               >
-                {status === "in_process"
-                  ? "Finish Visit"
-                  : status === "on_the_way"
-                    ? "Mark On Site"
-                    : "Mark On the Way"}
-              </ImmediateSubmitButton>
-            </form>
-          )}
-          <div style={{ display: "flex", gap: "8px" }}>
+                Closed out ✓
+              </div>
+            ) : null}
+            {/* Secondary button */}
             {!isTerminal ? (
               <SchedulePanel
                 jobId={jobId}
@@ -2645,216 +2781,25 @@ export default async function JobDetailV2Page({
                 windowEnd={String(job.window_end ?? "")}
                 action={updateJobScheduleFromForm}
               />
+            ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
+              <form action={markInvoiceCompleteFromForm}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="return_to" value={returnTo} />
+                <ImmediateSubmitButton
+                  pendingText="Saving…"
+                  className=""
+                  style={{
+                    ...(S.outlineBtn(false) as React.CSSProperties),
+                    width: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                  }}
+                >
+                  Send Invoice
+                </ImmediateSubmitButton>
+              </form>
             ) : null}
-            {isEccJob ? (
-              <Link
-                href={`/jobs/${jobId}/tests`}
-                style={{
-                  flex: 1,
-                  height: "38px",
-                  borderRadius: "9px",
-                  border: "1px solid oklch(0.9 0.006 250)",
-                  background: "#fff",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  color: "oklch(0.32 0.02 262)",
-                  textDecoration: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                Tests
-              </Link>
-            ) : null}
-          </div>
-        </div>
-
-        {/* PRIMARY NEXT ACTION panel */}
-        <div
-          style={{
-            marginTop: "20px",
-            borderRadius: "12px",
-            border: "1px solid oklch(0.88 0.04 255)",
-            background: "#fff",
-            overflow: "hidden",
-            boxShadow: "0 10px 24px -16px oklch(0.5 0.17 255 / 0.2)",
-          }}
-        >
-          <div style={{ height: "3px", background: "linear-gradient(90deg, oklch(0.27 0.02 262), oklch(0.5 0.17 255))" }} />
-          <div style={{ padding: "13px 15px 14px" }}>
-            {/* panel label */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "7px",
-                fontFamily: S.mono,
-                fontSize: "9.5px",
-                fontWeight: 600,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "oklch(0.42 0.08 255)",
-                marginBottom: "13px",
-              }}
-            >
-              <span
-                style={{
-                  width: "20px",
-                  height: "20px",
-                  borderRadius: "6px",
-                  background: "oklch(0.27 0.02 262)",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  paddingBottom: "1px",
-                }}
-              >
-                ›
-              </span>
-              Primary Next Action
-            </div>
-
-            {/* state-driven close-out actions */}
-            {fieldComplete && (closeoutNeeds.needsCerts || closeoutNeeds.needsInvoice) ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "13px" }}>
-                {closeoutNeeds.needsCerts && canShowCertsButton ? (
-                  <form action={markCertsCompleteFromForm}>
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input type="hidden" name="return_to" value={returnTo} />
-                    <ImmediateSubmitButton
-                      pendingText="Saving…"
-                      className=""
-                      style={{
-                        ...(S.primaryBtn as React.CSSProperties),
-                        height: "38px",
-                        justifyContent: "center",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      ✓ Certs Sent
-                    </ImmediateSubmitButton>
-                  </form>
-                ) : null}
-                {closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
-                  <form action={markInvoiceCompleteFromForm}>
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input type="hidden" name="return_to" value={returnTo} />
-                    <ImmediateSubmitButton
-                      pendingText="Saving…"
-                      className=""
-                      style={{
-                        ...(S.outlineBtn(false) as React.CSSProperties),
-                        width: "100%",
-                        justifyContent: "center",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      Send Invoice
-                    </ImmediateSubmitButton>
-                  </form>
-                ) : null}
-              </div>
-            ) : fieldComplete ? (
-              <div
-                style={{
-                  marginBottom: "13px",
-                  padding: "9px 13px",
-                  borderRadius: "9px",
-                  border: "1px solid oklch(0.88 0.06 150)",
-                  background: "oklch(0.97 0.03 150)",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  color: "oklch(0.42 0.1 150)",
-                  textAlign: "center",
-                }}
-              >
-                Closed out ✓
-              </div>
-            ) : null}
-
-            {/* shortcut row */}
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "6px",
-                borderTop: "1px solid oklch(0.93 0.005 250)",
-                paddingTop: "11px",
-              }}
-            >
-              <Link
-                href="/ops"
-                style={{
-                  ...(S.contactBtn as React.CSSProperties),
-                  display: "inline-flex",
-                  alignItems: "center",
-                  textDecoration: "none",
-                }}
-              >
-                Back to Ops
-              </Link>
-              {job.customer_id ? (
-                <Link
-                  href={`/customers/${job.customer_id}`}
-                  style={{
-                    ...(S.contactBtn as React.CSSProperties),
-                    display: "inline-flex",
-                    alignItems: "center",
-                    textDecoration: "none",
-                  }}
-                >
-                  Open Customer
-                </Link>
-              ) : null}
-              {createEstimateFromJobHref ? (
-                <Link
-                  href={createEstimateFromJobHref}
-                  style={{
-                    ...(S.contactBtn as React.CSSProperties),
-                    display: "inline-flex",
-                    alignItems: "center",
-                    textDecoration: "none",
-                  }}
-                >
-                  Create Estimate
-                </Link>
-              ) : null}
-              {isEccJob && fieldComplete ? (
-                <Link
-                  href={`/jobs/${jobId}/tests`}
-                  style={{
-                    ...(S.contactBtn as React.CSSProperties),
-                    display: "inline-flex",
-                    alignItems: "center",
-                    textDecoration: "none",
-                  }}
-                >
-                  Open Tests Workspace
-                </Link>
-              ) : null}
-              {isEccJob && hasCompletedEccTest ? (
-                <Link
-                  href={`/jobs/${jobId}/tests?t=completion_report`}
-                  style={{
-                    ...(S.contactBtn as React.CSSProperties),
-                    display: "inline-flex",
-                    alignItems: "center",
-                    textDecoration: "none",
-                  }}
-                >
-                  Completion Report
-                </Link>
-              ) : null}
-            </div>
           </div>
         </div>
 
@@ -2865,7 +2810,7 @@ export default async function JobDetailV2Page({
         {blockers.length > 0 ? (
           <div
             style={{
-              marginTop: "24px",
+              marginTop: "20px",
               paddingTop: "18px",
               borderTop: "1px solid oklch(0.91 0.006 250)",
             }}
@@ -2910,20 +2855,62 @@ export default async function JobDetailV2Page({
               ))}
             </div>
           </div>
-        ) : (
+        ) : null}
+
+        {/* quick links */}
+        <div
+          style={{
+            marginTop: "20px",
+            paddingTop: "18px",
+            borderTop: "1px solid oklch(0.91 0.006 250)",
+          }}
+        >
           <div
             style={{
-              marginTop: "24px",
-              paddingTop: "18px",
-              borderTop: "1px solid oklch(0.91 0.006 250)",
-              fontSize: "12.5px",
-              color: "oklch(0.58 0.13 150)",
+              fontFamily: S.mono,
+              fontSize: "9.5px",
               fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "oklch(0.62 0.015 262)",
+              marginBottom: "6px",
             }}
           >
-            All closeout requirements met
+            Quick Links
           </div>
-        )}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {(
+              [
+                { href: "/ops", label: "Back to Ops", show: true },
+                { href: `/customers/${job.customer_id}`, label: "Open Customer", show: Boolean(job.customer_id) },
+                { href: createEstimateFromJobHref ?? "", label: "Create Estimate", show: Boolean(createEstimateFromJobHref) },
+                { href: `/jobs/${jobId}/tests`, label: "Open Tests Workspace", show: isEccJob && fieldComplete },
+                { href: `/jobs/${jobId}/tests?t=completion_report`, label: "Completion Report", show: isEccJob && hasCompletedEccTest },
+              ] as Array<{ href: string; label: string; show: boolean }>
+            )
+              .filter((item) => item.show)
+              .map(({ href, label }) => (
+                <Link
+                  key={label}
+                  href={href}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 0",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "oklch(0.4 0.02 262)",
+                    textDecoration: "none",
+                    borderBottom: "1px solid oklch(0.95 0.004 250)",
+                  }}
+                >
+                  {label}
+                  <span style={{ fontSize: "11px", color: "oklch(0.65 0.015 262)", flexShrink: 0 }}>↗</span>
+                </Link>
+              ))}
+          </div>
+        </div>
       </aside>
     </div>
     </div>

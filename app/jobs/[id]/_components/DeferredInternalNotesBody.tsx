@@ -68,11 +68,9 @@ type AudienceChipStyle = {
 };
 
 function resolveAudienceChip(eventType: string): AudienceChipStyle {
-  if (eventType === "public_note") {
+  // contractor_note is shared visibility — authored by a contractor, visible to all parties
+  if (eventType === "public_note" || eventType === "contractor_note") {
     return { label: "SHARED", bg: "oklch(0.95 0.04 150)", color: "oklch(0.42 0.13 150)" };
-  }
-  if (eventType === "contractor_note") {
-    return { label: "CONTRACTOR", bg: "oklch(0.96 0.05 75)", color: "oklch(0.48 0.12 65)" };
   }
   // internal_note and any other types
   return { label: "INTERNAL", bg: "oklch(0.94 0.03 255)", color: "oklch(0.45 0.13 255)" };
