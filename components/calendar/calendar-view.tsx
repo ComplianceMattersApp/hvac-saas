@@ -198,9 +198,7 @@ function todayYmdLA(now = new Date()) {
 }
 
 function isDispatchVisibleForLayout(job: DispatchJob) {
-  const ops = String(job.ops_status ?? '').toLowerCase();
   if (!job.scheduled_date || !job.window_start) return false;
-  if (ops === 'on_hold') return false;
   return true;
 }
 

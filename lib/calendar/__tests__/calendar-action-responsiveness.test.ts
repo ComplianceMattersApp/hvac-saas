@@ -152,4 +152,14 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain("<CalendarQueueSidebar queuePromise={queuePromise}");
     expect(calendarViewSource).toContain("Open or drag a job to place it on the schedule.");
   });
+
+  it("keeps scheduled on-hold jobs visible in the rendered calendar layout", () => {
+    const layoutVisibilityBlock = calendarViewSource.slice(
+      calendarViewSource.indexOf("function isDispatchVisibleForLayout"),
+      calendarViewSource.indexOf("function listTimeWindowLabel"),
+    );
+
+    expect(layoutVisibilityBlock).toContain("!job.scheduled_date || !job.window_start");
+    expect(layoutVisibilityBlock).not.toContain("on_hold");
+  });
 });
