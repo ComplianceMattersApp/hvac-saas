@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -16,9 +16,14 @@ const v2SchedulePanelSource = readFileSync(
   path.join(process.cwd(), "app", "jobs", "[id]", "v2", "_components", "SchedulePanel.tsx"),
   "utf8",
 );
+const middlewarePath = path.join(process.cwd(), "middleware.ts");
 
 describe("job detail V2 entrypoint", () => {
   it("selects Desktop V2 and Mobile V2 from the canonical job detail route", () => {
+    const mobileBranchStart = legacyJobDetailSource.indexOf('<div className="block lg:hidden">');
+    const desktopBranchStart = legacyJobDetailSource.indexOf('<div className="hidden lg:block">');
+    const desktopV2RenderStart = legacyJobDetailSource.indexOf("<DesktopJobDetailV2Page");
+
     expect(legacyJobDetailSource).not.toContain("function buildV2JobDetailRedirectPath");
     expect(legacyJobDetailSource).not.toContain("redirect(buildV2JobDetailRedirectPath(jobId, sp));");
     expect(legacyJobDetailSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
@@ -30,6 +35,12 @@ describe("job detail V2 entrypoint", () => {
     expect(legacyJobDetailSource).toContain('desktopLayoutMode === "classic"');
     expect(legacyJobDetailSource).toContain('legacyMode === "1"');
     expect(legacyJobDetailSource).toContain("<DesktopJobDetailV2Page");
+    expect(mobileBranchStart).toBeGreaterThan(-1);
+    expect(desktopBranchStart).toBeGreaterThan(mobileBranchStart);
+    expect(desktopV2RenderStart).toBeGreaterThan(desktopBranchStart);
+    expect(legacyJobDetailSource.slice(mobileBranchStart, desktopBranchStart)).toContain("<MobileJobDetailMobileComponent");
+    expect(legacyJobDetailSource.slice(mobileBranchStart, desktopBranchStart)).not.toContain("<DesktopJobDetailV2Page");
+    expect(existsSync(middlewarePath)).toBe(false);
     expect(legacyJobDetailSource).not.toContain("const mobileV2ExplicitPreviewAllowed =");
     expect(legacyJobDetailSource).not.toContain("const mobileV2OwnerDefaultAllowed =");
     expect(legacyJobDetailSource).not.toContain("const mobileV2UniversalDefaultAllowed =");

@@ -117,13 +117,18 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("keeps the desktop branch separate from the mobile V2 selector", () => {
-    const desktopBranchStart = pageSource.indexOf('<div className="hidden space-y-5 lg:block"');
+    const mobileBranchStart = pageSource.indexOf('<div className="block lg:hidden">');
+    const desktopBranchStart = pageSource.indexOf('<div className="hidden lg:block">');
     const desktopBranch = pageSource.slice(desktopBranchStart);
 
+    expect(mobileBranchStart).toBeGreaterThan(-1);
     expect(desktopBranchStart).toBeGreaterThan(-1);
+    expect(desktopBranchStart).toBeGreaterThan(mobileBranchStart);
     expect(pageSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
     expect(pageSource).toContain("const forceCurrentDesktopLayout =");
     expect(pageSource).toContain("<DesktopJobDetailV2Page");
+    expect(pageSource.slice(mobileBranchStart, desktopBranchStart)).toContain("<MobileJobDetailMobileComponent");
+    expect(pageSource.slice(mobileBranchStart, desktopBranchStart)).not.toContain("<DesktopJobDetailV2Page");
     expect(desktopBranch).not.toContain("<MobileJobDetailMobileComponent");
     expect(desktopBranch).not.toContain("<MobileJobDetailV2Preview");
     expect(desktopBranch).toContain("<AssignedTeamControls");
