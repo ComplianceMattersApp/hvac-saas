@@ -1275,52 +1275,6 @@ const workspaceSoftCardClass =
 const workspaceEmptyStateClass =
   "rounded-lg border border-dashed border-slate-300 bg-slate-50/72 px-4 py-4 text-sm text-slate-600";
 
-function parseMobileJobV2Allowlist(value: string | undefined) {
-  return String(value ?? "")
-    .split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function isMobileJobV2OwnerDefaultEnabled() {
-  return String(process.env.ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT ?? "").trim().toLowerCase() === "true";
-}
-
-function isMobileJobV2DefaultEnabled() {
-  return String(process.env.ENABLE_MOBILE_JOB_V2_DEFAULT ?? "").trim().toLowerCase() === "true";
-}
-
-function isMobileJobV2AllowlistedUser(user: { id?: string | null; email?: string | null }) {
-  const allowedEmails = parseMobileJobV2Allowlist(process.env.MOBILE_JOB_V2_ALLOWED_EMAILS);
-  const allowedUserIds = parseMobileJobV2Allowlist(process.env.MOBILE_JOB_V2_ALLOWED_USER_IDS);
-  const userEmail = String(user.email ?? "").trim().toLowerCase();
-  const userId = String(user.id ?? "").trim().toLowerCase();
-
-  return Boolean(
-    (userEmail && allowedEmails.includes(userEmail)) ||
-      (userId && allowedUserIds.includes(userId)),
-  );
-}
-
-function firstSearchParamValue(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
-}
-
-function buildV2JobDetailRedirectPath(jobId: string, sp: SearchParams) {
-  const query = new URLSearchParams();
-
-  for (const [key, rawValue] of Object.entries(sp)) {
-    if (key === "legacy") continue;
-    const values = Array.isArray(rawValue) ? rawValue : rawValue === undefined ? [] : [rawValue];
-    values.forEach((value) => {
-      if (value !== undefined) query.append(key, value);
-    });
-  }
-
-  const qs = query.toString();
-  return `/jobs/${encodeURIComponent(jobId)}/v2${qs ? `?${qs}` : ""}`;
-}
-
 export default async function JobDetailPage({
   params,
   searchParams,
@@ -1335,14 +1289,6 @@ export default async function JobDetailPage({
   }
 
   const sp: SearchParams = (searchParams ? await searchParams : {}) ?? {};
-  const legacyRaw = firstSearchParamValue(sp.legacy).trim().toLowerCase();
-  const shouldRenderLegacyJobDetail =
-    legacyRaw === "1" || legacyRaw === "true" || legacyRaw === "yes";
-
-  if (!shouldRenderLegacyJobDetail) {
-    redirect(buildV2JobDetailRedirectPath(jobId, sp));
-  }
-
   const mobileLayoutRaw = sp.mobileLayout;
   const mobileLayout =
     Array.isArray(mobileLayoutRaw)
@@ -3617,19 +3563,12 @@ const showCorrectionReviewResolution =
     !hasContractorShadowMembership &&
     String((internalUser as any).status ?? "").trim().toLowerCase() !== "inactive" &&
     (internalUser as any).active !== false;
-  const mobileV2UniversalDefaultAllowed =
-    mobileV2EligibleInternalUser &&
-    isMobileJobV2DefaultEnabled();
-  const mobileV2OwnerDefaultAllowed =
-    mobileV2EligibleInternalUser &&
-    isMobileJobV2OwnerDefaultEnabled() &&
-    isMobileJobV2AllowlistedUser(user);
   const mobileV2ExplicitPreviewAllowed =
     mobileV2EligibleInternalUser &&
     explicitlyRequestedMobileV2Preview;
   const useMobileV2Preview =
     !forceCurrentMobileLayout &&
-    (mobileV2ExplicitPreviewAllowed || mobileV2UniversalDefaultAllowed || mobileV2OwnerDefaultAllowed);
+    mobileV2ExplicitPreviewAllowed;
   const MobileJobDetailMobileComponent = useMobileV2Preview
     ? MobileJobDetailV2Preview
     : MobileJobDetailCurrent;
