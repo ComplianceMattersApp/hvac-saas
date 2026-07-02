@@ -3847,7 +3847,7 @@ const showCorrectionReviewResolution =
               tab={tab}
               hasFullSchedule={hasFullSchedule}
               variant="commandBar"
-              completeLabel={surfaceProfile.labels.finishComplete}
+              completeLabel="Mark Work Complete"
               completedLabel={surfaceProfile.labels.finishComplete}
             />
             {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (

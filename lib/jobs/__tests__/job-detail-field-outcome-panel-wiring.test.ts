@@ -94,6 +94,8 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).not.toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
     expect(panelSource).not.toContain("form action={advanceJobStatusFromForm}");
     expect(panelSource).not.toContain("Confirm Work Completed");
+    expect(jobDetailAndCurrentMobileSource).toContain('completeLabel="Mark Work Complete"');
+    expect(jobDetailAndCurrentMobileSource).not.toContain("completeLabel={surfaceProfile.labels.finishComplete}");
     expect(panelSource).not.toContain("Confirm field work complete");
   });
 

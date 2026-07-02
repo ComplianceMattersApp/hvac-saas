@@ -145,7 +145,7 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
                 tab={tab}
                 hasFullSchedule={hasFullSchedule}
                 variant="fieldMode"
-                completeLabel={surfaceProfile.labels.finishComplete}
+                completeLabel="Mark Work Complete"
                 completedLabel={surfaceProfile.labels.finishComplete}
               />
               {showFieldOutcomePanel ? (

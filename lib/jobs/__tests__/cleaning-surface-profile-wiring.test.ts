@@ -60,7 +60,8 @@ describe("cleaning surface profile wiring", () => {
     expect(fieldOutcomePanelSource).toContain("labels?: {");
     expect(fieldExceptionPickerSource).toContain("partsNeededLabel");
     expect(fieldExceptionPickerSource).toContain("approvalNeededLabel");
-    expect(jobDetailSource).toContain("completeLabel={surfaceProfile.labels.finishComplete}");
+    expect(jobDetailSource).toContain('completeLabel="Mark Work Complete"');
+    expect(jobDetailSource).toContain("completedLabel={surfaceProfile.labels.finishComplete}");
     expect(jobDetailSource).toContain("partsNeeded: surfaceProfile.labels.needParts");
     expect(jobDetailSource).toContain('approvalNeeded: isCleaningMode ? "Office / Client Approval Needed" : "Approval Needed"');
   });
