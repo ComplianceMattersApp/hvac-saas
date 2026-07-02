@@ -19,10 +19,6 @@ type FixtureInput = {
     contractorId: string;
     lifecycleState?: string | null;
   } | null;
-  companyPortal?: {
-    connectionStatus?: string;
-    handoffKind?: string;
-  } | null;
 };
 
 function makeSupabaseFixture(input: FixtureInput) {
@@ -75,22 +71,6 @@ function makeSupabaseFixture(input: FixtureInput) {
             });
           }
           return { data: rows, error: null };
-        }
-
-        if (table === "account_handoff_connections") {
-          if (!input.companyPortal) return { data: [], error: null };
-          return {
-            data: [
-              {
-                id: "connection-1",
-                requesting_account_owner_user_id: "owner-1",
-                recipient_account_owner_user_id: "compliance-owner-1",
-                connection_status: input.companyPortal.connectionStatus ?? "active",
-                handoff_kind: input.companyPortal.handoffKind ?? "ecc",
-              },
-            ],
-            error: null,
-          };
         }
 
         throw new Error(`Unexpected limit table: ${table}`);
@@ -198,57 +178,14 @@ describe("resolveDualContextAccess", () => {
     expect(access.portal).toMatchObject({
       contractorId: "contractor-1",
       accountOwnerUserId: "compliance-owner-1",
-      membershipSource: "direct_contractor_user",
     });
     expect(access.preferredLandingContext).toBe("app");
   });
 
-  it("shows portal access for active admin users with a company-level Compliance Matters relationship", async () => {
+  it("does not use account handoff relationships as current portal access", async () => {
     const access = await resolveDualContextAccess({
       supabase: makeSupabaseFixture({
         internal: { role: "admin", entitlementStatus: "active" },
-        companyPortal: {},
-      }),
-    });
-
-    expect(access.isDualContextUser).toBe(true);
-    expect(access.hasActiveAppAccess).toBe(true);
-    expect(access.hasPortalAccess).toBe(true);
-    expect(access.portal).toMatchObject({
-      contractorId: null,
-      accountOwnerUserId: "compliance-owner-1",
-      portalAccountOwnerUserId: "compliance-owner-1",
-      sourceCompanyAccountOwnerUserId: "owner-1",
-      membershipSource: "company_account_handoff_connection",
-      eligibleRole: "admin",
-    });
-    expect(access.availableContexts).toEqual(["app", "portal"]);
-    expect(access.preferredLandingContext).toBe("app");
-  });
-
-  it("shows portal access for active office users with a company-level Compliance Matters relationship", async () => {
-    const access = await resolveDualContextAccess({
-      supabase: makeSupabaseFixture({
-        internal: { role: "office", entitlementStatus: "active" },
-        companyPortal: {},
-      }),
-    });
-
-    expect(access.hasPortalAccess).toBe(true);
-    expect(access.portal).toMatchObject({
-      membershipSource: "company_account_handoff_connection",
-      eligibleRole: "office",
-      sourceCompanyAccountOwnerUserId: "owner-1",
-      portalAccountOwnerUserId: "compliance-owner-1",
-    });
-    expect(access.preferredLandingContext).toBe("app");
-  });
-
-  it("does not grant company-level portal access to tech users", async () => {
-    const access = await resolveDualContextAccess({
-      supabase: makeSupabaseFixture({
-        internal: { role: "tech", entitlementStatus: "active" },
-        companyPortal: {},
       }),
     });
 

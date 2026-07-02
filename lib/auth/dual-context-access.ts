@@ -3,7 +3,7 @@ import {
   type OperationalMutationEntitlementReason,
 } from "@/lib/business/platform-entitlement";
 import { isSessionInvalidError } from "@/lib/auth/session-error";
-import { resolveCurrentPortalMembership } from "@/lib/portal/current-portal-membership";
+import { resolveActiveContractorPortalMembership } from "@/lib/portal/current-portal-membership";
 
 export type DualContextInternalRole = "admin" | "office" | "tech" | "billing";
 export type DualContextLandingContext = "app" | "portal" | "inactive_app" | "none";
@@ -18,14 +18,10 @@ export type DualContextInternalIdentity = {
 };
 
 export type DualContextPortalIdentity = {
-  contractorId: string | null;
+  contractorId: string;
   contractorName: string | null;
   accountOwnerUserId: string;
   lifecycleState: string | null;
-  portalAccountOwnerUserId: string;
-  sourceCompanyAccountOwnerUserId: string | null;
-  membershipSource: "direct_contractor_user" | "company_account_handoff_connection";
-  eligibleRole: "admin" | "office" | null;
 };
 
 export type DualContextAccess = {
@@ -116,10 +112,9 @@ export async function resolveDualContextAccess(input: {
         }
       : null;
 
-  const portal = await resolveCurrentPortalMembership({
+  const portal = await resolveActiveContractorPortalMembership({
     supabase,
     userId: user.id,
-    internalUser,
   });
 
   let hasActiveAppAccess = false;

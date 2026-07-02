@@ -25,10 +25,6 @@ function directPortal() {
     contractorName: "Partner Co",
     accountOwnerUserId: "compliance-owner-1",
     lifecycleState: "active",
-    portalAccountOwnerUserId: "compliance-owner-1",
-    sourceCompanyAccountOwnerUserId: null,
-    membershipSource: "direct_contractor_user" as const,
-    eligibleRole: null,
   };
 }
 
