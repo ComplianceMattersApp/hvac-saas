@@ -119,7 +119,24 @@ export default async function DeferredInternalNotesBody({
 
           return (
             <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
-              <div className="text-xs text-slate-500">{when}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                <div className="text-xs text-slate-500">{when}</div>
+                <span
+                  style={{
+                    fontFamily: "var(--font-ibm-plex-mono), monospace",
+                    fontSize: "9px",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    padding: "2px 7px",
+                    borderRadius: "4px",
+                    background: "oklch(0.94 0.03 255)",
+                    color: "oklch(0.45 0.13 255)",
+                    flexShrink: 0,
+                  }}
+                >
+                  INTERNAL
+                </span>
+              </div>
 
               {noteText ? (
                 <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">

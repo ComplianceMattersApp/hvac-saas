@@ -47,7 +47,6 @@ import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 import DeferredTimelineBody from "../_components/DeferredTimelineBody";
 import DeferredInternalNotesBody from "../_components/DeferredInternalNotesBody";
-import DeferredSharedNotesBody from "../_components/DeferredSharedNotesBody";
 import DeferredServiceChainPanelBody from "../_components/DeferredServiceChainPanelBody";
 import DeferredJobAttachmentsInternal from "../_components/DeferredJobAttachmentsInternal";
 import JobLocationPreview, { buildAddressDisplay } from "@/components/jobs/JobLocationPreview";
@@ -261,6 +260,19 @@ const JOB_V2_SELECT = `
   ),
   ecc_test_runs (
     id, test_type, is_completed, computed_pass, override_pass, created_at
+  ),
+  job_equipment (
+    id,
+    equipment_role,
+    component_type,
+    system_location,
+    manufacturer,
+    model,
+    serial,
+    tonnage,
+    refrigerant_type,
+    notes,
+    created_at
   )
 `;
 
@@ -500,6 +512,20 @@ export default async function JobDetailV2Page({
   const completedEccRuns = eccRuns.filter((r) => r.is_completed).length;
   const hasFailedEccRun = eccRuns.some((r) => r.is_completed && r.computed_pass === false);
 
+  // equipment rows
+  const equipmentRows = ((job as any).job_equipment ?? []) as Array<{
+    id: string;
+    equipment_role: string | null;
+    component_type: string | null;
+    system_location: string | null;
+    manufacturer: string | null;
+    model: string | null;
+    serial: string | null;
+    tonnage: number | null;
+    refrigerant_type: string | null;
+    notes: string | null;
+  }>;
+
   // return URL for actions
   const returnTo = `/jobs/${jobId}/v2`;
 
@@ -514,6 +540,7 @@ export default async function JobDetailV2Page({
     { id: "people", label: "People & Place" },
     { id: "notes", label: "Job Memory" },
     { id: "field", label: "Field & Finish" },
+    { id: "equipment", label: "Equipment" },
     { id: "billing", label: "Work & Billing" },
     { id: "followup", label: "Follow-Up & Chain" },
     ...(isEccJob ? [{ id: "compliance", label: "Compliance" }] : []),
@@ -552,32 +579,90 @@ export default async function JobDetailV2Page({
 
         {/* header band */}
         <div style={{ padding: "32px 0 28px" }}>
-          <div
-            style={{
-              fontFamily: S.mono,
-              fontSize: "11px",
-              letterSpacing: "0.06em",
-              fontWeight: 600,
-              color: "oklch(0.55 0.015 262)",
-              marginBottom: "9px",
-            }}
-          >
-            <Link href="/ops" style={{ color: "oklch(0.55 0.17 255)", textDecoration: "none" }}>
-              Ops
-            </Link>
-            {" "}/ Jobs / <span style={{ color: "oklch(0.4 0.02 262)" }}>{jobDisplayRef}</span>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "20px" }}>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: S.mono,
+                  fontSize: "11px",
+                  letterSpacing: "0.06em",
+                  fontWeight: 600,
+                  color: "oklch(0.55 0.015 262)",
+                  marginBottom: "9px",
+                }}
+              >
+                <Link href="/ops" style={{ color: "oklch(0.55 0.17 255)", textDecoration: "none" }}>
+                  Ops
+                </Link>
+                {" "}/ Jobs / <span style={{ color: "oklch(0.4 0.02 262)" }}>{jobDisplayRef}</span>
+              </div>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: "28px",
+                  fontWeight: 700,
+                  letterSpacing: "-0.015em",
+                  color: "oklch(0.27 0.02 262)",
+                }}
+              >
+                {job.title}
+              </h1>
+            </div>
+            {contractorName ? (
+              <div
+                style={{
+                  flexShrink: 0,
+                  padding: "12px 16px",
+                  borderRadius: "11px",
+                  background: "oklch(0.97 0.03 75)",
+                  border: "1px solid oklch(0.88 0.1 70)",
+                  minWidth: "160px",
+                }}
+              >
+                <div
+                  style={{
+                    fontFamily: S.mono,
+                    fontSize: "9.5px",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "oklch(0.55 0.1 65)",
+                    fontWeight: 600,
+                    marginBottom: "5px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "7px",
+                  }}
+                >
+                  Contractor / Billing
+                  {isEccJob ? (
+                    <span
+                      style={{
+                        fontSize: "8.5px",
+                        fontWeight: 700,
+                        padding: "2px 5px",
+                        borderRadius: "4px",
+                        background: "oklch(0.92 0.07 70)",
+                        color: "oklch(0.42 0.1 65)",
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      ECC · EXTERNAL
+                    </span>
+                  ) : null}
+                </div>
+                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.35 0.02 262)" }}>
+                  {contractorName}
+                </div>
+                <div style={{ fontSize: "11.5px", color: "oklch(0.6 0.015 262)", marginTop: "2px" }}>
+                  {billingDisposition === "externally_billed"
+                    ? "Externally billed"
+                    : billingDisposition === "no_charge"
+                      ? "No charge"
+                      : "See billing section"}
+                </div>
+              </div>
+            ) : null}
           </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "28px",
-              fontWeight: 700,
-              letterSpacing: "-0.015em",
-              color: "oklch(0.27 0.02 262)",
-            }}
-          >
-            {job.title}
-          </h1>
         </div>
 
         {/* ── JOB BRIEF ─────────────────────────────────────────────────────── */}
@@ -659,7 +744,9 @@ export default async function JobDetailV2Page({
                 style={{
                   marginTop: "16px",
                   paddingTop: "16px",
+                  paddingBottom: "16px",
                   ...S.hairline,
+                  borderBottom: "1px solid oklch(0.93 0.005 250)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -721,16 +808,6 @@ export default async function JobDetailV2Page({
                   })}
                 </div>
               </div>
-
-              {/* contractor / billing */}
-              {contractorName ? (
-                <div
-                  style={{ marginTop: "16px", paddingTop: "16px", ...S.hairline }}
-                >
-                  <div style={S.fieldLabel}>Contractor / Billing</div>
-                  <div style={{ fontSize: "14px", fontWeight: 600 }}>{contractorName}</div>
-                </div>
-              ) : null}
 
               {/* assigned team */}
               <div style={{ marginTop: "22px" }}>
@@ -862,37 +939,33 @@ export default async function JobDetailV2Page({
               )}
               {addressDisplay ? (
                 <div style={{ marginTop: "12px" }}>
-                  <div style={{ display: "flex", gap: "14px" }}>
-                    {addressDisplay ? (
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressDisplay)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          fontSize: "12.5px",
-                          fontWeight: 600,
-                          color: "oklch(0.5 0.13 255)",
-                          textDecoration: "none",
-                        }}
-                      >
-                        Navigate
-                      </a>
-                    ) : null}
-                    {addressDisplay ? (
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressDisplay)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          fontSize: "12.5px",
-                          fontWeight: 600,
-                          color: "oklch(0.5 0.13 255)",
-                          textDecoration: "none",
-                        }}
-                      >
-                        Open in Maps
-                      </a>
-                    ) : null}
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressDisplay)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        ...S.contactBtn,
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      Navigate
+                    </a>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressDisplay)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        ...S.contactBtn,
+                        textDecoration: "none",
+                        display: "inline-flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      Open in Maps
+                    </a>
                   </div>
                   {customerLocations.length > 1 && (
                     <div style={{ marginTop: "10px" }}>
@@ -1201,6 +1274,108 @@ export default async function JobDetailV2Page({
               }}
             >
               Field work complete — visit submitted.
+            </div>
+          )}
+        </section>
+
+        {/* ── EQUIPMENT ─────────────────────────────────────────────────────── */}
+        <section
+          id="equipment"
+          data-jobsection="equipment"
+          style={S.section}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "16px",
+            }}
+          >
+            <div style={S.sectionLabel}>Equipment</div>
+            <Link
+              href={`/jobs/${jobId}/info?f=equipment`}
+              style={{
+                fontSize: "12.5px",
+                fontWeight: 600,
+                color: "oklch(0.5 0.13 255)",
+                textDecoration: "none",
+              }}
+            >
+              Manage →
+            </Link>
+          </div>
+          {equipmentRows.length > 0 ? (
+            <div
+              style={{
+                border: "1px solid oklch(0.93 0.005 250)",
+                borderRadius: "11px",
+                overflow: "hidden",
+              }}
+            >
+              {equipmentRows.map((eq) => {
+                const roleLabel = String(eq.equipment_role ?? eq.component_type ?? "")
+                  .replace(/_/g, " ")
+                  .trim();
+                const makeModel = [eq.manufacturer, eq.model].filter(Boolean).join(" ") || "Unknown";
+                return (
+                  <div
+                    key={eq.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      padding: "13px 16px",
+                      ...S.rowRule,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{makeModel}</div>
+                      {eq.system_location ? (
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "oklch(0.55 0.015 262)",
+                            marginTop: "1px",
+                          }}
+                        >
+                          {eq.system_location}
+                        </div>
+                      ) : null}
+                    </div>
+                    {roleLabel ? (
+                      <span
+                        style={{
+                          fontFamily: S.mono,
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: "5px",
+                          background: "oklch(0.96 0.004 250)",
+                          color: "oklch(0.55 0.015 262)",
+                          textTransform: "capitalize",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {roleLabel}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "22px",
+                textAlign: "center",
+                border: "1px dashed oklch(0.88 0.006 250)",
+                borderRadius: "11px",
+                color: "oklch(0.55 0.015 262)",
+                fontSize: "13px",
+              }}
+            >
+              No equipment records — add equipment to track system inventory.
             </div>
           )}
         </section>
@@ -1642,63 +1817,35 @@ export default async function JobDetailV2Page({
             {/* schedule a next visit */}
             <div>
               <div style={{ ...S.fieldLabel, marginBottom: "10px" }}>Schedule a next visit</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <form action={createReturnVisitAction} style={{ display: "flex", gap: "6px" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <form action={createReturnVisitAction} style={{ flex: 1 }}>
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="return_to" value={returnTo} />
                   <input
-                    type="text"
+                    type="hidden"
                     name="next_visit_reason"
-                    defaultValue={String(job.service_visit_reason ?? job.title ?? "").trim()}
-                    placeholder="Reason for return visit…"
-                    required
-                    style={{
-                      flex: 1,
-                      height: "34px",
-                      borderRadius: "8px",
-                      border: "1px solid oklch(0.88 0.006 250)",
-                      padding: "0 10px",
-                      fontSize: "12.5px",
-                      fontFamily: "inherit",
-                      color: "oklch(0.27 0.02 262)",
-                      background: "#fff",
-                      minWidth: 0,
-                    }}
+                    value={String(job.service_visit_reason ?? job.title ?? "").trim()}
                   />
                   <ImmediateSubmitButton
                     pendingText="Creating…"
                     className=""
-                    style={S.outlineBtn(true) as React.CSSProperties}
+                    style={{ ...(S.outlineBtn(true) as React.CSSProperties), width: "100%", justifyContent: "center" } as React.CSSProperties}
                   >
                     Return Visit
                   </ImmediateSubmitButton>
                 </form>
-                <form action={createCallbackAction} style={{ display: "flex", gap: "6px" }}>
+                <form action={createCallbackAction} style={{ flex: 1 }}>
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="return_to" value={returnTo} />
                   <input
-                    type="text"
+                    type="hidden"
                     name="callback_visit_reason"
-                    defaultValue={String(job.service_visit_reason ?? job.title ?? "").trim()}
-                    placeholder="Reason for callback…"
-                    required
-                    style={{
-                      flex: 1,
-                      height: "34px",
-                      borderRadius: "8px",
-                      border: "1px solid oklch(0.88 0.006 250)",
-                      padding: "0 10px",
-                      fontSize: "12.5px",
-                      fontFamily: "inherit",
-                      color: "oklch(0.27 0.02 262)",
-                      background: "#fff",
-                      minWidth: 0,
-                    }}
+                    value={String(job.service_visit_reason ?? job.title ?? "").trim()}
                   />
                   <ImmediateSubmitButton
                     pendingText="Creating…"
                     className=""
-                    style={S.outlineBtn(false) as React.CSSProperties}
+                    style={{ ...(S.outlineBtn(false) as React.CSSProperties), width: "100%", justifyContent: "center" } as React.CSSProperties}
                   >
                     Callback
                   </ImmediateSubmitButton>
@@ -1713,9 +1860,9 @@ export default async function JobDetailV2Page({
                 }}
               >
                 A <strong style={{ color: "oklch(0.4 0.02 262)" }}>return</strong> continues
-                unresolved work and links to this visit. A{" "}
+                unresolved work. A{" "}
                 <strong style={{ color: "oklch(0.4 0.02 262)" }}>callback</strong> opens a new
-                issue after completion — original job history stays intact.
+                issue after completion.
               </div>
             </div>
 
@@ -1877,11 +2024,31 @@ export default async function JobDetailV2Page({
                   </div>
                 </div>
               ) : (
-                <InterruptionHub
-                  jobId={jobId}
-                  returnTo={returnTo}
-                  action={updateJobOpsFromForm}
-                />
+                <div>
+                  <div
+                    style={{
+                      fontFamily: S.mono,
+                      fontSize: "10px",
+                      fontWeight: 600,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: "oklch(0.65 0.015 262)",
+                      padding: "5px 10px",
+                      borderRadius: "6px",
+                      background: "oklch(0.97 0.004 250)",
+                      border: "1px solid oklch(0.92 0.006 250)",
+                      display: "inline-block",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    No active hold
+                  </div>
+                  <InterruptionHub
+                    jobId={jobId}
+                    returnTo={returnTo}
+                    action={updateJobOpsFromForm}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -1982,6 +2149,26 @@ export default async function JobDetailV2Page({
           {/* service chain */}
           <div style={{ marginTop: "24px" }}>
             <div style={{ ...S.fieldLabel, marginBottom: "12px" }}>Service chain</div>
+            {/* current job node */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+              <span
+                style={{
+                  fontFamily: S.mono,
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  padding: "5px 12px",
+                  borderRadius: "20px",
+                  background: "oklch(0.27 0.02 262)",
+                  color: "#fff",
+                }}
+              >
+                THIS JOB · {jobDisplayRef}
+              </span>
+              {serviceCaseId ? (
+                <span style={{ fontSize: "13px", color: "oklch(0.65 0.015 262)" }}>↓</span>
+              ) : null}
+            </div>
             <Suspense
               fallback={
                 <div
@@ -2177,26 +2364,44 @@ export default async function JobDetailV2Page({
                   ),
                 },
                 {
-                  id: "notes",
-                  label: "Shared Notes",
-                  count: "—",
+                  id: "equipment",
+                  label: "Equipment",
+                  count: `${equipmentRows.length}`,
                   content: (
-                    <Suspense
-                      fallback={
-                        <div style={{ padding: "16px 0", fontSize: "13px", color: "oklch(0.62 0.015 262)" }}>
-                          Loading notes…
+                    <div style={{ padding: "4px 0" }}>
+                      {equipmentRows.length > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                          {equipmentRows.map((eq) => (
+                            <div
+                              key={eq.id}
+                              style={{ fontSize: "13px", color: "oklch(0.38 0.02 262)" }}
+                            >
+                              {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "Unknown equipment"}
+                              {eq.system_location ? ` — ${eq.system_location}` : ""}
+                            </div>
+                          ))}
                         </div>
-                      }
-                    >
-                      <DeferredSharedNotesBody
-                        jobId={jobId}
-                        timelineJobIds={timelineJobIds}
-                        hasDirectNarrativeChain={hasDirectNarrativeChain}
-                        emptyStateClassName="text-sm text-slate-500 py-3"
-                      />
-                    </Suspense>
+                      ) : (
+                        <div style={{ fontSize: "13px", color: "oklch(0.62 0.015 262)" }}>
+                          No equipment records.
+                        </div>
+                      )}
+                      <div style={{ marginTop: "12px" }}>
+                        <Link
+                          href={`/jobs/${jobId}/info?f=equipment`}
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 600,
+                            color: "oklch(0.5 0.13 255)",
+                            textDecoration: "none",
+                          }}
+                        >
+                          Manage equipment →
+                        </Link>
+                      </div>
+                    </div>
                   ),
-                },
+                } satisfies RecordTab,
                 ...(isEccJob
                   ? [
                       {
