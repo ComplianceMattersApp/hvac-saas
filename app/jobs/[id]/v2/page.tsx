@@ -421,6 +421,7 @@ export default async function JobDetailV2Page({
   const contractorName = contractor
     ? String(contractor.name ?? "").trim() || null
     : null;
+  const contractorDisplayName = contractorName || "Retail";
 
   // ── derived display values ────────────────────────────────────────────────
 
@@ -725,7 +726,7 @@ export default async function JobDetailV2Page({
             </div>
             <div>
               <div style={S.fieldLabel}>Contractor</div>
-              <div style={S.fieldValue}>{contractorName || "—"}</div>
+              <div style={S.fieldValue}>{contractorDisplayName}</div>
             </div>
             <div>
               <div style={S.fieldLabel}>Billing</div>

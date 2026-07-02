@@ -21,4 +21,10 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("billedTruthSatisfied ? (");
     expect(source).toContain("COMPLETE");
   });
+
+  it("labels internal retail jobs when no contractor is selected", () => {
+    expect(source).toContain('const contractorDisplayName = contractorName || "Retail";');
+    expect(source).toContain("{contractorDisplayName}");
+    expect(source).not.toContain('{contractorName || "—"}');
+  });
 });
