@@ -23,6 +23,7 @@ type FixtureInput = {
 
 function makeSupabaseFixture(input: FixtureInput) {
   const user = { id: "user-1", email: "user@example.com" };
+  const tableReads: string[] = [];
 
   const auth = {
     getUser: async () => ({
@@ -114,7 +115,11 @@ function makeSupabaseFixture(input: FixtureInput) {
 
   return {
     auth,
-    from: (table: string) => makeQuery(table),
+    tableReads,
+    from: (table: string) => {
+      tableReads.push(table);
+      return makeQuery(table);
+    },
   };
 }
 
@@ -183,16 +188,19 @@ describe("resolveDualContextAccess", () => {
   });
 
   it("does not use account handoff relationships as current portal access", async () => {
+    const supabase = makeSupabaseFixture({
+      internal: { role: "admin", entitlementStatus: "active" },
+    });
+
     const access = await resolveDualContextAccess({
-      supabase: makeSupabaseFixture({
-        internal: { role: "admin", entitlementStatus: "active" },
-      }),
+      supabase,
     });
 
     expect(access.hasActiveAppAccess).toBe(true);
     expect(access.hasPortalAccess).toBe(false);
     expect(access.portal).toBeNull();
     expect(access.preferredLandingContext).toBe("app");
+    expect(supabase.tableReads).not.toContain("account_handoff_connections");
   });
 
   it("uses any active portal membership instead of treating the first membership as exclusive", async () => {

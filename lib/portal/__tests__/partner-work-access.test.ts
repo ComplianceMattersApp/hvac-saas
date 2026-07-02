@@ -67,6 +67,8 @@ describe("partner work access", () => {
     expect(layoutSource).toContain("Compliance Matters Portal");
     expect(layoutSource).toContain("hasPortalAccess={hasPortalAccess}");
     expect(mobileShellSource).toContain("hasPortalAccess: boolean;");
+    expect(mobileShellSource).toContain("{hasPortalAccess ? (");
+    expect(mobileShellSource).toContain('<Link href="/portal"');
     expect(mobileShellSource).toContain("Compliance Matters Portal");
     expect(portalSource).toContain("sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? \"Created by Rater\"}");
     expect(portalJobsSource).toContain("sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? \"Created by Rater\"}");

@@ -62,6 +62,22 @@ function activeInternalAccess(): DualContextAccess {
   };
 }
 
+function dualContextAccess(): DualContextAccess {
+  return {
+    ...activeInternalAccess(),
+    hasPortalAccess: true,
+    isDualContextUser: true,
+    availableContexts: ["app", "portal"],
+    preferredLandingContext: "app",
+    portal: {
+      contractorId: "contractor-1",
+      contractorName: "Partner Co",
+      accountOwnerUserId: "compliance-owner-1",
+      lifecycleState: "active",
+    },
+  };
+}
+
 describe("portal / ops redirect loop prevention", () => {
   it("sends portal-only /ops visits to /portal as a terminal portal state", () => {
     expect(resolveOpsGuardRedirect(portalAccess())).toBe("/portal");
@@ -78,6 +94,15 @@ describe("portal / ops redirect loop prevention", () => {
 
   it("allows paid/internal users through the /ops guard", () => {
     expect(resolveOpsGuardRedirect(activeInternalAccess())).toBeNull();
+  });
+
+  it("keeps dual internal plus portal users in the app by default while preserving portal route access", () => {
+    const access = dualContextAccess();
+
+    expect(landingPathForDualContextAccess(access)).toBe("/today");
+    expect(resolveOpsGuardRedirect(access)).toBeNull();
+    expect(access.hasPortalAccess).toBe(true);
+    expect(access.portal?.contractorId).toBe("contractor-1");
   });
 
   it("does not create /portal -> /today -> /portal for portal access", () => {
@@ -105,5 +130,20 @@ describe("portal / ops redirect loop prevention", () => {
       expect(source).toContain("PortalAccessIssue");
       expect(source).not.toContain('redirect("/ops")');
     }
+  });
+
+  it("does not block portal routes merely because the same user also has internal access", () => {
+    const portalSource = readRepoFile("app/portal/page.tsx");
+    const portalJobsSource = readRepoFile("app/portal/jobs/page.tsx");
+    const portalContextSource = readRepoFile("lib/portal/intake-proposal-read-model.ts");
+
+    expect(portalSource).toContain("requireCurrentContractorPortalContext");
+    expect(portalJobsSource).toContain("requireCurrentContractorPortalContext");
+    expect(portalContextSource).toContain("resolveActiveContractorPortalMembership");
+
+    expect(portalSource).not.toContain("hasActiveAppAccess");
+    expect(portalSource).not.toContain("hasInternalMembership");
+    expect(portalJobsSource).not.toContain("hasActiveAppAccess");
+    expect(portalJobsSource).not.toContain("hasInternalMembership");
   });
 });
