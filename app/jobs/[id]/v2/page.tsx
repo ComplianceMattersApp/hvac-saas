@@ -41,6 +41,7 @@ import ChangeServiceLocationForm from "../_components/ChangeServiceLocationForm"
 import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
@@ -550,6 +551,10 @@ export default async function JobDetailV2Page({
     if (serviceCaseId) params.set("service_case_id", String(serviceCaseId));
     return `/estimates/new?${params.toString()}`;
   })();
+  const addServicePlanHref =
+    isMaintenanceAgreementsEnabled() && job.customer_id
+      ? `/customers/${job.customer_id}?tab=service-plans`
+      : null;
 
   // contact attempts
   const contactAttemptCount = Number(contactAttemptsResult.count ?? 0);
@@ -2884,6 +2889,7 @@ export default async function JobDetailV2Page({
                 { href: "/ops", label: "Back to Ops", show: true },
                 { href: `/customers/${job.customer_id}`, label: "Open Customer", show: Boolean(job.customer_id) },
                 { href: createEstimateFromJobHref ?? "", label: "Create Estimate", show: Boolean(createEstimateFromJobHref) },
+                { href: addServicePlanHref ?? "", label: "Add Service Plan", show: Boolean(addServicePlanHref) },
                 { href: `/jobs/${jobId}/tests`, label: "Open Tests Workspace", show: isEccJob && fieldComplete },
                 { href: `/jobs/${jobId}/tests?t=completion_report`, label: "Completion Report", show: isEccJob && hasCompletedEccTest },
               ] as Array<{ href: string; label: string; show: boolean }>
