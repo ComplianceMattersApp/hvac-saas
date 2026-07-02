@@ -29,7 +29,6 @@ import {
   markEccPermitAvailableFromForm,
   markCertsCompleteFromForm,
   markInvoiceCompleteFromForm,
-  updateJobOpsFromForm,
   releaseAndReevaluateFromForm,
   updateJobOpsDetailsFromForm,
 } from "@/lib/actions/job-ops-actions";
@@ -49,13 +48,12 @@ import DeferredTimelineBody from "../_components/DeferredTimelineBody";
 import DeferredInternalNotesBody from "../_components/DeferredInternalNotesBody";
 import DeferredServiceChainPanelBody from "../_components/DeferredServiceChainPanelBody";
 import DeferredJobAttachmentsInternal from "../_components/DeferredJobAttachmentsInternal";
-import JobLocationPreview, { buildAddressDisplay } from "@/components/jobs/JobLocationPreview";
+import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 
 import ScrollSpyNav, { type NavItem } from "./_components/ScrollSpyNav";
 import AlertBanner from "./_components/AlertBanner";
 import FinishOutcomeCards from "./_components/FinishOutcomeCards";
-import InterruptionHub from "./_components/InterruptionHub";
 import RecordsTabs, { type RecordTab } from "./_components/RecordsTabs";
 import SchedulePanel from "./_components/SchedulePanel";
 import NoteComposer from "./_components/NoteComposer";
@@ -341,7 +339,7 @@ export default async function JobDetailV2Page({
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
       ? getContractors(accountOwnerUserId)
-      : Promise.resolve([] as Array<{ id: string; business_name: string | null; display_name: string | null }>),
+      : Promise.resolve([] as Array<{ id: string; name: string | null }>),
     job.customer_id
       ? supabase
           .from("locations")
@@ -372,12 +370,12 @@ export default async function JobDetailV2Page({
 
   const assignedTeam = assignmentMap[jobId] ?? [];
   const contractor = job.contractor_id
-    ? (contractorRows as Array<{ id: string; business_name?: string | null; display_name?: string | null }>).find(
+    ? (contractorRows as Array<{ id: string; name?: string | null }>).find(
         (c) => c.id === job.contractor_id,
       )
     : null;
   const contractorName = contractor
-    ? String(contractor.business_name ?? contractor.display_name ?? "").trim() || null
+    ? String(contractor.name ?? "").trim() || null
     : null;
 
   // ── derived display values ────────────────────────────────────────────────
@@ -433,16 +431,6 @@ export default async function JobDetailV2Page({
   const location: LocationRow | null = Array.isArray(rawLoc)
     ? (rawLoc.find((l: unknown) => l) ?? null)
     : (rawLoc ?? null);
-
-  const addressDisplay = location
-    ? buildAddressDisplay({
-        addressLine1: location.address_line1,
-        addressLine2: location.address_line2,
-        city: location.city,
-        state: location.state,
-        zip: location.zip,
-      })
-    : String(job.job_address ?? job.city ?? "").trim();
 
   const customerFullName = [
     formatPersonNamePart(job.customer_first_name),
@@ -937,47 +925,15 @@ export default async function JobDetailV2Page({
                   </span>
                 </div>
               )}
-              {addressDisplay ? (
-                <div style={{ marginTop: "12px" }}>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addressDisplay)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        ...S.contactBtn,
-                        textDecoration: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      Navigate
-                    </a>
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressDisplay)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        ...S.contactBtn,
-                        textDecoration: "none",
-                        display: "inline-flex",
-                        alignItems: "center",
-                      }}
-                    >
-                      Open in Maps
-                    </a>
-                  </div>
-                  {customerLocations.length > 1 && (
-                    <div style={{ marginTop: "10px" }}>
-                      <ChangeServiceLocationForm
-                        action={changeJobServiceLocationFromForm}
-                        currentLocationId={location?.id ?? ""}
-                        jobId={jobId}
-                        locations={customerLocations}
-                        returnTo={returnTo}
-                      />
-                    </div>
-                  )}
+              {customerLocations.length > 1 ? (
+                <div style={{ marginTop: "10px" }}>
+                  <ChangeServiceLocationForm
+                    action={changeJobServiceLocationFromForm}
+                    currentLocationId={location?.id ?? ""}
+                    jobId={jobId}
+                    locations={customerLocations}
+                    returnTo={returnTo}
+                  />
                 </div>
               ) : null}
             </div>
@@ -1041,6 +997,7 @@ export default async function JobDetailV2Page({
               timelineJobIds={timelineJobIds}
               hasDirectNarrativeChain={hasDirectNarrativeChain}
               emptyStateClassName="text-sm text-slate-500"
+              noteEventTypes={["internal_note", "public_note", "contractor_note"]}
             />
           </Suspense>
         </section>
@@ -2043,11 +2000,15 @@ export default async function JobDetailV2Page({
                   >
                     No active hold
                   </div>
-                  <InterruptionHub
-                    jobId={jobId}
-                    returnTo={returnTo}
-                    action={updateJobOpsFromForm}
-                  />
+                  <div
+                    style={{
+                      fontSize: "12.5px",
+                      lineHeight: 1.55,
+                      color: "oklch(0.55 0.015 262)",
+                    }}
+                  >
+                    When the field flags a hold, its tracker activates here — ordered → arrived → released stays synced to this job and the next visit.
+                  </div>
                 </div>
               )}
             </div>

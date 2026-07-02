@@ -9,6 +9,8 @@ type DeferredInternalNotesBodyProps = {
   timelineJobIds: string[];
   hasDirectNarrativeChain: boolean;
   emptyStateClassName: string;
+  /** Which event types to fetch. Defaults to ["internal_note"] to preserve V1 behaviour. */
+  noteEventTypes?: string[];
 };
 
 function getEventNoteText(meta?: any) {
@@ -59,11 +61,29 @@ function renderInlineMentionText(
   });
 }
 
+type AudienceChipStyle = {
+  label: string;
+  bg: string;
+  color: string;
+};
+
+function resolveAudienceChip(eventType: string): AudienceChipStyle {
+  if (eventType === "public_note") {
+    return { label: "SHARED", bg: "oklch(0.95 0.04 150)", color: "oklch(0.42 0.13 150)" };
+  }
+  if (eventType === "contractor_note") {
+    return { label: "CONTRACTOR", bg: "oklch(0.96 0.05 75)", color: "oklch(0.48 0.12 65)" };
+  }
+  // internal_note and any other types
+  return { label: "INTERNAL", bg: "oklch(0.94 0.03 255)", color: "oklch(0.45 0.13 255)" };
+}
+
 export default async function DeferredInternalNotesBody({
   jobId,
   timelineJobIds,
   hasDirectNarrativeChain,
   emptyStateClassName,
+  noteEventTypes = ["internal_note"],
 }: DeferredInternalNotesBodyProps) {
   try {
     const supabase = await createClient();
@@ -72,8 +92,8 @@ export default async function DeferredInternalNotesBody({
 
     const { data: noteItems, error: narrativeWindowErr } = await supabase
       .from("job_events")
-      .select("created_at, meta")
-      .eq("event_type", "internal_note")
+      .select("event_type, created_at, meta")
+      .in("event_type", noteEventTypes)
       .in("job_id", narrativeScopeJobIds)
       .order("created_at", { ascending: false })
       .limit(200);
@@ -96,8 +116,8 @@ export default async function DeferredInternalNotesBody({
       return (
         <div className={emptyStateClassName}>
           {hasDirectNarrativeChain
-            ? "No internal notes in this direct retest chain yet."
-            : "No internal notes yet."}
+            ? "No notes in this direct retest chain yet."
+            : "No notes yet."}
         </div>
       );
     }
@@ -108,6 +128,8 @@ export default async function DeferredInternalNotesBody({
           const when = e?.created_at ? formatTimestampDateTimeDisplayLA(String(e.created_at)) : "-";
           const meta = e?.meta ?? {};
           const noteText = getEventNoteText(meta);
+          const eventType = String(e?.event_type ?? "internal_note");
+          const chip = resolveAudienceChip(eventType);
           const taggedDisplayNames = getTaggedUserIds(meta)
             .map((id) => ({
               id,
@@ -119,28 +141,36 @@ export default async function DeferredInternalNotesBody({
 
           return (
             <div key={idx} className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                <div className="text-xs text-slate-500">{when}</div>
-                <span
-                  style={{
-                    fontFamily: "var(--font-ibm-plex-mono), monospace",
-                    fontSize: "9px",
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    padding: "2px 7px",
-                    borderRadius: "4px",
-                    background: "oklch(0.94 0.03 255)",
-                    color: "oklch(0.45 0.13 255)",
-                    flexShrink: 0,
-                  }}
-                >
-                  INTERNAL
-                </span>
-              </div>
+              <div className="text-xs text-slate-500">{when}</div>
 
               {noteText ? (
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-800">
-                  {renderInlineMentionText(noteText, taggedDisplayNames)}
+                <div
+                  style={{
+                    marginTop: "8px",
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "8px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: "var(--font-ibm-plex-mono), monospace",
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      padding: "3px 7px",
+                      borderRadius: "4px",
+                      background: chip.bg,
+                      color: chip.color,
+                      flexShrink: 0,
+                      marginTop: "3px",
+                    }}
+                  >
+                    {chip.label}
+                  </span>
+                  <div className="whitespace-pre-wrap text-sm leading-6 text-slate-800">
+                    {renderInlineMentionText(noteText, taggedDisplayNames)}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -151,7 +181,7 @@ export default async function DeferredInternalNotesBody({
   } catch (error) {
     console.error("DeferredInternalNotesBody failed", error);
     return (
-      <DeferredNarrativeSectionFailure message="Internal notes are temporarily unavailable. Core job details remain available. Refresh to try again." />
+      <DeferredNarrativeSectionFailure message="Notes are temporarily unavailable. Core job details remain available. Refresh to try again." />
     );
   }
 }
