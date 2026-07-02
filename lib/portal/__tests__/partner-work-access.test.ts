@@ -9,8 +9,8 @@ import { shouldShowPartnerWorkMenuItem, shouldShowPortalMenuItem } from "../part
 
 describe("partner work access", () => {
   it("shows the portal menu whenever the user has portal access", () => {
-    expect(shouldShowPortalMenuItem({ hasPortalAccess: true })).toBe(true);
-    expect(shouldShowPortalMenuItem({ hasPortalAccess: false })).toBe(false);
+    expect(shouldShowPortalMenuItem({ hasExistingPortalAccess: true })).toBe(true);
+    expect(shouldShowPortalMenuItem({ hasExistingPortalAccess: false })).toBe(false);
     expect(
       shouldShowPartnerWorkMenuItem({ isInternalUser: true, hasPartnerWorkAccess: true }),
     ).toBe(true);
@@ -63,7 +63,7 @@ describe("partner work access", () => {
     const portalJobsSource = readFileSync(resolve(__dirname, "../../../app/portal/jobs/page.tsx"), "utf-8");
 
     expect(layoutSource).toContain("shouldShowPortalMenuItem");
-    expect(layoutSource).toContain("const hasPortalAccess = access.hasPortalAccess");
+    expect(layoutSource).toContain("const hasExistingPortalAccess = access.hasExistingPortalAccess");
     expect(layoutSource).toContain("Compliance Matters Portal");
     expect(layoutSource).toContain("hasPortalAccess={hasPortalAccess}");
     expect(mobileShellSource).toContain("hasPortalAccess: boolean;");

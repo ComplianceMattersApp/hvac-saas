@@ -29,6 +29,7 @@ export type DualContextAccess = {
   hasInternalMembership: boolean;
   hasActiveAppAccess: boolean;
   hasExpiredOrInactiveAppAccess: boolean;
+  hasExistingPortalAccess: boolean;
   hasPortalAccess: boolean;
   isDualContextUser: boolean;
   availableContexts: DualContextAvailableContext[];
@@ -82,6 +83,7 @@ export async function resolveDualContextAccess(input: {
       hasInternalMembership: false,
       hasActiveAppAccess: false,
       hasExpiredOrInactiveAppAccess: false,
+      hasExistingPortalAccess: false,
       hasPortalAccess: false,
       isDualContextUser: false,
       availableContexts: [],
@@ -132,7 +134,8 @@ export async function resolveDualContextAccess(input: {
   }
 
   const hasInternalMembership = Boolean(internalUser);
-  const hasPortalAccess = Boolean(portal);
+  const hasExistingPortalAccess = Boolean(portal);
+  const hasPortalAccess = hasExistingPortalAccess;
   const availableContexts: DualContextAvailableContext[] = [];
   if (hasActiveAppAccess) availableContexts.push("app");
   if (hasPortalAccess) availableContexts.push("portal");
@@ -150,6 +153,7 @@ export async function resolveDualContextAccess(input: {
     hasInternalMembership,
     hasActiveAppAccess,
     hasExpiredOrInactiveAppAccess: hasInternalMembership && !hasActiveAppAccess,
+    hasExistingPortalAccess,
     hasPortalAccess,
     isDualContextUser: hasInternalMembership && hasPortalAccess,
     availableContexts,

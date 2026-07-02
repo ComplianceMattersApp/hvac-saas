@@ -1,12 +1,12 @@
 export function shouldShowPortalMenuItem(input: {
-  hasPortalAccess: boolean;
+  hasExistingPortalAccess: boolean;
 }) {
-  return input.hasPortalAccess;
+  return input.hasExistingPortalAccess;
 }
 
 export function shouldShowPartnerWorkMenuItem(input: {
   isInternalUser: boolean;
   hasPartnerWorkAccess: boolean;
 }) {
-  return shouldShowPortalMenuItem({ hasPortalAccess: input.hasPartnerWorkAccess });
+  return shouldShowPortalMenuItem({ hasExistingPortalAccess: input.hasPartnerWorkAccess });
 }

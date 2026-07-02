@@ -8,6 +8,7 @@ function access(overrides: Partial<DualContextAccess>): DualContextAccess {
     hasInternalMembership: false,
     hasActiveAppAccess: false,
     hasExpiredOrInactiveAppAccess: false,
+    hasExistingPortalAccess: false,
     hasPortalAccess: false,
     isDualContextUser: false,
     availableContexts: [],
@@ -34,6 +35,7 @@ describe("resolvePostLoginDestination", () => {
       resolvePostLoginDestination({
         access: access({
           hasPortalAccess: true,
+          hasExistingPortalAccess: true,
           availableContexts: ["portal"],
           preferredLandingContext: "portal",
           portal: directPortal(),
@@ -47,6 +49,7 @@ describe("resolvePostLoginDestination", () => {
       resolvePostLoginDestination({
         access: access({
           hasPortalAccess: true,
+          hasExistingPortalAccess: true,
           availableContexts: ["portal"],
           preferredLandingContext: "portal",
           portal: directPortal(),
@@ -104,6 +107,7 @@ describe("resolvePostLoginDestination", () => {
           hasInternalMembership: true,
           hasActiveAppAccess: true,
           hasPortalAccess: true,
+          hasExistingPortalAccess: true,
           isDualContextUser: true,
           availableContexts: ["app", "portal"],
           preferredLandingContext: "app",
@@ -128,6 +132,7 @@ describe("resolvePostLoginDestination", () => {
           hasInternalMembership: true,
           hasExpiredOrInactiveAppAccess: true,
           hasPortalAccess: true,
+          hasExistingPortalAccess: true,
           isDualContextUser: true,
           availableContexts: ["portal"],
           preferredLandingContext: "portal",

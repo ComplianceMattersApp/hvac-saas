@@ -25,6 +25,7 @@ function portalAccess(): DualContextAccess {
     hasInternalMembership: false,
     hasActiveAppAccess: false,
     hasExpiredOrInactiveAppAccess: false,
+    hasExistingPortalAccess: true,
     hasPortalAccess: true,
     isDualContextUser: false,
     availableContexts: ["portal"],
@@ -46,6 +47,7 @@ function activeInternalAccess(): DualContextAccess {
     hasInternalMembership: true,
     hasActiveAppAccess: true,
     hasExpiredOrInactiveAppAccess: false,
+    hasExistingPortalAccess: false,
     hasPortalAccess: false,
     isDualContextUser: false,
     availableContexts: ["app"],
@@ -65,6 +67,7 @@ function activeInternalAccess(): DualContextAccess {
 function dualContextAccess(): DualContextAccess {
   return {
     ...activeInternalAccess(),
+    hasExistingPortalAccess: true,
     hasPortalAccess: true,
     isDualContextUser: true,
     availableContexts: ["app", "portal"],

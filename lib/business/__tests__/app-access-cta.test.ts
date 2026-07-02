@@ -11,6 +11,7 @@ function makeAccess(overrides: Partial<DualContextAccess> = {}): DualContextAcce
     hasInternalMembership: false,
     hasActiveAppAccess: false,
     hasExpiredOrInactiveAppAccess: false,
+    hasExistingPortalAccess: false,
     hasPortalAccess: false,
     isDualContextUser: false,
     availableContexts: [],
@@ -53,6 +54,7 @@ describe("resolveAppAccessCta", () => {
     const cta = resolveAppAccessCta({
       access: makeAccess({
         hasPortalAccess: true,
+        hasExistingPortalAccess: true,
         portal: directPortal(),
       }),
       billingAvailability: checkoutAvailable,
@@ -87,6 +89,7 @@ describe("resolveAppAccessCta", () => {
     const cta = resolveAppAccessCta({
       access: adminAccess({
         hasPortalAccess: true,
+        hasExistingPortalAccess: true,
         isDualContextUser: true,
         appAccessBlockedReason: "blocked_trial_expired",
       }),
@@ -132,6 +135,7 @@ describe("resolveAppAccessCta", () => {
       const cta = resolveAppAccessCta({
         access: adminAccess({
           hasPortalAccess: true,
+          hasExistingPortalAccess: true,
           isDualContextUser: true,
           appAccessBlockedReason: "blocked_entitlement_status",
         }),
@@ -154,6 +158,7 @@ describe("resolveAppAccessCta", () => {
         hasActiveAppAccess: true,
         hasExpiredOrInactiveAppAccess: false,
         hasPortalAccess: true,
+        hasExistingPortalAccess: true,
         isDualContextUser: true,
         availableContexts: ["app", "portal"],
         preferredLandingContext: "app",

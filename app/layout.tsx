@@ -96,7 +96,8 @@ export default async function RootLayout({
   const servicePlansEnabled = isMaintenanceAgreementsEnabled();
   let unreadNotificationCount = 0;
   let productMode: ProductMode = "hybrid";
-  const hasPortalAccess = access.hasPortalAccess;
+  const hasExistingPortalAccess = access.hasExistingPortalAccess;
+  const hasPortalAccess = hasExistingPortalAccess;
   let permitWorkflowEnabled = false;
 
   if (access.preferredLandingContext === "portal") {
@@ -120,7 +121,7 @@ export default async function RootLayout({
   }
 
   const showPortalMenuItem = shouldShowPortalMenuItem({
-    hasPortalAccess,
+    hasExistingPortalAccess,
   });
 
   const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";
