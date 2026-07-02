@@ -9537,6 +9537,41 @@ function canContractorWriteEvent(event_type: string) {
       redirect("/jobs/new?err=contractor_proposal_submit_failed");
     }
 
+    if (site_access_contact_different && site_access_contact_name) {
+      try {
+        const siteContactPhone = String(site_access_contact_phone ?? "").trim() || null;
+        const siteContactEmail = normalizeSiteAccessEmail(site_access_contact_email);
+        const preferredContactMethod = siteContactPhone ? "phone" : siteContactEmail ? "email" : "none";
+
+        const { error: candidateInsertErr } = await proposalWriteClient
+          .from("contractor_intake_contact_candidates")
+          .insert({
+            account_owner_user_id: proposalOwnerUserId,
+            contractor_intake_submission_id: proposalId,
+            proposed_role: "site_access_contact",
+            display_name: String(site_access_contact_name).trim().slice(0, 120),
+            phone: siteContactPhone,
+            email: siteContactEmail,
+            preferred_contact_method: preferredContactMethod,
+            proposed_link_target: "job",
+            source_role: "contractor",
+            source_type: "intake_submission",
+            status: "proposed",
+            notes: String(site_access_contact_notes ?? "").trim().slice(0, 500) || null,
+            created_by_user_id: submittingUserId,
+          });
+
+        if (candidateInsertErr) throw candidateInsertErr;
+      } catch (error) {
+        logContractorProposalSubmitFailure({
+          errorCode: "site_access_contact_candidate_insert_failed",
+          error,
+          stage: "site_access_contact_candidate_insert",
+          proposalId,
+        });
+      }
+    }
+
     if (proposalId) {
       try {
         const proposalCustomerName = [customerFirstNameRaw, customerLastNameRaw]

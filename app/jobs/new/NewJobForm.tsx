@@ -1026,6 +1026,12 @@ const [billingRecipient, setBillingRecipient] = useState<
   const shouldShowSiteAccessToggle = Boolean(
     isInternalMode && (createNewCustomer || selectedCustomerId),
   );
+  const hasSiteAccessContactDraft = Boolean(
+    siteAccessContactName.trim() ||
+    siteAccessContactPhone.trim() ||
+    siteAccessContactEmail.trim() ||
+    siteAccessContactNotes.trim(),
+  );
 
   const relationshipJobs = useMemo(() => {
     return [...relationshipContext.activeJobs, ...relationshipContext.recentJobs];
@@ -1502,7 +1508,9 @@ const [billingRecipient, setBillingRecipient] = useState<
     : "Leave unscheduled if timing is not set yet.";
   const additionalDetailsSummary = systems.length > 0
     ? `${systems.length} system${systems.length === 1 ? "" : "s"} added`
-    : "Permit, equipment, photos, and comments stay secondary.";
+    : isInternalMode
+      ? "Notes stay optional."
+      : "Permit, equipment, photos, and comments stay secondary.";
 
   function guidedSectionToneClasses(tone: "active" | "complete" | "pending") {
     if (tone === "complete") {
@@ -3149,6 +3157,52 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <p className="text-xs text-slate-500">Reason for Visit explains why this visit exists and gives dispatch context.</p>
                   </div>
 
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">Secondary Site Contact (optional)</h3>
+                      <p className="mt-0.5 text-xs leading-5 text-slate-600">
+                        Add a tenant, occupant, or on-site person our team can contact about access or job details.
+                      </p>
+                    </div>
+                    <input
+                      type="hidden"
+                      name="site_access_contact_different"
+                      value={hasSiteAccessContactDraft ? "1" : "0"}
+                    />
+                    <input
+                      className="w-full rounded-md border border-slate-300 bg-white p-2"
+                      name="site_access_contact_name"
+                      placeholder="Name"
+                      value={siteAccessContactName}
+                      onChange={(e) => setSiteAccessContactName(e.target.value)}
+                    />
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <input
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="site_access_contact_phone"
+                        placeholder="Phone"
+                        value={siteAccessContactPhone}
+                        onChange={(e) => setSiteAccessContactPhone(e.target.value)}
+                      />
+                      <input
+                        type="email"
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="site_access_contact_email"
+                        placeholder="Email"
+                        value={siteAccessContactEmail}
+                        onChange={(e) => setSiteAccessContactEmail(e.target.value)}
+                      />
+                    </div>
+                    <textarea
+                      className="w-full rounded-md border border-slate-300 bg-white p-2"
+                      name="site_access_contact_notes"
+                      rows={2}
+                      placeholder="Access notes (optional)"
+                      value={siteAccessContactNotes}
+                      onChange={(e) => setSiteAccessContactNotes(e.target.value)}
+                    />
+                  </div>
+
                   <input type="hidden" name="title" value={visitScopeSummary} />
                   <input type="hidden" name="job_notes" value={visitScopeSummary} />
                 </div>
@@ -3594,19 +3648,42 @@ const [billingRecipient, setBillingRecipient] = useState<
             </section>
             ) : null}
 
-            {/* Optional Equipment */}
-            {isInternalMode || isContractorMode ? (
+            {/* Optional notes/equipment */}
+            {isInternalMode ? (
+            <section className={guidedSectionShellClass}>
+              {renderGuidedSectionIntro({
+                icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
+                title: "Notes",
+                description: "Add internal handoff notes only if they help the job move forward.",
+                summary: additionalDetailsSummary,
+                tone: "pending",
+              })}
+              <div className={guidedSectionBodyClass}>
+                <div className={`${guidedSectionInsetClass} space-y-3`}>
+                  {renderSupportingSectionHeader({
+                    icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
+                    title: "Internal Notes",
+                    description: "Add handoff notes only if needed.",
+                    trailing: <span className={supportingSectionMetaClass}>Optional</span>,
+                  })}
+                  <textarea
+                    name="job_notes"
+                    rows={4}
+                    placeholder="Anything the next person should know before this job moves forward..."
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  />
+                  <input type="hidden" name="equipment_json" value="[]" />
+                </div>
+              </div>
+            </section>
+            ) : isContractorMode ? (
             <section className={guidedSectionShellClass}>
               {renderGuidedSectionIntro({
                 icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
-                title: isCleaningMode ? "Site Details" : isContractorMode ? "Equipment" : "Additional Details",
+                title: isCleaningMode ? "Site Details" : "Equipment",
                 description: isCleaningMode
                   ? "Add site instructions, photos, and extra comments when they help the crew prepare."
-                  : isContractorMode
-                  ? "Add equipment now so Compliance Matters has the system details before the job is reviewed."
-                  : productMode === "ecc_hers"
-                  ? "Supporting information only. Add it when it helps the compliance job move forward."
-                  : "Supporting information only. Add it when it helps this work order move forward.",
+                  : "Add equipment now so Compliance Matters has the system details before the job is reviewed.",
                 summary: additionalDetailsSummary,
                 tone: additionalDetailsTone,
               })}
@@ -3867,39 +3944,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <input type="hidden" name="equipment_json" value="[]" />
                 </div>
               )}
-              {isInternalMode ? (
-                <>
-              <div className={`${guidedSectionInsetClass} space-y-3`}>
-                {renderSupportingSectionHeader({
-                  icon: <Camera className="h-4 w-4" aria-hidden="true" />,
-                  title: "Photos",
-                  description: isCleaningMode ? "Site photos, access images, or cleaning context. JPG, PNG, WEBP, or PDF." : "Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.",
-                  trailing: <span className={supportingSectionMetaClass}>Optional</span>,
-                })}
-                <input
-                  type="file"
-                  name="photos"
-                  accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
-                  multiple
-                  className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700"
-                />
-              </div>
-              <div className={`${guidedSectionInsetClass} space-y-3`}>
-                {renderSupportingSectionHeader({
-                  icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
-                  title: "Additional Comments",
-                  description: "Add handoff notes only if needed.",
-                  trailing: <span className={supportingSectionMetaClass}>Optional</span>,
-                })}
-                <textarea
-                  name="job_notes"
-                  rows={4}
-                  placeholder="Anything the next person should know before this job moves forward..."
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                />
-              </div>
-                </>
-              ) : null}
                 </>
               ) : null}
               </div>

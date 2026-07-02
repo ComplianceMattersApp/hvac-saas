@@ -32,6 +32,15 @@ describe("createJobFromForm relationship-intake wiring", () => {
     expect(jobActionsSource).toContain('site_access_contact_create_failed');
   });
 
+  it("stores portal secondary site contacts as provisional intake candidates", () => {
+    expect(jobActionsSource).toContain('.from("contractor_intake_contact_candidates")');
+    expect(jobActionsSource).toContain('proposed_role: "site_access_contact"');
+    expect(jobActionsSource).toContain('proposed_link_target: "job"');
+    expect(jobActionsSource).toContain('source_role: "contractor"');
+    expect(jobActionsSource).toContain('source_type: "intake_submission"');
+    expect(jobActionsSource).toContain('site_access_contact_candidate_insert_failed');
+  });
+
   it("does not change internal invoice or closeout paths from create intake wiring", () => {
     expect(jobActionsSource).not.toContain('createInternalInvoiceDraftFromForm(');
     expect(jobActionsSource).not.toContain('sendInternalInvoiceEmailFromForm(');

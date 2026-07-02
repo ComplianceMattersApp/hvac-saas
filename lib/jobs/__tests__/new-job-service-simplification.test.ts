@@ -41,12 +41,14 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
     expect(formSource).toContain("<VisitScopeBuilder");
   });
 
-  it("renames Step 7 Optional details to Additional details", () => {
-    expect(formSource).toContain("Additional Details");
+  it("renders internal supporting details as notes-only", () => {
+    expect(formSource).toContain('title: "Notes"');
+    expect(formSource).toContain('title: "Internal Notes"');
     expect(formSource).not.toMatch(/>Optional details</);
+    expect(formSource).not.toContain("Additional Details");
   });
 
-  it("preserves permit field names inside Additional Details disclosure for Service mode", () => {
+  it("preserves permit field names inside the portal equipment disclosure for Service mode", () => {
     expect(formSource).toMatch(
       /isHvacServiceMode && surfaceProfile\.surfaces\.permits \? \(\s*<details[\s\S]*Permit information[\s\S]*name="permit_number"[\s\S]*name="jurisdiction"[\s\S]*name="permit_date"[\s\S]*<\/details>/,
     );
