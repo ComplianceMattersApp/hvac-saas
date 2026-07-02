@@ -1302,6 +1302,25 @@ function isMobileJobV2AllowlistedUser(user: { id?: string | null; email?: string
   );
 }
 
+function firstSearchParamValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
+function buildV2JobDetailRedirectPath(jobId: string, sp: SearchParams) {
+  const query = new URLSearchParams();
+
+  for (const [key, rawValue] of Object.entries(sp)) {
+    if (key === "legacy") continue;
+    const values = Array.isArray(rawValue) ? rawValue : rawValue === undefined ? [] : [rawValue];
+    values.forEach((value) => {
+      if (value !== undefined) query.append(key, value);
+    });
+  }
+
+  const qs = query.toString();
+  return `/jobs/${encodeURIComponent(jobId)}/v2${qs ? `?${qs}` : ""}`;
+}
+
 export default async function JobDetailPage({
   params,
   searchParams,
@@ -1316,6 +1335,14 @@ export default async function JobDetailPage({
   }
 
   const sp: SearchParams = (searchParams ? await searchParams : {}) ?? {};
+  const legacyRaw = firstSearchParamValue(sp.legacy).trim().toLowerCase();
+  const shouldRenderLegacyJobDetail =
+    legacyRaw === "1" || legacyRaw === "true" || legacyRaw === "yes";
+
+  if (!shouldRenderLegacyJobDetail) {
+    redirect(buildV2JobDetailRedirectPath(jobId, sp));
+  }
+
   const mobileLayoutRaw = sp.mobileLayout;
   const mobileLayout =
     Array.isArray(mobileLayoutRaw)
