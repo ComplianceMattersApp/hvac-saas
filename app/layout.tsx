@@ -96,7 +96,7 @@ export default async function RootLayout({
   const servicePlansEnabled = isMaintenanceAgreementsEnabled();
   let unreadNotificationCount = 0;
   let productMode: ProductMode = "hybrid";
-  let hasPartnerWorkAccess = false;
+  const hasPartnerWorkAccess = access.hasPortalAccess;
   let permitWorkflowEnabled = false;
 
   if (access.preferredLandingContext === "portal") {
@@ -111,7 +111,6 @@ export default async function RootLayout({
       accountOwnerUserId,
     });
 
-    hasPartnerWorkAccess = access.hasPortalAccess;
     permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(accountOwnerUserId);
 
     productMode = await resolveProductModeForAccountOwnerId({
@@ -285,7 +284,7 @@ export default async function RootLayout({
                         </ShellNavLink>
                       ) : null}
                       {showPartnerWorkMenuItem ? (
-                        <ShellNavLink href="/portal">Partner Work</ShellNavLink>
+                        <ShellNavLink href="/portal">Compliance Matters Portal</ShellNavLink>
                       ) : null}
                       <ShellMoreMenu items={moreMenuItems} />
                     </nav>

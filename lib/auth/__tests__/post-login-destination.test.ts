@@ -30,6 +30,7 @@ describe("resolvePostLoginDestination", () => {
           portal: {
             contractorId: "contractor-1",
             contractorName: "Partner Co",
+            accountOwnerUserId: "compliance-owner-1",
             lifecycleState: "active",
           },
         }),
@@ -47,6 +48,7 @@ describe("resolvePostLoginDestination", () => {
           portal: {
             contractorId: "contractor-1",
             contractorName: "Partner Co",
+            accountOwnerUserId: "compliance-owner-1",
             lifecycleState: "active",
           },
         }),
@@ -116,6 +118,7 @@ describe("resolvePostLoginDestination", () => {
           portal: {
             contractorId: "contractor-1",
             contractorName: "Partner Co",
+            accountOwnerUserId: "compliance-owner-1",
             lifecycleState: "active",
           },
         }),
@@ -144,6 +147,7 @@ describe("resolvePostLoginDestination", () => {
           portal: {
             contractorId: "contractor-1",
             contractorName: "Partner Co",
+            accountOwnerUserId: "compliance-owner-1",
             lifecycleState: "active",
           },
           appAccessBlockedReason: "inactive_internal_user",

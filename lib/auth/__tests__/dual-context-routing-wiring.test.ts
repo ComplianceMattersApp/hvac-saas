@@ -29,12 +29,13 @@ describe("dual-context routing wiring", () => {
 
     expect(layout).toContain("access.hasActiveAppAccess");
     expect(layout).toContain("{isInternalUser ? <ShellCreateMenu items={createMenuItems} /> : null}");
-    expect(layout).toContain("hasPartnerWorkAccess = access.hasPortalAccess");
+    expect(layout).toContain("const hasPartnerWorkAccess = access.hasPortalAccess");
+    expect(layout).toContain("Compliance Matters Portal");
 
     expect(mobileMenu).toContain("{isInternalUser ? (");
     expect(mobileMenu).toContain('href="/jobs/new"');
     expect(mobileMenu).toContain('href="/customers/new"');
-    expect(mobileMenu).toContain("Partner Work");
+    expect(mobileMenu).toContain("Compliance Matters Portal");
   });
 
   it("keeps portal request entry explicit and prevents membership-only job context switching", () => {

@@ -8,7 +8,7 @@ import {
 import { shouldShowPartnerWorkMenuItem } from "../partner-work-access";
 
 describe("partner work access", () => {
-  it("shows the partner work menu only for internal users with partner access", () => {
+  it("shows the portal menu whenever the user has portal access", () => {
     expect(
       shouldShowPartnerWorkMenuItem({ isInternalUser: true, hasPartnerWorkAccess: true }),
     ).toBe(true);
@@ -17,7 +17,7 @@ describe("partner work access", () => {
     ).toBe(false);
     expect(
       shouldShowPartnerWorkMenuItem({ isInternalUser: false, hasPartnerWorkAccess: true }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("labels attached work as created by rater and prefers sent to rater when formal handoff exists", () => {
@@ -61,10 +61,11 @@ describe("partner work access", () => {
     const portalJobsSource = readFileSync(resolve(__dirname, "../../../app/portal/jobs/page.tsx"), "utf-8");
 
     expect(layoutSource).toContain("shouldShowPartnerWorkMenuItem");
-    expect(layoutSource).toContain("Partner Work");
+    expect(layoutSource).toContain("const hasPartnerWorkAccess = access.hasPortalAccess");
+    expect(layoutSource).toContain("Compliance Matters Portal");
     expect(layoutSource).toContain("showPartnerWorkMenuItem={showPartnerWorkMenuItem}");
     expect(mobileShellSource).toContain("showPartnerWorkMenuItem: boolean;");
-    expect(mobileShellSource).toContain("Partner Work");
+    expect(mobileShellSource).toContain("Compliance Matters Portal");
     expect(portalSource).toContain("sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? \"Created by Rater\"}");
     expect(portalJobsSource).toContain("sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? \"Created by Rater\"}");
     expect(portalSource).not.toContain("invoice_number");

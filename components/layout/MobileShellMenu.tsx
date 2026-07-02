@@ -211,7 +211,7 @@ export default function MobileShellMenu({
                   {showPartnerWorkMenuItem ? (
                     <Link href="/portal" onClick={closeMenu} className={mobileMenuItemClass(portalActive)}>
                       <BriefcaseBusiness className={itemIconClass(portalActive)} aria-hidden="true" />
-                      Partner Work
+                      Compliance Matters Portal
                     </Link>
                   ) : null}
                   {isInternalUser ? (

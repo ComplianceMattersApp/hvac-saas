@@ -53,6 +53,7 @@ function makeSupabaseFixture(input: FixtureInput) {
               contractors: {
                 id: "contractor-1",
                 name: "Partner Co",
+                owner_user_id: "compliance-owner-1",
                 lifecycle_state: input.portal.lifecycleState ?? "active",
               },
             },
@@ -130,6 +131,7 @@ describe("resolveDualContextAccess", () => {
 
     expect(access.hasActiveAppAccess).toBe(false);
     expect(access.hasPortalAccess).toBe(true);
+    expect(access.portal?.accountOwnerUserId).toBe("compliance-owner-1");
     expect(access.preferredLandingContext).toBe("portal");
     expect(landingPathForDualContextAccess(access)).toBe("/portal");
   });
@@ -144,6 +146,10 @@ describe("resolveDualContextAccess", () => {
 
     expect(access.isDualContextUser).toBe(true);
     expect(access.availableContexts).toEqual(["app", "portal"]);
+    expect(access.portal).toMatchObject({
+      contractorId: "contractor-1",
+      accountOwnerUserId: "compliance-owner-1",
+    });
     expect(access.preferredLandingContext).toBe("app");
   });
 

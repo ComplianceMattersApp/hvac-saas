@@ -19,6 +19,7 @@ export type DualContextInternalIdentity = {
 export type DualContextPortalIdentity = {
   contractorId: string;
   contractorName: string | null;
+  accountOwnerUserId: string;
   lifecycleState: string | null;
 };
 
@@ -104,7 +105,7 @@ export async function resolveDualContextAccess(input: {
         .maybeSingle(),
       supabase
         .from("contractor_users")
-        .select("contractor_id, contractors ( id, name, lifecycle_state )")
+        .select("contractor_id, contractors ( id, name, lifecycle_state, owner_user_id )")
         .eq("user_id", user.id)
         .maybeSingle(),
     ]);
@@ -127,11 +128,13 @@ export async function resolveDualContextAccess(input: {
   const contractor = pickRelatedObject((contractorRow as any)?.contractors);
   const lifecycleState = normalizeText((contractor as any)?.lifecycle_state).toLowerCase() || null;
   const contractorId = normalizeText((contractorRow as any)?.contractor_id);
+  const portalAccountOwnerUserId = normalizeText((contractor as any)?.owner_user_id);
   const portal =
-    contractorId && (!lifecycleState || lifecycleState === "active")
+    contractorId && portalAccountOwnerUserId && (!lifecycleState || lifecycleState === "active")
       ? {
           contractorId,
           contractorName: normalizeText((contractor as any)?.name) || null,
+          accountOwnerUserId: portalAccountOwnerUserId,
           lifecycleState,
         }
       : null;
