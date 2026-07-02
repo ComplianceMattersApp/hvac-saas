@@ -647,7 +647,6 @@ function isActiveDispatchRow(job: JobDispatchRow) {
 
 function isCalendarScheduledDispatchRow(job: JobDispatchRow) {
   if (!job.scheduled_date) return false;
-  if (isOnHoldDispatchRow(job)) return false;
   return true;
 }
 
@@ -968,7 +967,9 @@ export async function getDispatchCalendarQueueData(params: DispatchCalendarLoadP
       .filter(Boolean),
   );
 
-  const scheduledAttentionCalendarRows = validScheduledAttentionRows.filter((row) => isCalendarScheduledDispatchRow(row));
+  const scheduledAttentionCalendarRows = validScheduledAttentionRows.filter(
+    (row) => isActiveDispatchRow(row) && isCalendarScheduledDispatchRow(row),
+  );
   const unscheduledActiveRows = suppressRetestParentRows(
     validUnscheduledRows.filter((row) => isActiveDispatchRow(row) && !row.scheduled_date),
     activeRetestParentIds,

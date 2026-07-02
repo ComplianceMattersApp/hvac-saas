@@ -149,6 +149,32 @@ function makeFixture() {
       deleted_at: null,
     },
     {
+      id: 'job-on-hold-scheduled',
+      customer_id: 'cust-1',
+      location_id: 'loc-4',
+      title: 'Paused But Scheduled Visit',
+      job_type: 'service',
+      status: 'open',
+      ops_status: 'on_hold',
+      parent_job_id: null,
+      scheduled_date: '2026-04-29',
+      window_start: '15:00',
+      window_end: '16:00',
+      city: 'Hold City',
+      customer_phone: '555-5000',
+      job_address: '555 Main St',
+      customer_first_name: 'Riley',
+      customer_last_name: 'Chen',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:15:00.000Z',
+      deleted_at: null,
+    },
+    {
       id: 'job-needs-scheduling',
       customer_id: 'cust-1',
       location_id: 'loc-3',
@@ -356,6 +382,7 @@ describe('calendar action wiring', () => {
           is_primary: true,
         },
       ],
+      'job-on-hold-scheduled': [],
     });
   });
 
@@ -377,8 +404,14 @@ describe('calendar action wiring', () => {
       anchorDate: '2026-04-29',
     });
 
-    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback', 'job-assigned-tech-2']);
-    expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null, null]);
+    expect(board.day.jobs.map((job) => job.id)).toEqual([
+      'job-assigned-canonical',
+      'job-unassigned-fallback',
+      'job-assigned-tech-2',
+      'job-on-hold-scheduled',
+    ]);
+    expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null, null, null]);
+    expect(board.day.jobs.find((job) => job.id === 'job-on-hold-scheduled')?.ops_status).toBe('on_hold');
     expect('unassignedScheduledJobs' in board).toBe(false);
     expect('scheduledAttentionWindowJobs' in board).toBe(false);
     expect('assignableUsers' in board).toBe(false);
@@ -422,7 +455,12 @@ describe('calendar action wiring', () => {
       techFilterType: 'specific',
     });
 
-    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback', 'job-assigned-tech-2']);
+    expect(board.day.jobs.map((job) => job.id)).toEqual([
+      'job-assigned-canonical',
+      'job-unassigned-fallback',
+      'job-assigned-tech-2',
+      'job-on-hold-scheduled',
+    ]);
   });
 
   it('forces technicians to their own calendar even when the URL requests another user', async () => {
