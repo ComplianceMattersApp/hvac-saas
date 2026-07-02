@@ -78,12 +78,12 @@ export default function SchedulePanel({
         type="button"
         onClick={() => setOpen(true)}
         style={{
-          flex: 1,
-          height: "38px",
-          borderRadius: "9px",
+          width: "100%",
+          height: "42px",
+          borderRadius: "10px",
           border: "1px solid oklch(0.9 0.006 250)",
           background: "#fff",
-          fontSize: "12.5px",
+          fontSize: "13.5px",
           fontWeight: 600,
           cursor: "pointer",
           fontFamily: "inherit",
@@ -92,13 +92,14 @@ export default function SchedulePanel({
           alignItems: "center",
           justifyContent: "center",
           gap: "6px",
+          boxSizing: "border-box",
         }}
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
           <rect x="1" y="2" width="14" height="13" rx="2" stroke="currentColor" strokeWidth="1.5" />
           <path d="M5 1v3M11 1v3M1 6h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
-        {hasSchedule ? "Reschedule" : "Schedule"}
+        {hasSchedule ? "Reschedule" : "Schedule Job"}
       </button>
     );
   }

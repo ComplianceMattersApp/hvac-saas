@@ -2925,7 +2925,6 @@ export default async function JobDetailV2Page({
           <div style={{ display: "flex", flexDirection: "column" }}>
             {(
               [
-                { href: "/ops", label: "Back to Ops", show: true },
                 { href: `/customers/${job.customer_id}`, label: "Open Customer", show: Boolean(job.customer_id) },
                 { href: createEstimateFromJobHref ?? "", label: "Create Estimate", show: Boolean(createEstimateFromJobHref) },
                 { href: addServicePlanHref ?? "", label: "Add Service Plan", show: Boolean(addServicePlanHref) },
