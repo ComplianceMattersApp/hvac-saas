@@ -321,7 +321,7 @@ function agendaJobLeftRailClass(lifecycle: string | null): string {
   if (lifecycle === 'scheduled') return 'border-l-cyan-500';
   if (lifecycle === 'field_complete') return 'border-l-amber-400';
   if (lifecycle === 'pending_info') return 'border-l-amber-400';
-  if (lifecycle === 'on_hold') return 'border-l-slate-400';
+  if (lifecycle === 'on_hold') return 'border-l-violet-500';
   if (lifecycle === 'closed') return 'border-l-green-500';
   if (lifecycle === 'cancelled') return 'border-l-slate-300';
   return 'border-l-slate-300';

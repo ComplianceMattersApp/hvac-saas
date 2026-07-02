@@ -17,6 +17,11 @@ const dispatchGridSource = readFileSync(
   "utf-8",
 );
 
+const calendarStatusSource = readFileSync(
+  resolve(__dirname, "../../../components/calendar/calendar-status.ts"),
+  "utf-8",
+);
+
 const dragJobLinkSource = readFileSync(
   resolve(__dirname, "../../../components/calendar/CalendarDragJobLink.tsx"),
   "utf-8",
@@ -161,5 +166,15 @@ describe("calendar action responsiveness", () => {
 
     expect(layoutVisibilityBlock).toContain("!job.scheduled_date || !job.window_start");
     expect(layoutVisibilityBlock).not.toContain("on_hold");
+  });
+
+  it("gives on-hold calendar jobs their own non-cancelled color treatment", () => {
+    expect(calendarStatusSource).toContain("on_hold: 'bg-violet-500'");
+    expect(calendarStatusSource).toContain("cancelled: 'bg-slate-400'");
+    expect(calendarStatusSource).toContain("'on_hold',");
+    expect(dispatchGridSource).toContain('if (value === "on_hold") return "border-violet-300 bg-violet-100 text-violet-950"');
+    expect(dispatchGridSource).toContain('if (value === "cancelled") return "border-slate-300 border-dashed bg-slate-100 text-slate-500"');
+    expect(calendarViewSource).toContain("if (lifecycle === 'on_hold') return 'border-l-violet-500'");
+    expect(calendarViewSource).toContain("if (lifecycle === 'cancelled') return 'border-l-slate-300'");
   });
 });

@@ -177,7 +177,7 @@ function dispatchBlockClass(status?: string | null) {
   const value = String(status ?? "").toLowerCase();
   if (value === "failed") return "border-rose-300 bg-rose-100 text-rose-950";
   if (value === "pending_info") return "border-amber-200 bg-amber-100 text-amber-900";
-  if (value === "on_hold") return "border-slate-300 bg-slate-100 text-slate-900";
+  if (value === "on_hold") return "border-violet-300 bg-violet-100 text-violet-950";
   if (value === "on_my_way") return "border-blue-300 bg-blue-100 text-blue-950";
   if (value === "in_progress") return "border-indigo-300 bg-indigo-100 text-indigo-950";
   if (value === "field_complete") return "border-amber-200 bg-amber-100 text-amber-900";
