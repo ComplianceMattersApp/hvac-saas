@@ -43,6 +43,7 @@ import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 import DeferredTimelineBody from "../_components/DeferredTimelineBody";
 import DeferredInternalNotesBody from "../_components/DeferredInternalNotesBody";
@@ -2362,6 +2363,97 @@ export default async function JobDetailV2Page({
                       </div>
                     </div>
                   ),
+                } satisfies RecordTab,
+                {
+                  id: "permit",
+                  label: "Permit",
+                  count: isValidEccPermitNumber(job.permit_number)
+                    ? String(job.permit_number)
+                    : "Not added",
+                  content: (() => {
+                    const hasPermit = isValidEccPermitNumber(job.permit_number);
+                    const permitNumber = hasPermit ? String(job.permit_number) : null;
+                    const jurisdiction = String(job.jurisdiction ?? "").trim() || null;
+                    const permitDate = String(job.permit_date ?? "").trim() || null;
+
+                    const rows: Array<{ label: string; value: string | null }> = [
+                      { label: "Permit number", value: permitNumber },
+                      { label: "Jurisdiction", value: jurisdiction },
+                      { label: "Issue date", value: permitDate ? formatBusinessDateUS(permitDate) : null },
+                    ];
+
+                    return (
+                      <div style={{ padding: "4px 0" }}>
+                        {hasPermit ? (
+                          <div
+                            style={{
+                              border: "1px solid oklch(0.93 0.005 250)",
+                              borderRadius: "11px",
+                              overflow: "hidden",
+                            }}
+                          >
+                            {rows.map((row) => (
+                              <div
+                                key={row.label}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "12px 16px",
+                                  ...S.rowRule,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "13px",
+                                    fontWeight: 500,
+                                    color: "oklch(0.45 0.02 262)",
+                                  }}
+                                >
+                                  {row.label}
+                                </span>
+                                <span
+                                  style={{
+                                    fontFamily: S.mono,
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                    color: row.value ? "oklch(0.33 0.02 262)" : "oklch(0.65 0.015 262)",
+                                  }}
+                                >
+                                  {row.value ?? "—"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              color: "oklch(0.62 0.015 262)",
+                              padding: "3px 0",
+                            }}
+                          >
+                            No permit on record.
+                            {isEccJob ? (
+                              <>
+                                {" "}
+                                <Link
+                                  href={`/jobs/${jobId}/tests`}
+                                  style={{
+                                    color: "oklch(0.5 0.13 255)",
+                                    textDecoration: "none",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Add via ECC workspace →
+                                </Link>
+                              </>
+                            ) : null}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })(),
                 } satisfies RecordTab,
                 ...(isEccJob
                   ? [
