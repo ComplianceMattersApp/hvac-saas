@@ -90,30 +90,23 @@ const realPreviewWorkspacePatterns = [
 ];
 
 describe("mobile job detail assignment parity", () => {
-  it("keeps current mobile as the default job detail mobile view while preserving explicit V2", () => {
-    const mobileSelectionStart = pageSource.indexOf("const MobileJobDetailMobileComponent = useMobileV2Preview");
+  it("defaults canonical mobile job detail to V2 while preserving current mobile fallback", () => {
+    const mobileSelectionStart = pageSource.indexOf("const MobileJobDetailMobileComponent = forceCurrentMobileLayout");
     const mobileSelection = pageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
 
     expect(mobileSelectionStart).toBeGreaterThan(-1);
     expect(pageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
     expect(pageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
     expect(pageSource).not.toContain("buildV2JobDetailRedirectPath");
-    expect(pageSource).not.toContain("/v2");
-    expect(pageSource).not.toContain("sp.legacy");
     expect(pageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
-    expect(pageSource).toContain('const explicitlyRequestedMobileV2Preview = mobileLayoutMode === "v2";');
     expect(pageSource).toContain('const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";');
-    expect(pageSource).toContain("const mobileV2EligibleInternalUser =");
-    expect(pageSource).toContain("isInternalUser &&");
-    expect(pageSource).toContain("!hasContractorShadowMembership &&");
-    expect(pageSource).toContain("const mobileV2ExplicitPreviewAllowed =");
-    expect(pageSource).toContain("mobileV2EligibleInternalUser &&\n    explicitlyRequestedMobileV2Preview");
+    expect(pageSource).not.toContain("const explicitlyRequestedMobileV2Preview =");
+    expect(pageSource).not.toContain("const mobileV2EligibleInternalUser =");
+    expect(pageSource).not.toContain("const mobileV2ExplicitPreviewAllowed =");
     expect(pageSource).not.toContain("const mobileV2UniversalDefaultAllowed =");
     expect(pageSource).not.toContain("const mobileV2OwnerDefaultAllowed =");
-    expect(pageSource).toContain("!forceCurrentMobileLayout &&");
-    expect(pageSource).toContain("!forceCurrentMobileLayout &&\n    mobileV2ExplicitPreviewAllowed");
-    expect(mobileSelection).toContain("? MobileJobDetailV2Preview");
-    expect(mobileSelection).toContain(": MobileJobDetailCurrent");
+    expect(mobileSelection).toContain("? MobileJobDetailCurrent");
+    expect(mobileSelection).toContain(": MobileJobDetailV2Preview");
     expect(pageSource).toContain("<MobileJobDetailMobileComponent");
     expect(mobileJobDetailV2PreviewSource).toContain("export default function MobileJobDetailV2Preview");
     expect(mobileJobDetailV2PreviewSource).toContain("Billing / Closeout");
@@ -123,11 +116,14 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobStatusActionSurface {...props} />");
   });
 
-  it("keeps the desktop branch separate from the V2 preview selector", () => {
+  it("keeps the desktop branch separate from the mobile V2 selector", () => {
     const desktopBranchStart = pageSource.indexOf('<div className="hidden space-y-5 lg:block"');
     const desktopBranch = pageSource.slice(desktopBranchStart);
 
     expect(desktopBranchStart).toBeGreaterThan(-1);
+    expect(pageSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
+    expect(pageSource).toContain("const forceCurrentDesktopLayout =");
+    expect(pageSource).toContain("<DesktopJobDetailV2Page");
     expect(desktopBranch).not.toContain("<MobileJobDetailMobileComponent");
     expect(desktopBranch).not.toContain("<MobileJobDetailV2Preview");
     expect(desktopBranch).toContain("<AssignedTeamControls");

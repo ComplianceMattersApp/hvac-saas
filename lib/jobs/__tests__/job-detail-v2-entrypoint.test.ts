@@ -7,11 +7,6 @@ const legacyJobDetailSource = readFileSync(
   "utf8",
 );
 
-const middlewareSource = readFileSync(
-  path.join(process.cwd(), "middleware.ts"),
-  "utf8",
-);
-
 const v2JobDetailSource = readFileSync(
   path.join(process.cwd(), "app", "jobs", "[id]", "v2", "page.tsx"),
   "utf8",
@@ -23,22 +18,26 @@ const v2SchedulePanelSource = readFileSync(
 );
 
 describe("job detail V2 entrypoint", () => {
-  it("routes desktop job detail traffic to desktop V2 while preserving original mobile detail", () => {
+  it("selects Desktop V2 and Mobile V2 from the canonical job detail route", () => {
     expect(legacyJobDetailSource).not.toContain("function buildV2JobDetailRedirectPath");
     expect(legacyJobDetailSource).not.toContain("redirect(buildV2JobDetailRedirectPath(jobId, sp));");
-    expect(legacyJobDetailSource).toContain("const MobileJobDetailMobileComponent = useMobileV2Preview");
-    expect(legacyJobDetailSource).toContain("? MobileJobDetailV2Preview");
-    expect(legacyJobDetailSource).toContain(": MobileJobDetailCurrent");
-    expect(middlewareSource).toContain('const JOB_DETAIL_PATH_RE = /^\\/jobs\\/([^/]+)$/;');
-    expect(middlewareSource).toContain('const JOB_DETAIL_V2_PATH_RE = /^\\/jobs\\/([^/]+)\\/v2$/;');
-    expect(middlewareSource).toContain('url.pathname = `/jobs/${jobDetailMatch[1]}/v2`;');
-    expect(middlewareSource).toContain('url.pathname = `/jobs/${jobDetailV2Match[1]}`;');
-    expect(middlewareSource).toContain('matcher: ["/jobs/:id", "/jobs/:id/v2"]');
+    expect(legacyJobDetailSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
+    expect(legacyJobDetailSource).toContain("const MobileJobDetailMobileComponent = forceCurrentMobileLayout");
+    expect(legacyJobDetailSource).toContain("? MobileJobDetailCurrent");
+    expect(legacyJobDetailSource).toContain(": MobileJobDetailV2Preview");
+    expect(legacyJobDetailSource).toContain("const forceCurrentDesktopLayout =");
+    expect(legacyJobDetailSource).toContain('desktopLayoutMode === "current"');
+    expect(legacyJobDetailSource).toContain('desktopLayoutMode === "classic"');
+    expect(legacyJobDetailSource).toContain('legacyMode === "1"');
+    expect(legacyJobDetailSource).toContain("<DesktopJobDetailV2Page");
+    expect(legacyJobDetailSource).not.toContain("const mobileV2ExplicitPreviewAllowed =");
+    expect(legacyJobDetailSource).not.toContain("const mobileV2OwnerDefaultAllowed =");
+    expect(legacyJobDetailSource).not.toContain("const mobileV2UniversalDefaultAllowed =");
   });
 
-  it("does not offer a stale desktop V2 legacy detail escape", () => {
-    expect(v2JobDetailSource).not.toContain('href: `/jobs/${jobId}?legacy=1`');
-    expect(v2JobDetailSource).not.toContain('label: "Open Legacy Detail"');
+  it("keeps /jobs/[id]/v2 as the Desktop V2 compatibility route", () => {
+    expect(v2JobDetailSource).toContain("export default async function JobDetailV2Page");
+    expect(v2JobDetailSource).not.toContain("redirect(`/jobs/${jobId}`");
   });
 
   it("uses full-width schedule action wording in the V2 right rail", () => {

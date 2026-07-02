@@ -68,27 +68,23 @@ const refrigerantChargePhotoEvidencePanelSource = readFileSync(
 );
 
 describe("job tests page wiring", () => {
-  it("keeps current mobile as the job detail default while V2 remains explicit", () => {
-    const mobileSelectionStart = jobPageSource.indexOf("const MobileJobDetailMobileComponent = useMobileV2Preview");
+  it("keeps Mobile V2 as the canonical mobile default while preserving current fallback", () => {
+    const mobileSelectionStart = jobPageSource.indexOf("const MobileJobDetailMobileComponent = forceCurrentMobileLayout");
     const mobileSelection = jobPageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
 
     expect(jobPageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
     expect(jobPageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
     expect(jobPageSource).not.toContain("buildV2JobDetailRedirectPath");
-    expect(jobPageSource).not.toContain("sp.legacy");
     expect(jobPageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
-    expect(jobPageSource).toContain('const explicitlyRequestedMobileV2Preview = mobileLayoutMode === "v2";');
     expect(jobPageSource).toContain('const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";');
-    expect(jobPageSource).toContain("const mobileV2EligibleInternalUser =");
-    expect(jobPageSource).toContain("!hasContractorShadowMembership &&");
-    expect(jobPageSource).toContain("const mobileV2ExplicitPreviewAllowed =");
+    expect(jobPageSource).not.toContain("const explicitlyRequestedMobileV2Preview =");
+    expect(jobPageSource).not.toContain("const mobileV2EligibleInternalUser =");
+    expect(jobPageSource).not.toContain("const mobileV2ExplicitPreviewAllowed =");
     expect(jobPageSource).not.toContain("const mobileV2UniversalDefaultAllowed =");
     expect(jobPageSource).not.toContain("const mobileV2OwnerDefaultAllowed =");
-    expect(jobPageSource).toContain("!forceCurrentMobileLayout &&");
-    expect(jobPageSource).toContain("!forceCurrentMobileLayout &&\n    mobileV2ExplicitPreviewAllowed");
     expect(mobileSelectionStart).toBeGreaterThan(-1);
-    expect(mobileSelection).toContain("? MobileJobDetailV2Preview");
-    expect(mobileSelection).toContain(": MobileJobDetailCurrent");
+    expect(mobileSelection).toContain("? MobileJobDetailCurrent");
+    expect(mobileSelection).toContain(": MobileJobDetailV2Preview");
     expect(mobileJobDetailCurrentSource).toContain("export default function MobileJobDetailCurrent");
   });
 

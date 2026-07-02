@@ -176,6 +176,7 @@ import { buildInternalJobRoleContactSections } from "@/lib/communications/contac
 import RoleContactsCard from "@/components/RoleContactsCard";
 import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";
 import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";
+import DesktopJobDetailV2Page from "./v2/page";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 import { isMissingJobsBillingDispositionColumnError } from "@/lib/supabase/jobs-billing-disposition-compat";
 
@@ -1298,7 +1299,29 @@ export default async function JobDetailPage({
       : "";
   const mobileLayoutMode = mobileLayout.trim().toLowerCase();
   const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";
-  const explicitlyRequestedMobileV2Preview = mobileLayoutMode === "v2";
+
+  const desktopLayoutRaw = sp.desktopLayout;
+  const desktopLayout =
+    Array.isArray(desktopLayoutRaw)
+      ? desktopLayoutRaw[0]
+      : typeof desktopLayoutRaw === "string"
+      ? desktopLayoutRaw
+      : "";
+  const desktopLayoutMode = desktopLayout.trim().toLowerCase();
+  const legacyRaw = sp.legacy;
+  const legacyLayout =
+    Array.isArray(legacyRaw)
+      ? legacyRaw[0]
+      : typeof legacyRaw === "string"
+      ? legacyRaw
+      : "";
+  const legacyMode = legacyLayout.trim().toLowerCase();
+  const forceCurrentDesktopLayout =
+    desktopLayoutMode === "current" ||
+    desktopLayoutMode === "classic" ||
+    legacyMode === "1" ||
+    legacyMode === "true" ||
+    legacyMode === "yes";
 
   const tabRaw = sp.tab;
   const tab =
@@ -3558,20 +3581,11 @@ const showCorrectionReviewResolution =
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
   const showMobileContractorContext =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
-  const mobileV2EligibleInternalUser =
-    isInternalUser &&
-    !hasContractorShadowMembership &&
-    String((internalUser as any).status ?? "").trim().toLowerCase() !== "inactive" &&
-    (internalUser as any).active !== false;
-  const mobileV2ExplicitPreviewAllowed =
-    mobileV2EligibleInternalUser &&
-    explicitlyRequestedMobileV2Preview;
-  const useMobileV2Preview =
-    !forceCurrentMobileLayout &&
-    mobileV2ExplicitPreviewAllowed;
-  const MobileJobDetailMobileComponent = useMobileV2Preview
-    ? MobileJobDetailV2Preview
-    : MobileJobDetailCurrent;
+  const MobileJobDetailMobileComponent = forceCurrentMobileLayout
+    ? MobileJobDetailCurrent
+    : MobileJobDetailV2Preview;
+  const desktopV2Params = Promise.resolve({ id: jobId });
+  const desktopV2SearchParams = Promise.resolve(sp);
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
@@ -3761,6 +3775,7 @@ const showCorrectionReviewResolution =
         workspaceTextareaClass={workspaceTextareaClass}
       />
 
+      {forceCurrentDesktopLayout ? (
       <div className="hidden space-y-5 lg:block">
 
 <section className={`${workspaceSectionClass} relative mb-6 overflow-hidden border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_26px_64px_-42px_rgba(15,23,42,0.44)] ring-1 ring-blue-100/70`}>
@@ -7683,7 +7698,16 @@ const showCorrectionReviewResolution =
 
       </div>
 
-{timingEnabled ? <JobDetailTimingLog /> : null}
+      ) : (
+        <div className="hidden lg:block">
+          <DesktopJobDetailV2Page
+            params={desktopV2Params}
+            searchParams={desktopV2SearchParams}
+          />
+        </div>
+      )}
+
+{forceCurrentDesktopLayout && timingEnabled ? <JobDetailTimingLog /> : null}
 
   </div>
   );
