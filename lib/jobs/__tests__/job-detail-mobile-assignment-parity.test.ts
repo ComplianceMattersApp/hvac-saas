@@ -485,6 +485,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain('standardJobAnchorHref("mobile-follow-up-job")');
     expect(mobileJobServiceFollowUpToolSource).toContain("Create Return Visit");
     expect(mobileJobServiceFollowUpToolSource).toContain('id="mobile-follow-up-job"');
+    expect(mobileJobServiceFollowUpToolSource).toContain("group-open:rotate-90");
+    expect(mobileJobServiceFollowUpToolSource).not.toContain("group-open:inline\">Close");
     expect(mobileJobServiceFollowUpToolSource).toContain("form action={createNextServiceVisitFromForm}");
     expect(mobileJobServiceFollowUpToolSource).toContain('name="job_id"');
     expect(mobileJobServiceFollowUpToolSource).toContain('name="tab"');

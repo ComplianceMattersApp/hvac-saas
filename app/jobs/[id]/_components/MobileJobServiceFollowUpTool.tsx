@@ -6,6 +6,7 @@ export default function MobileJobServiceFollowUpTool(props: MobileJobServiceFoll
   const {
     createNextServiceVisitFromForm,
     job,
+    ChevronRightIcon,
     mobileToolLinkClass,
     SubmitButton,
     tab,
@@ -29,8 +30,7 @@ export default function MobileJobServiceFollowUpTool(props: MobileJobServiceFoll
               <span className="block text-sm font-medium text-slate-600">Create an unscheduled follow-up visit</span>
             </span>
           </span>
-          <span className="shrink-0 text-sm font-medium text-slate-500 group-open:hidden">Open</span>
-          <span className="hidden shrink-0 text-sm font-medium text-slate-500 group-open:inline">Close</span>
+          <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
         </summary>
         <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
           <form action={createNextServiceVisitFromForm} className="space-y-3">
