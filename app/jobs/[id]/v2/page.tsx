@@ -38,6 +38,7 @@ import DeferredAddAssigneeForm from "../_components/DeferredAddAssigneeForm";
 import ChangeServiceLocationForm from "../_components/ChangeServiceLocationForm";
 import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
+import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
@@ -500,6 +501,38 @@ export default async function JobDetailV2Page({
   const eccRuns = (job.ecc_test_runs ?? []) as Array<{ is_completed: boolean | null; computed_pass: boolean | null; override_pass: boolean | null }>;
   const completedEccRuns = eccRuns.filter((r) => r.is_completed).length;
   const hasFailedEccRun = eccRuns.some((r) => r.is_completed && r.computed_pass === false);
+  const hasCompletedEccTest = eccRuns.some((r) => r.is_completed);
+
+  // closeout needs + shortcut derivations
+  const isFailedUnresolved = isEccJob && ["failed", "retest_needed", "pending_office_review"].includes(opsStatus);
+  const closeoutNeeds = getCloseoutNeeds({
+    field_complete: job.field_complete,
+    job_type: job.job_type,
+    ops_status: job.ops_status,
+    permit_number: job.permit_number,
+    invoice_complete: billedTruthSatisfied,
+    certs_complete: job.certs_complete,
+  });
+  const canShowCertsButton =
+    isEccJob &&
+    !certsComplete &&
+    !isFailedUnresolved &&
+    isValidEccPermitNumber(job.permit_number);
+  const canShowInvoiceButton =
+    isEccJob &&
+    !billedTruthSatisfied &&
+    billingState.lightweightBillingAllowed &&
+    opsStatus !== "closed";
+  const createEstimateFromJobHref = (() => {
+    if (!isEstimatesEnabled() || !job.customer_id || !job.location_id || !job.id) return null;
+    const params = new URLSearchParams({
+      customer_id: String(job.customer_id),
+      location_id: String(job.location_id),
+      origin_job_id: String(job.id),
+    });
+    if (serviceCaseId) params.set("service_case_id", String(serviceCaseId));
+    return `/estimates/new?${params.toString()}`;
+  })();
 
   // equipment rows
   const equipmentRows = ((job as any).job_equipment ?? []) as Array<{
@@ -2636,6 +2669,192 @@ export default async function JobDetailV2Page({
                 Tests
               </Link>
             ) : null}
+          </div>
+        </div>
+
+        {/* PRIMARY NEXT ACTION panel */}
+        <div
+          style={{
+            marginTop: "20px",
+            borderRadius: "12px",
+            border: "1px solid oklch(0.88 0.04 255)",
+            background: "#fff",
+            overflow: "hidden",
+            boxShadow: "0 10px 24px -16px oklch(0.5 0.17 255 / 0.2)",
+          }}
+        >
+          <div style={{ height: "3px", background: "linear-gradient(90deg, oklch(0.27 0.02 262), oklch(0.5 0.17 255))" }} />
+          <div style={{ padding: "13px 15px 14px" }}>
+            {/* panel label */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "7px",
+                fontFamily: S.mono,
+                fontSize: "9.5px",
+                fontWeight: 600,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "oklch(0.42 0.08 255)",
+                marginBottom: "13px",
+              }}
+            >
+              <span
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "6px",
+                  background: "oklch(0.27 0.02 262)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  paddingBottom: "1px",
+                }}
+              >
+                ›
+              </span>
+              Primary Next Action
+            </div>
+
+            {/* state-driven close-out actions */}
+            {fieldComplete && (closeoutNeeds.needsCerts || closeoutNeeds.needsInvoice) ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "13px" }}>
+                {closeoutNeeds.needsCerts && canShowCertsButton ? (
+                  <form action={markCertsCompleteFromForm}>
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <ImmediateSubmitButton
+                      pendingText="Saving…"
+                      className=""
+                      style={{
+                        ...(S.primaryBtn as React.CSSProperties),
+                        height: "38px",
+                        justifyContent: "center",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      ✓ Certs Sent
+                    </ImmediateSubmitButton>
+                  </form>
+                ) : null}
+                {closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
+                  <form action={markInvoiceCompleteFromForm}>
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <ImmediateSubmitButton
+                      pendingText="Saving…"
+                      className=""
+                      style={{
+                        ...(S.outlineBtn(false) as React.CSSProperties),
+                        width: "100%",
+                        justifyContent: "center",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      Send Invoice
+                    </ImmediateSubmitButton>
+                  </form>
+                ) : null}
+              </div>
+            ) : fieldComplete ? (
+              <div
+                style={{
+                  marginBottom: "13px",
+                  padding: "9px 13px",
+                  borderRadius: "9px",
+                  border: "1px solid oklch(0.88 0.06 150)",
+                  background: "oklch(0.97 0.03 150)",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  color: "oklch(0.42 0.1 150)",
+                  textAlign: "center",
+                }}
+              >
+                Closed out ✓
+              </div>
+            ) : null}
+
+            {/* shortcut row */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "6px",
+                borderTop: "1px solid oklch(0.93 0.005 250)",
+                paddingTop: "11px",
+              }}
+            >
+              <Link
+                href="/ops"
+                style={{
+                  ...(S.contactBtn as React.CSSProperties),
+                  display: "inline-flex",
+                  alignItems: "center",
+                  textDecoration: "none",
+                }}
+              >
+                Back to Ops
+              </Link>
+              {job.customer_id ? (
+                <Link
+                  href={`/customers/${job.customer_id}`}
+                  style={{
+                    ...(S.contactBtn as React.CSSProperties),
+                    display: "inline-flex",
+                    alignItems: "center",
+                    textDecoration: "none",
+                  }}
+                >
+                  Open Customer
+                </Link>
+              ) : null}
+              {createEstimateFromJobHref ? (
+                <Link
+                  href={createEstimateFromJobHref}
+                  style={{
+                    ...(S.contactBtn as React.CSSProperties),
+                    display: "inline-flex",
+                    alignItems: "center",
+                    textDecoration: "none",
+                  }}
+                >
+                  Create Estimate
+                </Link>
+              ) : null}
+              {isEccJob && fieldComplete ? (
+                <Link
+                  href={`/jobs/${jobId}/tests`}
+                  style={{
+                    ...(S.contactBtn as React.CSSProperties),
+                    display: "inline-flex",
+                    alignItems: "center",
+                    textDecoration: "none",
+                  }}
+                >
+                  Open Tests Workspace
+                </Link>
+              ) : null}
+              {isEccJob && hasCompletedEccTest ? (
+                <Link
+                  href={`/jobs/${jobId}/tests?t=completion_report`}
+                  style={{
+                    ...(S.contactBtn as React.CSSProperties),
+                    display: "inline-flex",
+                    alignItems: "center",
+                    textDecoration: "none",
+                  }}
+                >
+                  Completion Report
+                </Link>
+              ) : null}
+            </div>
           </div>
         </div>
 
