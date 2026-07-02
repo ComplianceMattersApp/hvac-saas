@@ -3,6 +3,7 @@ import {
   type OperationalMutationEntitlementReason,
 } from "@/lib/business/platform-entitlement";
 import { isSessionInvalidError } from "@/lib/auth/session-error";
+import { resolveActiveContractorPortalMembership } from "@/lib/portal/current-portal-membership";
 
 export type DualContextInternalRole = "admin" | "office" | "tech" | "billing";
 export type DualContextLandingContext = "app" | "portal" | "inactive_app" | "none";
@@ -48,11 +49,6 @@ function normalizeText(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function pickRelatedObject<T extends Record<string, unknown>>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
 export function landingPathForDualContextAccess(access: DualContextAccess) {
   if (access.preferredLandingContext === "app") return "/today";
   if (access.preferredLandingContext === "portal") return "/portal";
@@ -96,22 +92,20 @@ export async function resolveDualContextAccess(input: {
     };
   }
 
-  const [{ data: internalRow, error: internalErr }, { data: contractorRow, error: contractorErr }] =
+  const [{ data: internalRow, error: internalErr }, portal] =
     await Promise.all([
       supabase
         .from("internal_users")
         .select("user_id, role, is_active, account_owner_user_id, created_by")
         .eq("user_id", user.id)
         .maybeSingle(),
-      supabase
-        .from("contractor_users")
-        .select("contractor_id, contractors ( id, name, lifecycle_state, owner_user_id )")
-        .eq("user_id", user.id)
-        .maybeSingle(),
+      resolveActiveContractorPortalMembership({
+        supabase,
+        userId: user.id,
+      }),
     ]);
 
   if (internalErr) throw internalErr;
-  if (contractorErr) throw contractorErr;
 
   const role = parseInternalRole(internalRow?.role);
   const internalUser =
@@ -122,20 +116,6 @@ export async function resolveDualContextAccess(input: {
           isActive: Boolean(internalRow.is_active),
           accountOwnerUserId: String(internalRow.account_owner_user_id),
           createdBy: internalRow.created_by ?? null,
-        }
-      : null;
-
-  const contractor = pickRelatedObject((contractorRow as any)?.contractors);
-  const lifecycleState = normalizeText((contractor as any)?.lifecycle_state).toLowerCase() || null;
-  const contractorId = normalizeText((contractorRow as any)?.contractor_id);
-  const portalAccountOwnerUserId = normalizeText((contractor as any)?.owner_user_id);
-  const portal =
-    contractorId && portalAccountOwnerUserId && (!lifecycleState || lifecycleState === "active")
-      ? {
-          contractorId,
-          contractorName: normalizeText((contractor as any)?.name) || null,
-          accountOwnerUserId: portalAccountOwnerUserId,
-          lifecycleState,
         }
       : null;
 

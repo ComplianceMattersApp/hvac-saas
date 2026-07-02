@@ -95,6 +95,7 @@ describe("portal / ops redirect loop prevention", () => {
     const portalFiles = [
       "app/portal/page.tsx",
       "app/portal/jobs/page.tsx",
+      "app/portal/jobs/[id]/page.tsx",
       "app/portal/permit-request/page.tsx",
       "app/portal/intake-submissions/[id]/page.tsx",
     ];

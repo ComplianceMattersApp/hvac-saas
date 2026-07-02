@@ -16,7 +16,7 @@ type Props = {
   showPermitRequestCreateItem: boolean;
   servicePlansEnabled: boolean;
   showOperationalNotificationAwareness: boolean;
-  showPartnerWorkMenuItem: boolean;
+  hasPortalAccess: boolean;
   unreadNotificationCount: number;
   unreadNotificationBadgeLabel: string;
   primaryJobCtaLabel: string;
@@ -51,7 +51,7 @@ export default function MobileShellMenu({
   showPermitRequestCreateItem,
   servicePlansEnabled,
   showOperationalNotificationAwareness,
-  showPartnerWorkMenuItem,
+  hasPortalAccess,
   unreadNotificationCount,
   unreadNotificationBadgeLabel,
   primaryJobCtaLabel,
@@ -208,7 +208,7 @@ export default function MobileShellMenu({
                       My Work
                     </Link>
                   ) : null}
-                  {showPartnerWorkMenuItem ? (
+                  {hasPortalAccess ? (
                     <Link href="/portal" onClick={closeMenu} className={mobileMenuItemClass(portalActive)}>
                       <BriefcaseBusiness className={itemIconClass(portalActive)} aria-hidden="true" />
                       Compliance Matters Portal

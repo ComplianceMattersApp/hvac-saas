@@ -14,6 +14,10 @@ type FixtureInput = {
   portal?: {
     lifecycleState?: string | null;
   } | null;
+  extraPortal?: {
+    contractorId: string;
+    lifecycleState?: string | null;
+  } | null;
 };
 
 function makeSupabaseFixture(input: FixtureInput) {
@@ -27,9 +31,49 @@ function makeSupabaseFixture(input: FixtureInput) {
   };
 
   function makeQuery(table: string) {
+    const filters: Record<string, unknown> = {};
     const query: any = {
       select: () => query,
-      eq: () => query,
+      eq: (column: string, value: unknown) => {
+        filters[column] = value;
+        return query;
+      },
+      in: (column: string, value: unknown) => {
+        filters[column] = value;
+        return query;
+      },
+      limit: async () => {
+        if (table === "contractor_users") {
+          const rows = [];
+          if (input.portal) rows.push({ contractor_id: "contractor-1" });
+          if (input.extraPortal) rows.push({ contractor_id: input.extraPortal.contractorId });
+          return { data: rows, error: null };
+        }
+
+        if (table === "contractors") {
+          const requestedIds = Array.isArray(filters.id) ? filters.id.map(String) : [];
+          const rows = [];
+          if (input.portal && requestedIds.includes("contractor-1")) {
+            rows.push({
+              id: "contractor-1",
+              name: "Partner Co",
+              owner_user_id: "compliance-owner-1",
+              lifecycle_state: input.portal.lifecycleState ?? "active",
+            });
+          }
+          if (input.extraPortal && requestedIds.includes(input.extraPortal.contractorId)) {
+            rows.push({
+              id: input.extraPortal.contractorId,
+              name: "Second Partner Co",
+              owner_user_id: "compliance-owner-2",
+              lifecycle_state: input.extraPortal.lifecycleState ?? "active",
+            });
+          }
+          return { data: rows, error: null };
+        }
+
+        throw new Error(`Unexpected limit table: ${table}`);
+      },
       maybeSingle: async () => {
         if (table === "internal_users") {
           if (!input.internal) return { data: null, error: null };
@@ -40,22 +84,6 @@ function makeSupabaseFixture(input: FixtureInput) {
               is_active: input.internal.isActive ?? true,
               account_owner_user_id: "owner-1",
               created_by: null,
-            },
-            error: null,
-          };
-        }
-
-        if (table === "contractor_users") {
-          if (!input.portal) return { data: null, error: null };
-          return {
-            data: {
-              contractor_id: "contractor-1",
-              contractors: {
-                id: "contractor-1",
-                name: "Partner Co",
-                owner_user_id: "compliance-owner-1",
-                lifecycle_state: input.portal.lifecycleState ?? "active",
-              },
             },
             error: null,
           };
@@ -149,6 +177,24 @@ describe("resolveDualContextAccess", () => {
     expect(access.portal).toMatchObject({
       contractorId: "contractor-1",
       accountOwnerUserId: "compliance-owner-1",
+    });
+    expect(access.preferredLandingContext).toBe("app");
+  });
+
+  it("uses any active portal membership instead of treating the first membership as exclusive", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({
+        internal: { entitlementStatus: "active" },
+        portal: { lifecycleState: "archived" },
+        extraPortal: { contractorId: "contractor-2", lifecycleState: "active" },
+      }),
+    });
+
+    expect(access.hasActiveAppAccess).toBe(true);
+    expect(access.hasPortalAccess).toBe(true);
+    expect(access.portal).toMatchObject({
+      contractorId: "contractor-2",
+      accountOwnerUserId: "compliance-owner-2",
     });
     expect(access.preferredLandingContext).toBe("app");
   });

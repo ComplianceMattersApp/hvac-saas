@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requestRetestReadyFromPortal } from "@/lib/actions/job-actions";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { createClient } from "@/lib/supabase/server";
+import PortalAccessIssue from "@/components/portal/PortalAccessIssue";
 import JobAttachments from "@/components/portal/JobAttachments";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
@@ -27,6 +28,7 @@ import { isPortalVisibleJob } from "@/lib/visibility/portal";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { formatEccEventLabel } from "@/lib/ecc/ecc-workflow-display";
 import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
+import { requireCurrentContractorPortalContext } from "@/lib/portal/intake-proposal-read-model";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -311,17 +313,17 @@ export default async function PortalJobDetailPage({
 
   const supabase = await createClient();
 
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user) redirect("/login");
-
-  const { data: cu, error: cuErr } = await supabase
-    .from("contractor_users")
-    .select("contractor_id, contractors ( id, name )")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
-
-  if (cuErr) throw cuErr;
-  if (!cu?.contractor_id) redirect("/ops");
+  const portalContext = await (async () => {
+    try {
+      return await requireCurrentContractorPortalContext({ supabase });
+    } catch (error) {
+      const code = String((error as Error)?.message ?? "").trim().toUpperCase();
+      if (code === "NOT_AUTHENTICATED") redirect("/login");
+      if (code === "NOT_CONTRACTOR") return null;
+      throw error;
+    }
+  })();
+  if (!portalContext) return <PortalAccessIssue />;
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -354,7 +356,7 @@ export default async function PortalJobDetailPage({
       `
     )
     .eq("id", jobId)
-    .eq("contractor_id", cu.contractor_id)
+    .eq("contractor_id", portalContext.contractorId)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -376,7 +378,7 @@ export default async function PortalJobDetailPage({
   const { data: jobChain, error: chainErr } = await supabase
     .from("jobs")
     .select("id, parent_job_id, ops_status")
-    .eq("contractor_id", cu.contractor_id)
+    .eq("contractor_id", portalContext.contractorId)
     .is("deleted_at", null)
     .or(`id.eq.${rootJobId},parent_job_id.eq.${rootJobId}`)
     .order("created_at", { ascending: true })
@@ -692,32 +694,25 @@ export default async function PortalJobDetailPage({
 
     const nextSupabase = await createClient();
 
-    const { data: nextUserData, error: userErr } = await nextSupabase.auth.getUser();
-    if (userErr) {
-      redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
-    }
-    if (!nextUserData?.user) redirect("/login");
-
     // Ownership check: verify the submitted job belongs to the authenticated user's contractor.
     // Page-level fetch only protects the render path; this action is callable directly.
-    const { data: nextCu, error: cuCheckErr } = await nextSupabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", nextUserData.user.id)
-      .maybeSingle();
-
-    if (cuCheckErr) {
-      redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
-    }
-    if (!nextCu?.contractor_id) {
-      redirect(`/portal/jobs/${nextJobId}?note_error=not_allowed`);
-    }
+    const nextPortalContext = await (async () => {
+      try {
+        return await requireCurrentContractorPortalContext({ supabase: nextSupabase });
+      } catch (error) {
+        const code = String((error as Error)?.message ?? "").trim().toUpperCase();
+        if (code === "NOT_AUTHENTICATED") redirect("/login");
+        if (code === "NOT_CONTRACTOR") return null;
+        redirect(`/portal/jobs/${nextJobId}?note_error=save_failed`);
+      }
+    })();
+    if (!nextPortalContext) redirect(`/portal/jobs/${nextJobId}?note_error=not_allowed`);
 
     const { data: ownedJob, error: jobCheckErr } = await nextSupabase
       .from("jobs")
       .select("id")
       .eq("id", nextJobId)
-      .eq("contractor_id", nextCu.contractor_id)
+      .eq("contractor_id", nextPortalContext.contractorId)
       .is("deleted_at", null)
       .maybeSingle();
 
@@ -735,7 +730,7 @@ export default async function PortalJobDetailPage({
       .select("id")
       .eq("job_id", nextJobId)
       .eq("event_type", "contractor_note")
-      .eq("user_id", nextUserData.user.id)
+      .eq("user_id", nextPortalContext.userId)
       .contains("meta", { note })
       .gte("created_at", new Date(Date.now() - 15_000).toISOString())
       .maybeSingle();
@@ -751,7 +746,7 @@ export default async function PortalJobDetailPage({
     const { error: insErr } = await nextSupabase.from("job_events").insert({
       job_id: nextJobId,
       event_type: "contractor_note",
-      user_id: nextUserData.user.id,
+      user_id: nextPortalContext.userId,
       meta: { note },
     });
 
@@ -763,7 +758,7 @@ export default async function PortalJobDetailPage({
       supabase: nextSupabase,
       jobId: nextJobId,
       eventType: "contractor_note",
-      actorUserId: nextUserData.user.id,
+      actorUserId: nextPortalContext.userId,
     });
 
     revalidatePath(`/portal/jobs/${nextJobId}`);

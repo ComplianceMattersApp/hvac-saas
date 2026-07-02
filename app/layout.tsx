@@ -19,7 +19,7 @@ import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/bus
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
-import { shouldShowPartnerWorkMenuItem } from "@/lib/portal/partner-work-access";
+import { shouldShowPortalMenuItem } from "@/lib/portal/partner-work-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
@@ -96,7 +96,7 @@ export default async function RootLayout({
   const servicePlansEnabled = isMaintenanceAgreementsEnabled();
   let unreadNotificationCount = 0;
   let productMode: ProductMode = "hybrid";
-  const hasPartnerWorkAccess = access.hasPortalAccess;
+  const hasPortalAccess = access.hasPortalAccess;
   let permitWorkflowEnabled = false;
 
   if (access.preferredLandingContext === "portal") {
@@ -119,9 +119,8 @@ export default async function RootLayout({
     });
   }
 
-  const showPartnerWorkMenuItem = shouldShowPartnerWorkMenuItem({
-    isInternalUser,
-    hasPartnerWorkAccess,
+  const showPortalMenuItem = shouldShowPortalMenuItem({
+    hasPortalAccess,
   });
 
   const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";
@@ -283,7 +282,7 @@ export default async function RootLayout({
                           My Work
                         </ShellNavLink>
                       ) : null}
-                      {showPartnerWorkMenuItem ? (
+                      {showPortalMenuItem ? (
                         <ShellNavLink href="/portal">Compliance Matters Portal</ShellNavLink>
                       ) : null}
                       <ShellMoreMenu items={moreMenuItems} />
@@ -334,7 +333,7 @@ export default async function RootLayout({
                       isEstimatesEnabled={estimatesEnabled}
                       showPermitRequestCreateItem={permitWorkflowEnabled}
                       showOperationalNotificationAwareness={showOperationalNotificationAwareness}
-                      showPartnerWorkMenuItem={showPartnerWorkMenuItem}
+                      hasPortalAccess={hasPortalAccess}
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
                       primaryJobCtaLabel={primaryJobCtaLabel}

@@ -69,7 +69,6 @@ function makeContractorPortalSupabaseFixture(options?: {
   userId?: string;
   contractorId?: string | null;
   contractorName?: string | null;
-  contractorsAsArray?: boolean;
 }) {
   const userId = options?.userId ?? "contractor-user-1";
   const contractorId = options?.contractorId === undefined ? "contractor-1" : options.contractorId;
@@ -93,26 +92,35 @@ function makeContractorPortalSupabaseFixture(options?: {
       })),
     },
     from(table: string) {
-      if (table !== "contractor_users") {
-        throw new Error(`Unexpected table ${table}`);
+      if (table === "contractor_users") {
+        const query: any = {
+          eq: vi.fn(() => query),
+          limit: vi.fn(async () => ({
+            data: contractorId ? [{ contractor_id: contractorId }] : [],
+            error: null,
+          })),
+        };
+
+        return {
+          select: vi.fn(() => query),
+        };
       }
 
-      const query: any = {
-        eq: vi.fn(() => query),
-        maybeSingle: vi.fn(async () => ({
-          data: contractorId
-            ? {
-                contractor_id: contractorId,
-                contractors: options?.contractorsAsArray && contractorRow ? [contractorRow] : contractorRow,
-              }
-            : null,
-          error: null,
-        })),
-      };
+      if (table === "contractors") {
+        const query: any = {
+          in: vi.fn(() => query),
+          limit: vi.fn(async () => ({
+            data: contractorRow ? [contractorRow] : [],
+            error: null,
+          })),
+        };
 
-      return {
-        select: vi.fn(() => query),
-      };
+        return {
+          select: vi.fn(() => query),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
     },
   };
 }
@@ -293,21 +301,6 @@ describe("contractor portal intake proposal scope hardening", () => {
     ).rejects.toThrow("NOT_CONTRACTOR");
 
     expect(createAdminClientMock).not.toHaveBeenCalled();
-  });
-
-  it("accepts contractor relation rows returned as an array for portal context", async () => {
-    const supabase = makeContractorPortalSupabaseFixture({ contractorsAsArray: true });
-
-    const { requireCurrentContractorPortalContext } = await import(
-      "@/lib/portal/intake-proposal-read-model"
-    );
-
-    await expect(requireCurrentContractorPortalContext({ supabase })).resolves.toEqual({
-      contractorId: "contractor-1",
-      contractorName: "Alpha Heating",
-      accountOwnerUserId: "owner-1",
-      userId: "contractor-user-1",
-    });
   });
 
   it("resolves valid active contractor membership into the portal context used by routing", async () => {

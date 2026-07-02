@@ -1,4 +1,5 @@
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { resolveActiveContractorPortalMembership } from "@/lib/portal/current-portal-membership";
 
 export type CurrentContractorPortalContext = {
   contractorId: string;
@@ -33,11 +34,6 @@ function resolvePortalAccessError(code: string) {
   return new Error(code);
 }
 
-function pickRelatedObject<T extends Record<string, unknown>>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
 function resolveProposalReadAdmin(inputAdmin?: any) {
   return inputAdmin ?? createAdminClient();
 }
@@ -52,30 +48,13 @@ export async function requireCurrentContractorPortalContext(input?: {
   if (userErr) throw userErr;
   if (!userId) throw resolvePortalAccessError("NOT_AUTHENTICATED");
 
-  const { data: contractorUser, error: contractorErr } = await supabase
-    .from("contractor_users")
-    .select("contractor_id, contractors ( id, name, lifecycle_state, owner_user_id )")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (contractorErr) throw contractorErr;
-
-  const contractorId = normalizeText(contractorUser?.contractor_id);
-  if (!contractorId) throw resolvePortalAccessError("NOT_CONTRACTOR");
-
-  const contractor = pickRelatedObject((contractorUser as any)?.contractors);
-  const lifecycleState = normalizeText((contractor as any)?.lifecycle_state).toLowerCase();
-  if (lifecycleState && lifecycleState !== "active") {
-    throw resolvePortalAccessError("CONTRACTOR_ARCHIVED");
-  }
-
-  const accountOwnerUserId = normalizeText((contractor as any)?.owner_user_id);
-  if (!accountOwnerUserId) throw resolvePortalAccessError("NOT_CONTRACTOR");
+  const portal = await resolveActiveContractorPortalMembership({ supabase, userId });
+  if (!portal) throw resolvePortalAccessError("NOT_CONTRACTOR");
 
   return {
-    contractorId,
-    contractorName: normalizeText((contractor as any)?.name) || null,
-    accountOwnerUserId,
+    contractorId: portal.contractorId,
+    contractorName: portal.contractorName,
+    accountOwnerUserId: portal.accountOwnerUserId,
     userId,
   };
 }

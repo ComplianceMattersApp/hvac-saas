@@ -29,12 +29,14 @@ describe("dual-context routing wiring", () => {
 
     expect(layout).toContain("access.hasActiveAppAccess");
     expect(layout).toContain("{isInternalUser ? <ShellCreateMenu items={createMenuItems} /> : null}");
-    expect(layout).toContain("const hasPartnerWorkAccess = access.hasPortalAccess");
+    expect(layout).toContain("const hasPortalAccess = access.hasPortalAccess");
     expect(layout).toContain("Compliance Matters Portal");
+    expect(layout).toContain("hasPortalAccess={hasPortalAccess}");
 
     expect(mobileMenu).toContain("{isInternalUser ? (");
     expect(mobileMenu).toContain('href="/jobs/new"');
     expect(mobileMenu).toContain('href="/customers/new"');
+    expect(mobileMenu).toContain("hasPortalAccess: boolean;");
     expect(mobileMenu).toContain("Compliance Matters Portal");
   });
 

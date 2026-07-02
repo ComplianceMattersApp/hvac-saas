@@ -5,10 +5,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildPartnerWorkSourceLabelMap,
 } from "../partner-work-read-model";
-import { shouldShowPartnerWorkMenuItem } from "../partner-work-access";
+import { shouldShowPartnerWorkMenuItem, shouldShowPortalMenuItem } from "../partner-work-access";
 
 describe("partner work access", () => {
   it("shows the portal menu whenever the user has portal access", () => {
+    expect(shouldShowPortalMenuItem({ hasPortalAccess: true })).toBe(true);
+    expect(shouldShowPortalMenuItem({ hasPortalAccess: false })).toBe(false);
     expect(
       shouldShowPartnerWorkMenuItem({ isInternalUser: true, hasPartnerWorkAccess: true }),
     ).toBe(true);
@@ -60,11 +62,11 @@ describe("partner work access", () => {
     const portalSource = readFileSync(resolve(__dirname, "../../../app/portal/page.tsx"), "utf-8");
     const portalJobsSource = readFileSync(resolve(__dirname, "../../../app/portal/jobs/page.tsx"), "utf-8");
 
-    expect(layoutSource).toContain("shouldShowPartnerWorkMenuItem");
-    expect(layoutSource).toContain("const hasPartnerWorkAccess = access.hasPortalAccess");
+    expect(layoutSource).toContain("shouldShowPortalMenuItem");
+    expect(layoutSource).toContain("const hasPortalAccess = access.hasPortalAccess");
     expect(layoutSource).toContain("Compliance Matters Portal");
-    expect(layoutSource).toContain("showPartnerWorkMenuItem={showPartnerWorkMenuItem}");
-    expect(mobileShellSource).toContain("showPartnerWorkMenuItem: boolean;");
+    expect(layoutSource).toContain("hasPortalAccess={hasPortalAccess}");
+    expect(mobileShellSource).toContain("hasPortalAccess: boolean;");
     expect(mobileShellSource).toContain("Compliance Matters Portal");
     expect(portalSource).toContain("sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? \"Created by Rater\"}");
     expect(portalJobsSource).toContain("sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? \"Created by Rater\"}");
