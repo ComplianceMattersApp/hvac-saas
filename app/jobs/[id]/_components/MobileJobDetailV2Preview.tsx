@@ -894,7 +894,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                           {isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"}
                         </span>
                       </span>
-                      <span className={previewPillClass}>{isEccPermitNeededActive ? "Needed" : "Status"}</span>
+                      <span className={previewPillClass}>Open</span>
                     </div>
                   </summary>
                   <div className="px-3 pb-3">

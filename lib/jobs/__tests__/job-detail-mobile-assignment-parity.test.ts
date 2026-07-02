@@ -394,6 +394,9 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobStatusActionSurfaceSource).toContain("markCertsCompleteFromForm");
     expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-permit-info"');
     expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-permit-edit"');
+    expect(mobileJobDetailV2PreviewSource).toContain('<span className={previewPillClass}>Open</span>');
+    expect(mobileJobDetailV2PreviewSource).toContain('isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('isEccPermitNeededActive ? "Needed" : "Status"');
     expect(mobileJobDetailV2PreviewSource).toContain("const v2PermitReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-permit-info`;");
     expect(mobileJobDetailV2PreviewSource).toContain("form action={updateJobScheduleFromForm}");
     expect(mobileJobDetailV2PreviewSource).toContain('name="return_to" value={v2PermitReturnTo}');
