@@ -7,6 +7,11 @@ const legacyJobDetailSource = readFileSync(
   "utf8",
 );
 
+const middlewareSource = readFileSync(
+  path.join(process.cwd(), "middleware.ts"),
+  "utf8",
+);
+
 const v2JobDetailSource = readFileSync(
   path.join(process.cwd(), "app", "jobs", "[id]", "v2", "page.tsx"),
   "utf8",
@@ -18,17 +23,22 @@ const v2SchedulePanelSource = readFileSync(
 );
 
 describe("job detail V2 entrypoint", () => {
-  it("routes normal legacy job detail traffic to V2 while preserving a legacy fallback flag", () => {
-    expect(legacyJobDetailSource).toContain("function buildV2JobDetailRedirectPath");
-    expect(legacyJobDetailSource).toContain('if (key === "legacy") continue;');
-    expect(legacyJobDetailSource).toContain('legacyRaw === "1"');
-    expect(legacyJobDetailSource).toContain("redirect(buildV2JobDetailRedirectPath(jobId, sp));");
-    expect(legacyJobDetailSource).toContain('/jobs/${encodeURIComponent(jobId)}/v2');
+  it("routes desktop job detail traffic to desktop V2 while preserving original mobile detail", () => {
+    expect(legacyJobDetailSource).not.toContain("function buildV2JobDetailRedirectPath");
+    expect(legacyJobDetailSource).not.toContain("redirect(buildV2JobDetailRedirectPath(jobId, sp));");
+    expect(legacyJobDetailSource).toContain("const MobileJobDetailMobileComponent = useMobileV2Preview");
+    expect(legacyJobDetailSource).toContain("? MobileJobDetailV2Preview");
+    expect(legacyJobDetailSource).toContain(": MobileJobDetailCurrent");
+    expect(middlewareSource).toContain('const JOB_DETAIL_PATH_RE = /^\\/jobs\\/([^/]+)$/;');
+    expect(middlewareSource).toContain('const JOB_DETAIL_V2_PATH_RE = /^\\/jobs\\/([^/]+)\\/v2$/;');
+    expect(middlewareSource).toContain('url.pathname = `/jobs/${jobDetailMatch[1]}/v2`;');
+    expect(middlewareSource).toContain('url.pathname = `/jobs/${jobDetailV2Match[1]}`;');
+    expect(middlewareSource).toContain('matcher: ["/jobs/:id", "/jobs/:id/v2"]');
   });
 
-  it("keeps an escape hatch from V2 back to the original detail page", () => {
-    expect(v2JobDetailSource).toContain('href: `/jobs/${jobId}?legacy=1`');
-    expect(v2JobDetailSource).toContain('label: "Open Legacy Detail"');
+  it("does not offer a stale desktop V2 legacy detail escape", () => {
+    expect(v2JobDetailSource).not.toContain('href: `/jobs/${jobId}?legacy=1`');
+    expect(v2JobDetailSource).not.toContain('label: "Open Legacy Detail"');
   });
 
   it("uses full-width schedule action wording in the V2 right rail", () => {

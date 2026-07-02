@@ -2931,7 +2931,6 @@ export default async function JobDetailV2Page({
                 { href: addServicePlanHref ?? "", label: "Add Service Plan", show: Boolean(addServicePlanHref) },
                 { href: `/jobs/${jobId}/tests`, label: "Open Tests Workspace", show: isEccJob && fieldComplete },
                 { href: `/jobs/${jobId}/tests?t=completion_report`, label: "Completion Report", show: isEccJob && hasCompletedEccTest },
-                { href: `/jobs/${jobId}?legacy=1`, label: "Open Legacy Detail", show: true },
               ] as Array<{ href: string; label: string; show: boolean }>
             )
               .filter((item) => item.show)
