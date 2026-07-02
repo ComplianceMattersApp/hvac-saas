@@ -19,6 +19,19 @@ function access(overrides: Partial<DualContextAccess>): DualContextAccess {
   };
 }
 
+function directPortal() {
+  return {
+    contractorId: "contractor-1",
+    contractorName: "Partner Co",
+    accountOwnerUserId: "compliance-owner-1",
+    lifecycleState: "active",
+    portalAccountOwnerUserId: "compliance-owner-1",
+    sourceCompanyAccountOwnerUserId: null,
+    membershipSource: "direct_contractor_user" as const,
+    eligibleRole: null,
+  };
+}
+
 describe("resolvePostLoginDestination", () => {
   it("sends portal-only users to /portal by default", () => {
     expect(
@@ -27,12 +40,7 @@ describe("resolvePostLoginDestination", () => {
           hasPortalAccess: true,
           availableContexts: ["portal"],
           preferredLandingContext: "portal",
-          portal: {
-            contractorId: "contractor-1",
-            contractorName: "Partner Co",
-            accountOwnerUserId: "compliance-owner-1",
-            lifecycleState: "active",
-          },
+          portal: directPortal(),
         }),
       }),
     ).toEqual({ kind: "redirect", path: "/portal" });
@@ -45,12 +53,7 @@ describe("resolvePostLoginDestination", () => {
           hasPortalAccess: true,
           availableContexts: ["portal"],
           preferredLandingContext: "portal",
-          portal: {
-            contractorId: "contractor-1",
-            contractorName: "Partner Co",
-            accountOwnerUserId: "compliance-owner-1",
-            lifecycleState: "active",
-          },
+          portal: directPortal(),
         }),
         nextPath: "/ops",
       }),
@@ -115,12 +118,7 @@ describe("resolvePostLoginDestination", () => {
             accountOwnerUserId: "owner-1",
             createdBy: null,
           },
-          portal: {
-            contractorId: "contractor-1",
-            contractorName: "Partner Co",
-            accountOwnerUserId: "compliance-owner-1",
-            lifecycleState: "active",
-          },
+          portal: directPortal(),
         }),
         nextPath: "/portal/jobs",
       }),
@@ -144,12 +142,7 @@ describe("resolvePostLoginDestination", () => {
             accountOwnerUserId: "owner-1",
             createdBy: null,
           },
-          portal: {
-            contractorId: "contractor-1",
-            contractorName: "Partner Co",
-            accountOwnerUserId: "compliance-owner-1",
-            lifecycleState: "active",
-          },
+          portal: directPortal(),
           appAccessBlockedReason: "inactive_internal_user",
         }),
       }),

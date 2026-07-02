@@ -3,7 +3,7 @@ import {
   type OperationalMutationEntitlementReason,
 } from "@/lib/business/platform-entitlement";
 import { isSessionInvalidError } from "@/lib/auth/session-error";
-import { resolveActiveContractorPortalMembership } from "@/lib/portal/current-portal-membership";
+import { resolveCurrentPortalMembership } from "@/lib/portal/current-portal-membership";
 
 export type DualContextInternalRole = "admin" | "office" | "tech" | "billing";
 export type DualContextLandingContext = "app" | "portal" | "inactive_app" | "none";
@@ -18,10 +18,14 @@ export type DualContextInternalIdentity = {
 };
 
 export type DualContextPortalIdentity = {
-  contractorId: string;
+  contractorId: string | null;
   contractorName: string | null;
   accountOwnerUserId: string;
   lifecycleState: string | null;
+  portalAccountOwnerUserId: string;
+  sourceCompanyAccountOwnerUserId: string | null;
+  membershipSource: "direct_contractor_user" | "company_account_handoff_connection";
+  eligibleRole: "admin" | "office" | null;
 };
 
 export type DualContextAccess = {
@@ -92,18 +96,11 @@ export async function resolveDualContextAccess(input: {
     };
   }
 
-  const [{ data: internalRow, error: internalErr }, portal] =
-    await Promise.all([
-      supabase
-        .from("internal_users")
-        .select("user_id, role, is_active, account_owner_user_id, created_by")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      resolveActiveContractorPortalMembership({
-        supabase,
-        userId: user.id,
-      }),
-    ]);
+  const { data: internalRow, error: internalErr } = await supabase
+    .from("internal_users")
+    .select("user_id, role, is_active, account_owner_user_id, created_by")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
   if (internalErr) throw internalErr;
 
@@ -118,6 +115,12 @@ export async function resolveDualContextAccess(input: {
           createdBy: internalRow.created_by ?? null,
         }
       : null;
+
+  const portal = await resolveCurrentPortalMembership({
+    supabase,
+    userId: user.id,
+    internalUser,
+  });
 
   let hasActiveAppAccess = false;
   let appAccessBlockedReason: DualContextAccess["appAccessBlockedReason"] = null;

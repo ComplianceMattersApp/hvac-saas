@@ -35,6 +35,10 @@ function portalAccess(): DualContextAccess {
       contractorName: "Partner Co",
       accountOwnerUserId: "compliance-owner-1",
       lifecycleState: "active",
+      portalAccountOwnerUserId: "compliance-owner-1",
+      sourceCompanyAccountOwnerUserId: null,
+      membershipSource: "direct_contractor_user",
+      eligibleRole: null,
     },
     appAccessBlockedReason: null,
   };

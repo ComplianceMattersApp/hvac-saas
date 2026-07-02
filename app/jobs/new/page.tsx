@@ -98,7 +98,7 @@ export default async function NewJobPage(props: {
   const access = await resolveDualContextAccess({ supabase, user });
 
   if (explicitPortalContext) {
-    if (!access.hasPortalAccess || !access.portal) redirect("/portal");
+    if (!access.hasPortalAccess || !access.portal?.contractorId) redirect("/portal");
   } else if (!access.hasActiveAppAccess) {
     redirect(landingPathForDualContextAccess(access));
   }

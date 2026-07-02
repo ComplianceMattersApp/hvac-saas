@@ -37,6 +37,19 @@ function adminAccess(overrides: Partial<DualContextAccess> = {}) {
   });
 }
 
+function directPortal() {
+  return {
+    contractorId: "contractor-1",
+    contractorName: "Partner Co",
+    accountOwnerUserId: "compliance-owner-1",
+    lifecycleState: "active",
+    portalAccountOwnerUserId: "compliance-owner-1",
+    sourceCompanyAccountOwnerUserId: null,
+    membershipSource: "direct_contractor_user" as const,
+    eligibleRole: null,
+  };
+}
+
 const checkoutAvailable = { checkoutAvailable: true, portalAvailable: true };
 
 describe("resolveAppAccessCta", () => {
@@ -44,12 +57,7 @@ describe("resolveAppAccessCta", () => {
     const cta = resolveAppAccessCta({
       access: makeAccess({
         hasPortalAccess: true,
-        portal: {
-          contractorId: "contractor-1",
-          contractorName: "Partner Co",
-          accountOwnerUserId: "compliance-owner-1",
-          lifecycleState: "active",
-        },
+        portal: directPortal(),
       }),
       billingAvailability: checkoutAvailable,
     });
