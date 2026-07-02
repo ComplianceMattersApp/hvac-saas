@@ -240,6 +240,30 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+function formatBillingRecipientMethod(input: {
+  billingRecipient: unknown;
+  billingName: unknown;
+  contractorName: string | null;
+  customerName: string;
+}) {
+  const billingRecipient = String(input.billingRecipient ?? "").trim().toLowerCase();
+  const billingName = String(input.billingName ?? "").trim();
+
+  if (billingRecipient === "contractor") {
+    return input.contractorName ? `Contractor - ${input.contractorName}` : "Contractor";
+  }
+
+  if (billingRecipient === "other") {
+    return billingName ? `Other - ${billingName}` : "Other";
+  }
+
+  if (billingRecipient === "customer" || !billingRecipient) {
+    return input.customerName ? `Customer - ${input.customerName}` : "Customer";
+  }
+
+  return billingName || billingRecipient;
+}
+
 // ─── Supabase select ───────────────────────────────────────────────────────────
 
 const JOB_V2_SELECT = `
@@ -459,6 +483,12 @@ export default async function JobDetailV2Page({
     .filter(Boolean)
     .join(" ")
     .trim() || "Customer";
+  const billingRecipientMethodLabel = formatBillingRecipientMethod({
+    billingRecipient: (job as any).billing_recipient,
+    billingName: (job as any).billing_name,
+    contractorName,
+    customerName: customerFullName,
+  });
 
   const jobDisplayRef = formatJobDisplayReference({ jobDisplayNumber: job.job_display_number, jobId: job.id });
 
@@ -700,14 +730,23 @@ export default async function JobDetailV2Page({
             <div>
               <div style={S.fieldLabel}>Billing</div>
               <div style={{ ...S.fieldValue, display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                <span>
-                  {billingDisposition === "externally_billed"
-                    ? "Externally billed"
-                    : billingDisposition === "no_charge"
-                      ? "No charge"
-                      : "See billing section"}
-                </span>
-                {billingDisposition === "externally_billed" ? (
+                <span>{billingRecipientMethodLabel}</span>
+                {billedTruthSatisfied ? (
+                  <span
+                    style={{
+                      fontFamily: S.mono,
+                      fontSize: "9px",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      background: "oklch(0.95 0.04 150)",
+                      color: "oklch(0.45 0.13 150)",
+                    }}
+                  >
+                    COMPLETE
+                  </span>
+                ) : billingDisposition === "externally_billed" ? (
                   <span
                     style={{
                       fontFamily: S.mono,
