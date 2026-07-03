@@ -53,6 +53,7 @@ import DeferredTimelineBody from "../_components/DeferredTimelineBody";
 import DeferredInternalNotesBody from "../_components/DeferredInternalNotesBody";
 import DeferredServiceChainPanelBody from "../_components/DeferredServiceChainPanelBody";
 import DeferredJobAttachmentsInternal from "../_components/DeferredJobAttachmentsInternal";
+import ContractorReportPanel from "../_components/ContractorReportPanel";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 
@@ -429,6 +430,7 @@ export default async function JobDetailV2Page({
     ? String(contractor.name ?? "").trim() || null
     : null;
   const contractorDisplayName = contractorName || "Retail";
+  const hasAssignedContractor = Boolean(job.contractor_id);
 
   // ── derived display values ────────────────────────────────────────────────
 
@@ -561,6 +563,12 @@ export default async function JobDetailV2Page({
 
   // closeout needs + shortcut derivations
   const isFailedUnresolved = isEccJob && ["failed", "retest_needed", "pending_office_review"].includes(opsStatus);
+  const failedReasonBannerNote = String(job.next_action_note ?? "").replace(/\s+/g, " ").trim();
+  const canShowEccFailedReasonBanner = isEccJob && ["failed", "retest_needed", "pending_office_review"].includes(opsStatus);
+  const failedReasonBannerText = failedReasonBannerNote
+    ? `Failed Test - ${failedReasonBannerNote}`
+    : "Failed Test";
+  const canShowContractorReportPanel = hasAssignedContractor && ["failed", "pending_info"].includes(opsStatus);
   const closeoutNeeds = getCloseoutNeeds({
     field_complete: job.field_complete,
     job_type: job.job_type,
@@ -2134,6 +2142,12 @@ export default async function JobDetailV2Page({
             </div>
           </div>
 
+          {canShowContractorReportPanel ? (
+            <div style={{ marginTop: "24px" }}>
+              <ContractorReportPanel jobId={jobId} />
+            </div>
+          ) : null}
+
           {/* next action / follow-up metadata */}
           <div style={{ marginTop: "24px", paddingTop: "22px", borderTop: "1px solid oklch(0.93 0.005 250)" }}>
             <div style={{ ...S.fieldLabel, marginBottom: "14px" }}>Next action</div>
@@ -2705,6 +2719,129 @@ export default async function JobDetailV2Page({
             {statusPill.label}
           </span>
         </div>
+
+        {canShowEccFailedReasonBanner ? (
+          <details
+            id="failed-reason-banner"
+            style={{
+              marginTop: "14px",
+              padding: "12px",
+              borderRadius: "11px",
+              border: "1px solid oklch(0.88 0.08 20)",
+              background: "oklch(0.97 0.025 20)",
+              color: "oklch(0.38 0.09 20)",
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                listStyle: "none",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: "10px",
+              }}
+            >
+              <span style={{ minWidth: 0 }}>
+                <span
+                  style={{
+                    display: "block",
+                    fontFamily: S.mono,
+                    fontSize: "9.5px",
+                    fontWeight: 700,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "oklch(0.42 0.12 20)",
+                  }}
+                >
+                  Failed Reason
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    marginTop: "5px",
+                    fontSize: "13px",
+                    lineHeight: 1.45,
+                    fontWeight: 700,
+                    color: "oklch(0.31 0.08 20)",
+                  }}
+                >
+                  {failedReasonBannerText}
+                </span>
+              </span>
+              <span
+                style={{
+                  flexShrink: 0,
+                  borderRadius: "999px",
+                  border: "1px solid oklch(0.84 0.075 20)",
+                  background: "rgba(255,255,255,0.76)",
+                  padding: "4px 8px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "oklch(0.42 0.12 20)",
+                }}
+              >
+                Edit
+              </span>
+            </summary>
+            <form action={updateJobOpsDetailsFromForm} style={{ marginTop: "12px" }}>
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="return_to" value={`${returnTo}#failed-reason-banner`} />
+              <div style={{ ...S.fieldLabel, color: "oklch(0.45 0.11 20)", marginBottom: "7px" }}>
+                Failed reason banner
+              </div>
+              <textarea
+                name="next_action_note"
+                defaultValue={String(job.next_action_note ?? "")}
+                maxLength={240}
+                rows={3}
+                placeholder="Waiting on correction photos"
+                style={{
+                  width: "100%",
+                  minHeight: "74px",
+                  borderRadius: "8px",
+                  border: "1px solid oklch(0.84 0.075 20)",
+                  padding: "8px 10px",
+                  fontSize: "12.5px",
+                  fontFamily: "inherit",
+                  color: "oklch(0.33 0.02 262)",
+                  background: "#fff",
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                } as React.CSSProperties}
+              />
+              <div
+                style={{
+                  marginTop: "6px",
+                  fontSize: "11.5px",
+                  lineHeight: 1.45,
+                  color: "oklch(0.42 0.08 20)",
+                }}
+              >
+                Shown on internal Failed queue cards for quick review.
+              </div>
+              <ImmediateSubmitButton
+                pendingText="Saving..."
+                className=""
+                style={{
+                  marginTop: "10px",
+                  height: "32px",
+                  padding: "0 12px",
+                  borderRadius: "8px",
+                  border: "1px solid oklch(0.84 0.075 20)",
+                  background: "#fff",
+                  color: "oklch(0.38 0.1 20)",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                } as React.CSSProperties}
+              >
+                Save Failed Reason
+              </ImmediateSubmitButton>
+            </form>
+          </details>
+        ) : null}
 
         {/* NEXT ACTION group */}
         <div

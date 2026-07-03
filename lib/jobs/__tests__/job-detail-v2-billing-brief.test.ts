@@ -26,6 +26,20 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain('closeoutNeeds.needsInvoice || closeoutNeeds.needsCerts ? "Field Complete" : "Closed out"');
   });
 
+  it("keeps the failed ECC banner separate from the follow-up reminder surface", () => {
+    expect(source).toContain("const canShowEccFailedReasonBanner = isEccJob");
+    expect(source).toContain("const failedReasonBannerText = failedReasonBannerNote");
+    expect(source).toContain('id="failed-reason-banner"');
+    expect(source).toContain("Save Failed Reason");
+    expect(source).toContain('id="followup"');
+  });
+
+  it("ports the legacy contractor report panel to desktop V2", () => {
+    expect(source).toContain('import ContractorReportPanel from "../_components/ContractorReportPanel";');
+    expect(source).toContain('const canShowContractorReportPanel = hasAssignedContractor && ["failed", "pending_info"].includes(opsStatus);');
+    expect(source).toContain("<ContractorReportPanel jobId={jobId} />");
+  });
+
   it("labels internal retail jobs when no contractor is selected", () => {
     expect(source).toContain('const contractorDisplayName = contractorName || "Retail";');
     expect(source).toContain("{contractorDisplayName}");
