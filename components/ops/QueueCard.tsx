@@ -20,6 +20,22 @@ export type QueueCardProps = {
   children?: ReactNode;
 };
 
+function queueCardClassName(variant?: string) {
+  if (variant === "follow-up-overdue" || variant === "follow-up-due") {
+    return "rounded-xl border border-red-300 bg-red-50/80 px-3 py-2 shadow-[0_10px_26px_-24px_rgba(185,28,28,0.65)]";
+  }
+
+  if (variant === "follow-up-soon" || variant === "follow-up-unscheduled") {
+    return "rounded-xl border border-amber-300 bg-amber-50/80 px-3 py-2 shadow-[0_10px_26px_-24px_rgba(180,83,9,0.55)]";
+  }
+
+  if (variant === "follow-up-future") {
+    return "rounded-xl border border-slate-200 bg-white px-3 py-2";
+  }
+
+  return "rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2";
+}
+
 export default function QueueCard({
   id,
   variant,
@@ -35,7 +51,7 @@ export default function QueueCard({
     <div
       id={id}
       data-ops-workspace-card-variant={variant}
-      className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2"
+      className={queueCardClassName(variant)}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">

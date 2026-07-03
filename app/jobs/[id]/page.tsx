@@ -408,6 +408,7 @@ const MAIN_JOB_SELECT_WITH_BILLING_DISPOSITION = `
       follow_up_date,
       next_action_note,
       action_required_by,
+      ops_board_failure_note,
       permit_number,
       jurisdiction,
       permit_date,
@@ -500,6 +501,7 @@ const MAIN_JOB_SELECT_COMPAT = `
       follow_up_date,
       next_action_note,
       action_required_by,
+      ops_board_failure_note,
       permit_number,
       jurisdiction,
       permit_date,
@@ -2998,7 +3000,7 @@ const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(
     String(job.ops_status ?? "").trim().toLowerCase(),
   );
-const failedReasonBannerNote = String((job as any).next_action_note ?? "").replace(/\s+/g, " ").trim();
+const failedReasonBannerNote = String((job as any).ops_board_failure_note ?? "").replace(/\s+/g, " ").trim();
 const canShowEccFailedReasonBanner =
   isInternalUser &&
   String(job.job_type ?? "").trim().toLowerCase() === "ecc" &&
@@ -7256,8 +7258,8 @@ const showCorrectionReviewResolution =
         <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
         <label className={workspaceFieldLabelClass}>Failed reason banner</label>
         <textarea
-          name="next_action_note"
-          defaultValue={job.next_action_note ?? ""}
+          name="ops_board_failure_note"
+          defaultValue={(job as any).ops_board_failure_note ?? ""}
           maxLength={240}
           rows={3}
           className={workspaceTextareaClass}

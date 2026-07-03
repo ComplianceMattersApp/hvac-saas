@@ -421,7 +421,7 @@ describe("focused queue display labels", () => {
     expect(getOpsQueueCardStatusReason({
       job_type: "ecc",
       ops_status: "failed",
-      next_action_note: "Waiting on correction photos",
+      ops_board_failure_note: "Waiting on correction photos",
       pending_info_reason: "Failed - needs review/correction",
     })).toBe("Failed / Correction Required: Waiting on correction photos");
 

@@ -108,8 +108,8 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
                 <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-failed-reason-editor`} />
                 <label className="text-sm font-semibold text-slate-700">Failed reason banner</label>
                 <textarea
-                  name="next_action_note"
-                  defaultValue={job.next_action_note ?? ""}
+                  name="ops_board_failure_note"
+                  defaultValue={job.ops_board_failure_note ?? ""}
                   maxLength={240}
                   rows={3}
                   className="min-h-[6rem] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"

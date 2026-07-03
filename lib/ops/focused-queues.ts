@@ -36,6 +36,7 @@ export type FocusedQueueJob = {
   pending_info_reason?: string | null;
   on_hold_reason?: string | null;
   next_action_note?: string | null;
+  ops_board_failure_note?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   account_owner_user_id?: string | null;
@@ -302,7 +303,7 @@ function isGenericAssignmentFallbackLabel(value: unknown): boolean {
 }
 
 export function getOpsQueueCardStatusReason(
-  job: Pick<FocusedQueueJob, "status" | "ops_status" | "job_type" | "pending_info_reason" | "on_hold_reason" | "next_action_note" | "service_follow_up_progress_label">,
+  job: Pick<FocusedQueueJob, "status" | "ops_status" | "job_type" | "pending_info_reason" | "on_hold_reason" | "next_action_note" | "ops_board_failure_note" | "service_follow_up_progress_label">,
 ): string {
   const status = normalize(job?.ops_status);
   const lifecycle = normalize(job?.status);
@@ -345,7 +346,7 @@ export function getOpsQueueCardStatusReason(
 
   if (status === "failed") {
     if (isEccJobType(job?.job_type)) {
-      const failedNote = cleanReason(job?.next_action_note);
+      const failedNote = cleanReason(job?.ops_board_failure_note);
       const label = formatEccOpsStatusLabel(status, "ops") ?? "Failed / Correction Required";
       return failedNote ? `${label}: ${failedNote}` : label;
     }

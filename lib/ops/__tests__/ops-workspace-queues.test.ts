@@ -65,4 +65,21 @@ describe("Ops workspace queue product-mode gating", () => {
       }),
     ).toBe("contractor_intake");
   });
+
+  it("keeps follow-up reminders visible across product modes", () => {
+    expect(
+      resolveVisibleOpsWorkspaceQueueKeys({
+        productMode: "ecc_hers",
+        permitRequestsSchemaAvailable: true,
+      }),
+    ).toContain("follow_ups");
+
+    expect(
+      resolveEffectiveOpsBoardBucketFilter({
+        requestedBucket: "follow_ups",
+        productMode: "hvac_service",
+        permitRequestsSchemaAvailable: false,
+      }),
+    ).toBe("follow_ups");
+  });
 });

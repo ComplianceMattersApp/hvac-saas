@@ -29,9 +29,18 @@ describe("desktop job detail V2 billing brief", () => {
   it("keeps the failed ECC banner separate from the follow-up reminder surface", () => {
     expect(source).toContain("const canShowEccFailedReasonBanner = isEccJob");
     expect(source).toContain("const failedReasonBannerText = failedReasonBannerNote");
+    expect(source).toContain("ops_board_failure_note");
     expect(source).toContain('id="failed-reason-banner"');
     expect(source).toContain("Save Failed Reason");
     expect(source).toContain('id="followup"');
+  });
+
+  it("treats follow-up notes as reminders that surface in Operations", () => {
+    expect(source).toContain("const followUpReminderStatus = followUpDateValue");
+    expect(source).toContain("Due now in Operations Follow Ups");
+    expect(source).toContain("Visible in Operations Follow Ups; due");
+    expect(source).toContain("highlights as the date approaches");
+    expect(source).toContain("What should the office remember to do later?");
   });
 
   it("ports the legacy contractor report panel to desktop V2", () => {

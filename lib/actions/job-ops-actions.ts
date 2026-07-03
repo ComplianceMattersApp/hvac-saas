@@ -141,6 +141,7 @@ type OpsSnapshot = {
   follow_up_date: string | null;
   next_action_note: string | null;
   action_required_by: string | null;
+  ops_board_failure_note?: string | null;
 };
 
 function hasExplicitPendingInfo(snapshot: Pick<OpsSnapshot, "ops_status" | "pending_info_reason">): boolean {
@@ -1843,7 +1844,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from('jobs')
-    .select('ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by')
+    .select('ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, ops_board_failure_note')
     .eq('id', jobId)
     .single();
 
@@ -1856,13 +1857,16 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
     follow_up_date: beforeJob.follow_up_date ?? null,
     next_action_note: beforeJob.next_action_note ?? null,
     action_required_by: beforeJob.action_required_by ?? null,
+    ops_board_failure_note: (beforeJob as any).ops_board_failure_note ?? null,
   };
   const hasFollowUpDateInput = formData.has("follow_up_date");
   const hasNextActionNoteInput = formData.has("next_action_note");
   const hasActionRequiredByInput = formData.has("action_required_by");
+  const hasOpsBoardFailureNoteInput = formData.has("ops_board_failure_note");
   const followUpDateRaw = formData.get('follow_up_date');
   const nextActionNoteRaw = formData.get('next_action_note');
   const actionRequiredByRaw = formData.get('action_required_by');
+  const opsBoardFailureNoteRaw = formData.get("ops_board_failure_note");
 
   const next_action_note =
     hasNextActionNoteInput
@@ -1884,11 +1888,19 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
       : null
     : before.action_required_by;
 
+  const ops_board_failure_note =
+    hasOpsBoardFailureNoteInput
+      ? typeof opsBoardFailureNoteRaw === "string" && opsBoardFailureNoteRaw.trim()
+        ? opsBoardFailureNoteRaw.trim()
+        : null
+      : before.ops_board_failure_note ?? null;
+
   const after: OpsSnapshot = {
     ...before,
     follow_up_date,
     next_action_note,
     action_required_by,
+    ops_board_failure_note,
   };
 
   const changes = buildOpsChanges(before, after);
@@ -1904,6 +1916,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
       follow_up_date,
       next_action_note,
       action_required_by,
+      ops_board_failure_note,
     })
     .eq('id', jobId);
 

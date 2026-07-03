@@ -309,7 +309,7 @@ describe("Operations Board reason mapping", () => {
         {
           job_type: "ecc",
           ops_status: "failed",
-          next_action_note: "Waiting on correction photos",
+          ops_board_failure_note: "Waiting on correction photos",
           ops_board_failure_detail: "Duct Leakage failed",
         },
         "Failed",
@@ -321,13 +321,31 @@ describe("Operations Board reason mapping", () => {
     });
   });
 
+  it("does not treat follow-up reminder notes as failed ECC banner notes", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        {
+          job_type: "ecc",
+          ops_status: "failed",
+          next_action_note: "Call customer next Tuesday",
+          ops_board_failure_detail: "Duct Leakage failed",
+        },
+        "Failed",
+      ),
+    ).toEqual({
+      label: "Failed ECC test",
+      detail: "Duct Leakage failed",
+      source: "mapped",
+    });
+  });
+
   it("does not expose failed banner notes for passing ECC jobs", () => {
     expect(
       getOpsBoardVisibleReason(
         {
           job_type: "ecc",
           ops_status: "closed",
-          next_action_note: "Waiting on correction photos",
+          ops_board_failure_note: "Waiting on correction photos",
         },
         "Closeout Complete",
       ),

@@ -128,6 +128,7 @@ function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
     normalized === "waiting" ||
     normalized === "exceptions" ||
     normalized === "closeout" ||
+    normalized === "follow_ups" ||
     normalized === "contractor_intake" ||
     normalized === "permits"
   ) {
@@ -497,6 +498,7 @@ function telHref(phone?: string | null) {
     return {
       ...job,
       next_action_note: job?.next_action_note ?? null,
+      ops_board_failure_note: job?.ops_board_failure_note ?? null,
       ops_board_failure_detail: jobId ? primaryFailureReasonByJob.get(jobId) ?? null : null,
     };
   }
@@ -511,7 +513,7 @@ function telHref(phone?: string | null) {
     if (opsStatus === "pending_office_review") return "Correction Required";
     if (opsStatus !== "failed") return "";
 
-    const failedNote = String(job?.next_action_note ?? "").trim();
+    const failedNote = String(job?.ops_board_failure_note ?? "").trim();
     if (failedNote) return `Failed Test - ${failedNote}`;
 
     const jobId = String(job?.id ?? "").trim();
@@ -522,7 +524,7 @@ function telHref(phone?: string | null) {
   const wsStartTomorrowUtc = startOfTomorrowUtcIsoLA();
 
     const workspaceSelect =
-      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, pending_info_reason, on_hold_reason, next_action_note, permit_number, jurisdiction, permit_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
+      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, ops_board_failure_note, permit_number, jurisdiction, permit_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
 
@@ -555,6 +557,13 @@ function telHref(phone?: string | null) {
       return q;
     }
 
+    const followUpTodayDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
     const needToScheduleCountQ = opsStatusCountQuery("need_to_schedule", { requireOpenStatus: true });
     const pendingInfoCountQ = opsStatusCountQuery("pending_info");
     const onHoldCountQ = opsStatusCountQuery("on_hold");
@@ -563,6 +572,12 @@ function telHref(phone?: string | null) {
     const failedCountQ = opsStatusCountQuery("failed");
     const retestNeededCountQ = opsStatusCountQuery("retest_needed");
     const problemCountQ = opsStatusCountQuery("problem");
+    const followUpReminderCountQ = supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null");
 
     let fieldWorkCountQ = supabase
       .from("jobs")
@@ -603,6 +618,7 @@ function telHref(phone?: string | null) {
       failedCountRes,
       retestNeededCountRes,
       problemCountRes,
+      followUpReminderCountRes,
       fieldWorkCountRes,
       scheduledOpenRowsRes,
       closeoutCountRowsRes,
@@ -619,6 +635,7 @@ function telHref(phone?: string | null) {
       failedCountQ,
       retestNeededCountQ,
       problemCountQ,
+      followUpReminderCountQ,
       fieldWorkCountQ,
       scheduledOpenRowsQ,
       closeoutCountRowsQ,
@@ -647,6 +664,7 @@ function telHref(phone?: string | null) {
     if (failedCountRes.error) throw failedCountRes.error;
     if (retestNeededCountRes.error) throw retestNeededCountRes.error;
     if (problemCountRes.error) throw problemCountRes.error;
+    if (followUpReminderCountRes.error) throw followUpReminderCountRes.error;
     if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
     if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
     if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
@@ -660,6 +678,7 @@ function telHref(phone?: string | null) {
       ["failed", failedCountRes.count ?? 0],
       ["retest_needed", retestNeededCountRes.count ?? 0],
       ["problem", problemCountRes.count ?? 0],
+      ["follow_ups", followUpReminderCountRes.count ?? 0],
     ]);
 
     const scheduledOpenRows = (scheduledOpenRowsRes.data ?? []) as any[];
@@ -744,6 +763,12 @@ function telHref(phone?: string | null) {
         count: closeoutCount,
         href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
       },
+      {
+        key: "follow_ups",
+        label: "Follow Ups",
+        count: countsWs.get("follow_ups") ?? 0,
+        href: `/ops${buildQueryString({ bucket: "follow_ups", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
+      },
       ...(contractorIntakeQueueAvailable
         ? [{
             key: "contractor_intake",
@@ -774,6 +799,7 @@ function telHref(phone?: string | null) {
       waiting: "waiting",
       exceptions: "exceptions",
       closeout: "closeout",
+      follow_ups: "follow_ups",
       contractor_intake: "contractor_intake",
       permits: "permits",
     };
@@ -881,6 +907,10 @@ function telHref(phone?: string | null) {
         queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"]);
       } else if (workspaceKey === "exceptions") {
         queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
+      } else if (workspaceKey === "follow_ups") {
+        queueQ = queueQ
+          .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")
+          .order("follow_up_date", { ascending: true, nullsFirst: false });
       } else if (workspaceKey === "permits") {
         return [];
       } else {
@@ -978,6 +1008,8 @@ function telHref(phone?: string | null) {
           ? "exceptions"
           : workspaceKey === "closeout"
           ? "closeout"
+          : workspaceKey === "follow_ups"
+          ? "follow_ups"
           : workspaceKey === "contractor_intake"
           ? "contractor_intake"
           : workspaceKey === "permits"
@@ -994,6 +1026,8 @@ function telHref(phone?: string | null) {
           ? "Waiting"
           : workspaceKey === "contractor_intake"
           ? "Intake"
+          : workspaceKey === "follow_ups"
+          ? "Follow Ups"
           : workspaceKey === "permits"
           ? "Permits"
           : section.label,
@@ -1484,6 +1518,84 @@ function telHref(phone?: string | null) {
       );
     }
 
+    function formatFollowUpOwner(value: unknown) {
+      const normalized = String(value ?? "").trim().toLowerCase();
+      if (normalized === "customer") return "Customer";
+      if (normalized === "contractor") return "Contractor";
+      if (normalized === "rater") return "Rater";
+      return "Office";
+    }
+
+    function businessDateToUtcMs(value: string) {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? "").trim());
+      if (!match) return null;
+      const [, year, month, day] = match;
+      return Date.UTC(Number(year), Number(month) - 1, Number(day));
+    }
+
+    function followUpUrgency(dueDate: string) {
+      const dueMs = businessDateToUtcMs(dueDate);
+      const todayMs = businessDateToUtcMs(followUpTodayDate);
+      if (dueMs === null || todayMs === null) {
+        return {
+          variant: "follow-up-unscheduled",
+          label: "Needs date",
+        };
+      }
+
+      const daysUntilDue = Math.round((dueMs - todayMs) / 86_400_000);
+      if (daysUntilDue < 0) {
+        return {
+          variant: "follow-up-overdue",
+          label: `${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) === 1 ? "" : "s"} overdue`,
+        };
+      }
+      if (daysUntilDue === 0) {
+        return {
+          variant: "follow-up-due",
+          label: "Due today",
+        };
+      }
+      if (daysUntilDue <= 2) {
+        return {
+          variant: "follow-up-soon",
+          label: `Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`,
+        };
+      }
+      return {
+        variant: "follow-up-future",
+        label: `Due in ${daysUntilDue} days`,
+      };
+    }
+
+    function workspaceFollowUpRichCard(job: any) {
+      const jobId = String(job?.id ?? "").trim();
+      const note = String(job?.next_action_note ?? "").trim() || "No reminder note added.";
+      const dueDate = String(job?.follow_up_date ?? "").trim();
+      const owner = formatFollowUpOwner(job?.action_required_by);
+      const statusLabel = getOpsQueueCardStatusReason(job);
+      const urgency = followUpUrgency(dueDate);
+
+      return (
+        <QueueCard
+          key={jobId}
+          id={`ops-workspace-follow-up-job-${jobId}`}
+          variant={urgency.variant}
+          href={`/jobs/${jobId}/v2#followup`}
+          title={workspaceTitle(job)}
+          subtitle={workspaceCustomerLocation(job)}
+          actionLabel="Open Follow Up"
+          tags={[
+            { label: "Due", value: dueDate ? formatBusinessDateUS(dueDate) : "No date set" },
+            { label: "Urgency", value: urgency.label },
+            { label: "Owner", value: owner },
+            { label: "Status", value: statusLabel },
+            { label: "Reminder", value: note, fullWidth: true },
+          ]}
+        />
+      );
+    }
+
     function workspaceFieldPaymentReviewCard(item: NonNullable<typeof fieldPaymentReconciliationAttention>["items"][number]) {
       const isSelfReported = item.reportedByUserId === user.id;
       const utilityLabelClass =
@@ -1594,6 +1706,8 @@ function telHref(phone?: string | null) {
         ? "permit requests"
         : selectedWorkspaceKey === "contractor_intake"
         ? "intake submissions"
+        : selectedWorkspaceKey === "follow_ups"
+        ? "follow ups"
         : "jobs";
     const selectedWorkspaceCountText =
       selectedWorkspacePreviewCount === selectedWorkspaceTotalCount
@@ -2595,6 +2709,9 @@ function telHref(phone?: string | null) {
                   }
                   if (selectedWorkspaceSection.key === "closeout") {
                     return workspaceCloseoutRichCard(job, visibleReason);
+                  }
+                  if (selectedWorkspaceSection.key === "follow_ups") {
+                    return workspaceFollowUpRichCard(job);
                   }
 
                   return (

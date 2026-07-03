@@ -37,6 +37,11 @@ const opsWorkspaceQueuesSource = readFileSync(
   "utf-8",
 );
 
+const queueCardSource = readFileSync(
+  resolve(__dirname, "../../../components/ops/QueueCard.tsx"),
+  "utf-8",
+);
+
 const contractorFocusSelectorSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/ContractorFocusSelector.tsx"),
   "utf-8",
@@ -122,10 +127,22 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('waiting: "waiting"');
     expect(opsPageSource).toContain('exceptions: "exceptions"');
     expect(opsPageSource).toContain('closeout: "closeout"');
+    expect(opsPageSource).toContain('follow_ups: "follow_ups"');
     expect(opsPageSource).toContain('contractor_intake: "contractor_intake"');
     expect(opsPageSource).toContain("resolveVisibleOpsWorkspaceQueueKeys");
     expect(opsPageSource).toContain("const coreBoardWorkspaceKeys = resolveVisibleOpsWorkspaceQueueKeys({");
     expect(opsPageSource).toContain("const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter]];");
+  });
+
+  it("keeps follow-up reminders always visible with date urgency styling", () => {
+    expect(opsPageSource).toContain('key: "follow_ups"');
+    expect(opsPageSource).toContain('label: "Follow Ups"');
+    expect(opsPageSource).toContain('.or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")');
+    expect(opsPageSource).toContain("function followUpUrgency(dueDate: string)");
+    expect(opsPageSource).toContain('variant: "follow-up-overdue"');
+    expect(opsPageSource).toContain('variant: "follow-up-soon"');
+    expect(queueCardSource).toContain('variant === "follow-up-overdue" || variant === "follow-up-due"');
+    expect(queueCardSource).toContain('variant === "follow-up-soon" || variant === "follow-up-unscheduled"');
   });
 
   it("restores fixed queue chips as the primary Ops queue selector", () => {

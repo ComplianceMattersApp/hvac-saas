@@ -8,6 +8,7 @@ export type OpsBoardFilterBucket =
   | "waiting"
   | "exceptions"
   | "closeout"
+  | "follow_ups"
   | "contractor_intake"
   | "permits";
 
@@ -17,6 +18,7 @@ export type OpsWorkspaceQueueKey =
   | "waiting"
   | "exceptions"
   | "closeout"
+  | "follow_ups"
   | "contractor_intake"
   | "permits";
 
@@ -36,6 +38,7 @@ export function resolveVisibleOpsWorkspaceQueueKeys(params: {
       : []),
     "waiting",
     "exceptions",
+    "follow_ups",
     "closeout",
     ...(params.permitRequestsSchemaAvailable ? (["permits"] as const) : []),
   ];

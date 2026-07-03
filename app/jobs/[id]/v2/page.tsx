@@ -285,7 +285,7 @@ const JOB_V2_SELECT = `
   scheduled_date, window_start, window_end, on_the_way_at,
   field_complete, certs_complete, invoice_complete,
   ops_status, pending_info_reason, on_hold_reason,
-  follow_up_date, next_action_note, action_required_by,
+  follow_up_date, next_action_note, action_required_by, ops_board_failure_note,
   permit_number, jurisdiction, permit_date,
   billing_recipient, billing_name, billing_email,
   billing_disposition,
@@ -563,7 +563,7 @@ export default async function JobDetailV2Page({
 
   // closeout needs + shortcut derivations
   const isFailedUnresolved = isEccJob && ["failed", "retest_needed", "pending_office_review"].includes(opsStatus);
-  const failedReasonBannerNote = String(job.next_action_note ?? "").replace(/\s+/g, " ").trim();
+  const failedReasonBannerNote = String((job as any).ops_board_failure_note ?? "").replace(/\s+/g, " ").trim();
   const canShowEccFailedReasonBanner = isEccJob && ["failed", "retest_needed", "pending_office_review"].includes(opsStatus);
   const failedReasonBannerText = failedReasonBannerNote
     ? `Failed Test - ${failedReasonBannerNote}`
@@ -601,6 +601,21 @@ export default async function JobDetailV2Page({
     isMaintenanceAgreementsEnabled() && job.customer_id
       ? `/customers/${job.customer_id}?tab=service-plans`
       : null;
+  const followUpDateValue = String(job.follow_up_date ?? "").trim();
+  const followUpNoteValue = String(job.next_action_note ?? "").trim();
+  const followUpOwnerValue = String(job.action_required_by ?? "").trim();
+  const todayBusinessDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const hasFollowUpReminder = Boolean(followUpDateValue || followUpNoteValue || followUpOwnerValue);
+  const followUpReminderStatus = followUpDateValue
+    ? followUpDateValue <= todayBusinessDate
+      ? "Due now in Operations Follow Ups"
+      : `Visible in Operations Follow Ups; due ${formatBusinessDateUS(followUpDateValue)}`
+    : "No reminder date set";
 
   // contact attempts
   const contactAttemptCount = Number(contactAttemptsResult.count ?? 0);
@@ -2148,9 +2163,35 @@ export default async function JobDetailV2Page({
             </div>
           ) : null}
 
-          {/* next action / follow-up metadata */}
+          {/* follow-up reminder metadata */}
           <div style={{ marginTop: "24px", paddingTop: "22px", borderTop: "1px solid oklch(0.93 0.005 250)" }}>
-            <div style={{ ...S.fieldLabel, marginBottom: "14px" }}>Next action</div>
+            <div style={{ ...S.fieldLabel, marginBottom: "14px" }}>Follow-up reminder</div>
+            <div
+              style={{
+                marginBottom: "14px",
+                padding: "12px 14px",
+                borderRadius: "10px",
+                border: hasFollowUpReminder
+                  ? "1px solid oklch(0.85 0.06 255)"
+                  : "1px solid oklch(0.92 0.006 250)",
+                background: hasFollowUpReminder ? "oklch(0.97 0.02 255)" : "oklch(0.98 0.003 250)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  color: hasFollowUpReminder ? "oklch(0.42 0.12 255)" : "oklch(0.55 0.015 262)",
+                }}
+              >
+                {followUpReminderStatus}
+              </div>
+              <div style={{ marginTop: "4px", fontSize: "12px", lineHeight: 1.5, color: "oklch(0.48 0.02 262)" }}>
+                {hasFollowUpReminder
+                  ? "This is an internal reminder. It stays visible in Operations Follow Ups and highlights as the date approaches."
+                  : "Add a date and reminder note when someone should come back to this job later."}
+              </div>
+            </div>
             <form action={updateJobOpsDetailsFromForm}>
               <input type="hidden" name="job_id" value={jobId} />
               <input type="hidden" name="return_to" value={returnTo} />
@@ -2180,7 +2221,7 @@ export default async function JobDetailV2Page({
                   </select>
                 </div>
                 <div>
-                  <div style={S.fieldLabel}>Follow-up Date</div>
+                <div style={S.fieldLabel}>Reminder Date</div>
                   <input
                     type="date"
                     name="follow_up_date"
@@ -2201,12 +2242,12 @@ export default async function JobDetailV2Page({
                 </div>
               </div>
               <div style={{ marginBottom: "10px" }}>
-                <div style={S.fieldLabel}>Next Action Note</div>
+                <div style={S.fieldLabel}>Reminder Note</div>
                 <textarea
                   name="next_action_note"
                   defaultValue={String(job.next_action_note ?? "")}
                   rows={3}
-                  placeholder="What needs to happen next?"
+                  placeholder="What should the office remember to do later?"
                   style={{
                     width: "100%",
                     borderRadius: "8px",
@@ -2236,7 +2277,7 @@ export default async function JobDetailV2Page({
                   fontFamily: "inherit",
                 }}
               >
-                Save Follow Up
+                Save Reminder
               </button>
             </form>
           </div>
@@ -2791,8 +2832,8 @@ export default async function JobDetailV2Page({
                 Failed reason banner
               </div>
               <textarea
-                name="next_action_note"
-                defaultValue={String(job.next_action_note ?? "")}
+                name="ops_board_failure_note"
+                defaultValue={String((job as any).ops_board_failure_note ?? "")}
                 maxLength={240}
                 rows={3}
                 placeholder="Waiting on correction photos"
