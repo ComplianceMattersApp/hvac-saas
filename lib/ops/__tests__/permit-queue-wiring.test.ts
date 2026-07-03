@@ -79,23 +79,22 @@ describe("Ops workspace permit queue wiring", () => {
 
     expect(opsPageSource).toContain("createJobFromPermitRequestAndMarkCreated");
     expect(opsPageSource).toContain("createJobAndMarkPermitCreatedFromOps");
-    expect(branch).toContain("No job is linked yet. Creating the permit automatically moves this workflow into job creation using the existing permit information.");
-    expect(branch).toContain("Create Job & Mark Permit Created");
+    expect(branch).toContain("No job is linked yet. This will start the customer/job record from the permit intake below.");
+    expect(branch).toContain("Permit intake draft");
+    expect(branch).toContain("Create Job From Permit Intake");
     expect(branch).toContain('name="customer_location_mode"');
-    expect(branch).toContain('value="existing_existing"');
-    expect(branch).toContain("Existing customer + existing location");
-    expect(branch).toContain('value="existing_new"');
-    expect(branch).toContain("Existing customer + new location");
     expect(branch).toContain('value="new_new"');
-    expect(branch).toContain("New customer + new location");
-    expect(branch).toContain('name="existing_customer_id"');
-    expect(branch).toContain('name="existing_location_id"');
     expect(branch).toContain('name="customer_first_name"');
     expect(branch).toContain('name="customer_last_name"');
     expect(branch).toContain('name="address_line1"');
     expect(branch).toContain('name="city"');
     expect(branch).toContain('name="state"');
     expect(branch).toContain('name="zip"');
+    expect(branch).not.toContain("Existing customer + existing location");
+    expect(branch).not.toContain("Existing customer + new location");
+    expect(branch).not.toContain("New customer + new location");
+    expect(branch).not.toContain('name="existing_customer_id"');
+    expect(branch).not.toContain('name="existing_location_id"');
     expect(branch).toContain("Is the job ready to be tested?");
     expect(branch).toContain("Ready - schedule now or queue for scheduling");
     expect(branch).toContain("Waiting for install");
@@ -110,7 +109,7 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain('action={markPermitCreatedFromOps}');
     expect(branch).toContain('action={createJobAndMarkPermitCreatedFromOps}');
     expect(branch).toContain("Moves the linked job to scheduling when it is unscheduled, or keeps it scheduled if it already has a time.");
-    expect(branch).toContain("Create Job & Mark Permit Created");
+    expect(branch).toContain("Create Job From Permit Intake");
   });
 
   it("renders an internal permit intake review panel alongside route completion controls", () => {

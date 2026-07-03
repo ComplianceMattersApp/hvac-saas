@@ -100,17 +100,6 @@ import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/pe
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 
 
-type PermitJobCustomerOption = {
-  id: string;
-  label: string;
-};
-
-type PermitJobLocationOption = {
-  id: string;
-  customerId: string;
-  label: string;
-};
-
 type ContractorFocusOption = {
   id: string;
   name: string;
@@ -367,6 +356,12 @@ function telHref(phone?: string | null) {
   const p = digitsOnly(phone);
   return p ? `tel:${p}` : "";
 }
+  function cityFromPermitJurisdiction(value?: string | null) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    return raw.replace(/^city\s+of\s+/i, "").trim();
+  }
+
   function workspaceTitle(job: any) {
     return normalizeRetestLinkedJobTitle(job?.title) || `Job ${String(job?.id ?? "").slice(0, 8)}`;
   }
@@ -1241,77 +1236,6 @@ function telHref(phone?: string | null) {
       selected: contractorFocusIdSet.has(contractorOption.id),
     }));
     const contractorFocusAllCount = contractorFocusSourceRows.length;
-    const shouldLoadPermitJobOptions = selectedWorkspaceKey === "permits";
-    const [permitJobCustomersRes, permitJobLocationsRes] = shouldLoadPermitJobOptions
-      ? await Promise.all([
-          supabase
-            .from("customers")
-            .select("id, full_name, first_name, last_name, phone")
-            .eq("owner_user_id", internalUser.account_owner_user_id)
-            .order("last_name", { ascending: true })
-            .limit(200),
-          supabase
-            .from("locations")
-            .select("id, customer_id, address_line1, city, state, zip, postal_code")
-            .eq("owner_user_id", internalUser.account_owner_user_id)
-            .order("address_line1", { ascending: true })
-            .limit(500),
-        ])
-      : [
-          { data: [] as any[], error: null },
-          { data: [] as any[], error: null },
-        ];
-
-    if (permitJobCustomersRes.error) throw permitJobCustomersRes.error;
-    if (permitJobLocationsRes.error) throw permitJobLocationsRes.error;
-
-    const permitJobCustomerOptions: PermitJobCustomerOption[] = (permitJobCustomersRes.data ?? [])
-      .map((customer: any) => {
-        const id = String(customer?.id ?? "").trim();
-        const name =
-          String(customer?.full_name ?? "").trim() ||
-          [customer?.first_name, customer?.last_name]
-            .map((part) => String(part ?? "").trim())
-            .filter(Boolean)
-            .join(" ") ||
-          id;
-        const phone = String(customer?.phone ?? "").trim();
-        return id
-          ? {
-              id,
-              label: phone ? `${name} - ${phone}` : name,
-            }
-          : null;
-      })
-      .filter(Boolean) as PermitJobCustomerOption[];
-
-    const permitCustomerLabelById = new Map(
-      permitJobCustomerOptions.map((customer) => [customer.id, customer.label]),
-    );
-    const permitJobLocationOptions: PermitJobLocationOption[] = (permitJobLocationsRes.data ?? [])
-      .map((location: any) => {
-        const id = String(location?.id ?? "").trim();
-        const customerId = String(location?.customer_id ?? "").trim();
-        const address = String(location?.address_line1 ?? "").trim() || "Address";
-        const cityStateZip = [
-          String(location?.city ?? "").trim(),
-          [String(location?.state ?? "").trim(), String(location?.zip ?? location?.postal_code ?? "").trim()]
-            .filter(Boolean)
-            .join(" "),
-        ]
-          .filter(Boolean)
-          .join(", ");
-        const customerLabel = permitCustomerLabelById.get(customerId);
-        const label = [address, cityStateZip].filter(Boolean).join(", ");
-        return id && customerId
-          ? {
-              id,
-              customerId,
-              label: customerLabel ? `${label || id} - ${customerLabel}` : label || id,
-            }
-          : null;
-      })
-      .filter(Boolean) as PermitJobLocationOption[];
     const activeWorkspaceBaseHref = `/ops${buildQueryString({
       bucket: effectiveBoardBucketFilter,
       create: "",
@@ -2532,8 +2456,34 @@ function telHref(phone?: string | null) {
                         ) : (
                           <form action={createJobAndMarkPermitCreatedFromOps} className="mt-2 grid gap-2 md:grid-cols-2">
                             <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                            <input type="hidden" name="customer_location_mode" value="new_new" />
+                            <input type="hidden" name="customer_first_name" value={permitRequest.customerFirstNameSnapshot ?? ""} />
+                            <input type="hidden" name="customer_last_name" value={permitRequest.customerLastNameSnapshot ?? ""} />
+                            <input type="hidden" name="address_line1" value={permitRequest.serviceAddressTextSnapshot ?? ""} />
+                            <input type="hidden" name="city" value={cityFromPermitJurisdiction(permitRequest.jurisdiction)} />
+                            <input type="hidden" name="state" value="CA" />
+                            <input type="hidden" name="zip" value="" />
+                            <input type="hidden" name="job_title" value={permitRequest.requestLabel || "ECC Alteration Test"} />
                             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-medium leading-5 text-amber-950 md:col-span-2">
-                              No job is linked yet. Creating the permit automatically moves this workflow into job creation using the existing permit information.
+                              No job is linked yet. This will start the customer/job record from the permit intake below.
+                            </div>
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] leading-5 text-slate-700 md:col-span-2">
+                              <div className="font-semibold text-slate-900">Permit intake draft</div>
+                              <div>
+                                <span className="font-medium text-slate-500">Customer:</span>{" "}
+                                {[permitRequest.customerFirstNameSnapshot, permitRequest.customerLastNameSnapshot].filter(Boolean).join(" ") || "Customer name pending"}
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-500">Service address:</span>{" "}
+                                {permitRequest.serviceAddressTextSnapshot || "Address pending"}
+                              </div>
+                              <div>
+                                <span className="font-medium text-slate-500">City:</span>{" "}
+                                {cityFromPermitJurisdiction(permitRequest.jurisdiction) || "City pending"}
+                              </div>
+                              <div className="text-slate-500">
+                                After creation, finish any missing customer details from the job/customer record.
+                              </div>
                             </div>
                             <label className="grid gap-1 text-xs font-semibold text-slate-600">
                               Permit number
@@ -2576,142 +2526,6 @@ function telHref(phone?: string | null) {
                                 <option value="pending_install">Waiting for install</option>
                               </select>
                             </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
-                              Job title / request label
-                              <input
-                                name="job_title"
-                                defaultValue={permitRequest.requestLabel ?? ""}
-                                maxLength={160}
-                                placeholder="ECC Alteration Test"
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
-                              Customer/location mode
-                              <select
-                                name="customer_location_mode"
-                                required
-                                defaultValue=""
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              >
-                                <option value="" disabled>Select customer/location mode</option>
-                                <option value="existing_existing">Existing customer + existing location</option>
-                                <option value="existing_new">Existing customer + new location</option>
-                                <option value="new_new">New customer + new location</option>
-                              </select>
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Existing customer
-                              <select
-                                name="existing_customer_id"
-                                defaultValue=""
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              >
-                                <option value="">Select existing customer</option>
-                                {permitJobCustomerOptions.map((customer) => (
-                                  <option key={customer.id} value={customer.id}>
-                                    {customer.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Existing location
-                              <select
-                                name="existing_location_id"
-                                defaultValue=""
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              >
-                                <option value="">Select existing location</option>
-                                {permitJobLocationOptions.map((location) => (
-                                  <option key={location.id} value={location.id}>
-                                    {location.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Customer first name
-                              <input
-                                name="customer_first_name"
-                                defaultValue={permitRequest.customerFirstNameSnapshot ?? ""}
-                                maxLength={120}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Customer last name
-                              <input
-                                name="customer_last_name"
-                                defaultValue={permitRequest.customerLastNameSnapshot ?? ""}
-                                maxLength={120}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Customer email
-                              <input
-                                type="email"
-                                name="customer_email"
-                                maxLength={240}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Customer phone
-                              <input
-                                name="customer_phone"
-                                maxLength={80}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
-                              New location address line 1
-                              <input
-                                name="address_line1"
-                                maxLength={240}
-                                placeholder={permitRequest.serviceAddressTextSnapshot ?? "Street address"}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                              {permitRequest.serviceAddressTextSnapshot ? (
-                                <span className="text-[11px] font-medium text-slate-500">
-                                  Intake hint: {permitRequest.serviceAddressTextSnapshot}
-                                </span>
-                              ) : null}
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              City
-                              <input
-                                name="city"
-                                maxLength={120}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              State
-                              <input
-                                name="state"
-                                defaultValue="CA"
-                                maxLength={40}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Zip
-                              <input
-                                name="zip"
-                                maxLength={40}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              Location nickname
-                              <input
-                                name="location_nickname"
-                                maxLength={160}
-                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
-                              />
-                            </label>
                             <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
                               <div>
                                 <span className="font-semibold text-slate-700">Ready:</span>{" "}
@@ -2721,16 +2535,13 @@ function telHref(phone?: string | null) {
                                 <span className="font-semibold text-slate-700">Waiting for install:</span>{" "}
                                 Creates an ECC testing job and places it in Waiting / Pending Info as On Hold: Permit pulled and waiting for install.
                               </div>
-                              <div>
-                                Existing customer/location selections are account-scoped. New location fields are explicit and are not parsed from the intake address hint.
-                              </div>
                             </div>
                             <div className="flex justify-end md:col-span-2">
                               <button
                                 type="submit"
                                 className="inline-flex min-h-9 items-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-800"
                               >
-                                Create Job & Mark Permit Created
+                                Create Job From Permit Intake
                               </button>
                             </div>
                           </form>

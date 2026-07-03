@@ -1185,7 +1185,7 @@ describe("internal manual permit request actions", () => {
       permitRequestId: "permit-1",
       postPermitRoute: "ready_for_testing",
       permitNumber: "P-200",
-      jurisdiction: "Fresno",
+      jurisdiction: "City of Fresno",
       permitDate: "2026-06-16",
       customerLocationMode: "new_new",
       customerFirstName: "Maya",
@@ -1193,9 +1193,7 @@ describe("internal manual permit request actions", () => {
       customerEmail: "maya@example.com",
       customerPhone: "555-1212",
       addressLine1: "200 Permit Way",
-      city: "Fresno",
       state: "CA",
-      zip: "93720",
     });
 
     expect(result).toEqual({
@@ -1221,8 +1219,8 @@ describe("internal manual permit request actions", () => {
         address_line1: "200 Permit Way",
         city: "Fresno",
         state: "CA",
-        zip: "93720",
-        postal_code: "93720",
+        zip: null,
+        postal_code: null,
         owner_user_id: "owner-1",
       }),
     ]);
@@ -1238,7 +1236,7 @@ describe("internal manual permit request actions", () => {
         contractor_id: "ctr-1",
         ops_status: "need_to_schedule",
         permit_number: "P-200",
-        jurisdiction: "Fresno",
+        jurisdiction: "City of Fresno",
         permit_date: "2026-06-16",
       }),
     ]);
@@ -1264,7 +1262,7 @@ describe("internal manual permit request actions", () => {
         status: "permit_created",
         post_permit_route: "ready_for_testing",
         permit_number: "P-200",
-        jurisdiction: "Fresno",
+        jurisdiction: "City of Fresno",
         permit_date: "2026-06-16",
         completed_by_user_id: "internal-user-1",
       }),
@@ -1477,7 +1475,7 @@ describe("internal manual permit request actions", () => {
         city: "Fresno",
         zip: "93720",
       }),
-    ).rejects.toThrow("Service address, city, and zip are required to create a job.");
+    ).rejects.toThrow("Service address and city are required to create a job.");
 
     expect(fixture.calls.customerInsertPayloads).toHaveLength(0);
     expect(fixture.calls.locationInsertPayloads).toHaveLength(0);

@@ -673,18 +673,25 @@ type PermitJobLocation = {
 };
 
 function requireStructuredAddress(input: ReturnType<typeof readCreateJobFromPermitRequestInput>) {
-  if (!input.addressLine1 || !input.city || !input.zip) {
-    throw new Error("Service address, city, and zip are required to create a job.");
+  const city = input.city || cityFromPermitJurisdiction(input.jurisdiction);
+  if (!input.addressLine1 || !city) {
+    throw new Error("Service address and city are required to create a job.");
   }
 
   return {
     addressLine1: input.addressLine1,
     addressLine2: input.addressLine2,
-    city: input.city,
+    city,
     state: input.state ?? "CA",
     zip: input.zip,
     nickname: input.locationNickname,
   };
+}
+
+function cityFromPermitJurisdiction(value: string | null | undefined) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  return raw.replace(/^city\s+of\s+/i, "").trim() || null;
 }
 
 function normalizeCustomerRow(row: any, fallbackId: string): PermitJobCustomer {
@@ -803,7 +810,7 @@ async function createPermitJobLocation(admin: any, input: {
   addressLine2: string | null;
   city: string;
   state: string | null;
-  zip: string;
+  zip: string | null;
   nickname: string | null;
 }) {
   const { data, error } = await admin
