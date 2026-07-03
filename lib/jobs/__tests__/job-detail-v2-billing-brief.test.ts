@@ -7,6 +7,11 @@ const source = readFileSync(
   "utf8",
 );
 
+const scrollSpyNavSource = readFileSync(
+  path.join(process.cwd(), "app", "jobs", "[id]", "v2", "_components", "ScrollSpyNav.tsx"),
+  "utf8",
+);
+
 describe("desktop job detail V2 billing brief", () => {
   it("shows the intake billing recipient method instead of a section pointer", () => {
     expect(source).toContain("function formatBillingRecipientMethod");
@@ -42,6 +47,19 @@ describe("desktop job detail V2 billing brief", () => {
     expect(railIndex).toBeGreaterThanOrEqual(0);
     expect(railSlice).not.toContain("{jobDisplayRef}");
     expect(railSlice).not.toContain("{statusPill.label}");
+  });
+
+  it("uses stronger typography and borders for V2 section and rail labels", () => {
+    expect(source).toContain('letterSpacing: "0.11em"');
+    expect(source).toContain('color: "oklch(0.42 0.025 262)"');
+    expect(source).toContain('letterSpacing: "0.08em"');
+    expect(source).toContain('color: "oklch(0.48 0.02 262)"');
+    expect(source).toContain('border: "1px solid oklch(0.86 0.01 250)"');
+    expect(source).toContain('borderTop: "1px solid oklch(0.88 0.008 250)"');
+    expect(source).toContain('borderBottom: "1px solid oklch(0.88 0.008 250)"');
+    expect(scrollSpyNavSource).toContain('const NAV_MUTED = "oklch(0.38 0.025 262)"');
+    expect(scrollSpyNavSource).toContain('fontWeight: 700');
+    expect(scrollSpyNavSource).toContain('background: isActive ? ACCENT : "oklch(0.84 0.01 250)"');
   });
 
   it("keeps admin archive controls available on the V2 job detail", () => {

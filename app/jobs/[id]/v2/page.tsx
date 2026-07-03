@@ -83,18 +83,18 @@ const S = {
   sectionLabel: {
     fontFamily: "var(--font-ibm-plex-mono), monospace",
     fontSize: "11px",
-    letterSpacing: "0.14em",
+    letterSpacing: "0.11em",
     textTransform: "uppercase" as const,
-    color: "oklch(0.55 0.015 262)",
-    fontWeight: 600,
+    color: "oklch(0.42 0.025 262)",
+    fontWeight: 700,
   },
   fieldLabel: {
     fontFamily: "var(--font-ibm-plex-mono), monospace",
     fontSize: "10px",
-    letterSpacing: "0.1em",
+    letterSpacing: "0.08em",
     textTransform: "uppercase" as const,
-    color: "oklch(0.62 0.015 262)",
-    fontWeight: 600,
+    color: "oklch(0.48 0.02 262)",
+    fontWeight: 700,
     marginBottom: "7px",
   },
   fieldValue: {
@@ -102,11 +102,11 @@ const S = {
     lineHeight: 1.55,
     color: "oklch(0.33 0.02 262)",
   },
-  hairline: { borderTop: "1px solid oklch(0.93 0.005 250)" },
-  rowRule: { borderBottom: "1px solid oklch(0.96 0.004 250)" },
+  hairline: { borderTop: "1px solid oklch(0.88 0.008 250)" },
+  rowRule: { borderBottom: "1px solid oklch(0.92 0.006 250)" },
   section: {
     padding: "30px 0",
-    borderTop: "1px solid oklch(0.93 0.005 250)",
+    borderTop: "1px solid oklch(0.88 0.008 250)",
     scrollMarginTop: DESKTOP_SECTION_SCROLL_MARGIN_TOP,
   },
   primaryBtn: {
@@ -738,7 +738,7 @@ export default async function JobDetailV2Page({
       <div
         style={{
           background: "#fff",
-          border: "1px solid oklch(0.91 0.006 250)",
+          border: "1px solid oklch(0.86 0.01 250)",
           borderRadius: "16px",
           margin: "0 0 64px",
           padding: "0 40px",
@@ -1035,10 +1035,10 @@ export default async function JobDetailV2Page({
                   style={{
                     fontFamily: S.mono,
                     fontSize: "10px",
-                    letterSpacing: "0.1em",
+                    letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: "oklch(0.62 0.015 262)",
-                    fontWeight: 600,
+                    color: "oklch(0.48 0.02 262)",
+                    fontWeight: 700,
                   }}
                 >
                   Contact Logging
@@ -1204,10 +1204,10 @@ export default async function JobDetailV2Page({
                       left: "10px",
                       fontFamily: S.mono,
                       fontSize: "9.5px",
-                      letterSpacing: "0.1em",
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      fontWeight: 600,
-                      color: "oklch(0.5 0.02 262)",
+                      fontWeight: 700,
+                      color: "oklch(0.42 0.025 262)",
                       background: "rgba(255,255,255,0.85)",
                       padding: "4px 8px",
                       borderRadius: "6px",
@@ -2095,10 +2095,10 @@ export default async function JobDetailV2Page({
                     style={{
                       fontFamily: S.mono,
                       fontSize: "10px",
-                      letterSpacing: "0.1em",
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      fontWeight: 600,
-                      color: "oklch(0.5 0.12 65)",
+                      fontWeight: 700,
+                      color: "oklch(0.42 0.12 65)",
                       marginBottom: "6px",
                     }}
                   >
@@ -2242,10 +2242,10 @@ export default async function JobDetailV2Page({
                     style={{
                       fontFamily: S.mono,
                       fontSize: "9.5px",
-                      fontWeight: 600,
-                      letterSpacing: "0.1em",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      color: "oklch(0.58 0.015 262)",
+                      color: "oklch(0.46 0.025 262)",
                       padding: "4px 9px",
                       borderRadius: "6px",
                       background: "oklch(0.97 0.004 250)",
@@ -2943,7 +2943,7 @@ export default async function JobDetailV2Page({
           style={{
             marginTop: "18px",
             paddingBottom: "18px",
-            borderBottom: "1px solid oklch(0.91 0.006 250)",
+            borderBottom: "1px solid oklch(0.88 0.008 250)",
           }}
         >
           {/* amber label */}
@@ -2968,10 +2968,10 @@ export default async function JobDetailV2Page({
               style={{
                 fontFamily: S.mono,
                 fontSize: "9.5px",
-                fontWeight: 600,
-                letterSpacing: "0.12em",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                color: "oklch(0.5 0.12 65)",
+                color: "oklch(0.42 0.12 65)",
               }}
             >
               Next Action
@@ -3131,17 +3131,17 @@ export default async function JobDetailV2Page({
             style={{
               marginTop: "20px",
               paddingTop: "18px",
-              borderTop: "1px solid oklch(0.91 0.006 250)",
+              borderTop: "1px solid oklch(0.88 0.008 250)",
             }}
           >
             <div
               style={{
                 fontFamily: S.mono,
                 fontSize: "9.5px",
-                letterSpacing: "0.1em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
-                fontWeight: 600,
-                color: "oklch(0.5 0.12 65)",
+                fontWeight: 700,
+                color: "oklch(0.42 0.12 65)",
                 marginBottom: "12px",
               }}
             >
@@ -3156,8 +3156,8 @@ export default async function JobDetailV2Page({
                     alignItems: "center",
                     gap: "9px",
                     fontSize: "12.5px",
-                    fontWeight: 500,
-                    color: "oklch(0.45 0.025 262)",
+                    fontWeight: 600,
+                    color: "oklch(0.36 0.025 262)",
                   }}
                 >
                   <span
@@ -3181,17 +3181,17 @@ export default async function JobDetailV2Page({
           style={{
             marginTop: "20px",
             paddingTop: "18px",
-            borderTop: "1px solid oklch(0.91 0.006 250)",
+            borderTop: "1px solid oklch(0.88 0.008 250)",
           }}
         >
           <div
             style={{
               fontFamily: S.mono,
               fontSize: "9.5px",
-              fontWeight: 600,
-              letterSpacing: "0.1em",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "oklch(0.62 0.015 262)",
+              color: "oklch(0.46 0.025 262)",
               marginBottom: "6px",
             }}
           >
@@ -3218,8 +3218,8 @@ export default async function JobDetailV2Page({
                     justifyContent: "space-between",
                     padding: "6px 0",
                     fontSize: "13px",
-                    fontWeight: 500,
-                    color: "oklch(0.4 0.02 262)",
+                    fontWeight: 600,
+                    color: "oklch(0.34 0.025 262)",
                     textDecoration: "none",
                     borderBottom: "1px solid oklch(0.95 0.004 250)",
                   }}
@@ -3236,7 +3236,7 @@ export default async function JobDetailV2Page({
             style={{
               marginTop: "20px",
               paddingTop: "18px",
-              borderTop: "1px solid oklch(0.91 0.006 250)",
+              borderTop: "1px solid oklch(0.88 0.008 250)",
             }}
           >
             <summary
@@ -3246,7 +3246,7 @@ export default async function JobDetailV2Page({
                 fontFamily: S.mono,
                 fontSize: "9.5px",
                 fontWeight: 700,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 color: "oklch(0.46 0.13 25)",
               }}

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 const ACCENT = "oklch(0.55 0.17 255)";
-const NAV_MUTED = "oklch(0.5 0.02 262)";
-const NAV_ACTIVE = "oklch(0.4 0.13 255)";
+const NAV_MUTED = "oklch(0.38 0.025 262)";
+const NAV_ACTIVE = "oklch(0.34 0.14 255)";
 
 export type NavItem = {
   id: string;
@@ -52,7 +52,7 @@ export default function ScrollSpyNav({ items }: { items: NavItem[] }) {
               borderRadius: "8px",
               textDecoration: "none",
               fontSize: "13px",
-              fontWeight: 600,
+              fontWeight: 700,
               color: isActive ? NAV_ACTIVE : NAV_MUTED,
               transition: "color .12s",
             }}
@@ -63,7 +63,7 @@ export default function ScrollSpyNav({ items }: { items: NavItem[] }) {
                 height: "14px",
                 borderRadius: "3px",
                 flexShrink: 0,
-                background: isActive ? ACCENT : "oklch(0.9 0.006 250)",
+                background: isActive ? ACCENT : "oklch(0.84 0.01 250)",
                 transition: "background .12s",
               }}
             />
