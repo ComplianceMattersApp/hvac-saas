@@ -2828,7 +2828,7 @@ export default async function JobDetailV2Page({
                   textAlign: "center",
                 }}
               >
-                Closed out ✓
+                {closeoutNeeds.needsInvoice || closeoutNeeds.needsCerts ? "Field Complete" : "Closed out"}
               </div>
             ) : null}
             {/* Secondary button */}

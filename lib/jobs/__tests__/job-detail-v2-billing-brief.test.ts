@@ -22,6 +22,10 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("COMPLETE");
   });
 
+  it("does not call field-complete jobs closed out while closeout blockers remain", () => {
+    expect(source).toContain('closeoutNeeds.needsInvoice || closeoutNeeds.needsCerts ? "Field Complete" : "Closed out"');
+  });
+
   it("labels internal retail jobs when no contractor is selected", () => {
     expect(source).toContain('const contractorDisplayName = contractorName || "Retail";');
     expect(source).toContain("{contractorDisplayName}");
