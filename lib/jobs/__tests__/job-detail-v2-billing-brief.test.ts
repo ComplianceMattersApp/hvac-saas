@@ -23,7 +23,17 @@ describe("desktop job detail V2 billing brief", () => {
   });
 
   it("does not call field-complete jobs closed out while closeout blockers remain", () => {
-    expect(source).toContain('closeoutNeeds.needsInvoice || closeoutNeeds.needsCerts ? "Field Complete" : "Closed out"');
+    expect(source).toContain('isFailedUnresolved');
+    expect(source).toContain('"Failure unresolved"');
+    expect(source).toContain('"Field Complete"');
+  });
+
+  it("does not describe unresolved failed jobs as fully closed out", () => {
+    const failedBranch = source.indexOf('return "Failed test unresolved - review the failed reason and contractor report.";');
+    const allDoneBranch = source.indexOf('return "All done');
+    expect(failedBranch).toBeGreaterThan(-1);
+    expect(allDoneBranch).toBeGreaterThan(-1);
+    expect(failedBranch).toBeLessThan(allDoneBranch);
   });
 
   it("keeps the failed ECC banner separate from the follow-up reminder surface", () => {
