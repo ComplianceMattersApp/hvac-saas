@@ -31,6 +31,7 @@ export type JobBillingStateReadModel = {
   billedTruthSatisfied: boolean;
   jobInvoiceCompleteProjection: boolean;
   projectionMatchesBilledTruth: boolean;
+  legacyExternalBillingClosedService?: boolean;
   lightweightBillingAllowed: boolean;
   internalInvoicePanelEnabled: boolean;
   statusLabel: string;
@@ -68,6 +69,9 @@ export function buildJobBillingStateReadModel(input: {
   invoiceComplete?: boolean | null;
   internalInvoice?: InternalInvoiceSnapshot;
   billingDisposition?: string | null;
+  fieldComplete?: boolean | null;
+  jobType?: string | null;
+  opsStatus?: string | null;
 }): JobBillingStateReadModel {
   const billingMode = input.billingMode;
   const usesInternalInvoicing = billingMode === "internal_invoicing";
@@ -79,6 +83,13 @@ export function buildJobBillingStateReadModel(input: {
     : "missing";
   const billingDisposition = normalizeJobBillingDisposition(input.billingDisposition);
   const hasResolvedBillingDisposition = Boolean(billingDisposition);
+  const legacyExternalBillingClosedService =
+    usesExternalBilling &&
+    !jobInvoiceCompleteProjection &&
+    !hasResolvedBillingDisposition &&
+    Boolean(input.fieldComplete) &&
+    String(input.jobType ?? "").trim().toLowerCase() === "service" &&
+    String(input.opsStatus ?? "").trim().toLowerCase() === "closed";
 
   if (usesInternalInvoicing) {
     const billedTruthSatisfied = internalInvoiceStatus === "issued" || hasResolvedBillingDisposition;
@@ -103,6 +114,7 @@ export function buildJobBillingStateReadModel(input: {
       billedTruthSatisfied,
       jobInvoiceCompleteProjection,
       projectionMatchesBilledTruth: jobInvoiceCompleteProjection === billedTruthSatisfied,
+      legacyExternalBillingClosedService: false,
       lightweightBillingAllowed: false,
       internalInvoicePanelEnabled: true,
       statusLabel,
@@ -117,11 +129,14 @@ export function buildJobBillingStateReadModel(input: {
     };
   }
 
-  const billedTruthSatisfied = jobInvoiceCompleteProjection || hasResolvedBillingDisposition;
+  const billedTruthSatisfied =
+    jobInvoiceCompleteProjection || hasResolvedBillingDisposition || legacyExternalBillingClosedService;
   const statusLabel = billingDisposition === "no_charge"
     ? "No Charge Recorded"
     : billingDisposition === "externally_billed"
       ? "Externally Billed"
+      : legacyExternalBillingClosedService
+        ? "Externally Billed"
       : jobInvoiceCompleteProjection
         ? "Invoice Complete"
         : "Billing Pending";
@@ -135,6 +150,7 @@ export function buildJobBillingStateReadModel(input: {
     billedTruthSatisfied,
     jobInvoiceCompleteProjection,
     projectionMatchesBilledTruth: jobInvoiceCompleteProjection === billedTruthSatisfied,
+    legacyExternalBillingClosedService,
     lightweightBillingAllowed: true,
     internalInvoicePanelEnabled: false,
     statusLabel,
@@ -218,6 +234,9 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
       invoiceComplete: job.invoice_complete,
       internalInvoice: internalInvoiceByJobId.get(jobId),
       billingDisposition: job.billing_disposition,
+      fieldComplete: job.field_complete,
+      jobType: job.job_type,
+      opsStatus: job.ops_status,
     });
 
     projectionsByJobId.set(jobId, {
