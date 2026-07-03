@@ -71,6 +71,9 @@ type SearchParams = Record<string, string | string[] | undefined>;
 
 // ─── design tokens (verbatim from spec) ───────────────────────────────────────
 
+const DESKTOP_STICKY_HEADER_OFFSET = "72px";
+const DESKTOP_SECTION_SCROLL_MARGIN_TOP = "88px";
+
 const S = {
   mono: "var(--font-ibm-plex-mono), monospace",
   sectionLabel: {
@@ -97,7 +100,11 @@ const S = {
   },
   hairline: { borderTop: "1px solid oklch(0.93 0.005 250)" },
   rowRule: { borderBottom: "1px solid oklch(0.96 0.004 250)" },
-  section: { padding: "30px 0", borderTop: "1px solid oklch(0.93 0.005 250)", scrollMarginTop: "20px" },
+  section: {
+    padding: "30px 0",
+    borderTop: "1px solid oklch(0.93 0.005 250)",
+    scrollMarginTop: DESKTOP_SECTION_SCROLL_MARGIN_TOP,
+  },
   primaryBtn: {
     height: "42px",
     borderRadius: "10px",
@@ -656,6 +663,7 @@ export default async function JobDetailV2Page({
         gridTemplateColumns: "minmax(0,1fr) 290px",
         gap: "32px",
         alignItems: "start",
+        minHeight: 0,
         color: "oklch(0.27 0.02 262)",
         WebkitFontSmoothing: "antialiased",
       }}
@@ -668,6 +676,7 @@ export default async function JobDetailV2Page({
           borderRadius: "16px",
           margin: "0 0 64px",
           padding: "0 40px",
+          minWidth: 0,
         }}
       >
         {/* alert / feedback strip */}
@@ -2626,13 +2635,19 @@ export default async function JobDetailV2Page({
       <aside
         style={{
           position: "sticky",
-          top: "72px",
+          top: DESKTOP_STICKY_HEADER_OFFSET,
           alignSelf: "start",
-          padding: "24px 0 32px",
-          maxHeight: "calc(100vh - 80px)",
-          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+          padding: "24px 0",
+          maxHeight: `calc(100dvh - ${DESKTOP_STICKY_HEADER_OFFSET} - 16px)`,
+          minHeight: 0,
+          minWidth: 0,
+          overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
+        <div style={{ flex: "0 0 auto", minWidth: 0 }}>
         {/* identity */}
         <div
           style={{
@@ -2849,6 +2864,19 @@ export default async function JobDetailV2Page({
         </div>
 
         {/* jump nav — scroll-spy */}
+        </div>
+
+        <div
+          style={{
+            flex: "1 1 auto",
+            minHeight: 0,
+            minWidth: 0,
+            overflowY: "auto",
+            overscrollBehavior: "contain",
+            scrollbarGutter: "stable",
+            paddingBottom: "8px",
+          }}
+        >
         <ScrollSpyNav items={navItems} />
 
         {/* blockers */}
@@ -2955,6 +2983,7 @@ export default async function JobDetailV2Page({
                 </Link>
               ))}
           </div>
+        </div>
         </div>
       </aside>
     </div>

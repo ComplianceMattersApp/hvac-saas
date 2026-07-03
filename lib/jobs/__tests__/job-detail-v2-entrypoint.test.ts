@@ -60,4 +60,16 @@ describe("job detail V2 entrypoint", () => {
   it("does not duplicate the top toolbar Back to Ops link in V2 quick links", () => {
     expect(v2JobDetailSource).not.toContain('label: "Back to Ops"');
   });
+
+  it("keeps the V2 desktop right rail sticky with an internal scroll body", () => {
+    expect(v2JobDetailSource).toContain('const DESKTOP_STICKY_HEADER_OFFSET = "72px";');
+    expect(v2JobDetailSource).toContain("top: DESKTOP_STICKY_HEADER_OFFSET");
+    expect(v2JobDetailSource).toContain("maxHeight: `calc(100dvh - ${DESKTOP_STICKY_HEADER_OFFSET} - 16px)`");
+    expect(v2JobDetailSource).toContain('overflow: "hidden"');
+    expect(v2JobDetailSource).toContain('flex: "0 0 auto"');
+    expect(v2JobDetailSource).toContain('overflowY: "auto"');
+    expect(v2JobDetailSource).toContain('overscrollBehavior: "contain"');
+    expect(v2JobDetailSource).toContain('scrollbarGutter: "stable"');
+    expect(v2JobDetailSource).toContain("scrollMarginTop: DESKTOP_SECTION_SCROLL_MARGIN_TOP");
+  });
 });
