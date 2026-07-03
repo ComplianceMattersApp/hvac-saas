@@ -2463,7 +2463,6 @@ function telHref(phone?: string | null) {
                             <input type="hidden" name="city" value={cityFromPermitJurisdiction(permitRequest.jurisdiction)} />
                             <input type="hidden" name="state" value="CA" />
                             <input type="hidden" name="zip" value="" />
-                            <input type="hidden" name="job_title" value={permitRequest.requestLabel || "ECC Alteration Test"} />
                             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-medium leading-5 text-amber-950 md:col-span-2">
                               No job is linked yet. This will start the customer/job record from the permit intake below.
                             </div>
@@ -2494,6 +2493,28 @@ function telHref(phone?: string | null) {
                                 required
                                 className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
                               />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              ECC project type
+                              <select
+                                name="project_type"
+                                defaultValue="alteration"
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              >
+                                <option value="alteration">Alteration</option>
+                                <option value="all_new">All New</option>
+                              </select>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Billing party
+                              <select
+                                name="billing_recipient"
+                                defaultValue="contractor"
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              >
+                                <option value="contractor">Contractor</option>
+                                <option value="customer">Customer</option>
+                              </select>
                             </label>
                             <label className="grid gap-1 text-xs font-semibold text-slate-600">
                               Permit date

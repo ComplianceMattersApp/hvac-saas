@@ -14,6 +14,7 @@ import { isPermitRequestSchemaUnavailableError } from "@/lib/permits/permit-requ
 import { assertPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { deriveInternalIntakeJobTitle } from "@/lib/utils/contractor-intake-title";
 
 export type InternalManualPermitRequestInput = {
   contractorId: string;
@@ -61,6 +62,8 @@ export type InternalCreateJobFromPermitRequestInput = {
   permitNumber: string;
   jurisdiction?: string | null;
   permitDate?: string | null;
+  projectType?: string | null;
+  billingRecipient?: string | null;
   customerLocationMode: PermitRequestJobCustomerLocationMode | string;
   existingCustomerId?: string | null;
   existingLocationId?: string | null;
@@ -205,6 +208,16 @@ function normalizeCustomerLocationMode(value: unknown): PermitRequestJobCustomer
   return "";
 }
 
+function normalizePermitJobProjectType(value: unknown): "alteration" | "all_new" {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "all_new" || normalized === "new_construction" ? "all_new" : "alteration";
+}
+
+function normalizePermitJobBillingRecipient(value: unknown): "contractor" | "customer" {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "customer" ? "customer" : "contractor";
+}
+
 function readCreateJobFromPermitRequestInput(input: FormData | InternalCreateJobFromPermitRequestInput) {
   if (input instanceof FormData) {
     return {
@@ -213,6 +226,8 @@ function readCreateJobFromPermitRequestInput(input: FormData | InternalCreateJob
       permitNumber: getTrimmedValue(input.get("permit_number"), 160) ?? "",
       jurisdiction: getTrimmedValue(input.get("jurisdiction"), 160),
       permitDate: getNormalizedPermitDate(input.get("permit_date")),
+      projectType: normalizePermitJobProjectType(input.get("project_type")),
+      billingRecipient: normalizePermitJobBillingRecipient(input.get("billing_recipient")),
       customerLocationMode: normalizeCustomerLocationMode(input.get("customer_location_mode")),
       existingCustomerId: getTrimmedValue(input.get("existing_customer_id"), 120),
       existingLocationId: getTrimmedValue(input.get("existing_location_id"), 120),
@@ -236,6 +251,8 @@ function readCreateJobFromPermitRequestInput(input: FormData | InternalCreateJob
     permitNumber: getTrimmedValue(input.permitNumber, 160) ?? "",
     jurisdiction: getTrimmedValue(input.jurisdiction, 160),
     permitDate: getNormalizedPermitDate(input.permitDate),
+    projectType: normalizePermitJobProjectType(input.projectType),
+    billingRecipient: normalizePermitJobBillingRecipient(input.billingRecipient),
     customerLocationMode: normalizeCustomerLocationMode(input.customerLocationMode),
     existingCustomerId: getTrimmedValue(input.existingCustomerId, 120),
     existingLocationId: getTrimmedValue(input.existingLocationId, 120),
@@ -913,12 +930,13 @@ async function resolvePermitJobCustomerLocation(admin: any, input: {
 
 function buildPermitJobTitle(input: {
   parsed: ReturnType<typeof readCreateJobFromPermitRequestInput>;
-  permitRequest: ActivePermitRequestForMutation;
 }) {
   return (
     input.parsed.jobTitle ||
-    input.permitRequest.request_label ||
-    "ECC Alteration Test"
+    deriveInternalIntakeJobTitle({
+      jobType: "ecc",
+      projectType: input.parsed.projectType,
+    })
   );
 }
 
@@ -944,6 +962,8 @@ async function createRootJobForPermitRequest(admin: any, input: {
   permitNumber: string;
   jurisdiction: string | null;
   permitDate: string | null;
+  projectType: "alteration" | "all_new";
+  billingRecipient: "contractor" | "customer";
   title: string;
 }) {
   const jobOpsStatus = input.route === "pending_install" ? "on_hold" : "need_to_schedule";
@@ -957,7 +977,7 @@ async function createRootJobForPermitRequest(admin: any, input: {
       service_visit_type: null,
       service_visit_reason: null,
       service_visit_outcome: null,
-      project_type: "alteration",
+      project_type: input.projectType,
       title: input.title,
       job_address: input.location.address_line1,
       city: input.location.city,
@@ -967,6 +987,7 @@ async function createRootJobForPermitRequest(admin: any, input: {
       status: "open",
       lifecycle_state: "active",
       contractor_id: input.contractorId,
+      billing_recipient: input.billingRecipient,
       permit_number: input.permitNumber,
       jurisdiction: input.jurisdiction,
       permit_date: input.permitDate,
@@ -1506,7 +1527,6 @@ export async function createJobFromPermitRequestAndMarkCreated(
   const completedAt = new Date().toISOString();
   const jobTitle = buildPermitJobTitle({
     parsed,
-    permitRequest: context.permitRequest,
   });
   const createdJob = await createRootJobForPermitRequest(context.admin, {
     permitRequest: context.permitRequest,
@@ -1517,6 +1537,8 @@ export async function createJobFromPermitRequestAndMarkCreated(
     permitNumber: parsed.permitNumber,
     jurisdiction: parsed.jurisdiction,
     permitDate: parsed.permitDate,
+    projectType: parsed.projectType,
+    billingRecipient: parsed.billingRecipient,
     title: jobTitle,
   });
 
@@ -1546,6 +1568,8 @@ export async function createJobFromPermitRequestAndMarkCreated(
     job_ops_status_after: createdJob.jobOpsStatus,
     created_job_id: createdJob.jobId,
     customer_location_mode: customerLocation.mode,
+    project_type: parsed.projectType,
+    billing_recipient: parsed.billingRecipient,
     source_action: "create_job_from_permit_request_and_mark_created",
   };
 

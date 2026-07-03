@@ -84,6 +84,12 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain("Create Job From Permit Intake");
     expect(branch).toContain('name="customer_location_mode"');
     expect(branch).toContain('value="new_new"');
+    expect(branch).toContain('name="project_type"');
+    expect(branch).toContain('value="alteration"');
+    expect(branch).toContain('value="all_new"');
+    expect(branch).toContain('name="billing_recipient"');
+    expect(branch).toContain('value="contractor"');
+    expect(branch).toContain('value="customer"');
     expect(branch).toContain('name="customer_first_name"');
     expect(branch).toContain('name="customer_last_name"');
     expect(branch).toContain('name="address_line1"');
@@ -96,6 +102,8 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).not.toContain('name="existing_customer_id"');
     expect(branch).not.toContain('name="existing_location_id"');
     expect(branch).toContain("Is the job ready to be tested?");
+    expect(branch).toContain("ECC project type");
+    expect(branch).toContain("Billing party");
     expect(branch).toContain("Ready - schedule now or queue for scheduling");
     expect(branch).toContain("Waiting for install");
     expect(branch).toContain("Creates an unscheduled ECC testing job and places it in the waiting to be scheduled queue.");

@@ -20,4 +20,10 @@ describe("job detail header short reference wiring", () => {
     expect(source).toContain("Tech ID");
     expect(source).not.toContain(">Job ID<");
   });
+
+  it("badges jobs that started from the permit workflow", () => {
+    expect(source).toContain("const startedFromPermitWorkflow =");
+    expect(source).toContain("Created from permit request");
+    expect(source).toContain("Permit Workflow");
+  });
 });

@@ -3432,6 +3432,7 @@ const isCleaningMode = productMode === "cleaning_services";
 const jobTitleText = normalizeRetestLinkedJobTitle(job.title);
 const serviceVisitReasonText = String(job.service_visit_reason ?? "").trim();
 const jobNotesText = String(job.job_notes ?? "").trim();
+const startedFromPermitWorkflow = /^Created from permit request\b/i.test(jobNotesText);
 const fieldHeaderTitle =
   firstNonEmpty(
     customerDisplayName !== "—" ? customerDisplayName : "",
@@ -3809,6 +3810,11 @@ const showCorrectionReviewResolution =
         <div className="inline-flex rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
           {headerJobTypeLabel}
         </div>
+        {startedFromPermitWorkflow ? (
+          <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-800">
+            Permit Workflow
+          </div>
+        ) : null}
       </div>
       {maintenanceAgreementsEnabled && planLinkContext && planLinkContext.agreementId && job.customer_id ? (
         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">

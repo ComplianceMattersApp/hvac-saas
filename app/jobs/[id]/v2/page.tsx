@@ -536,6 +536,7 @@ export default async function JobDetailV2Page({
   const hasCustomerConcern =
     Boolean(jobTitleText) && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase();
   const workSummaryText = String(job.visit_scope_summary ?? "").trim();
+  const startedFromPermitWorkflow = /^Created from permit request\b/i.test(String(job.job_notes ?? "").trim());
   const workSummaryPlaceholder = isTerminal
     ? "Visit submitted — no summary captured."
     : visitStarted
@@ -773,6 +774,27 @@ export default async function JobDetailV2Page({
           >
             {job.title}
           </h1>
+          {startedFromPermitWorkflow ? (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                marginTop: "12px",
+                padding: "4px 9px",
+                borderRadius: "6px",
+                border: "1px solid oklch(0.84 0.06 255)",
+                background: "oklch(0.96 0.025 255)",
+                color: "oklch(0.43 0.13 255)",
+                fontFamily: S.mono,
+                fontSize: "10px",
+                fontWeight: 700,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
+              Permit Workflow
+            </div>
+          ) : null}
         </div>
 
         {/* ── JOB BRIEF ─────────────────────────────────────────────────────── */}

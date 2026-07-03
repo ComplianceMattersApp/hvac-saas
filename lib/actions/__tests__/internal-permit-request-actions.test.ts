@@ -1187,6 +1187,8 @@ describe("internal manual permit request actions", () => {
       permitNumber: "P-200",
       jurisdiction: "City of Fresno",
       permitDate: "2026-06-16",
+      projectType: "all_new",
+      billingRecipient: "customer",
       customerLocationMode: "new_new",
       customerFirstName: "Maya",
       customerLastName: "Lopez",
@@ -1227,8 +1229,9 @@ describe("internal manual permit request actions", () => {
     expect(fixture.calls.jobInsertPayloads).toEqual([
       expect.objectContaining({
         job_type: "ecc",
-        project_type: "alteration",
-        title: "Permit for gas package unit",
+        project_type: "all_new",
+        title: "ECC All New Test",
+        billing_recipient: "customer",
         status: "open",
         lifecycle_state: "active",
         customer_id: "created-customer-1",
@@ -1276,6 +1279,8 @@ describe("internal manual permit request actions", () => {
         meta: expect.objectContaining({
           created_job_id: "created-job-1",
           customer_location_mode: "new_new",
+          project_type: "all_new",
+          billing_recipient: "customer",
           source_action: "create_job_from_permit_request_and_mark_created",
         }),
       }),
@@ -1328,6 +1333,9 @@ describe("internal manual permit request actions", () => {
     expect(fixture.calls.locationInsertPayloads).toHaveLength(0);
     expect(fixture.calls.jobInsertPayloads).toEqual([
       expect.objectContaining({
+        title: "ECC Alteration Test",
+        project_type: "alteration",
+        billing_recipient: "contractor",
         customer_id: "customer-1",
         location_id: "location-1",
         ops_status: "on_hold",

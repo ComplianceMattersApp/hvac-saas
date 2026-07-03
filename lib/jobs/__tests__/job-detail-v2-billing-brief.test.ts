@@ -22,6 +22,12 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("COMPLETE");
   });
 
+  it("badges jobs that started from the permit workflow", () => {
+    expect(source).toContain("const startedFromPermitWorkflow =");
+    expect(source).toContain("Created from permit request");
+    expect(source).toContain("Permit Workflow");
+  });
+
   it("routes unresolved internal invoice creation through direct draft creation", () => {
     const readyInvoiceIndex = source.indexOf("Ready to invoice");
     const readyInvoiceSlice = source.slice(readyInvoiceIndex, readyInvoiceIndex + 3200);
