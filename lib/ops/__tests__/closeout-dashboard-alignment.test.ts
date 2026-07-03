@@ -8,16 +8,15 @@ const opsPageSource = readFileSync(
 );
 
 describe("/ops closeout queue alignment", () => {
-  it("aligns closeout source query with queue semantics", () => {
+  it("aligns closeout source query with status-invariant queue semantics", () => {
     expect(opsPageSource).toContain('.eq("field_complete", true)');
-    expect(opsPageSource).toContain('.neq("ops_status", "closed")');
     expect(opsPageSource).toContain('.order("created_at", { ascending: false })');
+    expect(opsPageSource).toContain("Invoice-needed closeout is status-invariant.");
   });
 
-  it("keeps active Closeout chip rows status-shaped with a narrow permit exception", () => {
-    expect(opsPageSource).toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
-    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold"])');
-    expect(opsPageSource).toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
-    expect(opsPageSource).not.toContain('queueQ = queueQ.neq("ops_status", "closed").eq("field_complete", true).limit(100);');
+  it("does not narrow Closeout chip rows to status-shaped or permit-only candidates", () => {
+    expect(opsPageSource).not.toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
+    expect(opsPageSource).not.toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
+    expect(opsPageSource).toContain("listCloseoutQueueJobs(");
   });
 });

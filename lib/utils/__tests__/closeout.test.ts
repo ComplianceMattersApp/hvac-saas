@@ -14,7 +14,7 @@ const failedEccJob = {
 };
 
 describe("closeout queue projection", () => {
-  it("keeps failed ECC jobs out of the closeout queue unless they have a closeout status", () => {
+  it("keeps failed ECC jobs in the closeout queue while invoice remains pending", () => {
     const job = {
       ...failedEccJob,
       invoice_complete: false,
@@ -25,7 +25,7 @@ describe("closeout queue projection", () => {
       needsCerts: false,
       isFailureFlow: true,
     });
-    expect(isInCloseoutQueue(job)).toBe(false);
+    expect(isInCloseoutQueue(job)).toBe(true);
   });
 
   it("removes failed ECC jobs from the closeout queue after invoice is sent", () => {
@@ -40,6 +40,17 @@ describe("closeout queue projection", () => {
       isFailureFlow: true,
     });
     expect(isInCloseoutQueue(job)).toBe(false);
+  });
+
+  it("keeps closed-status rows in closeout if invoice truth is still incomplete", () => {
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "service",
+        ops_status: "closed",
+        invoice_complete: false,
+      }),
+    ).toBe(true);
   });
 
   it("does not treat failed ECC jobs as needing cert closeout while failure is unresolved", () => {
@@ -69,7 +80,7 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
-  it("keeps generic pending info jobs out of closeout when invoice remains pending", () => {
+  it("keeps pending info jobs in closeout when invoice remains pending", () => {
     const job = {
       field_complete: true,
       job_type: "ecc",
@@ -84,7 +95,7 @@ describe("closeout queue projection", () => {
       needsCerts: false,
       isBlockedForCloseout: true,
     });
-    expect(isInCloseoutQueue(job)).toBe(false);
+    expect(isInCloseoutQueue(job)).toBe(true);
   });
 
   it("keeps permit-missing jobs in closeout when invoice remains pending", () => {
@@ -126,7 +137,7 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
-  it("keeps generic on-hold, need-to-schedule, and retest rows out of closeout", () => {
+  it("keeps status-blocked rows in closeout when invoice remains pending", () => {
     expect(
       isInCloseoutQueue({
         field_complete: true,
@@ -135,7 +146,7 @@ describe("closeout queue projection", () => {
         on_hold_reason: "Status interrupt state test",
         invoice_complete: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       isInCloseoutQueue({
@@ -144,7 +155,7 @@ describe("closeout queue projection", () => {
         ops_status: "need_to_schedule",
         invoice_complete: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       isInCloseoutQueue({
@@ -154,7 +165,7 @@ describe("closeout queue projection", () => {
         invoice_complete: false,
         certs_complete: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       isInCloseoutQueue({
@@ -164,67 +175,67 @@ describe("closeout queue projection", () => {
         invoice_complete: false,
         certs_complete: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it("does not broaden closeout to every field-complete unresolved job", () => {
+  it("does not keep unresolved status rows in closeout after invoice closeout is satisfied", () => {
     const rows = [
       {
-        label: "generic pending info with invoice incomplete",
+        label: "generic pending info with invoice complete",
         job: {
           field_complete: true,
           job_type: "service",
           ops_status: "pending_info",
           pending_info_reason: "Approval Needed: Customer approval required",
-          invoice_complete: false,
+          invoice_complete: true,
         },
       },
       {
-        label: "generic on hold with invoice incomplete",
+        label: "generic on hold with invoice complete",
         job: {
           field_complete: true,
           job_type: "service",
           ops_status: "on_hold",
           on_hold_reason: "Status interrupt state test",
-          invoice_complete: false,
+          invoice_complete: true,
         },
       },
       {
-        label: "needs scheduling with invoice incomplete",
+        label: "needs scheduling with invoice complete",
         job: {
           field_complete: true,
           job_type: "service",
           ops_status: "need_to_schedule",
-          invoice_complete: false,
+          invoice_complete: true,
         },
       },
       {
-        label: "failed ECC with invoice incomplete",
+        label: "failed ECC with invoice complete",
         job: {
           field_complete: true,
           job_type: "ecc",
           ops_status: "failed",
-          invoice_complete: false,
+          invoice_complete: true,
           certs_complete: false,
         },
       },
       {
-        label: "retest needed with invoice incomplete",
+        label: "retest needed with invoice complete",
         job: {
           field_complete: true,
           job_type: "ecc",
           ops_status: "retest_needed",
-          invoice_complete: false,
+          invoice_complete: true,
           certs_complete: false,
         },
       },
       {
-        label: "correction review with invoice incomplete",
+        label: "correction review with invoice complete",
         job: {
           field_complete: true,
           job_type: "ecc",
           ops_status: "pending_office_review",
-          invoice_complete: false,
+          invoice_complete: true,
           certs_complete: false,
         },
       },

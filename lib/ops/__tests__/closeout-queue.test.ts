@@ -70,7 +70,7 @@ describe("listCloseoutQueueJobs", () => {
     expect(count).toBe(2);
   });
 
-  it("includes permit-missing jobs when invoice closeout is still needed", () => {
+  it("includes status-blocked jobs when invoice closeout is still needed", () => {
     const jobs = [
       {
         id: "permit-missing-needs-invoice",
@@ -108,6 +108,30 @@ describe("listCloseoutQueueJobs", () => {
         invoice_complete: false,
       },
       {
+        id: "failed-ecc-needs-invoice",
+        job_type: "ecc",
+        ops_status: "failed",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+      {
+        id: "retest-needed-needs-invoice",
+        job_type: "ecc",
+        ops_status: "retest_needed",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+      {
+        id: "correction-review-needs-invoice",
+        job_type: "ecc",
+        ops_status: "pending_office_review",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+      {
         id: "permit-missing-no-closeout-blocker",
         job_type: "ecc",
         ops_status: "pending_info",
@@ -120,11 +144,19 @@ describe("listCloseoutQueueJobs", () => {
 
     const rows = listCloseoutQueueJobs(jobs, (job) => job);
 
-    expect(rows.map((row) => row.id)).toEqual(["permit-missing-needs-invoice"]);
+    expect(rows.map((row) => row.id)).toEqual([
+      "permit-missing-needs-invoice",
+      "generic-approval-needs-invoice",
+      "generic-on-hold-needs-invoice",
+      "need-to-schedule-needs-invoice",
+      "failed-ecc-needs-invoice",
+      "retest-needed-needs-invoice",
+      "correction-review-needs-invoice",
+    ]);
     expect(rows[0]?.pending_info_reason).toBe("Permit Missing");
   });
 
-  it("does not treat field-complete unresolved jobs as closeout rows without actionable closeout work", () => {
+  it("does not treat field-complete unresolved jobs as closeout rows after invoice closeout is satisfied", () => {
     const rows = listCloseoutQueueJobs([
       {
         id: "generic-pending-info",
@@ -132,7 +164,7 @@ describe("listCloseoutQueueJobs", () => {
         ops_status: "pending_info",
         pending_info_reason: "Approval Needed: Customer approval required",
         field_complete: true,
-        invoice_complete: false,
+        invoice_complete: true,
       },
       {
         id: "generic-on-hold",
@@ -140,21 +172,21 @@ describe("listCloseoutQueueJobs", () => {
         ops_status: "on_hold",
         on_hold_reason: "Status interrupt state test",
         field_complete: true,
-        invoice_complete: false,
+        invoice_complete: true,
       },
       {
         id: "need-to-schedule",
         job_type: "service",
         ops_status: "need_to_schedule",
         field_complete: true,
-        invoice_complete: false,
+        invoice_complete: true,
       },
       {
         id: "failed",
         job_type: "ecc",
         ops_status: "failed",
         field_complete: true,
-        invoice_complete: false,
+        invoice_complete: true,
         certs_complete: false,
       },
       {
@@ -162,7 +194,7 @@ describe("listCloseoutQueueJobs", () => {
         job_type: "ecc",
         ops_status: "retest_needed",
         field_complete: true,
-        invoice_complete: false,
+        invoice_complete: true,
         certs_complete: false,
       },
       {
@@ -170,7 +202,7 @@ describe("listCloseoutQueueJobs", () => {
         job_type: "ecc",
         ops_status: "pending_office_review",
         field_complete: true,
-        invoice_complete: false,
+        invoice_complete: true,
         certs_complete: false,
       },
       {

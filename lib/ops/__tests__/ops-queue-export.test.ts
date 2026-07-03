@@ -173,6 +173,36 @@ describe("ops queue CSV export", () => {
     expect(jobsQuery.or).toHaveBeenCalledWith("contractor_id.is.null,contractor_id.in.(contractor-1)");
   });
 
+  it("exports closeout rows from field-complete invoice-needed candidates without status prefiltering", async () => {
+    const jobsQuery = queryResult([
+      {
+        ...job,
+        id: "failed-closeout",
+        status: "completed",
+        ops_status: "failed",
+        field_complete: true,
+        invoice_complete: false,
+        certs_complete: false,
+      },
+    ]);
+
+    const result = await buildOpsQueueExport({
+      supabase: makeSupabaseWithJobsQuery(jobsQuery),
+      accountOwnerUserId: "owner-1",
+      mode: "internal",
+      queueKey: "closeout",
+      contractorId: null,
+      sort: "oldest",
+    });
+
+    expect(jobsQuery.eq).toHaveBeenCalledWith("field_complete", true);
+    expect(jobsQuery.in).not.toHaveBeenCalledWith("ops_status", ["invoice_required", "paperwork_required"]);
+    expect(jobsQuery.or).not.toHaveBeenCalledWith("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.csv).toContain("failed-closeout");
+  });
+
   it("exports valid headers only for empty results", async () => {
     const result = await buildOpsQueueExport({
       supabase: makeSupabase([]),

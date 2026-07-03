@@ -239,7 +239,6 @@ export default async function CloseoutQueuePage({
       .is("deleted_at", null)
       .neq("status", "cancelled")
       .eq("field_complete", true)
-      .neq("ops_status", "closed")
       .order("created_at", { ascending: sort === "oldest" });
 
     if (contractor) q = q.eq("contractor_id", contractor);

@@ -175,6 +175,136 @@ function makeFixture() {
       deleted_at: null,
     },
     {
+      id: 'job-failed-scheduled',
+      customer_id: 'cust-1',
+      location_id: 'loc-5',
+      title: 'Failed But Scheduled Visit',
+      job_type: 'ecc',
+      status: 'open',
+      ops_status: 'failed',
+      parent_job_id: null,
+      scheduled_date: '2026-04-29',
+      window_start: '16:00',
+      window_end: '17:00',
+      city: 'Failure City',
+      customer_phone: '555-6000',
+      job_address: '666 Main St',
+      customer_first_name: 'Casey',
+      customer_last_name: 'Diaz',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:20:00.000Z',
+      deleted_at: null,
+    },
+    {
+      id: 'job-pending-info-scheduled',
+      customer_id: 'cust-1',
+      location_id: 'loc-6',
+      title: 'Pending Info Scheduled Visit',
+      job_type: 'service',
+      status: 'open',
+      ops_status: 'pending_info',
+      parent_job_id: null,
+      scheduled_date: '2026-04-29',
+      window_start: '17:00',
+      window_end: '18:00',
+      city: 'Pending City',
+      customer_phone: '555-7000',
+      job_address: '777 Main St',
+      customer_first_name: 'Avery',
+      customer_last_name: 'Singh',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:25:00.000Z',
+      deleted_at: null,
+    },
+    {
+      id: 'job-closed-scheduled',
+      customer_id: 'cust-1',
+      location_id: 'loc-7',
+      title: 'Closed Historical Visit',
+      job_type: 'service',
+      status: 'completed',
+      ops_status: 'closed',
+      parent_job_id: null,
+      scheduled_date: '2026-04-29',
+      window_start: '18:00',
+      window_end: '19:00',
+      city: 'Closed City',
+      customer_phone: '555-8000',
+      job_address: '888 Main St',
+      customer_first_name: 'Quinn',
+      customer_last_name: 'Moore',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:30:00.000Z',
+      deleted_at: null,
+    },
+    {
+      id: 'job-cancelled-scheduled',
+      customer_id: 'cust-1',
+      location_id: 'loc-8',
+      title: 'Cancelled Historical Visit',
+      job_type: 'service',
+      status: 'cancelled',
+      ops_status: 'cancelled',
+      parent_job_id: null,
+      scheduled_date: '2026-04-29',
+      window_start: '19:00',
+      window_end: '20:00',
+      city: 'Cancelled City',
+      customer_phone: '555-9000',
+      job_address: '999 Main St',
+      customer_first_name: 'Drew',
+      customer_last_name: 'Hall',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:35:00.000Z',
+      deleted_at: null,
+    },
+    {
+      id: 'job-deleted-scheduled',
+      customer_id: 'cust-1',
+      location_id: 'loc-9',
+      title: 'Deleted Scheduled Visit',
+      job_type: 'service',
+      status: 'open',
+      ops_status: 'scheduled',
+      parent_job_id: null,
+      scheduled_date: '2026-04-29',
+      window_start: '20:00',
+      window_end: '21:00',
+      city: 'Deleted City',
+      customer_phone: '555-0000',
+      job_address: '000 Main St',
+      customer_first_name: 'Deleted',
+      customer_last_name: 'Row',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:40:00.000Z',
+      deleted_at: '2026-04-29T10:00:00.000Z',
+    },
+    {
       id: 'job-needs-scheduling',
       customer_id: 'cust-1',
       location_id: 'loc-3',
@@ -229,6 +359,7 @@ function makeFixture() {
     let scheduledDateEnd: string | null = null;
     let onlyScheduledNull = false;
     let requireScheduledDate = false;
+    let onlyDeletedNull = false;
 
     const query: any = {
       select: vi.fn(() => query),
@@ -241,6 +372,9 @@ function makeFixture() {
       is: vi.fn((column: string, value: unknown) => {
         if (column === 'scheduled_date' && value === null) {
           onlyScheduledNull = true;
+        }
+        if (column === 'deleted_at' && value === null) {
+          onlyDeletedNull = true;
         }
         return query;
       }),
@@ -262,6 +396,7 @@ function makeFixture() {
       then: (onFulfilled: (value: { data: JobRow[]; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) => {
         const data = jobs.filter((row) => {
           if (!customerIds.includes(row.customer_id)) return false;
+          if (onlyDeletedNull && row.deleted_at) return false;
 
           const scheduledDate = String(row.scheduled_date ?? '').trim();
           if (onlyScheduledNull && scheduledDate) return false;
@@ -409,9 +544,18 @@ describe('calendar action wiring', () => {
       'job-unassigned-fallback',
       'job-assigned-tech-2',
       'job-on-hold-scheduled',
+      'job-failed-scheduled',
+      'job-pending-info-scheduled',
+      'job-closed-scheduled',
+      'job-cancelled-scheduled',
     ]);
-    expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null, null, null]);
+    expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null, null, null, null, null, null, null]);
     expect(board.day.jobs.find((job) => job.id === 'job-on-hold-scheduled')?.ops_status).toBe('on_hold');
+    expect(board.day.jobs.find((job) => job.id === 'job-failed-scheduled')?.ops_status).toBe('failed');
+    expect(board.day.jobs.find((job) => job.id === 'job-pending-info-scheduled')?.ops_status).toBe('pending_info');
+    expect(board.day.jobs.find((job) => job.id === 'job-closed-scheduled')?.ops_status).toBe('closed');
+    expect(board.day.jobs.find((job) => job.id === 'job-cancelled-scheduled')?.status).toBe('cancelled');
+    expect(board.day.jobs.some((job) => job.id === 'job-deleted-scheduled')).toBe(false);
     expect('unassignedScheduledJobs' in board).toBe(false);
     expect('scheduledAttentionWindowJobs' in board).toBe(false);
     expect('assignableUsers' in board).toBe(false);
@@ -420,6 +564,8 @@ describe('calendar action wiring', () => {
       'job-assigned-canonical',
       'job-unassigned-fallback',
       'job-assigned-tech-2',
+      'job-failed-scheduled',
+      'job-pending-info-scheduled',
     ]);
     expect(roster.assignableUsers).toEqual([
       { user_id: 'tech-1', display_name: 'Tech One', email: null, calendar_label: 'Tech One' },
@@ -460,6 +606,10 @@ describe('calendar action wiring', () => {
       'job-unassigned-fallback',
       'job-assigned-tech-2',
       'job-on-hold-scheduled',
+      'job-failed-scheduled',
+      'job-pending-info-scheduled',
+      'job-closed-scheduled',
+      'job-cancelled-scheduled',
     ]);
   });
 

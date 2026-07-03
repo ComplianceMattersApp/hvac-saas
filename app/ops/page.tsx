@@ -541,15 +541,6 @@ function telHref(phone?: string | null) {
       }));
     }
 
-    function mergeRowsById(...rowSets: any[][]) {
-      const rowsById = new Map<string, any>();
-      for (const row of rowSets.flat()) {
-        const id = String(row?.id ?? "").trim();
-        if (id && !rowsById.has(id)) rowsById.set(id, row);
-      }
-      return Array.from(rowsById.values());
-    }
-
     const _t_workspaceCounts = opsTimingEnabled ? Date.now() : 0;
 
     function opsStatusCountQuery(opsStatus: string, options?: { requireOpenStatus?: boolean }) {
@@ -600,20 +591,8 @@ function telHref(phone?: string | null) {
       .is("deleted_at", null)
       .neq("status", "cancelled")
       .eq("field_complete", true)
-      .in("ops_status", ["invoice_required", "paperwork_required"])
       .order("created_at", { ascending: false })
       .limit(500);
-
-    let closeoutPermitExceptionRowsQ = supabase
-      .from("jobs")
-      .select(workspaceSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("field_complete", true)
-      .in("ops_status", ["pending_info", "on_hold"])
-      .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
-      .order("created_at", { ascending: false })
-      .limit(50);
 
     const [
       needToScheduleCountRes,
@@ -627,7 +606,6 @@ function telHref(phone?: string | null) {
       fieldWorkCountRes,
       scheduledOpenRowsRes,
       closeoutCountRowsRes,
-      closeoutPermitExceptionRowsRes,
       contractorIntakeCount,
       unreadContractorUpdates,
       unreadNewWorkRequests,
@@ -644,7 +622,6 @@ function telHref(phone?: string | null) {
       fieldWorkCountQ,
       scheduledOpenRowsQ,
       closeoutCountRowsQ,
-      closeoutPermitExceptionRowsQ,
       contractorIntakeQueueAvailable
         ? countPendingContractorIntakeQueueRows({
             supabase: admin,
@@ -673,7 +650,6 @@ function telHref(phone?: string | null) {
     if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
     if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
     if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
-    if (closeoutPermitExceptionRowsRes.error) throw closeoutPermitExceptionRowsRes.error;
 
     const countsWs = new Map<string, number>([
       ["need_to_schedule", needToScheduleCountRes.count ?? 0],
@@ -713,10 +689,7 @@ function telHref(phone?: string | null) {
       (countsWs.get("pending_office_review") ?? 0) +
       (countsWs.get("problem") ?? 0);
 
-    const closeoutCountSourceRows = mergeRowsById(
-      closeoutCountRowsRes.data ?? [],
-      closeoutPermitExceptionRowsRes.data ?? [],
-    );
+    const closeoutCountSourceRows = closeoutCountRowsRes.data ?? [];
     const { projectionsByJobId: closeoutCountProjectionByJobId } = await buildBillingTruthCloseoutProjectionMap({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
@@ -838,41 +811,19 @@ function telHref(phone?: string | null) {
     }
 
     async function loadCloseoutWorkspaceRows() {
-      const baseStatusQuery = () => {
-        let q = supabase
-          .from("jobs")
-          .select(workspaceSelect)
-          .is("deleted_at", null)
-          .neq("status", "cancelled")
-          .eq("field_complete", true)
-          .in("ops_status", ["invoice_required", "paperwork_required"])
-          .order("created_at", { ascending: true })
-          .limit(50);
-        return q;
-      };
+      // Invoice-needed closeout is status-invariant. Failed/on-hold/pending status
+      // may add exception routing, but must not suppress closeout invoice reminder.
+      const closeoutRowsRes = await supabase
+        .from("jobs")
+        .select(workspaceSelect)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .eq("field_complete", true)
+        .order("created_at", { ascending: true })
+        .limit(500);
+      if (closeoutRowsRes.error) throw closeoutRowsRes.error;
 
-      const permitExceptionQuery = () => {
-        let q = supabase
-          .from("jobs")
-          .select(workspaceSelect)
-          .is("deleted_at", null)
-          .neq("status", "cancelled")
-          .eq("field_complete", true)
-          .in("ops_status", ["pending_info", "on_hold"])
-          .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
-          .order("created_at", { ascending: true })
-          .limit(50);
-        return q;
-      };
-
-      const [statusRowsRes, permitRowsRes] = await Promise.all([
-        baseStatusQuery(),
-        permitExceptionQuery(),
-      ]);
-      if (statusRowsRes.error) throw statusRowsRes.error;
-      if (permitRowsRes.error) throw permitRowsRes.error;
-
-      const closeoutSourceRows = mergeRowsById(statusRowsRes.data ?? [], permitRowsRes.data ?? []);
+      const closeoutSourceRows = closeoutRowsRes.data ?? [];
       const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
         supabase,
         accountOwnerUserId: internalUser.account_owner_user_id,

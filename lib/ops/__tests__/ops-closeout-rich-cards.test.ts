@@ -15,7 +15,7 @@ const workspaceSelectSource =
     : "";
 
 const closeoutProjectionInputsStart = opsPageSource.indexOf("function closeoutProjectionInputs(");
-const closeoutProjectionInputsEnd = opsPageSource.indexOf("function mergeRowsById", closeoutProjectionInputsStart);
+const closeoutProjectionInputsEnd = opsPageSource.indexOf("const _t_workspaceCounts", closeoutProjectionInputsStart);
 const closeoutProjectionInputsSource =
   closeoutProjectionInputsStart > -1 && closeoutProjectionInputsEnd > closeoutProjectionInputsStart
     ? opsPageSource.slice(closeoutProjectionInputsStart, closeoutProjectionInputsEnd)

@@ -32,9 +32,9 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toContain('redirect("/portal")');
   });
 
-  it("reads closeout source jobs from field-complete and not-closed projection input", () => {
+  it("reads closeout source jobs from field-complete projection input without closed-status prefilter", () => {
     expect(closeoutQueuePageSource).toContain('.eq("field_complete", true)');
-    expect(closeoutQueuePageSource).toContain('.neq("ops_status", "closed")');
+    expect(closeoutQueuePageSource).not.toContain('.neq("ops_status", "closed")');
   });
 
   it("falls back to a compatibility jobs select when billing_disposition is unavailable", () => {

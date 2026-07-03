@@ -82,7 +82,7 @@ describe("Operations Board reason mapping", () => {
     ]);
   });
 
-  it("does not map generic blocked rows to closeout reasons in Closeout context", () => {
+  it("maps generic blocked invoice-needed rows to closeout reasons in Closeout context", () => {
     const rows = [
       {
         id: "approval",
@@ -102,9 +102,14 @@ describe("Operations Board reason mapping", () => {
       },
     ];
 
-    expect(getOpsBoardReasonLabel(rows[0], { queueKey: "closeout" })?.label).toBe("Waiting on approval");
-    expect(getOpsBoardReasonLabel(rows[1], { queueKey: "closeout" })?.label).toBe("On hold");
-    expect(filterOpsBoardRowsByReason(rows, "needs_invoice", { queueKey: "closeout" })).toEqual([]);
+    expect(getOpsBoardReasonLabel(rows[0])?.label).toBe("Waiting on approval");
+    expect(getOpsBoardReasonLabel(rows[1])?.label).toBe("On hold");
+    expect(getOpsBoardReasonLabel(rows[0], { queueKey: "closeout" })?.label).toBe("Needs invoice");
+    expect(getOpsBoardReasonLabel(rows[1], { queueKey: "closeout" })?.label).toBe("Needs invoice");
+    expect(filterOpsBoardRowsByReason(rows, "needs_invoice", { queueKey: "closeout" }).map((row) => row.id)).toEqual([
+      "approval",
+      "hold",
+    ]);
   });
 
   it("builds Closeout reason options from contextual closeout work instead of permit text", () => {

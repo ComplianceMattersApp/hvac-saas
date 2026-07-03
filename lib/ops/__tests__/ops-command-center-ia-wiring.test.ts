@@ -214,11 +214,10 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(fullCardRenderSource).not.toContain("workspaceStatusReason(job");
   });
 
-  it("loads the Closeout chip from status-shaped candidates plus the narrow permit exception", () => {
+  it("loads the Closeout chip from field-complete candidates and canonical projection", () => {
     expect(opsPageSource).toContain("async function loadCloseoutWorkspaceRows()");
-    expect(opsPageSource).toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
-    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold"])');
-    expect(opsPageSource).toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
+    expect(opsPageSource).toContain('.eq("field_complete", true)');
+    expect(opsPageSource).toContain("Invoice-needed closeout is status-invariant.");
     expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
     expect(opsPageSource).toContain("pending_info_reason: job?.pending_info_reason");
     expect(opsPageSource).toContain("on_hold_reason: job?.on_hold_reason");
@@ -227,7 +226,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key })");
   });
 
-  it("guards Closeout loading against broad field-complete candidate expansion", () => {
+  it("guards Closeout loading against status and permit-only prefilters", () => {
     const loaderStart = opsPageSource.indexOf("async function loadCloseoutWorkspaceRows()");
     const loaderEnd = opsPageSource.indexOf("async function loadWorkspacePreviewRows", loaderStart);
     const loaderSource =
@@ -235,11 +234,11 @@ describe("/ops Full Ops command center IA wiring", () => {
         ? opsPageSource.slice(loaderStart, loaderEnd)
         : "";
 
-    expect(loaderSource).toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
-    expect(loaderSource).toContain('.in("ops_status", ["pending_info", "on_hold"])');
-    expect(loaderSource).toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
+    expect(loaderSource).toContain('.eq("field_complete", true)');
     expect(loaderSource).toContain("buildBillingTruthCloseoutProjectionMap");
     expect(loaderSource).toContain("listCloseoutQueueJobs(");
+    expect(loaderSource).not.toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
+    expect(loaderSource).not.toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
     expect(loaderSource).not.toContain('.neq("ops_status", "closed")');
     expect(loaderSource).not.toContain('.not("ops_status"');
   });

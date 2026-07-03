@@ -181,52 +181,28 @@ function closeoutProjectionInputs(rows: ExportJob[]) {
   }));
 }
 
-function mergeRowsById(...rowSets: ExportJob[][]): ExportJob[] {
-  const rowsById = new Map<string, ExportJob>();
-  for (const row of rowSets.flat()) {
-    const id = String(row?.id ?? "").trim();
-    if (id && !rowsById.has(id)) rowsById.set(id, row);
-  }
-  return Array.from(rowsById.values());
-}
-
 async function loadCloseoutRows(params: {
   supabase: any;
   accountOwnerUserId: string;
   contractorId: string | null;
   sort: OpsBoardSortKey;
 }) {
-  const baseQuery = () => {
-    let q = params.supabase
-      .from("jobs")
-      .select(WORKSPACE_SELECT)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("field_complete", true)
-      .in("ops_status", ["invoice_required", "paperwork_required"])
-      .order("created_at", { ascending: true })
-      .limit(EXPORT_LIMIT);
-    return applyContractorExportScope(q, params.contractorId);
-  };
-  const permitQuery = () => {
-    let q = params.supabase
-      .from("jobs")
-      .select(WORKSPACE_SELECT)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("field_complete", true)
-      .in("ops_status", ["pending_info", "on_hold"])
-      .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
-      .order("created_at", { ascending: true })
-      .limit(EXPORT_LIMIT);
-    return applyContractorExportScope(q, params.contractorId);
-  };
+  // Invoice-needed closeout is status-invariant. Failed/on-hold/pending status
+  // may add exception routing, but must not suppress closeout invoice reminder.
+  let query = params.supabase
+    .from("jobs")
+    .select(WORKSPACE_SELECT)
+    .is("deleted_at", null)
+    .neq("status", "cancelled")
+    .eq("field_complete", true)
+    .order("created_at", { ascending: true })
+    .limit(EXPORT_LIMIT);
+  query = applyContractorExportScope(query, params.contractorId);
 
-  const [base, permit] = await Promise.all([baseQuery(), permitQuery()]);
-  if (base.error) throw base.error;
-  if (permit.error) throw permit.error;
+  const { data, error } = await query;
+  if (error) throw error;
 
-  const sourceRows = mergeRowsById(base.data ?? [], permit.data ?? []);
+  const sourceRows = data ?? [];
   const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
     supabase: params.supabase,
     accountOwnerUserId: params.accountOwnerUserId,
