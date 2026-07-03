@@ -1646,9 +1646,9 @@ export default async function JobDetailV2Page({
                 ? [
                     {
                       label: "Certs / compliance",
-                      detail: certsComplete ? "Certificates sent" : "Tests & certificate not complete",
+                      detail: certsComplete ? "Certificates sent" : "Certificate still open",
                       dot: certsComplete ? "oklch(0.58 0.13 150)" : "oklch(0.66 0.14 68)",
-                      value: certsComplete ? "Done" : "Blocked",
+                      value: certsComplete ? "Done" : "Open",
                       valueBg: certsComplete ? "oklch(0.95 0.04 150)" : "oklch(0.96 0.05 75)",
                       valueFg: certsComplete ? "oklch(0.45 0.13 150)" : "oklch(0.5 0.12 65)",
                     },
