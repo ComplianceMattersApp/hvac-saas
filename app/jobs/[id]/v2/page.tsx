@@ -49,7 +49,7 @@ import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 import DeferredTimelineBody from "../_components/DeferredTimelineBody";
 import DeferredInternalNotesBody from "../_components/DeferredInternalNotesBody";
@@ -166,6 +166,7 @@ type StatusPill = {
 function deriveStatusPill(
   status: string,
   opsStatus: string,
+  hasScheduledAppointment = false,
 ): StatusPill {
   if (status === "cancelled")
     return { label: "CANCELLED", bg: "oklch(0.96 0.004 250)", fg: "oklch(0.55 0.015 262)", dot: "oklch(0.7 0.02 262)" };
@@ -173,10 +174,10 @@ function deriveStatusPill(
     return { label: "ON THE WAY", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
   if (status === "in_process")
     return { label: "IN PROGRESS · ON SITE", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
+  if (opsStatus === "scheduled" || hasScheduledAppointment)
+    return { label: "SCHEDULED", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
   if (opsStatus === "need_to_schedule" || (!status || status === "open"))
     return { label: "NEEDS SCHEDULE", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
-  if (opsStatus === "scheduled")
-    return { label: "SCHEDULED", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
   if (opsStatus === "pending_info")
     return { label: "PENDING INFO", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
   if (opsStatus === "on_hold")
@@ -472,8 +473,13 @@ export default async function JobDetailV2Page({
   const isEnRoute = status === "on_the_way";
   const visitStarted = isFieldActive || isEnRoute;
   const isTerminal = fieldComplete || status === "completed" || status === "cancelled";
+  const hasScheduledAppointment = Boolean(job.scheduled_date || job.window_start || job.window_end);
+  const scheduledAppointmentText = [
+    formatBusinessDateUS(job.scheduled_date),
+    displayWindowLA(job.window_start, job.window_end),
+  ].filter(Boolean).join(" - ");
 
-  const statusPill = deriveStatusPill(status, opsStatus);
+  const statusPill = deriveStatusPill(status, opsStatus, hasScheduledAppointment);
   const fieldSteps = deriveFieldSteps(status, fieldComplete);
 
   const visitScopeItems = sanitizeVisitScopeItems(job.visit_scope_items);
@@ -620,6 +626,7 @@ export default async function JobDetailV2Page({
     if (!fieldComplete) {
       if (status === "in_process") return "Visit in progress — finish and submit when work is done.";
       if (status === "on_the_way") return "Tech is en route — mark on site when arrived.";
+      if (hasScheduledAppointment) return `Scheduled ${scheduledAppointmentText}. Mark on the way when the tech is heading out.`;
       return "Schedule and dispatch to start this job.";
     }
     if (isFailedUnresolved) {
@@ -2989,6 +2996,42 @@ export default async function JobDetailV2Page({
           >
             {nextActionSentence}
           </div>
+          {hasScheduledAppointment ? (
+            <div
+              style={{
+                marginTop: "-4px",
+                marginBottom: "14px",
+                borderRadius: "8px",
+                border: "1px solid oklch(0.86 0.01 250)",
+                background: "#fff",
+                padding: "9px 10px",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: S.mono,
+                  fontSize: "9.5px",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "oklch(0.48 0.02 262)",
+                  marginBottom: "4px",
+                }}
+              >
+                Appointment
+              </div>
+              <div
+                style={{
+                  fontSize: "13px",
+                  lineHeight: 1.35,
+                  fontWeight: 700,
+                  color: "oklch(0.28 0.018 262)",
+                }}
+              >
+                {scheduledAppointmentText}
+              </div>
+            </div>
+          ) : null}
           {/* stacked action buttons */}
           <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
             {/* Primary button */}

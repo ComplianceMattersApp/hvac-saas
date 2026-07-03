@@ -71,6 +71,21 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain('<CancelJobButton jobId={jobId} />');
   });
 
+  it("uses scheduled appointment fields before falling back to needs-schedule display", () => {
+    const scheduledBranch = source.indexOf('if (opsStatus === "scheduled" || hasScheduledAppointment)');
+    const needsScheduleBranch = source.indexOf('if (opsStatus === "need_to_schedule" || (!status || status === "open"))');
+
+    expect(source).toContain('const hasScheduledAppointment = Boolean(job.scheduled_date || job.window_start || job.window_end);');
+    expect(source).toContain('const scheduledAppointmentText = [');
+    expect(source).toContain('displayWindowLA(job.window_start, job.window_end)');
+    expect(source).toContain('deriveStatusPill(status, opsStatus, hasScheduledAppointment)');
+    expect(scheduledBranch).toBeGreaterThan(-1);
+    expect(needsScheduleBranch).toBeGreaterThan(-1);
+    expect(scheduledBranch).toBeLessThan(needsScheduleBranch);
+    expect(source).toContain('Scheduled ${scheduledAppointmentText}. Mark on the way when the tech is heading out.');
+    expect(source).toContain('Appointment');
+  });
+
   it("routes unresolved internal invoice creation through direct draft creation", () => {
     const readyInvoiceIndex = source.indexOf("Ready to invoice");
     const readyInvoiceSlice = source.slice(readyInvoiceIndex, readyInvoiceIndex + 3200);
