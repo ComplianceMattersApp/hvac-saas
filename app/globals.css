@@ -32,7 +32,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 /* Make native date/time picker icons visible in dark UI */
 input[type="date"]::-webkit-calendar-picker-indicator,

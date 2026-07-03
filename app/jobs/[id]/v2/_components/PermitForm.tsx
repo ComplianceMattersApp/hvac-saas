@@ -89,7 +89,7 @@ export default function PermitForm({
       >
         <span
           style={{
-            fontFamily: "var(--font-ibm-plex-mono), monospace",
+            fontFamily: "var(--font-geist-mono), monospace",
             fontSize: "10px",
             letterSpacing: "0.1em",
             textTransform: "uppercase",
@@ -124,7 +124,7 @@ export default function PermitForm({
           <label
             style={{
               display: "block",
-              fontFamily: "var(--font-ibm-plex-mono), monospace",
+              fontFamily: "var(--font-geist-mono), monospace",
               fontSize: "10px",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
@@ -162,7 +162,7 @@ export default function PermitForm({
             <label
               style={{
                 display: "block",
-                fontFamily: "var(--font-ibm-plex-mono), monospace",
+                fontFamily: "var(--font-geist-mono), monospace",
                 fontSize: "10px",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
@@ -195,7 +195,7 @@ export default function PermitForm({
             <label
               style={{
                 display: "block",
-                fontFamily: "var(--font-ibm-plex-mono), monospace",
+                fontFamily: "var(--font-geist-mono), monospace",
                 fontSize: "10px",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",

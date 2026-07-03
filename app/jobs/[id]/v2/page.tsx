@@ -79,9 +79,9 @@ const DESKTOP_STICKY_HEADER_OFFSET = "72px";
 const DESKTOP_SECTION_SCROLL_MARGIN_TOP = "88px";
 
 const S = {
-  mono: "var(--font-ibm-plex-mono), monospace",
+  mono: "var(--font-geist-mono), monospace",
   sectionLabel: {
-    fontFamily: "var(--font-ibm-plex-mono), monospace",
+    fontFamily: "var(--font-geist-mono), monospace",
     fontSize: "11px",
     letterSpacing: "0.11em",
     textTransform: "uppercase" as const,
@@ -89,7 +89,7 @@ const S = {
     fontWeight: 700,
   },
   fieldLabel: {
-    fontFamily: "var(--font-ibm-plex-mono), monospace",
+    fontFamily: "var(--font-geist-mono), monospace",
     fontSize: "10px",
     letterSpacing: "0.08em",
     textTransform: "uppercase" as const,

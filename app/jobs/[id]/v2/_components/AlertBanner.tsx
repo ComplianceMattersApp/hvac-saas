@@ -183,7 +183,7 @@ export default function AlertBanner({ slug }: { slug: string }) {
           border: "none",
           background: "none",
           cursor: "pointer",
-          fontFamily: "var(--font-ibm-plex-mono), monospace",
+          fontFamily: "var(--font-geist-mono), monospace",
           fontSize: "11px",
           fontWeight: 600,
           color: t.dismiss,

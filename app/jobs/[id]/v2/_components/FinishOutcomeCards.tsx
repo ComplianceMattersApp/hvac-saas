@@ -208,7 +208,7 @@ export default function FinishOutcomeCards({
             <div style={{ flex: 1 }}>
               <div
                 style={{
-                  fontFamily: "var(--font-ibm-plex-mono), monospace",
+                  fontFamily: "var(--font-geist-mono), monospace",
                   fontSize: "10px",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",

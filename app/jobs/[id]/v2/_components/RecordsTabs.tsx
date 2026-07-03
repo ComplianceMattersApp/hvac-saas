@@ -53,7 +53,7 @@ export default function RecordsTabs({ tabs }: { tabs: RecordTab[] }) {
               {t.label}
               <span
                 style={{
-                  fontFamily: "var(--font-ibm-plex-mono), monospace",
+                  fontFamily: "var(--font-geist-mono), monospace",
                   fontSize: "10px",
                   fontWeight: 600,
                   padding: "2px 6px",
