@@ -776,27 +776,70 @@ export default async function JobDetailV2Page({
           >
             {job.title}
           </h1>
-          {startedFromPermitWorkflow ? (
-            <div
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "7px", marginTop: "12px" }}>
+            {isEccJob ? (
+              <span
+                style={{
+                  fontFamily: S.mono,
+                  fontSize: "10.5px",
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  background: "oklch(0.95 0.03 255)",
+                  color: "oklch(0.5 0.13 255)",
+                }}
+              >
+                ECC
+              </span>
+            ) : null}
+            <span
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                marginTop: "12px",
-                padding: "4px 9px",
-                borderRadius: "6px",
-                border: "1px solid oklch(0.84 0.06 255)",
-                background: "oklch(0.96 0.025 255)",
-                color: "oklch(0.43 0.13 255)",
                 fontFamily: S.mono,
-                fontSize: "10px",
+                fontSize: "10.5px",
                 fontWeight: 700,
                 letterSpacing: "0.06em",
-                textTransform: "uppercase",
+                padding: "4px 9px",
+                borderRadius: "6px",
+                background: statusPill.bg,
+                color: statusPill.fg,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
               }}
             >
-              Permit Workflow
-            </div>
-          ) : null}
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: statusPill.dot,
+                  flexShrink: 0,
+                }}
+              />
+              {statusPill.label}
+            </span>
+            {startedFromPermitWorkflow ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "4px 9px",
+                  borderRadius: "6px",
+                  border: "1px solid oklch(0.84 0.06 255)",
+                  background: "oklch(0.96 0.025 255)",
+                  color: "oklch(0.43 0.13 255)",
+                  fontFamily: S.mono,
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Permit Workflow
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {/* ── JOB BRIEF ─────────────────────────────────────────────────────── */}
@@ -2772,64 +2815,6 @@ export default async function JobDetailV2Page({
         }}
       >
         <div style={{ flex: "0 0 auto", minWidth: 0 }}>
-        {/* identity */}
-        <div
-          style={{
-            fontFamily: S.mono,
-            fontSize: "10.5px",
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "oklch(0.6 0.015 262)",
-            fontWeight: 600,
-          }}
-        >
-          {jobDisplayRef}
-        </div>
-
-        {/* status pills */}
-        <div style={{ display: "flex", alignItems: "center", gap: "7px", marginTop: "10px" }}>
-          {isEccJob ? (
-            <span
-              style={{
-                fontFamily: S.mono,
-                fontSize: "10.5px",
-                fontWeight: 600,
-                padding: "4px 8px",
-                borderRadius: "6px",
-                background: "oklch(0.95 0.03 255)",
-                color: "oklch(0.5 0.13 255)",
-              }}
-            >
-              ECC
-            </span>
-          ) : null}
-          <span
-            style={{
-              fontFamily: S.mono,
-              fontSize: "10.5px",
-              fontWeight: 600,
-              padding: "4px 9px",
-              borderRadius: "6px",
-              background: statusPill.bg,
-              color: statusPill.fg,
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <span
-              style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                background: statusPill.dot,
-                flexShrink: 0,
-              }}
-            />
-            {statusPill.label}
-          </span>
-        </div>
-
         {canShowEccFailedReasonBanner ? (
           <details
             id="failed-reason-banner"

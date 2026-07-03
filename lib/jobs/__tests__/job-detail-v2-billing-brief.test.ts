@@ -28,6 +28,22 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("Permit Workflow");
   });
 
+  it("keeps static identity chips in the title band without duplicating the job reference", () => {
+    const headerIndex = source.indexOf('{" "}/ Jobs / <span');
+    const headerSlice = source.slice(headerIndex, headerIndex + 3200);
+    const railIndex = source.indexOf("RIGHT: command rail");
+    const railSlice = source.slice(railIndex, railIndex + 1200);
+
+    expect(headerIndex).toBeGreaterThanOrEqual(0);
+    expect(headerSlice).toContain("{jobDisplayRef}");
+    expect(headerSlice).toContain("{statusPill.label}");
+    expect(headerSlice).toContain("ECC");
+    expect(headerSlice).toContain("Permit Workflow");
+    expect(railIndex).toBeGreaterThanOrEqual(0);
+    expect(railSlice).not.toContain("{jobDisplayRef}");
+    expect(railSlice).not.toContain("{statusPill.label}");
+  });
+
   it("keeps admin archive controls available on the V2 job detail", () => {
     expect(source).toContain('archiveJobFromForm');
     expect(source).toContain('CancelJobButton');
