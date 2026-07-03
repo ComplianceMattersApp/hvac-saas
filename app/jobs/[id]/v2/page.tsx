@@ -759,91 +759,143 @@ export default async function JobDetailV2Page({
         <div style={{ padding: "32px 0 28px" }}>
           <div
             style={{
-              fontFamily: S.mono,
-              fontSize: "11px",
-              letterSpacing: "0.06em",
-              fontWeight: 600,
-              color: "oklch(0.55 0.015 262)",
-              marginBottom: "9px",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: "24px",
             }}
           >
-            <Link href="/ops" style={{ color: "oklch(0.55 0.17 255)", textDecoration: "none" }}>
-              Ops
-            </Link>
-            {" "}/ Jobs / <span style={{ color: "oklch(0.4 0.02 262)" }}>{jobDisplayRef}</span>
-          </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: "28px",
-              fontWeight: 700,
-              letterSpacing: "-0.015em",
-              color: "oklch(0.27 0.02 262)",
-            }}
-          >
-            {job.title}
-          </h1>
-          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "7px", marginTop: "12px" }}>
-            {isEccJob ? (
-              <span
+            <div style={{ minWidth: 0 }}>
+              <div
                 style={{
                   fontFamily: S.mono,
-                  fontSize: "10.5px",
-                  fontWeight: 700,
                   letterSpacing: "0.06em",
-                  padding: "4px 8px",
-                  borderRadius: "6px",
-                  background: "oklch(0.95 0.03 255)",
-                  color: "oklch(0.5 0.13 255)",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "oklch(0.55 0.015 262)",
+                  marginBottom: "9px",
                 }}
               >
-                ECC
-              </span>
-            ) : null}
-            <span
-              style={{
-                fontFamily: S.mono,
-                fontSize: "10.5px",
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                padding: "4px 9px",
-                borderRadius: "6px",
-                background: statusPill.bg,
-                color: statusPill.fg,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <span
+                <Link href="/ops" style={{ color: "oklch(0.55 0.17 255)", textDecoration: "none" }}>
+                  Ops
+                </Link>
+                {" "}/ Jobs / <span style={{ color: "oklch(0.4 0.02 262)" }}>{jobDisplayRef}</span>
+              </div>
+              <h1
                 style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: statusPill.dot,
-                  flexShrink: 0,
-                }}
-              />
-              {statusPill.label}
-            </span>
-            {startedFromPermitWorkflow ? (
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "4px 9px",
-                  borderRadius: "6px",
-                  border: "1px solid oklch(0.84 0.06 255)",
-                  background: "oklch(0.96 0.025 255)",
-                  color: "oklch(0.43 0.13 255)",
-                  fontFamily: S.mono,
-                  fontSize: "10px",
+                  margin: 0,
+                  fontSize: "28px",
                   fontWeight: 700,
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase",
+                  letterSpacing: "-0.015em",
+                  color: "oklch(0.27 0.02 262)",
                 }}
               >
-                Permit Workflow
+                {job.title}
+              </h1>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "7px", marginTop: "12px" }}>
+                {isEccJob ? (
+                  <span
+                    style={{
+                      fontFamily: S.mono,
+                      fontSize: "10.5px",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      padding: "4px 8px",
+                      borderRadius: "6px",
+                      background: "oklch(0.95 0.03 255)",
+                      color: "oklch(0.5 0.13 255)",
+                    }}
+                  >
+                    ECC
+                  </span>
+                ) : null}
+                <span
+                  style={{
+                    fontFamily: S.mono,
+                    fontSize: "10.5px",
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    padding: "4px 9px",
+                    borderRadius: "6px",
+                    background: statusPill.bg,
+                    color: statusPill.fg,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      borderRadius: "50%",
+                      background: statusPill.dot,
+                      flexShrink: 0,
+                    }}
+                  />
+                  {statusPill.label}
+                </span>
+                {startedFromPermitWorkflow ? (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "4px 9px",
+                      borderRadius: "6px",
+                      border: "1px solid oklch(0.84 0.06 255)",
+                      background: "oklch(0.96 0.025 255)",
+                      color: "oklch(0.43 0.13 255)",
+                      fontFamily: S.mono,
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Permit Workflow
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            {hasScheduledAppointment ? (
+              <span
+                style={{
+                  display: "block",
+                  minWidth: "190px",
+                  maxWidth: "250px",
+                  flex: "0 0 auto",
+                  borderRadius: "8px",
+                  border: "1px solid oklch(0.86 0.01 250)",
+                  background: "oklch(0.99 0.002 250)",
+                  padding: "10px 12px",
+                }}
+              >
+                <span
+                  style={{
+                    display: "block",
+                    fontFamily: S.mono,
+                    fontSize: "9.5px",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "oklch(0.48 0.02 262)",
+                    marginBottom: "5px",
+                  }}
+                >
+                  Appointment
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "13.5px",
+                    lineHeight: 1.35,
+                    fontWeight: 750,
+                    color: "oklch(0.28 0.018 262)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {scheduledAppointmentText}
+                </span>
               </span>
             ) : null}
           </div>
@@ -2996,42 +3048,6 @@ export default async function JobDetailV2Page({
           >
             {nextActionSentence}
           </div>
-          {hasScheduledAppointment ? (
-            <div
-              style={{
-                marginTop: "-4px",
-                marginBottom: "14px",
-                borderRadius: "8px",
-                border: "1px solid oklch(0.86 0.01 250)",
-                background: "#fff",
-                padding: "9px 10px",
-              }}
-            >
-              <div
-                style={{
-                  fontFamily: S.mono,
-                  fontSize: "9.5px",
-                  fontWeight: 800,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "oklch(0.48 0.02 262)",
-                  marginBottom: "4px",
-                }}
-              >
-                Appointment
-              </div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  lineHeight: 1.35,
-                  fontWeight: 700,
-                  color: "oklch(0.28 0.018 262)",
-                }}
-              >
-                {scheduledAppointmentText}
-              </div>
-            </div>
-          ) : null}
           {/* stacked action buttons */}
           <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
             {/* Primary button */}

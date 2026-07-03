@@ -74,6 +74,11 @@ describe("desktop job detail V2 billing brief", () => {
   it("uses scheduled appointment fields before falling back to needs-schedule display", () => {
     const scheduledBranch = source.indexOf('if (opsStatus === "scheduled" || hasScheduledAppointment)');
     const needsScheduleBranch = source.indexOf('if (opsStatus === "need_to_schedule" || (!status || status === "open"))');
+    const headerBandIndex = source.indexOf("{/* header band */}");
+    const jobBriefIndex = source.indexOf("{/* ── JOB BRIEF");
+    const nextActionIndex = source.indexOf("{/* NEXT ACTION group */}");
+    const nextActionSlice = source.slice(nextActionIndex, nextActionIndex + 2400);
+    const appointmentIndex = source.indexOf("Appointment", headerBandIndex);
 
     expect(source).toContain('const hasScheduledAppointment = Boolean(job.scheduled_date || job.window_start || job.window_end);');
     expect(source).toContain('const scheduledAppointmentText = [');
@@ -83,7 +88,11 @@ describe("desktop job detail V2 billing brief", () => {
     expect(needsScheduleBranch).toBeGreaterThan(-1);
     expect(scheduledBranch).toBeLessThan(needsScheduleBranch);
     expect(source).toContain('Scheduled ${scheduledAppointmentText}. Mark on the way when the tech is heading out.');
-    expect(source).toContain('Appointment');
+    expect(headerBandIndex).toBeGreaterThan(-1);
+    expect(jobBriefIndex).toBeGreaterThan(headerBandIndex);
+    expect(appointmentIndex).toBeGreaterThan(headerBandIndex);
+    expect(appointmentIndex).toBeLessThan(jobBriefIndex);
+    expect(nextActionSlice).not.toContain("Appointment");
   });
 
   it("routes unresolved internal invoice creation through direct draft creation", () => {
