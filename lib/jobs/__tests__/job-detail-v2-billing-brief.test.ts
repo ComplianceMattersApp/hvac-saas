@@ -24,16 +24,18 @@ describe("desktop job detail V2 billing brief", () => {
 
   it("does not call field-complete jobs closed out while closeout blockers remain", () => {
     expect(source).toContain('isFailedUnresolved');
-    expect(source).toContain('"Failure unresolved"');
+    expect(source).toContain('"Field Complete - Pending"');
     expect(source).toContain('"Field Complete"');
+    expect(source).not.toContain('"Failure unresolved"');
   });
 
   it("does not describe unresolved failed jobs as fully closed out", () => {
-    const failedBranch = source.indexOf('return "Failed test unresolved - review the failed reason and contractor report.";');
+    const failedBranch = source.indexOf('return "Field complete - pending closeout.";');
     const allDoneBranch = source.indexOf('return "All done');
     expect(failedBranch).toBeGreaterThan(-1);
     expect(allDoneBranch).toBeGreaterThan(-1);
     expect(failedBranch).toBeLessThan(allDoneBranch);
+    expect(source).not.toContain("Failed test unresolved - review the failed reason and contractor report.");
   });
 
   it("keeps the failed ECC banner separate from the follow-up reminder surface", () => {

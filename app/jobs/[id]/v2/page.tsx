@@ -633,9 +633,8 @@ export default async function JobDetailV2Page({
       return "Schedule and dispatch to start this job.";
     }
     if (isFailedUnresolved) {
-      if (opsStatus === "retest_needed") return "Retest is needed before this job can be closed out.";
-      if (opsStatus === "pending_office_review") return "Corrections are under office review before closeout.";
-      return "Failed test unresolved - review the failed reason and contractor report.";
+      if (opsStatus === "pending_office_review") return "Field complete - pending office review.";
+      return "Field complete - pending closeout.";
     }
     if (closeoutNeeds.needsCerts && closeoutNeeds.needsInvoice) return "Field work complete — send certs and invoice to close this job.";
     if (closeoutNeeds.needsCerts) return "Field work complete — send certs to close this job.";
@@ -3004,21 +3003,21 @@ export default async function JobDetailV2Page({
                   padding: "9px 13px",
                   borderRadius: "9px",
                   border: isFailedUnresolved
-                    ? "1px solid oklch(0.88 0.08 20)"
+                    ? "1px solid oklch(0.88 0.05 75)"
                     : "1px solid oklch(0.88 0.06 150)",
                   background: isFailedUnresolved
-                    ? "oklch(0.97 0.025 20)"
+                    ? "oklch(0.97 0.025 75)"
                     : "oklch(0.97 0.03 150)",
                   fontSize: "13px",
                   fontWeight: 600,
                   color: isFailedUnresolved
-                    ? "oklch(0.38 0.09 20)"
+                    ? "oklch(0.42 0.09 75)"
                     : "oklch(0.42 0.1 150)",
                   textAlign: "center",
                 }}
               >
                 {isFailedUnresolved
-                  ? "Failure unresolved"
+                  ? "Field Complete - Pending"
                   : closeoutNeeds.needsInvoice || closeoutNeeds.needsCerts
                   ? "Field Complete"
                   : "Closed out"}
