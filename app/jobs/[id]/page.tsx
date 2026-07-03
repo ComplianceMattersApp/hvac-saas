@@ -3588,7 +3588,7 @@ const showCorrectionReviewResolution =
   const desktopV2SearchParams = Promise.resolve(sp);
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:overflow-x-visible lg:p-6">
       <div className="block lg:hidden">
         <MobileJobDetailMobileComponent
           activeWaitingState={activeWaitingState}

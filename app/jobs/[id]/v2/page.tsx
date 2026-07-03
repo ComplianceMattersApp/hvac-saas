@@ -2640,7 +2640,7 @@ export default async function JobDetailV2Page({
           display: "flex",
           flexDirection: "column",
           padding: "24px 0",
-          maxHeight: `calc(100dvh - ${DESKTOP_STICKY_HEADER_OFFSET} - 16px)`,
+          height: `calc(100dvh - ${DESKTOP_STICKY_HEADER_OFFSET} - 16px)`,
           minHeight: 0,
           minWidth: 0,
           overflow: "hidden",

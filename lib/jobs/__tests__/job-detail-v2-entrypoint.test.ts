@@ -62,9 +62,12 @@ describe("job detail V2 entrypoint", () => {
   });
 
   it("keeps the V2 desktop right rail sticky with an internal scroll body", () => {
+    expect(legacyJobDetailSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
+    expect(legacyJobDetailSource).toContain("<DesktopJobDetailV2Page");
+    expect(legacyJobDetailSource).toContain("lg:overflow-x-visible");
     expect(v2JobDetailSource).toContain('const DESKTOP_STICKY_HEADER_OFFSET = "72px";');
     expect(v2JobDetailSource).toContain("top: DESKTOP_STICKY_HEADER_OFFSET");
-    expect(v2JobDetailSource).toContain("maxHeight: `calc(100dvh - ${DESKTOP_STICKY_HEADER_OFFSET} - 16px)`");
+    expect(v2JobDetailSource).toContain("height: `calc(100dvh - ${DESKTOP_STICKY_HEADER_OFFSET} - 16px)`");
     expect(v2JobDetailSource).toContain('overflow: "hidden"');
     expect(v2JobDetailSource).toContain('flex: "0 0 auto"');
     expect(v2JobDetailSource).toContain('overflowY: "auto"');
