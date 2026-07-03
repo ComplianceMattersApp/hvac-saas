@@ -8,7 +8,7 @@ const opsPageSource = readFileSync(
 );
 
 const workspaceRichCardStart = opsPageSource.indexOf("function workspaceNeedsSchedulingRichCard(");
-const workspaceRichCardEnd = opsPageSource.indexOf("const selectedWorkspaceItemCount", workspaceRichCardStart);
+const workspaceRichCardEnd = opsPageSource.indexOf("const selectedWorkspaceCountText", workspaceRichCardStart);
 const workspaceRichCardSource =
   workspaceRichCardStart > -1 && workspaceRichCardEnd > workspaceRichCardStart
     ? opsPageSource.slice(workspaceRichCardStart, workspaceRichCardEnd)
@@ -22,7 +22,7 @@ const workspaceCloseoutCardSource =
     : "";
 
 const workspacePaymentCardStart = opsPageSource.indexOf("function workspaceFieldPaymentReviewCard(");
-const workspacePaymentCardEnd = opsPageSource.indexOf("const selectedWorkspaceItemCount", workspacePaymentCardStart);
+const workspacePaymentCardEnd = opsPageSource.indexOf("const selectedWorkspaceCountText", workspacePaymentCardStart);
 const workspacePaymentCardSource =
   workspacePaymentCardStart > -1 && workspacePaymentCardEnd > workspacePaymentCardStart
     ? opsPageSource.slice(workspacePaymentCardStart, workspacePaymentCardEnd)

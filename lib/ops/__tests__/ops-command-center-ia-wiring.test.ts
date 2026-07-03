@@ -65,6 +65,11 @@ describe("/ops Full Ops command center IA wiring", () => {
   it("keeps the board queue preview compact with job actions still reachable", () => {
     expect(opsPageSource).toContain("Active Queue");
     expect(opsPageSource).toContain("Open Job");
+    expect(opsPageSource).toContain("selectedWorkspacePreviewCount");
+    expect(opsPageSource).toContain("selectedWorkspaceTotalCount");
+    expect(opsPageSource).toContain("Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount}");
+    expect(opsPageSource).toContain("/ops/closeout-queue${contractorScopeFilter");
+    expect(opsPageSource).toContain("View all");
   });
 
   it("renders an Excel-style Contractor Focus selector for ECC/hybrid while queue chips own bucket selection", () => {

@@ -946,13 +946,21 @@ function telHref(phone?: string | null) {
       selectedWorkspaceKey === "permits" || selectedWorkspaceKey === "contractor_intake"
         ? []
         : visibleWorkspaceSections.flatMap((section) => section.previewRows);
-    const selectedWorkspaceTab = {
-      ...visibleWorkspaceSections[0],
-      count: selectedWorkspaceKey === "permits"
+    const selectedWorkspacePreviewCount =
+      selectedWorkspaceKey === "permits"
         ? selectedPermitRows.length
         : selectedWorkspaceKey === "contractor_intake"
         ? selectedContractorIntakeRows.length
-        : selectedPreviewRows.length,
+        : selectedWorkspaceSection?.previewRows.length ?? 0;
+    const selectedWorkspaceTotalCount =
+      selectedWorkspaceKey === "permits"
+        ? selectedPermitRows.length
+        : selectedWorkspaceKey === "contractor_intake"
+        ? selectedContractorIntakeRows.length
+        : selectedWorkspaceSection?.count ?? selectedPreviewRows.length;
+    const selectedWorkspaceTab = {
+      ...visibleWorkspaceSections[0],
+      count: selectedWorkspaceTotalCount,
     };
     const workspaceQueueChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
       const section =
@@ -1581,18 +1589,16 @@ function telHref(phone?: string | null) {
       );
     }
 
-    const selectedWorkspaceItemCount =
-      selectedWorkspaceKey === "permits"
-        ? selectedPermitRows.length
-        : selectedWorkspaceKey === "contractor_intake"
-        ? selectedContractorIntakeRows.length
-        : selectedWorkspaceSection?.previewRows.length ?? 0;
     const selectedWorkspaceItemNoun =
       selectedWorkspaceKey === "permits"
         ? "permit requests"
         : selectedWorkspaceKey === "contractor_intake"
         ? "intake submissions"
         : "jobs";
+    const selectedWorkspaceCountText =
+      selectedWorkspacePreviewCount === selectedWorkspaceTotalCount
+        ? `${selectedWorkspaceTotalCount} ${selectedWorkspaceItemNoun}`
+        : `Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount} ${selectedWorkspaceItemNoun}`;
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const selectedPermitAttachmentResult = selectedPermitRows.length
@@ -1748,7 +1754,9 @@ function telHref(phone?: string | null) {
               <div className="text-lg font-semibold tracking-tight text-slate-950">Operations workbench</div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-              {selectedWorkspaceTab.count} visible jobs
+              {selectedWorkspacePreviewCount === selectedWorkspaceTotalCount
+                ? `${selectedWorkspaceTotalCount} visible ${selectedWorkspaceItemNoun}`
+                : `${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount} visible ${selectedWorkspaceItemNoun}`}
             </div>
           </div>
 
@@ -1867,7 +1875,7 @@ function telHref(phone?: string | null) {
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
               <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
               <div className="text-xs text-slate-600">
-                {selectedWorkspaceItemCount} {selectedWorkspaceItemNoun}
+                {selectedWorkspaceCountText}
               </div>
             </div>
             {selectedWorkspaceKey === "contractor_intake" ? (
@@ -1878,6 +1886,13 @@ function telHref(phone?: string | null) {
                 className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
               >
                 Export CSV
+              </Link>
+            ) : selectedWorkspaceKey === "closeout" ? (
+              <Link
+                href={`/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
+                className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+              >
+                View all
               </Link>
             ) : null}
           </div>
