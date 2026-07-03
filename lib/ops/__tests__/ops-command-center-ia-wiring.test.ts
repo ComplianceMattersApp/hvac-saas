@@ -243,7 +243,7 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("guards Ops card reason rendering from bypassing the structured visible reason helper", () => {
     const fullCardRenderStart = opsPageSource.indexOf("selectedWorkspaceSection.previewRows.map");
-    const fullCardRenderEnd = opsPageSource.indexOf("workspaceAgeLabel(job)", fullCardRenderStart);
+    const fullCardRenderEnd = opsPageSource.indexOf("workspaceQueueClockTag(job", fullCardRenderStart);
     const fullCardRenderSource =
       fullCardRenderStart > -1 && fullCardRenderEnd > fullCardRenderStart
         ? opsPageSource.slice(fullCardRenderStart, fullCardRenderEnd)

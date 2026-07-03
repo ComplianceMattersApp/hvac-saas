@@ -56,7 +56,8 @@ describe("lifecycle aging slice 1 wiring", () => {
   it("applies lifecycle-aware labels to ops workspace cards", () => {
     expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
     expect(opsPageSource).toContain("workspaceAgeLabel");
-    expect(opsPageSource).toContain("Days Aging");
+    expect(opsPageSource).toContain("workspaceQueueClockTag");
+    expect(opsPageSource).toContain("In Queue");
     expect(opsPageSource).not.toContain("Age/Time:");
     expect(opsPageSource).not.toContain('?? "-"');
   });

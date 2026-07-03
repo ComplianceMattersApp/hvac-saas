@@ -49,6 +49,7 @@ import {
   updateInternalPermitRequestIntake,
 } from "@/lib/actions/internal-permit-request-actions";
 import {
+  buildOpsStatusEnteredAtByJob,
   resolveLifecycleDaysAgingLabel,
 } from "@/lib/utils/lifecycle-aging";
 import {
@@ -388,6 +389,8 @@ function telHref(phone?: string | null) {
 
   // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
+  let followUpEnteredAtByJob = new Map<string, string>();
+  let latestJobEventByJob = new Map<string, any>();
   let latestFailedRunByJob = new Map<string, any>();
   let primaryFailureReasonByJob = new Map<string, string>();
   let serviceFollowUpProgressLabelByJob = new Map<string, string>();
@@ -436,6 +439,39 @@ function telHref(phone?: string | null) {
     return reasonByJob;
   }
 
+  function buildLatestJobEventByJob(events: any[]) {
+    const latestByJob = new Map<string, any>();
+    for (const event of Array.isArray(events) ? events : []) {
+      const jobId = String(event?.job_id ?? "").trim();
+      if (!jobId) continue;
+
+      const current = latestByJob.get(jobId);
+      if (!current || toEpochMs(event?.created_at) > toEpochMs(current?.created_at)) {
+        latestByJob.set(jobId, event);
+      }
+    }
+    return latestByJob;
+  }
+
+  function buildFollowUpEnteredAtByJob(events: any[]) {
+    const enteredByJob = new Map<string, string>();
+    for (const event of Array.isArray(events) ? events : []) {
+      const jobId = String(event?.job_id ?? "").trim();
+      const createdAt = String(event?.created_at ?? "").trim();
+      if (!jobId || !createdAt || enteredByJob.has(jobId)) continue;
+
+      const changes = Array.isArray(event?.meta?.changes) ? event.meta.changes : [];
+      const hasReminderEntered = changes.some((change: any) => {
+        const field = String(change?.field ?? "").trim().toLowerCase();
+        if (!["follow_up_date", "next_action_note", "action_required_by"].includes(field)) return false;
+        return Boolean(String(change?.to ?? "").trim());
+      });
+
+      if (hasReminderEntered) enteredByJob.set(jobId, createdAt);
+    }
+    return enteredByJob;
+  }
+
   function failedStatusSinceByJob(jobId: string): string | null {
     const run = latestFailedRunByJob.get(jobId);
     if (!run) return null;
@@ -476,6 +512,65 @@ function telHref(phone?: string | null) {
         failedEvidenceAt: failedStatusSinceByJob(jobId),
       }) ?? "Not available"
     );
+  }
+
+  function compactDurationSince(value?: string | null) {
+    const startMs = toEpochMs(value);
+    if (!startMs) return "Unknown";
+
+    const elapsedMs = Math.max(0, Date.now() - startMs);
+    const days = Math.floor(elapsedMs / 86_400_000);
+    if (days >= 1) return `${days}d`;
+
+    const hours = Math.floor(elapsedMs / 3_600_000);
+    if (hours >= 1) return `${hours}h`;
+
+    return "Today";
+  }
+
+  function formatJobEventLabel(event: any) {
+    const message = String(event?.message ?? "").replace(/\s+/g, " ").trim();
+    if (message) return message.length > 42 ? `${message.slice(0, 39)}...` : message;
+
+    const eventType = String(event?.event_type ?? "").trim();
+    if (!eventType) return "Updated";
+    return eventType.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
+  }
+
+  function workspaceQueueEnteredAt(job: any, queueKey: string) {
+    const jobId = String(job?.id ?? "").trim();
+    const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+
+    if (queueKey === "follow_ups") {
+      return (jobId ? followUpEnteredAtByJob.get(jobId) ?? null : null) || String(job?.created_at ?? "").trim() || null;
+    }
+
+    if (queueKey === "closeout") {
+      return String(job?.field_complete_at ?? "").trim() || (jobId ? opsStatusEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) || String(job?.created_at ?? "").trim() || null;
+    }
+
+    if (queueKey === "exceptions") {
+      return (jobId ? opsStatusEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) || failedStatusSinceByJob(jobId) || String(job?.created_at ?? "").trim() || null;
+    }
+
+    return (jobId ? opsStatusEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) || String(job?.created_at ?? "").trim() || null;
+  }
+
+  function workspaceQueueClockTag(job: any, queueKey: string) {
+    const enteredAt = workspaceQueueEnteredAt(job, queueKey);
+    if (!enteredAt) return workspaceAgeLabel(job);
+    return `${compactDurationSince(enteredAt)} · ${formatWorkspaceTimestamp(enteredAt)}`;
+  }
+
+  function workspaceLastActionTag(job: any) {
+    const jobId = String(job?.id ?? "").trim();
+    const latestEvent = jobId ? latestJobEventByJob.get(jobId) : null;
+    if (latestEvent?.created_at) {
+      return `${formatJobEventLabel(latestEvent)} · ${formatWorkspaceTimestamp(String(latestEvent.created_at))}`;
+    }
+
+    const createdAt = String(job?.created_at ?? "").trim();
+    return createdAt ? `Created · ${formatWorkspaceTimestamp(createdAt)}` : "No activity";
   }
 
   function wsStatusReason(job: any, queueKey: string) {
@@ -1084,6 +1179,24 @@ function telHref(phone?: string | null) {
 
     if (selectedPreviewCustomerAttemptEventsRes.error) throw selectedPreviewCustomerAttemptEventsRes.error;
 
+    const selectedPreviewJobEventsRes = selectedPreviewJobIds.length
+      ? await supabase
+          .from("job_events")
+          .select("job_id, event_type, created_at, message, meta")
+          .in("job_id", selectedPreviewJobIds)
+          .order("created_at", { ascending: false })
+          .limit(1000)
+      : { data: [], error: null };
+
+    if (selectedPreviewJobEventsRes.error) throw selectedPreviewJobEventsRes.error;
+
+    const selectedPreviewJobEvents = selectedPreviewJobEventsRes.data ?? [];
+    opsStatusEnteredAtByJob = buildOpsStatusEnteredAtByJob(
+      selectedPreviewJobEvents.filter((event: any) => String(event?.event_type ?? "") === "ops_update"),
+    );
+    followUpEnteredAtByJob = buildFollowUpEnteredAtByJob(selectedPreviewJobEvents);
+    latestJobEventByJob = buildLatestJobEventByJob(selectedPreviewJobEvents);
+
     latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
     primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
     const selectedPreviewLatestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
@@ -1261,7 +1374,8 @@ function telHref(phone?: string | null) {
               value: visibleReason.label,
               detail: visibleReason.detail || undefined,
             },
-            { label: "Aging", value: workspaceAgeLabel(job) },
+            { label: "In Queue", value: workspaceQueueClockTag(job, "need_to_schedule") },
+            { label: "Last Action", value: workspaceLastActionTag(job), fullWidth: true },
             { label: "Last Attempt", value: recentAttemptDisplay },
           ]}
         >
@@ -1426,9 +1540,6 @@ function telHref(phone?: string | null) {
         needsInvoice: needs.needsInvoice,
         billingState: projection?.billingState ?? null,
       });
-      const completedText = job?.field_complete_at
-        ? formatWorkspaceTimestamp(String(job.field_complete_at))
-        : "Completion pending";
       const scheduledText = job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "";
       const assignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
       const contractorName = workspaceContractorName(job);
@@ -1456,7 +1567,8 @@ function telHref(phone?: string | null) {
               value: visibleReason.label,
               detail: visibleReason.detail || undefined,
             },
-            { label: "Completed", value: completedText },
+            { label: "In Queue", value: workspaceQueueClockTag(job, "closeout") },
+            { label: "Last Action", value: workspaceLastActionTag(job), fullWidth: true },
             {
               label: "Needs",
               value:
@@ -1588,6 +1700,8 @@ function telHref(phone?: string | null) {
           tags={[
             { label: "Due", value: dueDate ? formatBusinessDateUS(dueDate) : "No date set" },
             { label: "Urgency", value: urgency.label },
+            { label: "In Queue", value: workspaceQueueClockTag(job, "follow_ups") },
+            { label: "Last Action", value: workspaceLastActionTag(job), fullWidth: true },
             { label: "Owner", value: owner },
             { label: "Status", value: statusLabel },
             { label: "Reminder", value: note, fullWidth: true },
@@ -2728,8 +2842,13 @@ function telHref(phone?: string | null) {
                           detail: visibleReason.detail || undefined,
                         },
                         {
-                          label: "Days Aging",
-                          value: workspaceAgeLabel(job),
+                          label: "In Queue",
+                          value: workspaceQueueClockTag(job, selectedWorkspaceSection.key),
+                        },
+                        {
+                          label: "Last Action",
+                          value: workspaceLastActionTag(job),
+                          fullWidth: true,
                         },
                         {
                           label: "Assignment",

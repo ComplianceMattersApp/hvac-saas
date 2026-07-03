@@ -521,8 +521,11 @@ describe("focused queue display labels", () => {
     expect(opsPageSource).toContain("value: workspaceContractorName(job)");
   });
 
-  it("Operations Workspace rows keep Days Aging and avoid dash-only metadata fallbacks", () => {
-    expect(opsPageSource).toContain("Days Aging");
+  it("Operations Workspace rows keep queue/action timing and avoid dash-only metadata fallbacks", () => {
+    expect(opsPageSource).toContain("In Queue");
+    expect(opsPageSource).toContain("Last Action");
+    expect(opsPageSource).toContain("workspaceQueueClockTag");
+    expect(opsPageSource).toContain("workspaceLastActionTag");
     expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
     expect(opsPageSource).toContain("Not available");
     expect(opsPageSource).not.toContain("Age/Time:");
