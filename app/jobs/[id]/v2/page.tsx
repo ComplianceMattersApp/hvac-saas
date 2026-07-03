@@ -532,28 +532,14 @@ export default async function JobDetailV2Page({
   // brief fields
   const visitReasonText = String(job.service_visit_reason ?? job.title ?? "").trim();
   const jobTitleText = String(job.title ?? "").trim();
-  const briefFields: Array<{ label: string; value: string }> = [
-    {
-      label: "Visit Reason",
-      value: visitReasonText || "—",
-    },
-    // Show Customer Concern only when the job title differs from the visit reason
-    ...(jobTitleText && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase()
-      ? [{ label: "Customer Concern", value: jobTitleText }]
-      : []),
-    {
-      label: "Service Details",
-      value: String(job.service_visit_type ?? "").trim() || "—",
-    },
-    {
-      label: "Work Summary",
-      value: isTerminal
-        ? String(job.visit_scope_summary ?? "").trim() || "Visit submitted — no summary captured."
-        : visitStarted
-          ? String(job.visit_scope_summary ?? "").trim() || "On site — work in progress."
-          : String(job.visit_scope_summary ?? "").trim() || "Pending field visit — no work items captured yet.",
-    },
-  ];
+  const hasCustomerConcern =
+    Boolean(jobTitleText) && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase();
+  const workSummaryText = String(job.visit_scope_summary ?? "").trim();
+  const workSummaryPlaceholder = isTerminal
+    ? "Visit submitted — no summary captured."
+    : visitStarted
+      ? "On site — work in progress."
+      : "Pending field visit — no work items captured yet.";
 
   // ECC test run counts
   const eccRuns = (job.ecc_test_runs ?? []) as Array<{ is_completed: boolean | null; computed_pass: boolean | null; override_pass: boolean | null }>;
@@ -746,20 +732,18 @@ export default async function JobDetailV2Page({
           style={S.section}
         >
           <div style={{ ...S.sectionLabel, marginBottom: "20px" }}>Job Brief</div>
-          {/* 2×2 grid: Visit Reason / Customer Concern / Contractor / Billing */}
+          {/* Visit Reason / Customer Concern / Contractor / Billing */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px 48px" }}>
             <div>
               <div style={S.fieldLabel}>Visit Reason</div>
               <div style={S.fieldValue}>{visitReasonText || "—"}</div>
             </div>
-            <div>
-              <div style={S.fieldLabel}>Customer Concern</div>
-              <div style={S.fieldValue}>
-                {jobTitleText && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase()
-                  ? jobTitleText
-                  : "—"}
+            {hasCustomerConcern ? (
+              <div>
+                <div style={S.fieldLabel}>Customer Concern</div>
+                <div style={S.fieldValue}>{jobTitleText}</div>
               </div>
-            </div>
+            ) : null}
             <div>
               <div style={S.fieldLabel}>Contractor</div>
               <div style={S.fieldValue}>{contractorDisplayName}</div>
@@ -811,13 +795,56 @@ export default async function JobDetailV2Page({
             }}
           >
             <div style={S.fieldLabel}>Work Summary</div>
-            <div style={{ ...S.fieldValue, lineHeight: 1.65 }}>
-              {isTerminal
-                ? String(job.visit_scope_summary ?? "").trim() || "Visit submitted — no summary captured."
-                : visitStarted
-                  ? String(job.visit_scope_summary ?? "").trim() || "On site — work in progress."
-                  : String(job.visit_scope_summary ?? "").trim() || "Pending field visit — no work items captured yet."}
-            </div>
+            <form action={updateJobVisitScopeFromForm} style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="tab" value="info" />
+              <input type="hidden" name="return_to" value={`${returnTo}#brief`} />
+              <input
+                type="hidden"
+                name="visit_scope_items_json"
+                value={JSON.stringify(visitScopeItems)}
+              />
+              <textarea
+                name="visit_scope_summary"
+                defaultValue={workSummaryText}
+                placeholder={workSummaryPlaceholder}
+                rows={3}
+                maxLength={600}
+                style={{
+                  width: "100%",
+                  minHeight: "78px",
+                  resize: "vertical",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid oklch(0.86 0.018 250)",
+                  background: "#fff",
+                  color: "oklch(0.27 0.02 262)",
+                  fontSize: "13.5px",
+                  lineHeight: 1.55,
+                  fontFamily: "inherit",
+                  outline: "none",
+                }}
+              />
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="submit"
+                  style={{
+                    height: "34px",
+                    padding: "0 12px",
+                    borderRadius: "8px",
+                    border: "1px solid oklch(0.85 0.04 255)",
+                    background: "oklch(0.97 0.02 255)",
+                    color: "oklch(0.45 0.14 255)",
+                    fontSize: "12.5px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Save Summary
+                </button>
+              </div>
+            </form>
           </div>
         </section>
 
@@ -1500,52 +1527,6 @@ export default async function JobDetailV2Page({
             }}
           >
             <div style={S.sectionLabel}>Work &amp; Billing</div>
-            <form action={updateJobVisitScopeFromForm} style={{ display: "inline" }}>
-              <input type="hidden" name="job_id" value={jobId} />
-              <input type="hidden" name="tab" value="info" />
-              <input type="hidden" name="return_to" value={returnTo} />
-              <input
-                type="hidden"
-                name="visit_scope_items_json"
-                value={JSON.stringify(visitScopeItems)}
-              />
-              <input
-                type="text"
-                name="visit_scope_summary"
-                defaultValue={String(job.visit_scope_summary ?? "")}
-                placeholder="Add / update work summary…"
-                style={{
-                  height: "34px",
-                  padding: "0 10px",
-                  borderRadius: "8px",
-                  border: "1px solid oklch(0.85 0.04 255)",
-                  background: "oklch(0.97 0.02 255)",
-                  color: "oklch(0.27 0.02 262)",
-                  fontSize: "12.5px",
-                  fontFamily: "inherit",
-                  width: "220px",
-                  outline: "none",
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  height: "34px",
-                  padding: "0 12px",
-                  marginLeft: "6px",
-                  borderRadius: "8px",
-                  border: "1px solid oklch(0.85 0.04 255)",
-                  background: "oklch(0.97 0.02 255)",
-                  color: "oklch(0.45 0.14 255)",
-                  fontSize: "12.5px",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                Save
-              </button>
-            </form>
           </div>
 
           {/* work items */}
