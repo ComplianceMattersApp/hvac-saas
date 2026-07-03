@@ -81,8 +81,13 @@ describe("desktop job detail V2 billing brief", () => {
     const appointmentIndex = source.indexOf("Appointment", headerBandIndex);
 
     expect(source).toContain('const hasScheduledAppointment = Boolean(job.scheduled_date || job.window_start || job.window_end);');
+    expect(source).toContain("function formatStandardTimeLA");
+    expect(source).toContain("function formatStandardWindowLA");
     expect(source).toContain('const scheduledAppointmentText = [');
-    expect(source).toContain('displayWindowLA(job.window_start, job.window_end)');
+    expect(source).toContain('const scheduledAppointmentDateText = formatBusinessDateUS(job.scheduled_date);');
+    expect(source).toContain('const scheduledAppointmentWindowText = formatStandardWindowLA(job.window_start, job.window_end);');
+    expect(source).toContain("{scheduledAppointmentDateText}");
+    expect(source).toContain("{scheduledAppointmentWindowText}");
     expect(source).toContain('deriveStatusPill(status, opsStatus, hasScheduledAppointment)');
     expect(scheduledBranch).toBeGreaterThan(-1);
     expect(needsScheduleBranch).toBeGreaterThan(-1);

@@ -49,7 +49,7 @@ import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { displayTimeLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 import DeferredTimelineBody from "../_components/DeferredTimelineBody";
 import DeferredInternalNotesBody from "../_components/DeferredInternalNotesBody";
@@ -154,6 +154,26 @@ const S = {
 function param(sp: SearchParams, key: string): string {
   const v = sp[key];
   return typeof v === "string" ? v.trim() : "";
+}
+
+function formatStandardTimeLA(value?: string | null): string {
+  const time = displayTimeLA(value);
+  const match = time.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return time;
+
+  const hour = Number(match[1]);
+  const minute = match[2];
+  const period = hour >= 12 ? "PM" : "AM";
+  const standardHour = hour % 12 || 12;
+  return `${standardHour}:${minute} ${period}`;
+}
+
+function formatStandardWindowLA(start?: string | null, end?: string | null): string {
+  const startText = formatStandardTimeLA(start);
+  const endText = formatStandardTimeLA(end);
+  if (!startText && !endText) return "";
+  if (startText && endText) return `${startText} - ${endText}`;
+  return startText || endText;
 }
 
 type StatusPill = {
@@ -474,9 +494,11 @@ export default async function JobDetailV2Page({
   const visitStarted = isFieldActive || isEnRoute;
   const isTerminal = fieldComplete || status === "completed" || status === "cancelled";
   const hasScheduledAppointment = Boolean(job.scheduled_date || job.window_start || job.window_end);
+  const scheduledAppointmentDateText = formatBusinessDateUS(job.scheduled_date);
+  const scheduledAppointmentWindowText = formatStandardWindowLA(job.window_start, job.window_end);
   const scheduledAppointmentText = [
-    formatBusinessDateUS(job.scheduled_date),
-    displayWindowLA(job.window_start, job.window_end),
+    scheduledAppointmentDateText,
+    scheduledAppointmentWindowText,
   ].filter(Boolean).join(" - ");
 
   const statusPill = deriveStatusPill(status, opsStatus, hasScheduledAppointment);
@@ -884,18 +906,35 @@ export default async function JobDetailV2Page({
                 >
                   Appointment
                 </span>
-                <span
-                  style={{
-                    display: "block",
-                    fontSize: "13.5px",
-                    lineHeight: 1.35,
-                    fontWeight: 750,
-                    color: "oklch(0.28 0.018 262)",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {scheduledAppointmentText}
-                </span>
+                {scheduledAppointmentDateText ? (
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "13.5px",
+                      lineHeight: 1.25,
+                      fontWeight: 750,
+                      color: "oklch(0.28 0.018 262)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {scheduledAppointmentDateText}
+                  </span>
+                ) : null}
+                {scheduledAppointmentWindowText ? (
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: scheduledAppointmentDateText ? "3px" : 0,
+                      fontSize: "13px",
+                      lineHeight: 1.25,
+                      fontWeight: 700,
+                      color: "oklch(0.34 0.02 262)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {scheduledAppointmentWindowText}
+                  </span>
+                ) : null}
               </span>
             ) : null}
           </div>
