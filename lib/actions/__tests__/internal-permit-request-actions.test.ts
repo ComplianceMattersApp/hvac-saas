@@ -998,7 +998,7 @@ describe("internal manual permit request actions", () => {
         jurisdiction: null,
         permit_date: null,
         ops_status: "on_hold",
-        on_hold_reason: "Pending Install",
+        on_hold_reason: "Permit pulled and waiting for install",
         pending_info_reason: null,
       },
     ]);
@@ -1333,7 +1333,7 @@ describe("internal manual permit request actions", () => {
         customer_id: "customer-1",
         location_id: "location-1",
         ops_status: "on_hold",
-        on_hold_reason: "Pending Install",
+        on_hold_reason: "Permit pulled and waiting for install",
         pending_info_reason: null,
         scheduled_date: null,
         window_start: null,

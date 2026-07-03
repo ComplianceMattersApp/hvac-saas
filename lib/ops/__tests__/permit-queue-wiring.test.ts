@@ -79,7 +79,7 @@ describe("Ops workspace permit queue wiring", () => {
 
     expect(opsPageSource).toContain("createJobFromPermitRequestAndMarkCreated");
     expect(opsPageSource).toContain("createJobAndMarkPermitCreatedFromOps");
-    expect(branch).toContain("No job is linked yet. Create the testing job from this permit request when the permit is ready.");
+    expect(branch).toContain("No job is linked yet. Creating the permit automatically moves this workflow into job creation using the existing permit information.");
     expect(branch).toContain("Create Job & Mark Permit Created");
     expect(branch).toContain('name="customer_location_mode"');
     expect(branch).toContain('value="existing_existing"');
@@ -96,8 +96,11 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain('name="city"');
     expect(branch).toContain('name="state"');
     expect(branch).toContain('name="zip"');
-    expect(branch).toContain("Creates an unscheduled ECC testing job and moves it to Scheduling.");
-    expect(branch).toContain("Creates an ECC testing job and places it On Hold");
+    expect(branch).toContain("Is the job ready to be tested?");
+    expect(branch).toContain("Ready - schedule now or queue for scheduling");
+    expect(branch).toContain("Waiting for install");
+    expect(branch).toContain("Creates an unscheduled ECC testing job and places it in the waiting to be scheduled queue.");
+    expect(branch).toContain("Creates an ECC testing job and places it in Waiting / Pending Info as On Hold: Permit pulled and waiting for install.");
   });
 
   it("keeps linked active permit requests on the existing mark-created path", () => {
@@ -106,7 +109,7 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain("permitRequest.jobId ? (");
     expect(branch).toContain('action={markPermitCreatedFromOps}');
     expect(branch).toContain('action={createJobAndMarkPermitCreatedFromOps}');
-    expect(branch).toContain("Moves the linked job toward scheduling if it is not already scheduled.");
+    expect(branch).toContain("Moves the linked job to scheduling when it is unscheduled, or keeps it scheduled if it already has a time.");
     expect(branch).toContain("Create Job & Mark Permit Created");
   });
 
@@ -124,10 +127,11 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain('name="post_permit_route"');
     expect(branch).toContain('value="ready_for_testing"');
     expect(branch).toContain('value="pending_install"');
-    expect(branch).toContain("Ready for Testing");
-    expect(branch).toContain("Pending Install");
-    expect(branch).toContain("Moves the linked job toward scheduling if it is not already scheduled.");
-    expect(branch).toContain("Moves the linked job to Waiting / On Hold");
+    expect(branch).toContain("Is the job ready to be tested?");
+    expect(branch).toContain("Ready - schedule now or queue for scheduling");
+    expect(branch).toContain("Waiting for install");
+    expect(branch).toContain("Moves the linked job to scheduling when it is unscheduled, or keeps it scheduled if it already has a time.");
+    expect(branch).toContain("Moves the linked job to Waiting / Pending Info as On Hold: Permit pulled and waiting for install.");
   });
 
   it("renders read-only submitted permit files without upload controls", () => {

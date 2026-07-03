@@ -2498,7 +2498,7 @@ function telHref(phone?: string | null) {
                               />
                             </label>
                             <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              What happens next?
+                              Is the job ready to be tested?
                               <select
                                 name="post_permit_route"
                                 required
@@ -2506,18 +2506,18 @@ function telHref(phone?: string | null) {
                                 className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
                               >
                                 <option value="" disabled>Select next step</option>
-                                <option value="ready_for_testing">Ready for Testing</option>
-                                <option value="pending_install">Pending Install</option>
+                                <option value="ready_for_testing">Ready - schedule now or queue for scheduling</option>
+                                <option value="pending_install">Waiting for install</option>
                               </select>
                             </label>
                             <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
                               <div>
-                                <span className="font-semibold text-slate-700">Ready for Testing:</span>{" "}
-                                Moves the linked job toward scheduling if it is not already scheduled.
+                                <span className="font-semibold text-slate-700">Ready:</span>{" "}
+                                Moves the linked job to scheduling when it is unscheduled, or keeps it scheduled if it already has a time.
                               </div>
                               <div>
-                                <span className="font-semibold text-slate-700">Pending Install:</span>{" "}
-                                Moves the linked job to Waiting / On Hold — Pending Install.
+                                <span className="font-semibold text-slate-700">Waiting for install:</span>{" "}
+                                Moves the linked job to Waiting / Pending Info as On Hold: Permit pulled and waiting for install.
                               </div>
                             </div>
                             <div className="flex justify-end md:col-span-2">
@@ -2533,7 +2533,7 @@ function telHref(phone?: string | null) {
                           <form action={createJobAndMarkPermitCreatedFromOps} className="mt-2 grid gap-2 md:grid-cols-2">
                             <input type="hidden" name="permit_request_id" value={permitRequest.id} />
                             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-medium leading-5 text-amber-950 md:col-span-2">
-                              No job is linked yet. Create the testing job from this permit request when the permit is ready.
+                              No job is linked yet. Creating the permit automatically moves this workflow into job creation using the existing permit information.
                             </div>
                             <label className="grid gap-1 text-xs font-semibold text-slate-600">
                               Permit number
@@ -2564,7 +2564,7 @@ function telHref(phone?: string | null) {
                               />
                             </label>
                             <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                              What happens next?
+                              Is the job ready to be tested?
                               <select
                                 name="post_permit_route"
                                 required
@@ -2572,8 +2572,8 @@ function telHref(phone?: string | null) {
                                 className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
                               >
                                 <option value="" disabled>Select next step</option>
-                                <option value="ready_for_testing">Ready for Testing</option>
-                                <option value="pending_install">Pending Install</option>
+                                <option value="ready_for_testing">Ready - schedule now or queue for scheduling</option>
+                                <option value="pending_install">Waiting for install</option>
                               </select>
                             </label>
                             <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
@@ -2714,12 +2714,12 @@ function telHref(phone?: string | null) {
                             </label>
                             <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
                               <div>
-                                <span className="font-semibold text-slate-700">Ready for Testing:</span>{" "}
-                                Creates an unscheduled ECC testing job and moves it to Scheduling.
+                                <span className="font-semibold text-slate-700">Ready:</span>{" "}
+                                Creates an unscheduled ECC testing job and places it in the waiting to be scheduled queue.
                               </div>
                               <div>
-                                <span className="font-semibold text-slate-700">Pending Install:</span>{" "}
-                                Creates an ECC testing job and places it On Hold — Pending Install.
+                                <span className="font-semibold text-slate-700">Waiting for install:</span>{" "}
+                                Creates an ECC testing job and places it in Waiting / Pending Info as On Hold: Permit pulled and waiting for install.
                               </div>
                               <div>
                                 Existing customer/location selections are account-scoped. New location fields are explicit and are not parsed from the intake address hint.

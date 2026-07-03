@@ -77,7 +77,7 @@ export type InternalCreateJobFromPermitRequestInput = {
   jobTitle?: string | null;
 };
 
-const PENDING_INSTALL_REASON = "Pending Install";
+const PENDING_INSTALL_REASON = "Permit pulled and waiting for install";
 
 const TERMINAL_JOB_STATUSES = new Set(["completed", "cancelled", "failed", "closed", "archived"]);
 const PROTECTED_OPS_STATUSES = new Set([
