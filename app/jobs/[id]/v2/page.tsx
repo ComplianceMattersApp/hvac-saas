@@ -33,6 +33,7 @@ import {
   updateJobOpsDetailsFromForm,
   updateJobOpsFromForm,
 } from "@/lib/actions/job-ops-actions";
+import { createInternalInvoiceDraftFromForm } from "@/lib/actions/internal-invoice-actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
@@ -649,6 +650,55 @@ export default async function JobDetailV2Page({
   const advanceStatusAction = advanceJobStatusFromForm;
   const createReturnVisitAction = createNextServiceVisitFromForm;
   const createCallbackAction = createCallbackVisitFromForm;
+
+  const renderCloseoutBillingAction = (
+    buttonStyle: React.CSSProperties,
+    options?: { secondary?: boolean },
+  ) => {
+    if (!fieldComplete || !closeoutNeeds.needsInvoice) return null;
+
+    const commonStyle: React.CSSProperties = {
+      ...buttonStyle,
+      width: options?.secondary ? "100%" : buttonStyle.width,
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      textDecoration: "none",
+    };
+
+    if (billingState.internalInvoicePanelEnabled) {
+      if (primaryInvoiceRaw) {
+        return (
+          <Link href={`/jobs/${jobId}/invoice#invoice-workspace`} style={commonStyle}>
+            Continue Invoice
+          </Link>
+        );
+      }
+
+      return (
+        <form action={createInternalInvoiceDraftFromForm}>
+          <input type="hidden" name="job_id" value={jobId} />
+          <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice#invoice-workspace`} />
+          <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+          <ImmediateSubmitButton pendingText="Starting..." className="" style={commonStyle}>
+            Create Invoice
+          </ImmediateSubmitButton>
+        </form>
+      );
+    }
+
+    if (!canShowInvoiceButton) return null;
+
+    return (
+      <form action={markInvoiceCompleteFromForm}>
+        <input type="hidden" name="job_id" value={jobId} />
+        <input type="hidden" name="return_to" value={returnTo} />
+        <ImmediateSubmitButton pendingText="Saving..." className="" style={commonStyle}>
+          External Billing Complete
+        </ImmediateSubmitButton>
+      </form>
+    );
+  };
 
   // nav items
   const navItems: NavItem[] = [
@@ -1770,7 +1820,7 @@ export default async function JobDetailV2Page({
                 </div>
               </div>
               <Link
-                href={`/jobs/${jobId}/invoice`}
+                href={`/jobs/${jobId}/invoice#invoice-workspace`}
                 style={{
                   height: "42px",
                   padding: "0 18px",
@@ -1799,7 +1849,7 @@ export default async function JobDetailV2Page({
                 </div>
               </div>
               <Link
-                href={`/jobs/${jobId}/invoice`}
+                href={`/jobs/${jobId}/invoice#invoice-workspace`}
                 style={{
                   height: "42px",
                   padding: "0 22px",
@@ -1829,45 +1879,55 @@ export default async function JobDetailV2Page({
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 {billingState.usesInternalInvoicing ? (
-                  <Link
-                    href={`/jobs/${jobId}/invoice`}
-                    style={{
-                      height: "42px",
-                      padding: "0 18px",
-                      borderRadius: "10px",
-                      border: "1px solid oklch(0.9 0.006 250)",
-                      background: "#fff",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      fontFamily: "inherit",
-                      color: "oklch(0.32 0.02 262)",
-                      textDecoration: "none",
-                      display: "inline-flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    Mark Externally Billed
-                  </Link>
+                  <form action={createInternalInvoiceDraftFromForm}>
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice#invoice-workspace`} />
+                    <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                    <ImmediateSubmitButton
+                      pendingText="Starting..."
+                      className=""
+                      style={{
+                        height: "42px",
+                        padding: "0 22px",
+                        borderRadius: "10px",
+                        border: "none",
+                        background: "oklch(0.27 0.02 262)",
+                        color: "#fff",
+                        fontSize: "13.5px",
+                        fontWeight: 600,
+                        fontFamily: "inherit",
+                        display: "inline-flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      Create Invoice
+                    </ImmediateSubmitButton>
+                  </form>
+                ) : canShowInvoiceButton ? (
+                  <form action={markInvoiceCompleteFromForm}>
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <ImmediateSubmitButton
+                      pendingText="Saving..."
+                      className=""
+                      style={{
+                        height: "42px",
+                        padding: "0 18px",
+                        borderRadius: "10px",
+                        border: "none",
+                        background: "oklch(0.27 0.02 262)",
+                        color: "#fff",
+                        fontSize: "13.5px",
+                        fontWeight: 600,
+                        fontFamily: "inherit",
+                        display: "inline-flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      External Billing Complete
+                    </ImmediateSubmitButton>
+                  </form>
                 ) : null}
-                <Link
-                  href={`/jobs/${jobId}/invoice`}
-                  style={{
-                    height: "42px",
-                    padding: "0 22px",
-                    borderRadius: "10px",
-                    border: "none",
-                    background: "oklch(0.27 0.02 262)",
-                    color: "#fff",
-                    fontSize: "13.5px",
-                    fontWeight: 600,
-                    fontFamily: "inherit",
-                    textDecoration: "none",
-                    display: "inline-flex",
-                    alignItems: "center",
-                  }}
-                >
-                  {billingState.usesInternalInvoicing ? "Create Invoice" : "Manage Billing"}
-                </Link>
               </div>
             </div>
           )}
@@ -2958,9 +3018,11 @@ export default async function JobDetailV2Page({
                     alignItems: "center",
                   }}
                 >
-                  Send Certs
+                  Certs were sent
                 </ImmediateSubmitButton>
               </form>
+            ) : fieldComplete && closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
+              renderCloseoutBillingAction(S.primaryBtn as React.CSSProperties)
             ) : fieldComplete && closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
               <form action={markInvoiceCompleteFromForm}>
                 <input type="hidden" name="job_id" value={jobId} />
@@ -2975,7 +3037,7 @@ export default async function JobDetailV2Page({
                     alignItems: "center",
                   }}
                 >
-                  Send Invoice
+                  External Billing Complete
                 </ImmediateSubmitButton>
               </form>
             ) : fieldComplete ? (
@@ -3014,6 +3076,8 @@ export default async function JobDetailV2Page({
                 windowEnd={String(job.window_end ?? "")}
                 action={updateJobScheduleFromForm}
               />
+            ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
+              renderCloseoutBillingAction(S.outlineBtn(false) as React.CSSProperties, { secondary: true })
             ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
               <form action={markInvoiceCompleteFromForm}>
                 <input type="hidden" name="job_id" value={jobId} />
@@ -3029,7 +3093,7 @@ export default async function JobDetailV2Page({
                     alignItems: "center",
                   }}
                 >
-                  Send Invoice
+                  External Billing Complete
                 </ImmediateSubmitButton>
               </form>
             ) : null}

@@ -22,6 +22,45 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("COMPLETE");
   });
 
+  it("routes unresolved internal invoice creation through direct draft creation", () => {
+    const readyInvoiceIndex = source.indexOf("Ready to invoice");
+    const readyInvoiceSlice = source.slice(readyInvoiceIndex, readyInvoiceIndex + 3200);
+
+    expect(readyInvoiceIndex).toBeGreaterThanOrEqual(0);
+    expect(source).toContain('import { createInternalInvoiceDraftFromForm } from "@/lib/actions/internal-invoice-actions";');
+    expect(readyInvoiceSlice).toContain("billingState.usesInternalInvoicing ? (");
+    expect(readyInvoiceSlice).toContain("createInternalInvoiceDraftFromForm");
+    expect(readyInvoiceSlice).toContain("return_to");
+    expect(readyInvoiceSlice).toContain("/invoice#invoice-workspace");
+    expect(readyInvoiceSlice).toContain("auto_import_visit_scope_items");
+    expect(readyInvoiceSlice).toContain("Create Invoice");
+    expect(readyInvoiceSlice).not.toContain("Mark Externally Billed");
+    expect(readyInvoiceSlice).not.toContain('href={`/jobs/${jobId}/invoice`}');
+  });
+
+  it("keeps external billing completion behind external lightweight billing mode", () => {
+    const readyInvoiceIndex = source.indexOf("Ready to invoice");
+    const readyInvoiceSlice = source.slice(readyInvoiceIndex, readyInvoiceIndex + 3200);
+
+    expect(readyInvoiceSlice).toContain(") : canShowInvoiceButton ? (");
+    expect(readyInvoiceSlice).toContain("markInvoiceCompleteFromForm");
+    expect(readyInvoiceSlice).toContain("External Billing Complete");
+    expect(source).not.toContain("Mark Externally Billed");
+  });
+
+  it("places billing closeout actions next to the certs completion action", () => {
+    const railIndex = source.indexOf("Certs were sent");
+    const railSlice = source.slice(railIndex, railIndex + 3600);
+
+    expect(railIndex).toBeGreaterThanOrEqual(0);
+    expect(railSlice).toContain("billingState.internalInvoicePanelEnabled");
+    expect(railSlice).toContain("renderCloseoutBillingAction(S.primaryBtn");
+    expect(railSlice).toContain("renderCloseoutBillingAction(S.outlineBtn");
+    expect(railSlice).toContain("External Billing Complete");
+    expect(railSlice).not.toContain("Send Certs");
+    expect(railSlice).not.toContain("Send Invoice");
+  });
+
   it("does not call field-complete jobs closed out while closeout blockers remain", () => {
     expect(source).toContain('isFailedUnresolved');
     expect(source).toContain('"Field Complete - Pending"');
