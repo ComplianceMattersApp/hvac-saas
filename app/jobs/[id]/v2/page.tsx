@@ -10,6 +10,7 @@ import {
 import {
   advanceJobStatusFromForm,
   getContractors,
+  archiveJobFromForm,
   createNextServiceVisitFromForm,
   createCallbackVisitFromForm,
   updateJobScheduleFromForm,
@@ -57,6 +58,7 @@ import DeferredJobAttachmentsInternal from "../_components/DeferredJobAttachment
 import ContractorReportPanel from "../_components/ContractorReportPanel";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
+import CancelJobButton from "@/components/jobs/CancelJobButton";
 
 import ScrollSpyNav, { type NavItem } from "./_components/ScrollSpyNav";
 import AlertBanner from "./_components/AlertBanner";
@@ -3243,6 +3245,69 @@ export default async function JobDetailV2Page({
               ))}
           </div>
         </div>
+
+        {isAdmin ? (
+          <details
+            style={{
+              marginTop: "20px",
+              paddingTop: "18px",
+              borderTop: "1px solid oklch(0.91 0.006 250)",
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                listStyle: "none",
+                fontFamily: S.mono,
+                fontSize: "9.5px",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: "oklch(0.46 0.13 25)",
+              }}
+            >
+              Danger Zone
+            </summary>
+            <div
+              style={{
+                marginTop: "12px",
+                display: "grid",
+                gap: "10px",
+                borderRadius: "11px",
+                border: "1px solid oklch(0.9 0.04 25)",
+                background: "oklch(0.98 0.012 25)",
+                padding: "12px",
+              }}
+            >
+              <div style={{ fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.42 0.05 25)" }}>
+                Archive hides this job across Ops, portal, and searches. Cancel keeps the job visible as cancelled.
+              </div>
+              <form action={archiveJobFromForm}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <button
+                  type="submit"
+                  style={{
+                    minHeight: "38px",
+                    width: "100%",
+                    borderRadius: "9px",
+                    border: "1px solid oklch(0.72 0.16 25)",
+                    background: "oklch(0.58 0.18 25)",
+                    color: "#fff",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Archive Job
+                </button>
+              </form>
+              {!["completed", "failed", "cancelled"].includes(status) ? (
+                <CancelJobButton jobId={jobId} />
+              ) : null}
+            </div>
+          </details>
+        ) : null}
         </div>
       </aside>
     </div>

@@ -28,6 +28,15 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("Permit Workflow");
   });
 
+  it("keeps admin archive controls available on the V2 job detail", () => {
+    expect(source).toContain('archiveJobFromForm');
+    expect(source).toContain('CancelJobButton');
+    expect(source).toContain('{isAdmin ? (');
+    expect(source).toContain('Danger Zone');
+    expect(source).toContain('Archive Job');
+    expect(source).toContain('<CancelJobButton jobId={jobId} />');
+  });
+
   it("routes unresolved internal invoice creation through direct draft creation", () => {
     const readyInvoiceIndex = source.indexOf("Ready to invoice");
     const readyInvoiceSlice = source.slice(readyInvoiceIndex, readyInvoiceIndex + 3200);
