@@ -117,19 +117,28 @@ export function buildJobBillingStateReadModel(input: {
     };
   }
 
+  const billedTruthSatisfied = jobInvoiceCompleteProjection || hasResolvedBillingDisposition;
+  const statusLabel = billingDisposition === "no_charge"
+    ? "No Charge Recorded"
+    : billingDisposition === "externally_billed"
+      ? "Externally Billed"
+      : jobInvoiceCompleteProjection
+        ? "Invoice Complete"
+        : "Billing Pending";
+
   return {
     billingMode,
     usesExternalBilling,
     usesInternalInvoicing,
     hasInternalInvoice,
     internalInvoiceStatus,
-    billedTruthSatisfied: jobInvoiceCompleteProjection,
+    billedTruthSatisfied,
     jobInvoiceCompleteProjection,
-    projectionMatchesBilledTruth: true,
+    projectionMatchesBilledTruth: jobInvoiceCompleteProjection === billedTruthSatisfied,
     lightweightBillingAllowed: true,
     internalInvoicePanelEnabled: false,
-    statusLabel: jobInvoiceCompleteProjection ? "Invoice Complete" : "Billing Pending",
-    statusTone: jobInvoiceCompleteProjection ? "emerald" : "amber",
+    statusLabel,
+    statusTone: billedTruthSatisfied ? "emerald" : "amber",
   };
 }
 

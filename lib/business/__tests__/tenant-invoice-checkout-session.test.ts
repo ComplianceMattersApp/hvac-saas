@@ -441,6 +441,27 @@ describe("createTenantInvoiceCheckoutSession", () => {
 
     expect(createMock).not.toHaveBeenCalled();
   });
+
+  it("legacy externally billed jobs block checkout session creation even when invoice projection is stale", async () => {
+    const fixture = buildSupabaseFixture({
+      jobInvoiceComplete: false,
+      jobBillingDisposition: "externally_billed",
+    });
+    const createMock = vi.fn();
+
+    await expect(
+      createTenantInvoiceCheckoutSession({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        stripe: { checkout: { sessions: { create: createMock, expire: vi.fn() } } } as any,
+        appUrl: "http://localhost:3000",
+      }),
+    ).rejects.toThrow("resolved outside online payment");
+
+    expect(createMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("createTenantInvoicePaymentLink", () => {
@@ -562,6 +583,24 @@ describe("createTenantInvoicePaymentLink", () => {
     const fixture = buildSupabaseFixture({
       jobInvoiceComplete: true,
       jobBillingDisposition: "externally_billed",
+    });
+
+    await expect(
+      createTenantInvoicePaymentLink({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        appUrl: "https://app.example",
+        signingSecret: "test-secret",
+      }),
+    ).rejects.toThrow("resolved outside online payment");
+  });
+
+  it("legacy no-charge jobs block new app payment links even when invoice projection is stale", async () => {
+    const fixture = buildSupabaseFixture({
+      jobInvoiceComplete: false,
+      jobBillingDisposition: "no_charge",
     });
 
     await expect(

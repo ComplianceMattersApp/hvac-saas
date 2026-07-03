@@ -13,6 +13,7 @@ import {
   calculatePlatformApplicationFeeAmountCents,
   derivePlatformApplicationFeeConfig,
 } from "@/lib/business/platform-application-fees";
+import { normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 
 export const INTERNAL_INVOICE_PAYMENT_STATUSES = [
   "recorded",
@@ -216,8 +217,7 @@ export async function resolveJobBlocksOnlineInvoicePayment(params: {
 
   if (error || !data?.id) return false;
 
-  const disposition = String(data.billing_disposition ?? "").trim().toLowerCase();
-  return Boolean(data.invoice_complete) && (disposition === "externally_billed" || disposition === "no_charge");
+  return Boolean(data.invoice_complete) || Boolean(normalizeJobBillingDisposition(data.billing_disposition));
 }
 
 const INTERNAL_INVOICE_PAYMENT_SELECT = [
