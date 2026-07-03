@@ -61,6 +61,14 @@ describe("listCloseoutQueueJobs", () => {
         certs_complete: false,
         invoice_complete: false,
       },
+      {
+        id: "job-d",
+        job_type: "ecc",
+        ops_status: "closed",
+        field_complete: true,
+        certs_complete: true,
+        invoice_complete: false,
+      },
     ];
 
     const rows = listCloseoutQueueJobs(jobs, (job) => job);

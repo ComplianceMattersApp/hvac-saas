@@ -51,15 +51,16 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
   if (!job.field_complete) return false;
 
   const opsStatus = String(job.ops_status ?? "").toLowerCase();
+  if (opsStatus === "closed") return false;
+
   const needs = getCloseoutNeeds(job);
   const hasCloseoutWork = needs.needsInvoice || needs.needsCerts;
   if (!hasCloseoutWork) return false;
 
-  // Invoice-needed closeout is status-invariant. Failed/on-hold/pending status
-  // may add exception routing, but must not suppress closeout invoice reminder.
+  // Invoice-needed closeout is status-invariant for active statuses.
+  // Failed/on-hold/pending status may add exception routing, but must not
+  // suppress closeout invoice reminders. Closed remains terminal.
   if (needs.needsInvoice) return true;
-
-  if (opsStatus === "closed") return false;
 
   if (opsStatus === "invoice_required" || opsStatus === "paperwork_required") return true;
 

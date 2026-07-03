@@ -42,7 +42,7 @@ describe("closeout queue projection", () => {
     expect(isInCloseoutQueue(job)).toBe(false);
   });
 
-  it("keeps closed-status rows in closeout if invoice truth is still incomplete", () => {
+  it("keeps closed-status rows out of the active closeout queue even when legacy invoice truth is stale", () => {
     expect(
       isInCloseoutQueue({
         field_complete: true,
@@ -50,7 +50,17 @@ describe("closeout queue projection", () => {
         ops_status: "closed",
         invoice_complete: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
+
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "closed",
+        invoice_complete: false,
+        certs_complete: true,
+      }),
+    ).toBe(false);
   });
 
   it("does not treat failed ECC jobs as needing cert closeout while failure is unresolved", () => {

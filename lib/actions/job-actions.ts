@@ -11809,6 +11809,7 @@ if (jobType !== "ecc") {
     .from("jobs")
     .update({
       invoice_number: invoice,
+      invoice_complete: true,
       data_entry_completed_at: completedAt,
     })
     .eq("id", id);
@@ -11823,6 +11824,7 @@ if (jobType !== "ecc") {
       source: "job_detail_data_entry",
       changes: [
         { field: "invoice_number", from: job?.invoice_number ?? null, to: invoice },
+        { field: "invoice_complete", from: !!job?.invoice_complete, to: true },
         { field: "data_entry_completed_at", from: job?.data_entry_completed_at ?? null, to: completedAt },
       ],
     },
