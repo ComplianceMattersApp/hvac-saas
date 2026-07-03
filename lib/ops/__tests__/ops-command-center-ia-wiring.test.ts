@@ -42,6 +42,16 @@ const queueCardSource = readFileSync(
   "utf-8",
 );
 
+const jobContactActionsSource = readFileSync(
+  resolve(__dirname, "../../../lib/actions/job-contact-actions.ts"),
+  "utf-8",
+);
+
+const clearContactAttemptAutoFollowupsMigrationSource = readFileSync(
+  resolve(__dirname, "../../../supabase/migrations/20260702205000_clear_contact_attempt_auto_followups.sql"),
+  "utf-8",
+);
+
 const contractorFocusSelectorSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/ContractorFocusSelector.tsx"),
   "utf-8",
@@ -143,6 +153,16 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('variant: "follow-up-soon"');
     expect(queueCardSource).toContain('variant === "follow-up-overdue" || variant === "follow-up-due"');
     expect(queueCardSource).toContain('variant === "follow-up-soon" || variant === "follow-up-unscheduled"');
+  });
+
+  it("keeps contact attempts from auto-creating Follow Ups queue reminders", () => {
+    expect(jobContactActionsSource).toContain("Contact attempts are history only.");
+    expect(jobContactActionsSource).toContain("Follow-up reminders are created through");
+    expect(jobContactActionsSource).not.toContain("function nextFollowUpDate");
+    expect(jobContactActionsSource).not.toContain("follow_up_date: followUp");
+    expect(clearContactAttemptAutoFollowupsMigrationSource).toContain("legacy contact-attempt cadence reminders");
+    expect(clearContactAttemptAutoFollowupsMigrationSource).toContain("event_type = 'customer_attempt'");
+    expect(clearContactAttemptAutoFollowupsMigrationSource).toContain("next_action_note");
   });
 
   it("restores fixed queue chips as the primary Ops queue selector", () => {

@@ -82,17 +82,6 @@ function todayYYYYMMDD() {
 }
 
 
-/**
- * Eddie cadence rule (hard-coded for now; easy to move to settings later):
- * - First 3 attempts: next follow-up = +1 day (daily)
- * - After that: next follow-up = +3 days (roughly twice per week)
- */
-function nextFollowUpDate(attemptCountAfterInsert: number) {
-  const base = todayYYYYMMDD();
-  const daysToAdd = attemptCountAfterInsert <= 3 ? 1 : 3;
-  return addDays(base, daysToAdd);
-}
-
 async function requireOperationalContactMutationEntitlementAccessOrRedirect(params: {
   supabase: any;
   accountOwnerUserId: string | null | undefined;
@@ -251,21 +240,11 @@ export async function logCustomerContactAttemptFromForm(formData: FormData): Pro
   if (insertErr) throw new Error(insertErr.message);
   completePhase("jobEventsInsert");
 
-  // 3) Auto-set follow-up date based on cadence
-  const followUp = nextFollowUpDate(attemptCountAfter);
+  // Contact attempts are history only. Follow-up reminders are created through
+  // the explicit ops details form so the Follow Ups queue stays user-authored.
+  setPhaseValue("jobsFollowUpUpdate", 0);
 
-  const { error: updateErr } = await supabase
-    .from("jobs")
-    .update({
-      action_required_by: "customer",
-      follow_up_date: followUp,
-    })
-    .eq("id", jobId);
-
-  if (updateErr) throw new Error(updateErr.message);
-  completePhase("jobsFollowUpUpdate");
-
-  // 4) End-of-week escalation breadcrumb (>= 7 days since first attempt)
+  // 3) End-of-week escalation breadcrumb (>= 7 days since first attempt)
   const today = todayYYYYMMDD();
   // Compare YYYY-MM-DD strings works because ISO order is lexicographic
   const weekMark = addDays(firstAttemptDate, 7);
