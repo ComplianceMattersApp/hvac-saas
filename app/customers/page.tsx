@@ -8,6 +8,7 @@ import {
   listScopedCustomerDirectory,
 } from "@/lib/customers/visibility";
 import { CustomerSearchPanel } from "@/app/customers/_components/CustomerSearchPanel";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import {
   buildCustomerDirectorySections,
   CUSTOMER_DIRECTORY_NAV_KEYS,
@@ -87,10 +88,8 @@ export default async function CustomersPage(props: {
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
         <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:px-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              {hasQuery ? "Filtered Directory" : "Alphabetical Directory"}
-            </p>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+            <SectionEyebrow>{hasQuery ? "Filtered Directory" : "Alphabetical Directory"}</SectionEyebrow>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-navy">
               {hasQuery ? `Customers matching "${q}"` : "Customers A-Z"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -114,7 +113,7 @@ export default async function CustomersPage(props: {
             {canExportCustomers ? (
               <Link
                 href={customerExportHref({ q, sort })}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-800"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
               >
                 <Download className="h-4 w-4" aria-hidden="true" />
                 Export CSV
@@ -134,7 +133,7 @@ export default async function CustomersPage(props: {
                   key={letter}
                   href={`#${getCustomerDirectoryAnchorId(letter)}`}
                   aria-label={`Jump to customers starting with ${letter === "#" ? "a number or symbol" : letter}`}
-                  className="inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                  className="inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-md border border-blue-600 bg-blue-600 px-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
                 >
                   {letter}
                 </a>
@@ -145,7 +144,7 @@ export default async function CustomersPage(props: {
               {CUSTOMER_DIRECTORY_NAV_KEYS.map((letter) => {
                 const isActive = activeDirectoryLetters.has(letter);
                 const chipClass = isActive
-                  ? "border-slate-300 bg-white text-slate-900 shadow-sm hover:border-slate-400 hover:bg-slate-100"
+                  ? "border-blue-600 bg-blue-600 text-white shadow-sm hover:bg-blue-700"
                   : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400";
 
                 return isActive ? (
@@ -177,7 +176,7 @@ export default async function CustomersPage(props: {
         {results.length === 0 ? (
           <div className="px-5 py-8">
             <div className="space-y-1">
-              <h2 className="text-base font-semibold text-slate-950">
+              <h2 className="text-base font-semibold text-navy">
                 {hasQuery ? "No customer matches" : "No customers visible yet"}
               </h2>
               <p className="text-sm leading-6 text-slate-600">

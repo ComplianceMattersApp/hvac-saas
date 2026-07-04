@@ -3,6 +3,7 @@
 import { ArrowRight, Mail, MapPin, Phone, Search, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 
 type CustomerSuggestion = {
   customer_id: string;
@@ -136,8 +137,8 @@ export function CustomerSearchPanel({ initialQuery }: { initialQuery: string }) 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <div className="min-w-0 space-y-4">
           <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Customer Directory</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Find a Customer</h1>
+            <SectionEyebrow>Customer Directory</SectionEyebrow>
+            <h1 className="text-2xl font-semibold tracking-tight text-navy">Find a Customer</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
               Search scoped customer records by the details operators actually have on hand: name, phone, email, street, or city.
             </p>
@@ -157,7 +158,7 @@ export function CustomerSearchPanel({ initialQuery }: { initialQuery: string }) 
             </label>
             <button
               type="submit"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:translate-y-[0.5px]"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[10px] bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 active:translate-y-[0.5px]"
             >
               Search
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -232,8 +233,8 @@ export function CustomerSearchPanel({ initialQuery }: { initialQuery: string }) 
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-slate-50/85 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Search Guidance</div>
-          <div className="mt-2 text-sm font-semibold text-slate-950">{searchIntent.title}</div>
+          <SectionEyebrow>Search Guidance</SectionEyebrow>
+          <div className="mt-2 text-sm font-semibold text-navy">{searchIntent.title}</div>
           <p className="mt-1 text-sm leading-6 text-slate-600">{searchIntent.helper}</p>
           <div className="mt-4 grid gap-2 text-xs text-slate-600">
             <div className="rounded-md border border-slate-200 bg-white px-3 py-2">Phone fragments work well, even with only a few digits.</div>
