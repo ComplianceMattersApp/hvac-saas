@@ -3620,49 +3620,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div>{selectedSystemName}</div>
             </div>
 
-            {runFilter ? (
-              <div
-                className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${
-                  runFilter.override_pass === true || runFilter.computed_pass === true
-                    ? "border-emerald-200 bg-emerald-50/70"
-                    : runFilter.override_pass === false || runFilter.computed_pass === false
-                    ? "border-red-200 bg-red-50/70"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className={eccUtilityLabelClass}>Focused Test</div>
-                    <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Air Filter Device Verification</div>
-                    <div className="mt-1 text-sm font-medium text-slate-700">{selectedSystemName}</div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                      runFilter.override_pass === true || runFilter.computed_pass === true
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : runFilter.override_pass === false || runFilter.computed_pass === false
-                        ? "border-red-200 bg-red-50 text-red-800"
-                        : "border-slate-200 bg-slate-50 text-slate-700"
-                    }`}
-                  >
-                    {getEffectiveResultLabel(runFilter)}
-                  </span>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Face Area</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-950">{formatAreaSquareInches(runFilter.computed?.calculated_nominal_face_area_sq_in ?? null)}</div>
-                    <div className="text-[10px] font-medium text-slate-500">in²</div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Required</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-950">{formatAreaSquareInches(runFilter.computed?.required_minimum_face_area_sq_in ?? null)}</div>
-                    <div className="text-[10px] font-medium text-slate-500">in²</div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
             {!runFilter ? (
               <form action={addEccTestRunFromForm} className="flex items-center gap-2">
                 <input type="hidden" name="job_id" value={job.id} />
@@ -3679,58 +3636,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runFilter.id} />
 
-                  <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Results</div>
-                    <p className="text-sm text-slate-600">Enter readings top to bottom in field order.</p>
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`filter-airflow-${runFilter.id}`}>
-                        Design Airflow CFM
-                      </label>
-                      <input
-                        id={`filter-airflow-${runFilter.id}`}
-                        name="design_airflow_cfm"
-                        type="number"
-                        step="0.01"
-                        className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
-                        defaultValue={runFilter.data?.design_airflow_cfm ?? ""}
-                        placeholder="Required for completion"
-                      />
+                  <div className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-950">Filter Face Area</div>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Enter the filter location, design airflow, and nominal filter size.
+                      </p>
                     </div>
-                    <div
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${
-                        runFilter.override_pass === true || runFilter.computed_pass === true
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : runFilter.override_pass === false || runFilter.computed_pass === false
-                          ? "border-red-200 bg-red-50 text-red-800"
-                          : "border-slate-200 bg-slate-50 text-slate-700"
-                      }`}
-                    >
-                      {runFilter.override_pass === true
-                        ? "Pass override active"
-                        : runFilter.override_pass === false
-                        ? "Fail override active"
-                        : runFilter.computed_pass === true
-                        ? "Pass"
-                        : runFilter.computed_pass === false
-                        ? "Fail"
-                        : "Needs input"}
-                    </div>
-                  </div>
 
-                  <details open className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">
-                            {fmtValue(runFilter.data?.nominal_depth_inches, "in")} x {fmtValue(runFilter.data?.nominal_width_inches, "in")} x {fmtValue(runFilter.data?.nominal_length_inches, "in")}
-                          </div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
-                      </div>
-                    </summary>
-
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="grid gap-1 sm:col-span-2">
                       <label className="text-sm font-medium" htmlFor={`filter-location-${runFilter.id}`}>
                         Filter Location / Description
@@ -3741,19 +3655,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         className="w-full rounded-md border px-3 py-2"
                         defaultValue={runFilter.data?.filter_location_description ?? ""}
                         placeholder="Return grille, filter cabinet, etc."
-                      />
-                    </div>
-
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`filter-rack-${runFilter.id}`}>
-                        Rack Type
-                      </label>
-                      <input
-                        id={`filter-rack-${runFilter.id}`}
-                        name="rack_type"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runFilter.data?.rack_type ?? ""}
-                        placeholder="1-inch throwaway, media cabinet, etc."
                       />
                     </div>
 
@@ -3817,35 +3718,50 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       />
                     </div>
 
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`filter-drop-${runFilter.id}`}>
-                        Design Allowable Pressure Drop, inches W.C.
-                      </label>
-                      <input
-                        id={`filter-drop-${runFilter.id}`}
-                        name="design_allowable_pressure_drop_iwc"
-                        type="number"
-                        step="0.01"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runFilter.data?.design_allowable_pressure_drop_iwc ?? ""}
-                      />
                     </div>
-                    </div>
-                  </details>
+                  </div>
 
                   <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
                     <summary className="cursor-pointer list-none">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">No override flow · Notes optional</div>
+                          <div className="font-semibold text-slate-900">Optional CF2R device details</div>
+                          <div className="mt-0.5 text-xs text-slate-600">Rack, pressure drop, and notes.</div>
                         </div>
                         <span className="text-xs font-semibold text-slate-600">Open</span>
                       </div>
                     </summary>
-                    <div className="mt-3 grid gap-1 sm:col-span-2">
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`filter-rack-${runFilter.id}`}>
+                          Rack Type
+                        </label>
+                        <input
+                          id={`filter-rack-${runFilter.id}`}
+                          name="rack_type"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runFilter.data?.rack_type ?? ""}
+                          placeholder="1-inch throwaway, media cabinet, etc."
+                        />
+                      </div>
+
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`filter-drop-${runFilter.id}`}>
+                          Design Allowable Pressure Drop, inches W.C.
+                        </label>
+                        <input
+                          id={`filter-drop-${runFilter.id}`}
+                          name="design_allowable_pressure_drop_iwc"
+                          type="number"
+                          step="0.01"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runFilter.data?.design_allowable_pressure_drop_iwc ?? ""}
+                        />
+                      </div>
+
+                      <div className="grid gap-1 sm:col-span-2">
                       <label className="text-sm font-medium" htmlFor={`filter-notes-${runFilter.id}`}>
-                        Notes (optional)
+                        Notes
                       </label>
                       <input
                         id={`filter-notes-${runFilter.id}`}
@@ -3854,25 +3770,69 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         defaultValue={runFilter.data?.notes ?? ""}
                         placeholder="Optional diagnostic notes"
                       />
+                      </div>
                     </div>
                   </details>
                 </form>
 
-                <EccLivePreview mode="air_filter_device" formId={filterSaveFormId} projectType={job.project_type} />
-
-                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
-                  <div className="mt-2 space-y-1">
-                    <div>Calculated Face Area: {formatAreaSquareInches(runFilter.computed?.calculated_nominal_face_area_sq_in ?? null)} in²</div>
-                    <div>Required Minimum Face Area: {formatAreaSquareInches(runFilter.computed?.required_minimum_face_area_sq_in ?? null)} in²</div>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      Face Area Compliance: {String(runFilter.computed?.face_area_compliance ?? "pending")
-                        .replaceAll("_", " ")
-                        .replace(/\b\w/g, (m) => m.toUpperCase())}
+                      <div className="font-semibold text-slate-900">Computed Summary</div>
+                      <div className="mt-1 text-xs text-slate-600">Saved calculation from the latest draft or completion.</div>
                     </div>
-                    <div>Compliance Statement: {fallbackText(runFilter.computed?.compliance_statement)}</div>
+                    <span
+                      className={`shrink-0 rounded-full border px-2.5 py-1 text-center text-xs font-semibold ${
+                        runFilter.override_pass === true || runFilter.computed_pass === true
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : runFilter.override_pass === false || runFilter.computed_pass === false
+                          ? "border-red-200 bg-red-50 text-red-800"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
+                    >
+                      {runFilter.override_pass === true
+                        ? "Pass override active"
+                        : runFilter.override_pass === false
+                        ? "Fail override active"
+                        : runFilter.computed_pass === true
+                        ? "Pass"
+                        : runFilter.computed_pass === false
+                        ? "Fail"
+                        : "Needs input"}
+                    </span>
                   </div>
-                </details>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                      <div className="text-xs font-semibold text-slate-500">Calculated Face Area</div>
+                      <div className="mt-1 font-semibold text-slate-950">
+                        {formatAreaSquareInches(runFilter.computed?.calculated_nominal_face_area_sq_in ?? null)} in²
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                      <div className="text-xs font-semibold text-slate-500">Required Minimum Face Area</div>
+                      <div className="mt-1 font-semibold text-slate-950">
+                        {formatAreaSquareInches(runFilter.computed?.required_minimum_face_area_sq_in ?? null)} in²
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                      <div className="text-xs font-semibold text-slate-500">Compliance Status</div>
+                      <div className="mt-1 font-semibold text-slate-950">
+                        {String(runFilter.computed?.face_area_compliance ?? "pending")
+                          .replaceAll("_", " ")
+                          .replace(/\b\w/g, (m) => m.toUpperCase())}
+                      </div>
+                    </div>
+                  </div>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs font-semibold text-slate-600">Calculation details</summary>
+                    <div className="mt-2 space-y-1 text-xs text-slate-600">
+                      <div>Design Airflow: {fmtValue(runFilter.data?.design_airflow_cfm, "CFM")}</div>
+                      <div>Nominal Length: {fmtValue(runFilter.data?.nominal_length_inches, "in")}</div>
+                      <div>Nominal Width: {fmtValue(runFilter.data?.nominal_width_inches, "in")}</div>
+                      <div>Compliance Statement: {fallbackText(runFilter.computed?.compliance_statement)}</div>
+                    </div>
+                  </details>
+                </div>
 
                 <div className={eccActionRowClass}>
                   <div className="mr-auto text-sm">
