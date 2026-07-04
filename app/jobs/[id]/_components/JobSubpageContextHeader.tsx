@@ -18,6 +18,7 @@ type JobSubpageContextHeaderProps = {
   secondaryHref?: string;
   secondaryLabel?: string;
   compactMobile?: boolean;
+  systemLabel?: string;
 };
 
 function fieldStatusTone(statusKey: string) {
@@ -65,6 +66,7 @@ export default function JobSubpageContextHeader({
   secondaryHref,
   secondaryLabel,
   compactMobile = false,
+  systemLabel,
 }: JobSubpageContextHeaderProps) {
   return (
     <section
@@ -93,6 +95,9 @@ export default function JobSubpageContextHeader({
 
           <div className="text-sm text-slate-600">{addressLabel}</div>
           <div className={`${compactMobile ? "hidden sm:block" : ""} text-sm text-slate-600`}>{appointmentLabel}</div>
+          {systemLabel ? (
+            <div className="text-sm font-semibold text-slate-700 sm:hidden">{systemLabel}</div>
+          ) : null}
         </div>
 
         <div className={`grid w-full gap-2 ${secondaryHref ? "grid-cols-2" : "grid-cols-1"} sm:w-auto sm:grid-flow-col sm:auto-cols-max`}>
