@@ -46,7 +46,7 @@ const CARD_SHELL =
   "rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_22px_48px_-30px_rgba(15,31,53,0.32)] sm:p-5";
 const CARD_SHELL_PRIMARY =
   "rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_28px_60px_-30px_rgba(15,31,53,0.36)] sm:p-6";
-const SECTION_EYEBROW_TEXT = "text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80";
+const SECTION_EYEBROW_TEXT = "text-[11px] font-semibold uppercase tracking-[0.09em] text-blue-700";
 const SECTION_HEADING_TEXT = "mt-0.5 text-base font-semibold tracking-tight text-[#0f1f35] sm:text-lg";
 const SECTION_HEADING_TEXT_LG = "mt-1 text-lg font-semibold tracking-tight text-[#0f1f35] sm:text-xl";
 const ROW_SHELL = "rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-[0_10px_24px_-20px_rgba(15,31,53,0.35)]";
@@ -54,7 +54,7 @@ const ROW_SHELL = "rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 sh
 function SectionEyebrow({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="h-3 w-1 rounded-full bg-gradient-to-b from-blue-500 to-blue-400/25" />
+      <span className="h-[13px] w-[3px] rounded-sm bg-blue-600" />
       <span className={SECTION_EYEBROW_TEXT}>{label}</span>
     </div>
   );
@@ -226,7 +226,7 @@ function HeaderSection({
             accountDisplayName={header.accountDisplayName}
           />
           <div className="min-w-0">
-            <span className={SECTION_EYEBROW_TEXT}>{header.accountDisplayName}</span>
+            <SectionEyebrow label={header.accountDisplayName} />
             <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-[#0f1f35] sm:text-[1.6rem]">
               Today
               <span className="ml-2 text-sm font-medium text-slate-500">· {header.greetingLine}</span>
