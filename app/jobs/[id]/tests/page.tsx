@@ -1281,13 +1281,6 @@ export default async function JobTestsPage({
   const packageSystem = isPackageSystem(selectedSystemEquipment);
   const mobileNextTestRow = selectedSystemStatusRows.find((row) => !row.complete && !row.carriedForward) ?? null;
   const mobileNextTestType = mobileNextTestRow?.testType ? String(mobileNextTestRow.testType) : "";
-  const mobileNextTestLabel = mobileNextTestType
-    ? getTestDisplayLabel(mobileNextTestType, packageSystem)
-    : "Tests";
-  const mobileNextTestRequiresRun =
-    Boolean(selectedSystemId && mobileNextTestType) &&
-    mobileNextTestRow?.status?.state === "required" &&
-    !mobileNextTestRow?.carriedForward;
 
 const primaryEquipment =
   selectedSystemEquipment.find((eq: any) => isPackageEquipment(eq)) ??
@@ -1800,30 +1793,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </div>
           ) : null}
 
-          {selectedSystemId && mobileNextTestType ? (
-            <div className="mt-3">
-              {mobileNextTestRequiresRun ? (
-                <form action={addEccTestRunFromForm}>
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="system_id" value={selectedSystemId} />
-                  <input type="hidden" name="test_type" value={mobileNextTestType} />
-                  <SubmitButton
-                    loadingText="Starting..."
-                    className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-700"
-                  >
-                    Continue {mobileNextTestLabel}
-                  </SubmitButton>
-                </form>
-              ) : (
-                <Link
-                  href={withS(mobileNextTestType, selectedSystemId)}
-                  className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-700"
-                >
-                  Continue {mobileNextTestLabel}
-                </Link>
-              )}
-            </div>
-          ) : selectedSystemId && !selectedAllTestsComplete ? (
+          {selectedSystemId && !mobileNextTestType && !selectedAllTestsComplete ? (
             <div className="mt-3">
               <Link
                 href={`/jobs/${job.id}/info?f=equipment`}
@@ -2577,6 +2547,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
   const tone = getTestStatusTone(String(row.state));
   const isOpen = focusedType === testType;
+  const isUpNextTest = testType === mobileNextTestType;
   const isOrphanedLastCard =
     !showInlineAddAnotherTestCard &&
     rowIndex === selectedSystemStatusRows.length - 1 &&
@@ -2627,14 +2598,25 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
             <input type="hidden" name="test_type" value={testType} />
-            <SubmitButton loadingText="Starting..." className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 sm:w-auto">
+            <SubmitButton
+              loadingText="Starting..."
+              className={`inline-flex min-h-10 w-full items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition-colors sm:w-auto ${
+                isUpNextTest
+                  ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700 sm:border-slate-300 sm:bg-white sm:text-slate-800 sm:hover:bg-slate-50"
+                  : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+              }`}
+            >
               Start Test
             </SubmitButton>
           </form>
         ) : (
           <Link
             href={testHref}
-            className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+            className={`inline-flex min-h-10 w-full items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition-colors sm:w-auto ${
+              isUpNextTest
+                ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700 sm:border-slate-300 sm:bg-white sm:text-slate-800 sm:hover:bg-slate-50"
+                : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+            }`}
           >
             {isOpen ? "Workspace Open" : "Open Workspace"}
           </Link>
@@ -2650,7 +2632,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     href={focusedType === "custom" ? withS(undefined) : withS("custom")}
                     className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:hidden ${
                       focusedType === "custom"
-                        ? "border-slate-900 bg-slate-900 text-white"
+                        ? "border-blue-600 bg-blue-600 text-white"
                         : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
                     }`}
                   >
