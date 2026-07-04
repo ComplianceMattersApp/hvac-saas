@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 
 type JobSubpageContextHeaderProps = {
   workspaceLabel: string;
@@ -73,8 +74,8 @@ export default function JobSubpageContextHeader({
     >
       <div className={`flex flex-col sm:flex-row sm:items-start sm:justify-between ${compactMobile ? "gap-3 sm:gap-4" : "gap-4"}`}>
         <div className={`min-w-0 ${compactMobile ? "space-y-1.5 sm:space-y-2.5" : "space-y-2.5"}`}>
-          <div className={`${compactMobile ? "hidden sm:block" : ""} text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500`}>{workspaceLabel}</div>
-          <h1 className={`${compactMobile ? "text-xl sm:text-2xl" : "text-2xl"} font-semibold tracking-tight text-slate-950`}>{workspaceTitle}</h1>
+          <div className={compactMobile ? "hidden sm:block" : ""}><SectionEyebrow>{workspaceLabel}</SectionEyebrow></div>
+          <h1 className={`${compactMobile ? "text-xl sm:text-2xl" : "text-2xl"} font-semibold tracking-tight text-navy`}>{workspaceTitle}</h1>
           <div className="text-sm font-semibold text-slate-800">{customerName}</div>
           <div className={`${compactMobile ? "hidden sm:block" : ""} text-sm text-slate-600`}>{jobTitle}</div>
 

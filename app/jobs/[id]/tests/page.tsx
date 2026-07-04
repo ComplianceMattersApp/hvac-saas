@@ -270,9 +270,53 @@ const eccUtilityLabelClass =
 const eccActionRowClass =
   "sticky bottom-2 z-10 -mx-1 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-[0_18px_44px_-30px_rgba(15,23,42,0.42)] backdrop-blur sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:border-t sm:border-x-0 sm:border-b-0 sm:rounded-none sm:bg-transparent sm:p-0 sm:pt-3 sm:shadow-none print:static print:shadow-none";
 const eccSecondaryButtonClass =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto";
+  "inline-flex min-h-11 w-full items-center justify-center rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:w-auto";
 const eccPrimaryButtonClass =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto";
+  "inline-flex min-h-11 w-full items-center justify-center rounded-[10px] border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:w-auto";
+
+function TestsStatusBar({
+  completedCount,
+  totalCount,
+  allComplete,
+  className = "",
+}: {
+  completedCount: number;
+  totalCount: number;
+  allComplete: boolean;
+  className?: string;
+}) {
+  if (totalCount === 0) {
+    return (
+      <div className={`rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 ${className}`}>
+        No active tests
+      </div>
+    );
+  }
+
+  if (allComplete) {
+    return (
+      <div className={`flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700 ${className}`}>
+        <span aria-hidden="true">✓</span>
+        All tests complete · {completedCount}/{totalCount}
+      </div>
+    );
+  }
+
+  const remainingCount = totalCount - completedCount;
+  const progressPercent = Math.round((completedCount / totalCount) * 100);
+
+  return (
+    <div className={`rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 ${className}`}>
+      <div className="flex items-center justify-between text-sm font-semibold text-blue-700">
+        <span>{remainingCount} left</span>
+        <span>{completedCount}/{totalCount}</span>
+      </div>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-blue-100">
+        <div className="h-full rounded-full bg-blue-600" style={{ width: `${progressPercent}%` }} />
+      </div>
+    </div>
+  );
+}
 
 function getTestStatusTone(state: string) {
   if (state === "pass" || state === "pass_override" || state === "attestation") {
@@ -1706,32 +1750,17 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         <div className="rounded-2xl border border-blue-200 bg-white px-4 py-3.5 shadow-[0_16px_28px_-26px_rgba(29,78,216,0.24)]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-lg font-semibold text-slate-950">Status &amp; Progress</div>
+              <div className="text-lg font-semibold text-navy">Status &amp; Progress</div>
               <div className="mt-1 text-sm font-semibold text-slate-700">{selectedSystemName}</div>
             </div>
-            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              {selectedCompletionLabel}
-            </span>
           </div>
 
-          <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
-              <div className="text-base font-semibold text-slate-950">{selectedRequiredRemainingCount}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Left</div>
-            </div>
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-              <div className="text-base font-semibold text-emerald-950">{selectedCompletedCount}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Done</div>
-            </div>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5">
-              <div className="text-base font-semibold text-blue-950">{selectedDraftCount}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700">Draft</div>
-            </div>
-            <div className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5">
-              <div className="text-base font-semibold text-sky-950">{selectedNotStartedCount}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-700">Not Started</div>
-            </div>
-          </div>
+          <TestsStatusBar
+            completedCount={selectedCompletedCount}
+            totalCount={selectedTotalCount}
+            allComplete={selectedAllTestsComplete}
+            className="mt-3"
+          />
 
           {selectedAttentionCount > 0 ? (
             <div className="mt-2 rounded-xl border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950">
@@ -1828,29 +1857,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
               <span className={eccUtilityLabelClass}>System focus</span>
               <span className="font-medium text-slate-800">{selectedSystemName}</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                {selectedCompletionLabel}
-              </span>
             </div>
 
-          <div className="grid gap-2 sm:grid-cols-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Required left</div>
-              <div className="mt-1 text-xl font-semibold text-slate-950">{selectedRequiredRemainingCount}</div>
-            </div>
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Completed</div>
-              <div className="mt-1 text-xl font-semibold text-emerald-950">{selectedCompletedCount}</div>
-            </div>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">Drafts</div>
-              <div className="mt-1 text-xl font-semibold text-blue-950">{selectedDraftCount}</div>
-            </div>
-            <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-sky-700">Not started</div>
-              <div className="mt-1 text-xl font-semibold text-sky-950">{selectedNotStartedCount}</div>
-            </div>
-          </div>
+          <TestsStatusBar
+            completedCount={selectedCompletedCount}
+            totalCount={selectedTotalCount}
+            allComplete={selectedAllTestsComplete}
+            className="sm:max-w-sm"
+          />
 
           {selectedAttentionCount > 0 ? (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
@@ -2389,7 +2403,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       <section className={`${isCompletionReportFocused ? "hidden" : eccPanelClass} ${isCompactTestWorkspace ? "space-y-3" : "space-y-5"} print:hidden`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-navy">
             {isDuctLeakageFocused ? "Duct Leakage Entry" : isAirflowFocused ? "Airflow Entry" : "Tests to Run"}
           </h2>
           {!isCompactTestWorkspace ? (
@@ -2531,7 +2545,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)] sm:space-y-4 sm:rounded-lg sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-lg font-semibold tracking-tight text-slate-950 sm:text-base">Current Tests</div>
+                <div className="text-lg font-semibold tracking-tight text-navy sm:text-base">Current Tests</div>
                 <div className="mt-1 hidden text-sm leading-6 text-slate-600 sm:block">
                   Required tests and selected add-ons. Profile:{" "}
                   <span className="font-medium">
@@ -2544,20 +2558,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
 
-              <div className="hidden grid-cols-3 gap-2 text-center sm:grid sm:min-w-[18rem]">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
-                  <div className="text-lg font-semibold text-slate-950">{selectedTotalCount}</div>
-                  <div className="text-[11px] font-medium text-slate-500">Total</div>
-                </div>
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
-                  <div className="text-lg font-semibold text-emerald-950">{selectedCompletedCount}</div>
-                  <div className="text-[11px] font-medium text-emerald-700">Done</div>
-                </div>
-                <div className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-2">
-                  <div className="text-lg font-semibold text-sky-950">{selectedRequiredRemainingCount}</div>
-                  <div className="text-[11px] font-medium text-sky-700">Left</div>
-                </div>
-              </div>
+              <TestsStatusBar
+                completedCount={selectedCompletedCount}
+                totalCount={selectedTotalCount}
+                allComplete={selectedAllTestsComplete}
+                className="hidden sm:block sm:min-w-[18rem]"
+              />
             </div>
 
             {selectedSystemStatusRows.length === 0 ? (
@@ -2897,7 +2903,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className="min-w-0 space-y-3 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-white sm:p-5 sm:shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)]">
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">Duct Leakage Results</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-2xl">Duct Leakage Results</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <span className="font-medium text-slate-800">{selectedSystemName}</span>
                   <span className="text-slate-300">/</span>
@@ -3164,7 +3170,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <h2 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">Airflow Results</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-2xl">Airflow Results</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <span className="font-medium text-slate-800">{selectedSystemName}</span>
                   <span className="text-slate-300">/</span>
@@ -4546,7 +4552,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">Refrigerant Charge Results</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-2xl">Refrigerant Charge Results</h2>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span>{" "}
                   {runRC
