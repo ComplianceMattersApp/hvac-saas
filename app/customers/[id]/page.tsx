@@ -94,6 +94,7 @@ import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } fro
 import { equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 import ProfileEquipmentCreateForm from "./_components/ProfileEquipmentCreateForm";
+import { Disclosure } from "@/components/ui/Disclosure";
 
 
 type CustomerRow = {
@@ -2668,14 +2669,13 @@ export default async function CustomerDetailPage(props: {
                             </div>
                             <div className="flex flex-wrap gap-2">
                               {!system.sourceJob ? (
-                              <details className="w-full rounded-lg border border-slate-200 bg-white p-3 sm:w-72">
-                                <summary className="cursor-pointer text-xs font-semibold text-slate-800">Add Equipment</summary>
+                              <Disclosure title="Add Equipment" className="w-full sm:w-72">
                                 <ProfileEquipmentCreateForm
                                   customerId={customerId}
                                   locationId={location.id}
                                   systemId={system.id.replace(/^profile:/, "")}
                                 />
-                              </details>
+                              </Disclosure>
                               ) : null}
                               {system.sourceJob ? (
                                 <>

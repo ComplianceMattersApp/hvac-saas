@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { updateJobEquipmentFromForm, deleteJobEquipmentFromForm } from "@/lib/actions/job-actions";
 import SubmitButton from "@/components/SubmitButton";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
+import { Disclosure } from "@/components/ui/Disclosure";
 import {
   equipmentRoleOptionsForValue,
   equipmentRoleLabel,
@@ -82,23 +84,23 @@ export default function EquipmentEditCard({
 
   if (!editing) {
     return (
-      <div className="px-5 py-4 sm:px-6 transition-colors hover:bg-gray-50/50">
+      <div className="px-5 py-4 sm:px-6 transition-colors hover:bg-slate-50/50">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1 space-y-3">
             <div>
-              <div className="text-sm font-semibold text-gray-950">{equipmentRoleLabel(eq.equipment_role)}</div>
+              <div className="text-sm font-semibold text-navy">{equipmentRoleLabel(eq.equipment_role)}</div>
               {isLegacyFilterEquipment ? (
                 <div className="mt-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
                   Legacy filter equipment record. Add new filters from Add Equipment or Filter.
                 </div>
               ) : null}
               {eq.system_location ? (
-                <div className="mt-0.5 text-xs text-gray-500">System: {eq.system_location}</div>
+                <div className="mt-0.5 text-xs text-slate-500">System: {eq.system_location}</div>
               ) : null}
             </div>
 
             <div>
-              <div className="text-sm font-medium text-gray-700">
+              <div className="text-sm font-medium text-slate-700">
                 {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "-"}
               </div>
             </div>
@@ -109,7 +111,7 @@ export default function EquipmentEditCard({
             eq.heating_output_btu ||
             (showRefrigerant && eq.refrigerant_type) ||
             eq.heating_efficiency_percent ? (
-              <div className="space-y-1 text-xs text-gray-600">
+              <div className="space-y-1 text-xs text-slate-600">
                 {eq.serial ? <div>Serial: {eq.serial}</div> : null}
                 {showHeatingCapacity && eq.heating_output_btu ? (
                   <div>Heating: {Number(eq.heating_output_btu).toLocaleString()} BTU/h</div>
@@ -124,36 +126,42 @@ export default function EquipmentEditCard({
               </div>
             ) : null}
 
-            {eq.notes ? <div className="text-xs italic text-gray-600">"{eq.notes}"</div> : null}
+            {eq.notes ? <div className="text-xs italic text-slate-600">"{eq.notes}"</div> : null}
           </div>
 
-          <div className="shrink-0 flex flex-col gap-2">
+          <div className="shrink-0">
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="inline-flex items-center justify-center rounded bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+              className="inline-flex items-center justify-center rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200"
             >
               Edit
             </button>
-            <form action={deleteJobEquipmentFromForm}>
-              <input type="hidden" name="job_id" value={jobId} />
-              <input type="hidden" name="equipment_id" value={eq.id} />
-              <DeleteEquipmentButton className="inline-flex items-center justify-center rounded bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100" />
-            </form>
           </div>
         </div>
+
+        <Disclosure title="Danger zone" variant="danger" className="mt-3">
+          <form action={deleteJobEquipmentFromForm}>
+            <input type="hidden" name="job_id" value={jobId} />
+            <input type="hidden" name="equipment_id" value={eq.id} />
+            <DeleteEquipmentButton className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-800 transition-colors hover:bg-rose-100" />
+          </form>
+        </Disclosure>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 bg-blue-50/50 px-5 py-4 sm:px-6">
-      <div className="flex items-center justify-between gap-2 border-b border-blue-200 pb-3">
-        <div className="text-sm font-semibold text-gray-950">Edit Equipment</div>
+    <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)] sm:p-5">
+      <div className="flex items-start justify-between gap-2 border-b border-slate-200 pb-3">
+        <div>
+          <SectionEyebrow>Equipment</SectionEyebrow>
+          <div className="text-base font-semibold text-navy">Edit Equipment</div>
+        </div>
         <button
           type="button"
           onClick={() => setEditing(false)}
-          className="rounded px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-white/50 hover:text-gray-900"
+          className="rounded px-2 py-1 text-xs text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
         >
           Cancel
         </button>
@@ -164,13 +172,13 @@ export default function EquipmentEditCard({
         <input type="hidden" name="equipment_id" value={eq.id} />
 
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-600" htmlFor={`role-${eq.id}`}>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400" htmlFor={`role-${eq.id}`}>
             Equipment Role
           </label>
           <select
             id={`role-${eq.id}`}
             name="equipment_role"
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             value={role}
             onChange={(e) => setRole(e.target.value)}
           >
@@ -183,7 +191,7 @@ export default function EquipmentEditCard({
         </div>
 
         <div>
-          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-gray-600" htmlFor={`sysloc-${eq.id}`}>
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400" htmlFor={`sysloc-${eq.id}`}>
             System
           </label>
           {existingSystemNames.length > 0 ? (
@@ -191,7 +199,7 @@ export default function EquipmentEditCard({
               <select
                 id={`sysloc-${eq.id}`}
                 name={isCustomSys ? undefined : "system_location"}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 value={sysChoice}
                 onChange={(e) => setSysChoice(e.target.value)}
               >
@@ -205,7 +213,7 @@ export default function EquipmentEditCard({
               {isCustomSys ? (
                 <input
                   name="system_location"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder='Type location name (e.g. "Garage")'
                   autoFocus
                 />
@@ -215,50 +223,49 @@ export default function EquipmentEditCard({
             <input
               id={`sysloc-${eq.id}`}
               name="system_location"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               defaultValue={eq.system_location ?? ""}
               placeholder="Upstairs"
             />
           )}
         </div>
 
-        <div className="pt-2">
-          <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Product Details</div>
+        <Disclosure title="Advanced Details" subtitle="Manufacturer, serial, tonnage, refrigerant, and notes" defaultOpen>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`mfr-${eq.id}`}>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`mfr-${eq.id}`}>
                 Manufacturer
               </label>
               <input
                 id={`mfr-${eq.id}`}
                 name="manufacturer"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 defaultValue={eq.manufacturer ?? ""}
                 placeholder="York"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`mdl-${eq.id}`}>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`mdl-${eq.id}`}>
                 Model
               </label>
               <input
                 id={`mdl-${eq.id}`}
                 name="model"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 defaultValue={eq.model ?? ""}
                 placeholder="Model #"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`ser-${eq.id}`}>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`ser-${eq.id}`}>
                 Serial
               </label>
               <input
                 id={`ser-${eq.id}`}
                 name="serial"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 defaultValue={eq.serial ?? ""}
                 placeholder="Serial #"
               />
@@ -266,7 +273,7 @@ export default function EquipmentEditCard({
 
             <div>
               <label
-                className="mb-1.5 block text-xs font-medium text-gray-700"
+                className="mb-1.5 block text-xs font-medium text-slate-700"
                 htmlFor={showHeatingCapacity ? `hc-${eq.id}` : `ton-${eq.id}`}
               >
                 {showHeatingCapacity ? "Heating Input (KBTU/h)" : "Tonnage"}
@@ -279,11 +286,11 @@ export default function EquipmentEditCard({
                     type="number"
                     step="1"
                     min="0"
-                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     defaultValue={eq.heating_capacity_kbtu ?? ""}
                     placeholder="120"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-slate-500">
                     Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
                   </p>
                 </>
@@ -294,7 +301,7 @@ export default function EquipmentEditCard({
                   type="number"
                   step="0.5"
                   min="0"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   defaultValue={eq.tonnage ?? ""}
                   placeholder="5"
                 />
@@ -303,7 +310,7 @@ export default function EquipmentEditCard({
 
             {showHeatingCapacity && (
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`out-${eq.id}`}>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`out-${eq.id}`}>
                   Heating Output (BTU/h)
                 </label>
                 <input
@@ -312,7 +319,7 @@ export default function EquipmentEditCard({
                   type="number"
                   step="1"
                   min="0"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   defaultValue={eq.heating_output_btu ?? ""}
                   placeholder="66000"
                 />
@@ -321,7 +328,7 @@ export default function EquipmentEditCard({
 
             {showHeatingCapacity && (
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`eff-${eq.id}`}>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`eff-${eq.id}`}>
                   Efficiency / AFUE %
                 </label>
                 <input
@@ -331,7 +338,7 @@ export default function EquipmentEditCard({
                   step="1"
                   min="1"
                   max="100"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   defaultValue={eq.heating_efficiency_percent ?? ""}
                   placeholder="80"
                 />
@@ -340,13 +347,13 @@ export default function EquipmentEditCard({
 
             {showRefrigerant && (
               <div className="sm:col-span-2">
-                <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`ref-${eq.id}`}>
+                <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`ref-${eq.id}`}>
                   Refrigerant Type
                 </label>
                 <select
                   id={`ref-${eq.id}`}
                   name="refrigerant_type"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   defaultValue={eq.refrigerant_type ?? ""}
                 >
                   <option value="">Select refrigerant</option>
@@ -368,24 +375,24 @@ export default function EquipmentEditCard({
             )}
 
             <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`notes-${eq.id}`}>
+              <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`notes-${eq.id}`}>
                 Notes
               </label>
               <input
                 id={`notes-${eq.id}`}
                 name="notes"
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 defaultValue={eq.notes ?? ""}
                 placeholder="Any extra details..."
               />
             </div>
           </div>
-        </div>
+        </Disclosure>
 
         <div className="pt-2">
           <SubmitButton
             loadingText="Saving..."
-            className="w-fit rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            className="w-fit rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
             Save Changes
           </SubmitButton>

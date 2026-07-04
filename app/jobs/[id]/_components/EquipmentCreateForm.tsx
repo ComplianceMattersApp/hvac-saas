@@ -18,7 +18,7 @@ export default function EquipmentCreateForm({
   return (
     <form
       action={role === FILTER_ROLE_VALUE ? addSystemFilterFromForm : addJobEquipmentFromForm}
-      className="pt-4 border-t border-gray-200"
+      className="rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)]"
     >
       <input type="hidden" name="job_id" value={jobId} />
       <EquipmentCreateFormFields

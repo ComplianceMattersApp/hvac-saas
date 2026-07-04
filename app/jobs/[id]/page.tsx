@@ -7353,10 +7353,10 @@ const showCorrectionReviewResolution =
               </Link>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)]">
               <div className="border-b border-slate-200/80 px-4 py-3 sm:px-5">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold text-slate-950">Current Equipment</h3>
+                  <h3 className="text-sm font-semibold text-navy">Current Equipment</h3>
                   {equipmentCount > 0 ? (
                     <div className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-700">
                       {equipmentCount}
@@ -7384,9 +7384,7 @@ const showCorrectionReviewResolution =
               )}
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
-              <EquipmentCreateForm jobId={job.id} systems={equipmentSystems ?? []} />
-            </div>
+            <EquipmentCreateForm jobId={job.id} systems={equipmentSystems ?? []} />
           </div>
           </div>
         </section>

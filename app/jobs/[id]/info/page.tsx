@@ -342,14 +342,14 @@ if (!job) return notFound();
                     const systemFiltersForInventory = (filtersBySystemId[system.id] ?? []).filter((filter) => !filter.archived_at);
                     const systemInventoryCount = systemEquipment.length + systemFiltersForInventory.length;
                     return (
-                      <div key={system.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                        <div className="border-b border-gray-200 bg-gray-50/80 px-4 py-3">
+                      <div key={system.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)]">
+                        <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3">
                           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                              <h3 className="text-sm font-semibold text-gray-950">{system.name || "System"}</h3>
-                              <p className="mt-0.5 text-xs text-gray-500">System details, equipment, and filters.</p>
+                              <h3 className="text-sm font-semibold text-navy">{system.name || "System"}</h3>
+                              <p className="mt-0.5 text-xs text-slate-500">System details, equipment, and filters.</p>
                             </div>
-                            <span className="inline-flex w-fit rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                            <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
                               {systemInventoryCount} inventory item{systemInventoryCount === 1 ? "" : "s"}
                             </span>
                           </div>
@@ -357,12 +357,12 @@ if (!job) return notFound();
 
                         <div className="space-y-4 p-4">
                           <div>
-                            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                               Inventory
                             </div>
                             {systemInventoryCount > 0 ? (
-                              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-                                <div className="divide-y divide-gray-200">
+                              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                <div className="divide-y divide-slate-200">
                                   {systemEquipment.map((eq) => (
                                     <EquipmentEditCard
                                       key={eq.id}
@@ -381,7 +381,7 @@ if (!job) return notFound();
                                 </div>
                               </div>
                             ) : (
-                              <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                              <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
                                 No equipment or filter records under this system yet.
                               </div>
                             )}
@@ -414,16 +414,14 @@ if (!job) return notFound();
                 </div>
               ) : (
                 <div className="px-5 py-8 sm:px-6 text-center">
-                  <div className="text-sm text-gray-600">No systems captured yet</div>
-                  <p className="mt-1 text-xs text-gray-500">Add equipment below to create a system inventory.</p>
+                  <div className="text-sm text-slate-600">No systems captured yet</div>
+                  <p className="mt-1 text-xs text-slate-500">Add equipment below to create a system inventory.</p>
                 </div>
               )}
             </div>
 
             {/* Add Equipment Form */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-              <EquipmentCreateForm jobId={job.id} systems={systems ?? []} />
-            </div>
+            <EquipmentCreateForm jobId={job.id} systems={systems ?? []} />
           </div>
         ) : (
           <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">

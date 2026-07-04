@@ -3,6 +3,8 @@
 import { useState } from "react";
 import SystemLocationPicker from "@/components/jobs/SystemLocationPicker";
 import SubmitButton from "@/components/SubmitButton";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
+import { Disclosure } from "@/components/ui/Disclosure";
 import {
   EQUIPMENT_ROLE_OPTIONS,
   equipmentUsesRefrigerant,
@@ -41,19 +43,20 @@ export default function EquipmentCreateFormFields({
   return (
     <div className="px-5 py-4 sm:px-6">
       <div className="mb-5">
-        <h3 className="text-base font-semibold text-gray-950">{title}</h3>
-        <p className="mt-1 text-sm text-gray-600">{description}</p>
+        <SectionEyebrow>Equipment</SectionEyebrow>
+        <h3 className="text-base font-semibold text-navy">{title}</h3>
+        <p className="mt-1 text-sm text-slate-600">{description}</p>
       </div>
 
       <div className="space-y-5">
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-gray-600 block mb-2" htmlFor="equipment_role">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400 block mb-2" htmlFor="equipment_role">
             System Item Type
           </label>
           <select
             id="equipment_role"
             name="equipment_role"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             required
@@ -71,22 +74,22 @@ export default function EquipmentCreateFormFields({
 
         {addingFilter ? (
           <div className="pt-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Filter Details</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">Filter Details</div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="sm:col-span-3">
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-label">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="filter-label">
                   Filter location
                 </label>
                 <input
                   id="filter-label"
                   name="label"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder="Hall return"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-length">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="filter-length">
                   Length
                 </label>
                 <input
@@ -96,13 +99,13 @@ export default function EquipmentCreateFormFields({
                   min="0.01"
                   step="0.01"
                   required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder="20"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-width">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="filter-width">
                   Width
                 </label>
                 <input
@@ -112,13 +115,13 @@ export default function EquipmentCreateFormFields({
                   min="0.01"
                   step="0.01"
                   required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder="25"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-height">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="filter-height">
                   Depth
                 </label>
                 <input
@@ -128,13 +131,13 @@ export default function EquipmentCreateFormFields({
                   min="0.01"
                   step="0.01"
                   required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder="1"
                 />
               </div>
 
               <div className="sm:col-span-3">
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-date-changed">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="filter-date-changed">
                   Date changed
                 </label>
                 <input
@@ -143,66 +146,69 @@ export default function EquipmentCreateFormFields({
                   type="date"
                   required
                   defaultValue={filterDateDefault}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 />
               </div>
 
               <div className="sm:col-span-3">
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-notes">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="filter-notes">
                   Notes (optional)
                 </label>
                 <textarea
                   id="filter-notes"
                   name="notes"
                   rows={2}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder="Optional notes"
                 />
               </div>
             </div>
           </div>
         ) : (
-        <div className="pt-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Product Details</div>
+        <Disclosure
+          title="Advanced Details"
+          subtitle="Manufacturer, serial, tonnage, refrigerant, and notes (all optional)"
+          className="mt-2"
+        >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="manufacturer">
+              <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="manufacturer">
                 Manufacturer (optional)
               </label>
               <input
                 id="manufacturer"
                 name="manufacturer"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 placeholder="York"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="model">
+              <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="model">
                 Model (optional)
               </label>
               <input
                 id="model"
                 name="model"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 placeholder="Model #"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="serial">
+              <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="serial">
                 Serial (optional)
               </label>
               <input
                 id="serial"
                 name="serial"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 placeholder="Serial #"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}>
+              <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}>
                 {showHeatingCapacity ? "Heating Input (KBTU/h)" : "Tonnage"} (optional)
               </label>
               <input
@@ -211,11 +217,11 @@ export default function EquipmentCreateFormFields({
                 type="number"
                 step={showHeatingCapacity ? "1" : "0.5"}
                 min="0"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 placeholder={showHeatingCapacity ? "120" : "5"}
               />
               {showHeatingCapacity ? (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-slate-500">
                   Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
                 </p>
               ) : null}
@@ -223,7 +229,7 @@ export default function EquipmentCreateFormFields({
 
             {showHeatingCapacity && (
               <div>
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="heating_output_btu">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="heating_output_btu">
                   Heating Output (BTU/h) (optional)
                 </label>
                 <input
@@ -232,7 +238,7 @@ export default function EquipmentCreateFormFields({
                   type="number"
                   step="1"
                   min="0"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder="66000"
                 />
               </div>
@@ -240,7 +246,7 @@ export default function EquipmentCreateFormFields({
 
             {showHeatingCapacity && (
               <div>
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="heating_efficiency_percent">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="heating_efficiency_percent">
                   Efficiency / AFUE % (optional)
                 </label>
                 <input
@@ -250,7 +256,7 @@ export default function EquipmentCreateFormFields({
                   step="1"
                   min="1"
                   max="100"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   placeholder="80"
                 />
               </div>
@@ -258,13 +264,13 @@ export default function EquipmentCreateFormFields({
 
             {showRefrigerant ? (
               <div className="sm:col-span-2">
-                <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="refrigerant_type">
+                <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="refrigerant_type">
                   Refrigerant Type (optional)
                 </label>
                 <select
                   id="refrigerant_type"
                   name="refrigerant_type"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                   defaultValue=""
                 >
                   <option value="">Select refrigerant</option>
@@ -280,23 +286,23 @@ export default function EquipmentCreateFormFields({
             )}
 
             <div className="sm:col-span-2">
-              <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="notes">
+              <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="notes">
                 Notes (optional)
               </label>
               <input
                 id="notes"
                 name="notes"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                 placeholder="Any extra details..."
               />
             </div>
           </div>
-        </div>
+        </Disclosure>
         )}
       </div>
 
-      <div className="mt-6 pt-4 border-t border-gray-200">
-        <SubmitButton loadingText="Adding..." className="w-fit rounded-md bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
+      <div className="mt-6 pt-4 border-t border-slate-200">
+        <SubmitButton loadingText="Adding..." className="w-fit rounded-[10px] bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
           {addingFilter ? "Add Filter" : "Add Equipment"}
         </SubmitButton>
       </div>

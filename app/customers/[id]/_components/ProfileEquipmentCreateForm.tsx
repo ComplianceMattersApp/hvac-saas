@@ -13,7 +13,7 @@ export default function ProfileEquipmentCreateForm({
   systemId: string;
 }) {
   return (
-    <form action={addCustomerLocationEquipmentFromForm} className="mt-3 border-t border-slate-200 pt-3">
+    <form action={addCustomerLocationEquipmentFromForm}>
       <input type="hidden" name="customer_id" value={customerId} />
       <input type="hidden" name="location_id" value={locationId} />
       <input type="hidden" name="system_id" value={systemId} />
