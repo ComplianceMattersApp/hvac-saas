@@ -4,6 +4,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { isDuctlessMiniSplitSystem, resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
+import { Disclosure } from "@/components/ui/Disclosure";
 import SubmitButton from "@/components/SubmitButton";
 import AirflowEntryFields from "@/components/jobs/AirflowEntryFields";
 import EccLivePreview from "@/components/jobs/EccLivePreview";
@@ -3145,18 +3146,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </SubmitButton>
                 </div>
 
-                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
-                  <div className="mt-2">
-                    <button
-                      type="submit"
-                      form={ductDeleteFormId}
-                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </details>
+                <Disclosure title="Danger zone" variant="danger">
+                  <button
+                    type="submit"
+                    form={ductDeleteFormId}
+                    className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 sm:w-auto"
+                  >
+                    Delete
+                  </button>
+                </Disclosure>
 
               </>
             )}
@@ -3298,19 +3296,18 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </SubmitButton>
                 </div>
 
-                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
-                  <form action={deleteEccTestRunFromForm} className="mt-2">
+                <Disclosure title="Danger zone" variant="danger">
+                  <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runAF.id} />
                     <button
                       type="submit"
-                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
+                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 sm:w-auto"
                     >
                       Delete
                     </button>
                   </form>
-                </details>
+                </Disclosure>
               </>
             )}
           </div>
@@ -3581,18 +3578,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </SubmitButton>
                 </div>
 
-                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
-                  <div className="mt-2">
-                    <button
-                      type="submit"
-                      form={fanDeleteFormId}
-                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </details>
+                <Disclosure title="Danger zone" variant="danger">
+                  <button
+                    type="submit"
+                    form={fanDeleteFormId}
+                    className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 sm:w-auto"
+                  >
+                    Delete
+                  </button>
+                </Disclosure>
 
                 <form id={fanDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
@@ -3865,18 +3859,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </SubmitButton>
                 </div>
 
-                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
-                  <div className="mt-2">
-                    <button
-                      type="submit"
-                      form={filterDeleteFormId}
-                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </details>
+                <Disclosure title="Danger zone" variant="danger">
+                  <button
+                    type="submit"
+                    form={filterDeleteFormId}
+                    className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 sm:w-auto"
+                  >
+                    Delete
+                  </button>
+                </Disclosure>
 
                 <form id={filterDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
@@ -4872,19 +4863,18 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </SubmitButton>
                 </div>
 
-                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
-                  <form action={deleteEccTestRunFromForm} className="mt-2">
+                <Disclosure title="Danger zone" variant="danger">
+                  <form action={deleteEccTestRunFromForm}>
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runRC.id} />
                     <button
                       type="submit"
-                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
+                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800 hover:bg-rose-100 sm:w-auto"
                     >
                       Delete
                     </button>
                   </form>
-                </details>
+                </Disclosure>
               </>
             )}
           </div>
