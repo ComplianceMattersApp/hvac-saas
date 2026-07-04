@@ -1538,8 +1538,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     Boolean(selectedSystemId) &&
     !isEccWorkspaceClosedOrCompleted &&
     !isCompactTestWorkspace &&
-    selectedSystemStatusRows.length > 1 &&
-    selectedSystemStatusRows.length % 2 === 1;
+    selectedSystemStatusRows.length > 0;
 
   function effectiveResult(run: any): "pass" | "fail" | "unknown" {
     if (!run) return "unknown";
@@ -2541,39 +2540,42 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
             ) : (
-              <div className={`grid gap-2 sm:grid-cols-1 ${selectedSystemStatusRows.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-                {selectedSystemStatusRows.map((row, rowIndex) => {
+              <div className="grid grid-cols-1 gap-2">
+                {selectedSystemStatusRows.map((row) => {
   const { testType, status, carriedForward, isRequired } = row;
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
   const tone = getTestStatusTone(String(row.state));
   const isOpen = focusedType === testType;
   const isUpNextTest = testType === mobileNextTestType;
-  const isOrphanedLastCard =
-    !showInlineAddAnotherTestCard &&
-    rowIndex === selectedSystemStatusRows.length - 1 &&
-    selectedSystemStatusRows.length % 2 === 1;
 
   return (
       <div
       key={testType}
-      className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:gap-3 sm:rounded-lg sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOrphanedLastCard ? "col-span-2" : ""} ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
+      className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:gap-3 sm:rounded-lg sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
     >
+        <div className="flex min-w-0 items-start justify-between gap-2 sm:justify-start sm:gap-3">
         <div className="flex min-w-0 gap-2 sm:gap-3">
-        <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
-        <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-slate-950 sm:text-base">
-              {getTestDisplayLabel(testType, packageSystem)}
-            </div>
-            <div className={`mt-1 hidden text-xs leading-5 sm:block ${carriedForward ? "text-emerald-700" : tone.text}`}>
-              {getTestStatusHelp(String(status.state), carriedForward)}
-            </div>
+          <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
+          <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-navy sm:text-base">
+                {getTestDisplayLabel(testType, packageSystem)}
+              </div>
+              <div className={`mt-1 hidden text-xs leading-5 sm:block ${carriedForward ? "text-emerald-700" : tone.text}`}>
+                {getTestStatusHelp(String(status.state), carriedForward)}
+              </div>
+          </div>
         </div>
+        <span
+          className={`ml-2 inline-flex shrink-0 min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium sm:hidden ${status.tone}`}
+        >
+          {carriedForward ? "Pass (parent)" : status.label}
+        </span>
       </div>
 
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end">
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="hidden items-center gap-2 sm:flex sm:justify-end">
           <span
-            className={`hidden min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${
+            className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
               carriedForward
                 ? "border-emerald-200 bg-white/70 text-emerald-700"
                 : isRequired
