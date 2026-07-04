@@ -2572,16 +2572,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             ) : (
               <div className={`grid gap-2 sm:grid-cols-1 ${selectedSystemStatusRows.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-                {selectedSystemStatusRows.map((row) => {
+                {selectedSystemStatusRows.map((row, rowIndex) => {
   const { testType, status, carriedForward, isRequired } = row;
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
   const tone = getTestStatusTone(String(row.state));
   const isOpen = focusedType === testType;
+  const isOrphanedLastCard =
+    !showInlineAddAnotherTestCard &&
+    rowIndex === selectedSystemStatusRows.length - 1 &&
+    selectedSystemStatusRows.length % 2 === 1;
 
   return (
       <div
       key={testType}
-      className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:gap-3 sm:rounded-lg sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
+      className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:gap-3 sm:rounded-lg sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOrphanedLastCard ? "col-span-2" : ""} ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
     >
         <div className="flex min-w-0 gap-2 sm:gap-3">
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
