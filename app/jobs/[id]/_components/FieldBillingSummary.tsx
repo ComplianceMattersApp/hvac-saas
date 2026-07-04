@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import type { FieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { hasDirectInvoiceDraftMutationAccess } from "@/lib/auth/field-billing-access";
 import type { FieldChargeProposalRecord } from "@/lib/business/field-charge-proposals";
@@ -225,8 +226,8 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
     <section className="mt-4 rounded-xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.22)]" aria-labelledby="field-billing-summary-title">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Field Billing Summary</div>
-          <h3 id="field-billing-summary-title" className="mt-1 text-base font-semibold text-slate-950">{state.headline}</h3>
+          <SectionEyebrow>Field Billing Summary</SectionEyebrow>
+          <h3 id="field-billing-summary-title" className="mt-1 text-base font-semibold text-navy">{state.headline}</h3>
           <p className="mt-1 text-sm leading-6 text-slate-600">{state.body}</p>
         </div>
         <span className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">

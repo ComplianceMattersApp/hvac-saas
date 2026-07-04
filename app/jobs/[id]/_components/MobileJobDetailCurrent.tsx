@@ -1,5 +1,6 @@
 // app/jobs/[id]/_components/MobileJobDetailCurrent
 
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";
 import MobileJobSchedulePanel from "./MobileJobSchedulePanel";
 import MobileJobTeamNotesPanel from "./MobileJobTeamNotesPanel";
@@ -773,8 +774,8 @@ export default function MobileJobDetailCurrent(props: MobileJobDetailCurrentProp
 
           {showMobileContractorContext ? (
             <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-3 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Contractor</div>
-              <div className="mt-1 text-base font-semibold text-slate-950">{contractorName || "Assigned contractor"}</div>
+              <SectionEyebrow>Contractor</SectionEyebrow>
+              <div className="mt-1 text-base font-semibold text-navy">{contractorName || "Assigned contractor"}</div>
             </section>
           ) : null}
 

@@ -7,6 +7,7 @@ import { Suspense, type ReactNode } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
@@ -880,20 +881,20 @@ function MobileLineIcon(props: { children: ReactNode; className?: string }) {
   );
 }
 
-function UserIcon(props: { className?: string }) {
-  return (
-    <MobileLineIcon className={props.className}>
-      <path d="M20 21a8 8 0 0 0-16 0" />
-      <circle cx="12" cy="7" r="4" />
-    </MobileLineIcon>
-  );
-}
-
 function MapPinIcon(props: { className?: string }) {
   return (
     <MobileLineIcon className={props.className}>
       <path d="M12 22s7-5.6 7-12a7 7 0 1 0-14 0c0 6.4 7 12 7 12Z" />
       <circle cx="12" cy="10" r="2.5" />
+    </MobileLineIcon>
+  );
+}
+
+function UserIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M20 21a8 8 0 0 0-16 0" />
+      <circle cx="12" cy="7" r="4" />
     </MobileLineIcon>
   );
 }
@@ -3832,12 +3833,7 @@ const showCorrectionReviewResolution =
     </div>
     <div id="field-status-actions" className="relative flex w-full flex-col gap-2.5 overflow-hidden rounded-2xl border border-blue-100 bg-white p-3 shadow-[0_20px_40px_-31px_rgba(29,78,216,0.36)] xl:items-stretch">
       <span className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
-      <div className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-900/55">
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-[#0f1f35] text-blue-100">
-          <ChevronRightIcon className="h-3.5 w-3.5" />
-        </span>
-        <span>Primary Next Action</span>
-      </div>
+      <SectionEyebrow>Primary Next Action</SectionEyebrow>
         {completionActionAttentionBanner ? (
           <div
             data-completion-action-banner="true"
@@ -4315,12 +4311,7 @@ const showCorrectionReviewResolution =
   </div>
 
   <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.99))] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_18px_36px_-34px_rgba(15,23,42,0.32)] sm:px-4">
-    <div className="mb-2 flex items-center gap-2">
-      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-        <ClockIcon className="h-3.5 w-3.5" />
-      </span>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">Schedule & Workflow</span>
-    </div>
+    <SectionEyebrow className="mb-2">Schedule & Workflow</SectionEyebrow>
     <div className="grid gap-2 lg:grid-cols-3">
       {/* Appointment — full card on all breakpoints */}
       <div className="relative overflow-hidden rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)]">
@@ -4461,14 +4452,7 @@ const showCorrectionReviewResolution =
   </div>
 
   <div className="mb-3 mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-4 sm:mt-0 sm:border-t-0 sm:pt-0">
-    <div className="flex items-center gap-2">
-      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#0f1f35] text-blue-100">
-        <ToolIcon className="h-3.5 w-3.5" />
-      </span>
-      <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">
-        <span>Field Operations Board</span>
-      </div>
-    </div>
+    <SectionEyebrow className="mb-0">Field Operations Board</SectionEyebrow>
     <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-blue-800 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.1em]">
       {surfaceProfile.surfaces.equipment
         ? `${equipmentCount} equipment / ${assignedTeam.length} assigned`
@@ -4484,7 +4468,7 @@ const showCorrectionReviewResolution =
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
-      <div className="mt-2 hidden items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35] sm:inline-flex"><UserIcon className="h-3.5 w-3.5 text-blue-700" />Customer / Account</div>
+      <div className="mt-2 hidden sm:block"><SectionEyebrow>Customer / Account</SectionEyebrow></div>
 
       {job.customer_id ? (
         <Link
@@ -4789,10 +4773,7 @@ const showCorrectionReviewResolution =
         <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">
-              <ClipboardIcon className="h-3.5 w-3.5 text-blue-700" />
-              <span>Visit Reason</span>
-            </div>
+            <SectionEyebrow>Visit Reason</SectionEyebrow>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isInternalUser ? (
@@ -4893,7 +4874,7 @@ const showCorrectionReviewResolution =
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35]"><span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100"><ToolIcon className="h-3.5 w-3.5" /></span>{surfaceProfile.labels.workItems} & Invoice</div>
+                <SectionEyebrow>{surfaceProfile.labels.workItems} & Invoice</SectionEyebrow>
                 {job.job_type === "service" ? (
                   <span className="hidden rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-800 sm:inline-flex">
                     {visitScopeCount > 0 ? `${surfaceProfile.labels.workItems} Set` : `No ${surfaceProfile.labels.workItems} Yet`}
@@ -5141,7 +5122,7 @@ const showCorrectionReviewResolution =
           <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
                 <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]"><ClipboardIcon className="h-3.5 w-3.5 text-blue-700" />Permit Quick Ref</div>
+              <SectionEyebrow>Permit Quick Ref</SectionEyebrow>
               <div className="mt-1 text-sm text-slate-600">
                 Permit number
               </div>
@@ -5162,23 +5143,17 @@ const showCorrectionReviewResolution =
         <div className="grid gap-3">
           <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-emerald-100 bg-emerald-50/70 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.18)]`}>
             <span className="absolute inset-x-0 top-0 h-[3px] bg-emerald-500/70" />
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-900">
-              <ClipboardIcon className="h-3.5 w-3.5" />Checklist
-            </div>
+            <SectionEyebrow>Checklist</SectionEyebrow>
             <p className="mt-2 text-sm leading-6 text-emerald-950">Cleaning checklist support is coming next. Use Cleaning Tasks and notes for this rollout.</p>
           </div>
           <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.18)]`}>
             <span className="absolute inset-x-0 top-0 h-[3px] bg-slate-400/60" />
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">
-              <MapPinIcon className="h-3.5 w-3.5 text-blue-700" />Site Instructions
-            </div>
+            <SectionEyebrow>Site Instructions</SectionEyebrow>
             <p className="mt-2 text-sm leading-6 text-slate-700">Use location notes and job notes for access, alarm, parking, and supply details.</p>
           </div>
           <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-blue-100 bg-blue-50/50 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.18)]`}>
             <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-900">
-              <WarningIcon className="h-3.5 w-3.5" />Quality Review
-            </div>
+            <SectionEyebrow>Quality Review</SectionEyebrow>
             <p className="mt-2 text-sm leading-6 text-blue-950">Use notes/photos for quality issues until inspection support is added.</p>
           </div>
         </div>
@@ -5188,7 +5163,7 @@ const showCorrectionReviewResolution =
         <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
         <div className="mb-2 flex items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]"><ChatIcon className="h-3.5 w-3.5 text-blue-700" />{rightRailNotesTitle}</div>
+            <SectionEyebrow>{rightRailNotesTitle}</SectionEyebrow>
             <div className="mt-1 text-[15px] leading-6 text-slate-600">{rightRailNotesSubtitle}</div>
           </div>
           <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-800">
@@ -5258,7 +5233,7 @@ const showCorrectionReviewResolution =
     <div id="next-service-action" className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClockIcon className="h-3.5 w-3.5" />Next Service Action</div>
+          <SectionEyebrow>Next Service Action</SectionEyebrow>
 
           <div className="mt-1 text-sm font-semibold text-slate-900">Create Return Visit</div>
         </div>
@@ -6440,7 +6415,7 @@ const showCorrectionReviewResolution =
   <div id="internal-invoice-panel" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 sm:p-5">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div>
-        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><ReceiptIcon className="h-3.5 w-3.5" />Billing</div>
+        <SectionEyebrow>Billing</SectionEyebrow>
         <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
           {internalInvoiceTruth ? formatInternalInvoiceStatus(internalInvoiceTruth.status) : "Invoice required"}
         </div>
@@ -6601,13 +6576,8 @@ const showCorrectionReviewResolution =
     <section id="job-details-records" className="rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-3.5 shadow-[0_20px_46px_-38px_rgba(15,23,42,0.32)] ring-1 ring-blue-100/50 sm:rounded-2xl sm:p-5">
       <div className="mb-3 flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:mb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35]">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-              <FolderIcon className="h-3.5 w-3.5" />
-            </span>
-            <span>Job Records</span>
-          </div>
-          <div className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-xl">Job Details & Records</div>
+          <SectionEyebrow>Job Records</SectionEyebrow>
+          <div className="mt-0.5 text-lg font-semibold tracking-tight text-navy sm:mt-1 sm:text-xl">Job Details & Records</div>
           <div className="mt-1 hidden text-base text-slate-600 sm:block">Details, status, equipment, attachments, follow-up, and history.</div>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -6901,8 +6871,8 @@ const showCorrectionReviewResolution =
       <div id="job-record-detail-panel" className="mt-4 space-y-4" aria-live="polite">        <section id="edit-job" data-record-panel="edit-job" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Job Details</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Job Details</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
@@ -7233,8 +7203,8 @@ const showCorrectionReviewResolution =
         <section id="job-status" data-record-panel="job-status" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Job Status</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Job Status</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
@@ -7370,8 +7340,8 @@ const showCorrectionReviewResolution =
         <section id="job-record-equipment" data-record-panel="job-record-equipment" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Equipment</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Equipment</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
@@ -7424,8 +7394,8 @@ const showCorrectionReviewResolution =
         <section id="job-record-attachments" data-record-panel="job-record-attachments" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Attachments</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Attachments</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
@@ -7451,8 +7421,8 @@ const showCorrectionReviewResolution =
         <section id="follow-up" data-record-panel="follow-up" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Follow Up</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Follow Up</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
@@ -7517,8 +7487,8 @@ const showCorrectionReviewResolution =
         <section id="job-record-follow-up-history" data-record-panel="job-record-follow-up-history" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Follow-Up History</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Follow-Up History</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
@@ -7537,8 +7507,8 @@ const showCorrectionReviewResolution =
         <section id="job-record-timeline" data-record-panel="job-record-timeline" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Timeline</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Timeline</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
@@ -7570,8 +7540,8 @@ const showCorrectionReviewResolution =
         <section id="service-chain" data-record-panel="service-chain" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
-              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Service Chain</div>
+              <SectionEyebrow className="mb-0">Selected record panel</SectionEyebrow>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-navy">Service Chain</div>
             </div>
             <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
