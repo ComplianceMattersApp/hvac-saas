@@ -3856,6 +3856,18 @@ const showCorrectionReviewResolution =
               completeLabel="Mark Work Complete"
               completedLabel={surfaceProfile.labels.finishComplete}
             />
+            {onTheWayUndoEligibility.eligible ? (
+              <form action={revertOnTheWayFromForm} className="w-auto flex-none">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="tab" value={tab} />
+                <ImmediateSubmitButton
+                  pendingText="Reverting..."
+                  className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_12px_24px_-20px_rgba(180,83,9,0.35)] transition-[border-color,background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Undo On the Way
+                </ImmediateSubmitButton>
+              </form>
+            ) : null}
             {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
               <PendingRouteLink
                 href={`/jobs/${job.id}/tests`}
@@ -4344,26 +4356,6 @@ const showCorrectionReviewResolution =
           }`}
         >
           {workflowChipLabel}
-        </div>
-        <div className="mt-3 flex w-full flex-col items-start gap-2">
-          {onTheWayUndoEligibility.eligible ? (
-            <div className="flex w-full flex-col items-start gap-2">
-              <form action={revertOnTheWayFromForm} className="w-full sm:w-auto">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="tab" value={tab} />
-                <ImmediateSubmitButton
-                  pendingText="Reverting..."
-                  className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] sm:w-auto"
-                >
-                  Undo On the Way
-                </ImmediateSubmitButton>
-              </form>
-
-              <div className="text-xs text-slate-500 xl:text-right">
-                Available only until any later job activity occurs.
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
 

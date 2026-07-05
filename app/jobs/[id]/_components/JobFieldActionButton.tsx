@@ -112,7 +112,7 @@ export function JobFieldActionButton({
         }
 
         const confirmed = window.confirm(
-          "This job is missing a full schedule. Press OK to auto-fill today with a 2-hour window starting now and continue to On the way."
+          "This job is not scheduled. Marking On The Way will add a short schedule window around now so the visit has a time block. Continue?"
         );
 
         if (!confirmed) {

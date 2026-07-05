@@ -51,11 +51,41 @@ describe("job detail button response wiring", () => {
     expect(jobDetailSource).toContain('value={`/jobs/${job.id}?tab=${tab}#field-status-actions`}');
   });
 
-  it("uses immediate pending feedback for on-the-way revert on mobile and desktop", () => {
+  it("uses immediate pending feedback for on-the-way revert on mobile and desktop primary action areas", () => {
+    const desktopActionsStart = jobDetailSource.indexOf('id="field-status-actions"');
+    const desktopActionsEnd = jobDetailSource.indexOf("{showFieldOutcomePanel ? (", desktopActionsStart);
+    const desktopActionsSource = jobDetailSource.slice(desktopActionsStart, desktopActionsEnd);
+    const mobileActionsStart = mobileStatusSource.indexOf("<JobFieldActionButton");
+    const mobileActionsEnd = mobileStatusSource.indexOf("</div>", mobileStatusSource.indexOf("{onTheWayUndoEligibility.eligible ?", mobileActionsStart));
+    const mobileActionsSlice = mobileStatusSource.slice(mobileActionsStart, mobileActionsEnd);
+
+    expect(desktopActionsSource).toContain("{onTheWayUndoEligibility.eligible ? (");
+    expect(desktopActionsSource).toContain("revertOnTheWayFromForm");
+    expect(desktopActionsSource).toContain("<ImmediateSubmitButton");
+    expect(desktopActionsSource).toContain('pendingText="Reverting..."');
+    expect(desktopActionsSource).toContain("Undo On the Way");
+    expect(mobileActionsSlice).toContain("{onTheWayUndoEligibility.eligible ? (");
+    expect(mobileActionsSlice).toContain("revertOnTheWayFromForm");
+    expect(mobileActionsSlice).toContain('pendingText="Reverting..."');
+    expect(mobileActionsSlice).toContain("Undo On the Way");
     expect(combinedJobDetailSource).toContain("revertOnTheWayFromForm");
     expect(combinedJobDetailSource).toContain("<ImmediateSubmitButton");
     expect(combinedJobDetailSource).toContain('pendingText="Reverting..."');
     expect(combinedJobDetailSource).not.toContain('loadingText="Undoing..."');
+  });
+
+  it("confirms only unscheduled Mark On The Way submits before using the existing auto-schedule path", () => {
+    expect(fieldActionButtonSource).toContain("const needsScheduleConfirm = currentStatus === \"open\" && !hasFullSchedule;");
+    expect(fieldActionButtonSource).toContain("if (!needsScheduleConfirm)");
+    expect(fieldActionButtonSource).toContain("window.confirm(");
+    expect(fieldActionButtonSource).toContain(
+      "This job is not scheduled. Marking On The Way will add a short schedule window around now so the visit has a time block. Continue?",
+    );
+    expect(fieldActionButtonSource).toContain('input[name="auto_schedule_confirmed"]');
+    expect(fieldActionButtonSource).toContain('if (hidden) hidden.value = "1";');
+    expect(fieldActionButtonSource).toContain('<input type="hidden" name="auto_schedule_confirmed" value="0" />');
+    expect(jobDetailSource).toContain("hasFullSchedule={hasFullSchedule}");
+    expect(mobileStatusSource).toContain("hasFullSchedule={hasFullSchedule}");
   });
 
   it("adds pending feedback to Tests and Equipment route buttons without breaking link behavior", () => {
