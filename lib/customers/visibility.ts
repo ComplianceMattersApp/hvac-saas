@@ -1,4 +1,9 @@
 import { getInternalUser } from "@/lib/auth/internal-user";
+import {
+  getCustomerDirectoryInitialKey,
+  normalizeCustomerDirectoryLetterFilter,
+  type CustomerDirectoryLetterFilter,
+} from "@/lib/customers/directory-initials";
 
 export type CustomerVisibilityScope =
   | {
@@ -139,16 +144,18 @@ function compareJobsLatestFirst(a: JobRow, b: JobRow) {
   return bDate.localeCompare(aDate);
 }
 
-function buildScopedCustomerResults(params: {
+export function buildScopedCustomerResults(params: {
   customers: CustomerRow[];
   locations: LocationRow[];
   jobs: JobRow[];
   searchText?: string | null;
+  letterFilter?: CustomerDirectoryLetterFilter | null;
   resultLimit: number;
   sortDirection?: CustomerDirectorySort;
-}) {
+}): { results: ScopedCustomerSearchResult[]; totalCount: number } {
   const q = normalizeText(params.searchText);
   const searchDigits = normalizePhoneDigits(q);
+  const letterFilter = normalizeCustomerDirectoryLetterFilter(params.letterFilter);
 
   const locationsByCustomerId = new Map<string, LocationRow[]>();
   for (const location of params.locations) {
@@ -168,16 +175,21 @@ function buildScopedCustomerResults(params: {
     jobsByCustomerId.set(customerId, rows);
   }
 
-  return params.customers
+  const filteredRows = params.customers
     .filter((customer) => {
-      if (!q) return true;
       const customerId = normalizeText(customer.id);
-      return matchesScopedCustomerSearch({
-        customer,
-        locations: locationsByCustomerId.get(customerId) ?? [],
-        searchText: q,
-        searchDigits,
-      });
+      if (q) {
+        const matchesSearch = matchesScopedCustomerSearch({
+          customer,
+          locations: locationsByCustomerId.get(customerId) ?? [],
+          searchText: q,
+          searchDigits,
+        });
+        if (!matchesSearch) return false;
+      }
+
+      if (letterFilter === "all") return true;
+      return getCustomerDirectoryInitialKey(customerDisplayName(customer)) === letterFilter;
     })
     .map((customer) => {
       const customerId = normalizeText(customer.id);
@@ -215,8 +227,12 @@ function buildScopedCustomerResults(params: {
         open_job_count: customerJobs.filter(isOperationallyActiveJob).length,
       } satisfies ScopedCustomerSearchResult;
     })
-    .sort((a, b) => compareDirectoryRows(a, b, normalizeSortDirection(params.sortDirection)))
-    .slice(0, params.resultLimit);
+    .sort((a, b) => compareDirectoryRows(a, b, normalizeSortDirection(params.sortDirection)));
+
+  return {
+    totalCount: filteredRows.length,
+    results: filteredRows.slice(0, params.resultLimit),
+  };
 }
 
 async function loadDirectoryInputs(params: {
@@ -308,9 +324,11 @@ export async function searchScopedCustomers(params: {
   searchText: string;
   resultLimit?: number;
   sortDirection?: CustomerDirectorySort;
+  letterFilter?: CustomerDirectoryLetterFilter | null;
 }): Promise<{
   scope: CustomerVisibilityScope;
   results: ScopedCustomerSearchResult[];
+  totalCount: number;
 }> {
   const scope = await resolveCustomerVisibilityScope({
     supabase: params.supabase,
@@ -323,31 +341,34 @@ export async function searchScopedCustomers(params: {
 
   const q = normalizeText(params.searchText);
   if (!q) {
-    return { scope, results: [] };
+    return { scope, results: [], totalCount: 0 };
   }
 
   const resultLimit = params.resultLimit ?? 25;
   const inputs = await loadDirectoryInputs({ supabase: params.supabase });
-  const results = buildScopedCustomerResults({
+  const directory = buildScopedCustomerResults({
     ...inputs,
     searchText: q,
+    letterFilter: params.letterFilter,
     resultLimit,
     sortDirection: params.sortDirection,
   });
 
-  return { scope, results };
+  return { scope, ...directory };
 }
 
 export async function listScopedCustomerDirectory(params: {
   supabase: any;
   userId: string;
   searchText?: string | null;
+  letterFilter?: CustomerDirectoryLetterFilter | null;
   resultLimit?: number;
   sortDirection?: CustomerDirectorySort;
   accountOwnerUserId?: string | null;
 }): Promise<{
   scope: CustomerVisibilityScope;
   results: ScopedCustomerSearchResult[];
+  totalCount: number;
 }> {
   const scope = await resolveCustomerVisibilityScope({
     supabase: params.supabase,
@@ -363,15 +384,15 @@ export async function listScopedCustomerDirectory(params: {
     accountOwnerUserId: scope.kind === "internal" ? params.accountOwnerUserId : null,
   });
 
-  return {
-    scope,
-    results: buildScopedCustomerResults({
-      ...inputs,
-      searchText: params.searchText,
-      resultLimit: params.resultLimit ?? 100,
-      sortDirection: params.sortDirection,
-    }),
-  };
+  const directory = buildScopedCustomerResults({
+    ...inputs,
+    searchText: params.searchText,
+    letterFilter: params.letterFilter,
+    resultLimit: params.resultLimit ?? 100,
+    sortDirection: params.sortDirection,
+  });
+
+  return { scope, ...directory };
 }
 
 export async function searchScopedCustomerSuggestions(params: {
@@ -382,6 +403,7 @@ export async function searchScopedCustomerSuggestions(params: {
 }): Promise<{
   scope: CustomerVisibilityScope;
   results: ScopedCustomerSearchResult[];
+  totalCount: number;
 }> {
   const q = normalizeText(params.searchText);
   const resultLimit = params.resultLimit ?? 6;
@@ -396,7 +418,7 @@ export async function searchScopedCustomerSuggestions(params: {
       throw new Error("CUSTOMER_VISIBILITY_SCOPE_REQUIRED");
     }
 
-    return { scope, results: [] };
+    return { scope, results: [], totalCount: 0 };
   }
 
   // Keep phone-digit matching on the canonical search path to preserve exact behavior.
@@ -458,7 +480,7 @@ export async function searchScopedCustomerSuggestions(params: {
 
   const customerIds = Array.from(candidateIds);
   if (customerIds.length === 0) {
-    return { scope, results: [] };
+    return { scope, results: [], totalCount: 0 };
   }
 
   const { data: customerRows, error: customerErr } = await params.supabase
@@ -486,7 +508,7 @@ export async function searchScopedCustomerSuggestions(params: {
 
   if (jobErr) throw jobErr;
 
-  const results = buildScopedCustomerResults({
+  const directory = buildScopedCustomerResults({
     customers,
     locations,
     jobs: (jobRows ?? []) as JobRow[],
@@ -495,7 +517,7 @@ export async function searchScopedCustomerSuggestions(params: {
     sortDirection: "az",
   });
 
-  return { scope, results };
+  return { scope, ...directory };
 }
 
 function csvEscape(value: string) {

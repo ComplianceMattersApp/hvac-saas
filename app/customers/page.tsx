@@ -12,9 +12,13 @@ import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import {
   buildCustomerDirectorySections,
   CUSTOMER_DIRECTORY_NAV_KEYS,
-  getAvailableCustomerDirectoryLetters,
-  getCustomerDirectoryAnchorId,
+  getCustomerDirectoryInitialKeyFromLetterKey,
 } from "@/lib/customers/directory-sections";
+import {
+  customerDirectoryLetterFilterLabel,
+  normalizeCustomerDirectoryLetterFilter,
+  type CustomerDirectoryLetterFilter,
+} from "@/lib/customers/directory-initials";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 
 const DEFAULT_DIRECTORY_LIMIT = 100;
@@ -24,17 +28,19 @@ function normalizeSort(value: unknown): CustomerDirectorySort {
   return String(value ?? "").trim().toLowerCase() === "za" ? "za" : "az";
 }
 
-function customerDirectoryHref(params: { q?: string; sort: CustomerDirectorySort }) {
+function customerDirectoryHref(params: { q?: string; sort: CustomerDirectorySort; letter?: CustomerDirectoryLetterFilter }) {
   const searchParams = new URLSearchParams();
   if (params.q) searchParams.set("q", params.q);
+  if (params.letter && params.letter !== "all") searchParams.set("letter", params.letter);
   if (params.sort !== "az") searchParams.set("sort", params.sort);
   const query = searchParams.toString();
   return query ? `/customers?${query}` : "/customers";
 }
 
-function customerExportHref(params: { q?: string; sort: CustomerDirectorySort }) {
+function customerExportHref(params: { q?: string; sort: CustomerDirectorySort; letter?: CustomerDirectoryLetterFilter }) {
   const searchParams = new URLSearchParams();
   if (params.q) searchParams.set("q", params.q);
+  if (params.letter && params.letter !== "all") searchParams.set("letter", params.letter);
   if (params.sort !== "az") searchParams.set("sort", params.sort);
   const query = searchParams.toString();
   return query ? `/customers/export?${query}` : "/customers/export";
@@ -48,7 +54,7 @@ function formatDirectoryDate(value?: string | null) {
 }
 
 export default async function CustomersPage(props: {
-  searchParams: Promise<{ q?: string; sort?: string }>;
+  searchParams: Promise<{ q?: string; sort?: string; letter?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -58,7 +64,9 @@ export default async function CustomersPage(props: {
   const sp = await props.searchParams;
   const q = (sp?.q ?? "").trim();
   const sort = normalizeSort(sp?.sort);
+  const letter = normalizeCustomerDirectoryLetterFilter(sp?.letter);
   const hasQuery = q.length > 0;
+  const hasLetterFilter = letter !== "all";
   const resultLimit = hasQuery ? SEARCH_DIRECTORY_LIMIT : DEFAULT_DIRECTORY_LIMIT;
 
   const [scoped, internalUser] = await Promise.all([
@@ -66,6 +74,7 @@ export default async function CustomersPage(props: {
       supabase,
       userId: userData.user.id,
       searchText: q,
+      letterFilter: letter,
       resultLimit,
       sortDirection: sort,
     }),
@@ -73,34 +82,40 @@ export default async function CustomersPage(props: {
   ]);
 
   const results = scoped.results;
+  const totalCount = scoped.totalCount;
   const canExportCustomers =
     internalUser?.is_active === true &&
     (internalUser.role === "admin" || internalUser.role === "office");
   const sortToggle = sort === "az" ? "za" : "az";
   const directorySections = buildCustomerDirectorySections(results);
-  const availableDirectoryLetters = getAvailableCustomerDirectoryLetters(directorySections);
-  const activeDirectoryLetters = new Set(availableDirectoryLetters);
+  const activeLetterLabel = customerDirectoryLetterFilterLabel(letter);
+  const currentFilterDescription = [
+    hasQuery ? `matching "${q}"` : null,
+    hasLetterFilter ? `starting with ${activeLetterLabel}` : null,
+  ].filter(Boolean).join(" and ");
+  const showingCappedResults = results.length < totalCount;
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 bg-slate-50 p-3 text-slate-900 sm:p-6">
-      <CustomerSearchPanel initialQuery={q} />
+      <CustomerSearchPanel initialQuery={q} initialSort={sort} initialLetter={letter} />
 
       <div className="rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
         <div className="flex flex-col gap-4 border-b border-slate-200 px-4 py-4 sm:px-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <SectionEyebrow>{hasQuery ? "Filtered Directory" : "Alphabetical Directory"}</SectionEyebrow>
+            <SectionEyebrow>{hasQuery || hasLetterFilter ? "Filtered Directory" : "Customer Directory"}</SectionEyebrow>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-navy">
-              {hasQuery ? `Customers matching "${q}"` : "Customers A-Z"}
+              {currentFilterDescription ? `Customers ${currentFilterDescription}` : "All Customers"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              {results.length} customer{results.length === 1 ? "" : "s"} visible
-              {hasQuery ? ` for this search` : ""}. Rows open the customer workspace.
+              Showing {results.length} of {totalCount} customer{totalCount === 1 ? "" : "s"}
+              {currentFilterDescription ? ` ${currentFilterDescription}` : ""}. Rows open the customer workspace.
+              {showingCappedResults ? ` Showing first ${resultLimit}.` : ""}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Link
-              href={customerDirectoryHref({ q, sort: sortToggle })}
+              href={customerDirectoryHref({ q, sort: sortToggle, letter })}
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
             >
               {sort === "az" ? (
@@ -112,7 +127,7 @@ export default async function CustomersPage(props: {
             </Link>
             {canExportCustomers ? (
               <Link
-                href={customerExportHref({ q, sort })}
+                href={customerExportHref({ q, sort, letter })}
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
               >
                 <Download className="h-4 w-4" aria-hidden="true" />
@@ -122,66 +137,78 @@ export default async function CustomersPage(props: {
           </div>
         </div>
 
-        {results.length > 0 ? (
-          <nav
-            aria-label="Customer directory letter navigation"
-            className="sticky top-16 z-20 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm shadow-slate-950/5 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:px-5 lg:top-20"
-          >
-            <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:hidden">
-              {availableDirectoryLetters.map((letter) => (
-                <a
-                  key={letter}
-                  href={`#${getCustomerDirectoryAnchorId(letter)}`}
-                  aria-label={`Jump to customers starting with ${letter === "#" ? "a number or symbol" : letter}`}
-                  className="inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-md border border-blue-600 bg-blue-600 px-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+        <nav
+          aria-label="Customer directory starts-with filter"
+          className="sticky top-16 z-20 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm shadow-slate-950/5 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:px-5 lg:top-20"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Starts with</div>
+            {(hasQuery || hasLetterFilter || sort !== "az") ? (
+              <Link
+                href="/customers"
+                className="text-xs font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+              >
+                Clear all
+              </Link>
+            ) : null}
+          </div>
+          <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:hidden">
+            {(["all", ...CUSTOMER_DIRECTORY_NAV_KEYS.map(getCustomerDirectoryInitialKeyFromLetterKey)] as CustomerDirectoryLetterFilter[]).map((filter) => {
+              const selected = letter === filter;
+              return (
+                <Link
+                  key={filter}
+                  href={customerDirectoryHref({ q, sort, letter: filter })}
+                  aria-current={selected ? "page" : undefined}
+                  className={[
+                    "inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-md border px-2 text-sm font-semibold transition",
+                    selected
+                      ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
+                  ].join(" ")}
                 >
-                  {letter}
-                </a>
-              ))}
-            </div>
+                  {customerDirectoryLetterFilterLabel(filter)}
+                </Link>
+              );
+            })}
+          </div>
 
-            <div className="-mx-1 hidden gap-1 px-1 sm:flex sm:flex-wrap">
-              {CUSTOMER_DIRECTORY_NAV_KEYS.map((letter) => {
-                const isActive = activeDirectoryLetters.has(letter);
-                const chipClass = isActive
-                  ? "border-blue-600 bg-blue-600 text-white shadow-sm hover:bg-blue-700"
-                  : "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400";
-
-                return isActive ? (
-                  <a
-                    key={letter}
-                    href={`#${getCustomerDirectoryAnchorId(letter)}`}
-                    aria-label={`Jump to customers starting with ${letter === "#" ? "a number or symbol" : letter}`}
-                    className={`inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-md border px-2 text-sm font-semibold transition ${chipClass}`}
-                  >
-                    {letter}
-                  </a>
-                ) : (
-                  <button
-                    key={letter}
-                    type="button"
-                    disabled
-                    aria-disabled="true"
-                    aria-label={`No visible customers starting with ${letter === "#" ? "a number or symbol" : letter}`}
-                    className={`inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-md border px-2 text-sm font-semibold ${chipClass}`}
-                  >
-                    {letter}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-        ) : null}
+          <div className="-mx-1 hidden gap-1 px-1 sm:flex sm:flex-wrap">
+            {(["all", ...CUSTOMER_DIRECTORY_NAV_KEYS.map(getCustomerDirectoryInitialKeyFromLetterKey)] as CustomerDirectoryLetterFilter[]).map((filter) => {
+              const selected = letter === filter;
+              return (
+                <Link
+                  key={filter}
+                  href={customerDirectoryHref({ q, sort, letter: filter })}
+                  aria-current={selected ? "page" : undefined}
+                  className={[
+                    "inline-flex h-9 min-w-9 shrink-0 items-center justify-center rounded-md border px-2 text-sm font-semibold transition",
+                    filter === "all" ? "min-w-14" : "",
+                    selected
+                      ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
+                  ].join(" ")}
+                >
+                  {customerDirectoryLetterFilterLabel(filter)}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
 
         {results.length === 0 ? (
           <div className="px-5 py-8">
             <div className="space-y-1">
               <h2 className="text-base font-semibold text-navy">
-                {hasQuery ? "No customer matches" : "No customers visible yet"}
+                {hasQuery || hasLetterFilter ? "No customer matches" : "No customers visible yet"}
               </h2>
               <p className="text-sm leading-6 text-slate-600">
-                {hasQuery
-                  ? `No matches for "${q}". Try a broader name fragment, fewer phone digits, or part of the address or city.`
+                {hasQuery && hasLetterFilter
+                  ? `No customers found for "${q}" starting with "${activeLetterLabel}". Try clearing the search or choosing All.`
+                  : hasLetterFilter
+                    ? `No customers found starting with "${activeLetterLabel}". Try choosing All.`
+                    : hasQuery
+                      ? `No matches for "${q}". Try a broader name fragment, fewer phone digits, or part of the address or city.`
                   : "Customer records will appear here as soon as they are visible in your account scope."}
               </p>
             </div>

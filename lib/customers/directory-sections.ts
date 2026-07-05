@@ -1,33 +1,13 @@
 import type { ScopedCustomerSearchResult } from "@/lib/customers/visibility";
+import {
+  CUSTOMER_DIRECTORY_LETTER_VALUES,
+  getCustomerDirectoryInitialKey,
+  type CustomerDirectoryInitialKey,
+} from "@/lib/customers/directory-initials";
 
 export const CUSTOMER_DIRECTORY_NAV_KEYS = [
   "#",
-  "A",
-  "B",
-  "C",
-  "D",
-  "E",
-  "F",
-  "G",
-  "H",
-  "I",
-  "J",
-  "K",
-  "L",
-  "M",
-  "N",
-  "O",
-  "P",
-  "Q",
-  "R",
-  "S",
-  "T",
-  "U",
-  "V",
-  "W",
-  "X",
-  "Y",
-  "Z",
+  ...CUSTOMER_DIRECTORY_LETTER_VALUES,
 ] as const;
 
 export type CustomerDirectoryLetterKey = (typeof CUSTOMER_DIRECTORY_NAV_KEYS)[number];
@@ -39,10 +19,12 @@ export type CustomerDirectorySection = {
 };
 
 export function getCustomerDirectoryLetterKey(displayName: unknown): CustomerDirectoryLetterKey {
-  const trimmed = String(displayName ?? "").trim();
-  const firstAlphanumeric = trimmed.match(/[A-Za-z0-9]/)?.[0] ?? "";
-  const upper = firstAlphanumeric.toUpperCase();
-  return /^[A-Z]$/.test(upper) ? (upper as CustomerDirectoryLetterKey) : "#";
+  const key = getCustomerDirectoryInitialKey(displayName);
+  return key === "other" ? "#" : (key as CustomerDirectoryLetterKey);
+}
+
+export function getCustomerDirectoryInitialKeyFromLetterKey(letterKey: CustomerDirectoryLetterKey): CustomerDirectoryInitialKey {
+  return letterKey === "#" ? "other" : letterKey;
 }
 
 export function getCustomerDirectoryAnchorId(letterKey: CustomerDirectoryLetterKey) {

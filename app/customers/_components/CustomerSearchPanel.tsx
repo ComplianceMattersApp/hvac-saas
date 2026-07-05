@@ -4,6 +4,8 @@ import { ArrowRight, Mail, MapPin, Phone, Search, UserRound } from "lucide-react
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
+import type { CustomerDirectorySort } from "@/lib/customers/visibility";
+import type { CustomerDirectoryLetterFilter } from "@/lib/customers/directory-initials";
 
 type CustomerSuggestion = {
   customer_id: string;
@@ -62,7 +64,24 @@ function detectSearchIntent(query: string) {
   };
 }
 
-export function CustomerSearchPanel({ initialQuery }: { initialQuery: string }) {
+function customerSearchHref(params: { q?: string; sort: CustomerDirectorySort; letter: CustomerDirectoryLetterFilter }) {
+  const searchParams = new URLSearchParams();
+  if (params.q) searchParams.set("q", params.q);
+  if (params.letter !== "all") searchParams.set("letter", params.letter);
+  if (params.sort !== "az") searchParams.set("sort", params.sort);
+  const query = searchParams.toString();
+  return query ? `/customers?${query}` : "/customers";
+}
+
+export function CustomerSearchPanel({
+  initialQuery,
+  initialSort,
+  initialLetter,
+}: {
+  initialQuery: string;
+  initialSort: CustomerDirectorySort;
+  initialLetter: CustomerDirectoryLetterFilter;
+}) {
   const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
@@ -145,6 +164,8 @@ export function CustomerSearchPanel({ initialQuery }: { initialQuery: string }) 
           </div>
 
           <form className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]" action="/customers" method="get">
+            {initialLetter !== "all" ? <input type="hidden" name="letter" value={initialLetter} /> : null}
+            {initialSort !== "az" ? <input type="hidden" name="sort" value={initialSort} /> : null}
             <label className="relative block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
               <input
@@ -164,6 +185,23 @@ export function CustomerSearchPanel({ initialQuery }: { initialQuery: string }) 
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </form>
+
+          {initialQuery ? (
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Link
+                href={customerSearchHref({ sort: initialSort, letter: initialLetter })}
+                className="font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+              >
+                Clear search
+              </Link>
+              <Link
+                href="/customers"
+                className="font-semibold text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+              >
+                Clear all filters
+              </Link>
+            </div>
+          ) : null}
 
           {showSuggestions ? (
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">

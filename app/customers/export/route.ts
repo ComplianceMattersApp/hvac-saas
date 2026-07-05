@@ -6,6 +6,7 @@ import {
   buildCustomerDirectoryCsv,
   listScopedCustomerDirectory,
 } from "@/lib/customers/visibility";
+import { normalizeCustomerDirectoryLetterFilter } from "@/lib/customers/directory-initials";
 
 const DEFAULT_DIRECTORY_EXPORT_LIMIT = 100;
 const SEARCH_DIRECTORY_EXPORT_LIMIT = 25;
@@ -39,12 +40,14 @@ export async function GET(request: NextRequest) {
 
   const q = String(request.nextUrl.searchParams.get("q") ?? "").trim();
   const sort = normalizeSort(request.nextUrl.searchParams.get("sort"));
+  const letter = normalizeCustomerDirectoryLetterFilter(request.nextUrl.searchParams.get("letter"));
   const resultLimit = q ? SEARCH_DIRECTORY_EXPORT_LIMIT : DEFAULT_DIRECTORY_EXPORT_LIMIT;
   const admin = createAdminClient();
   const scoped = await listScopedCustomerDirectory({
     supabase: admin,
     userId: user.id,
     searchText: q,
+    letterFilter: letter,
     sortDirection: sort,
     resultLimit,
     accountOwnerUserId: internalUser.account_owner_user_id,
