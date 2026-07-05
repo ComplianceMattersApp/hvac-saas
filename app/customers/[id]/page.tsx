@@ -95,6 +95,7 @@ import { equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } 
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 import ProfileEquipmentCreateForm from "./_components/ProfileEquipmentCreateForm";
 import { Disclosure } from "@/components/ui/Disclosure";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 
 
 type CustomerRow = {
@@ -1463,8 +1464,8 @@ export default async function CustomerDetailPage(props: {
             </Link>
 
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Customer Workspace</div>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
+              <SectionEyebrow>Customer Workspace</SectionEyebrow>
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-navy md:text-3xl">
                 {customerDisplayName(customer)}
               </h1>
               <p className="mt-1 text-sm text-slate-600">
@@ -1519,7 +1520,7 @@ export default async function CustomerDetailPage(props: {
 
           <div className="flex flex-col items-stretch gap-3 rounded-xl border border-slate-200 bg-white/85 p-3 md:items-end">
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Quick Actions</div>
+              <SectionEyebrow>Quick Actions</SectionEyebrow>
               <div className="flex flex-wrap gap-2">
                 {callHref ? (
                   <a
@@ -1572,9 +1573,7 @@ export default async function CustomerDetailPage(props: {
           aria-label="Customer workspace tabs"
           className="rounded-2xl border border-slate-300 bg-slate-100/95 p-3 shadow-sm ring-1 ring-slate-200 md:p-4"
         >
-          <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
-            Workspace Navigation
-          </div>
+          <SectionEyebrow className="mb-3">Workspace Navigation</SectionEyebrow>
           <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
             {workspaceNavigationItems.map((item) => (
               <Link
@@ -1598,7 +1597,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "overview" ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-slate-900">Attention Snapshot</h2>
+            <h2 className="text-sm font-semibold text-navy">Attention Snapshot</h2>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -1639,9 +1638,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "overview" ? (
         <section className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Open Jobs Summary
-            </h2>
+            <SectionEyebrow className="mb-0">Open Jobs Summary</SectionEyebrow>
           </div>
 
           <div className="flex flex-wrap gap-1 sm:gap-1.5">
@@ -1665,7 +1662,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "money" ? (
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3">
-              <h2 className="text-sm font-semibold text-slate-900">Money Overview</h2>
+              <h2 className="text-sm font-semibold text-navy">Money Overview</h2>
               <p className="mt-1 text-xs text-slate-600">
                 Customer-level payment status and where to go for invoice actions.
               </p>
@@ -1754,7 +1751,7 @@ export default async function CustomerDetailPage(props: {
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
-                <h2 className="text-sm font-semibold text-slate-900">Payment Method</h2>
+                <h2 className="text-sm font-semibold text-navy">Payment Method</h2>
                 <p className="text-xs font-medium text-slate-700">Saved Card Setup</p>
                 <p className="text-xs text-slate-600">
                   Card details are entered in Stripe-hosted checkout. Compliance Matters does not store full card number or CVC.
@@ -1816,7 +1813,7 @@ export default async function CustomerDetailPage(props: {
           {activeWorkspaceTab === "overview" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-lg font-semibold text-navy">
                 Account Summary
               </h2>
             </div>
@@ -1883,7 +1880,7 @@ export default async function CustomerDetailPage(props: {
 
           {activeWorkspaceTab === "settings" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Billing / Paperwork Defaults</h2>
+            <h2 className="text-lg font-semibold text-navy">Billing / Paperwork Defaults</h2>
 
             <p className="mt-2 text-sm text-slate-600">
               Invoices and paperwork default to the responsible account unless a job or invoice has its own billing recipient.
@@ -1993,7 +1990,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "locations-contacts" && isInternalViewer ? (
           <section id="contact-overview" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
-              <h2 className="text-lg font-semibold text-slate-900">Contact Overview</h2>
+              <h2 className="text-lg font-semibold text-navy">Contact Overview</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Quickly confirm who to call for scheduling, billing paperwork, and site access.
               </p>
@@ -2071,7 +2068,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "locations-contacts" && isInternalViewer ? (
           <section id="role-contacts" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
-              <h2 className="text-lg font-semibold text-slate-900">Account Contacts</h2>
+              <h2 className="text-lg font-semibold text-navy">Account Contacts</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Directory of people tied to this customer account for scheduling, billing, and access needs.
               </p>
@@ -2162,7 +2159,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "history" && isInternalViewer ? (
           <section id="customer-notes" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
-              <h2 className="text-lg font-semibold text-slate-900">Customer Notes</h2>
+              <h2 className="text-lg font-semibold text-navy">Customer Notes</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Internal notes and context for this customer.
               </p>
@@ -2199,7 +2196,7 @@ export default async function CustomerDetailPage(props: {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Managed Locations</h2>
+              <h2 className="text-lg font-semibold text-navy">Managed Locations</h2>
               <p className="text-sm text-slate-500">
                 Saved service addresses for this customer account. Add locations when this customer has more than one service address.
               </p>
@@ -2575,7 +2572,7 @@ export default async function CustomerDetailPage(props: {
           <section id="systems-equipment" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">Systems &amp; Equipment</h2>
+                <h2 className="text-lg font-semibold text-navy">Systems &amp; Equipment</h2>
                 <p className="mt-0.5 text-sm text-slate-500">
                   Systems and equipment saved for each customer property.
                 </p>
@@ -2798,7 +2795,7 @@ export default async function CustomerDetailPage(props: {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Recent / Active Work</h2>
+              <h2 className="text-lg font-semibold text-navy">Recent / Active Work</h2>
               <p className="text-sm text-slate-500">
                 {isInternalViewer
                   ? "All jobs for this customer across every location."
@@ -2945,7 +2942,7 @@ export default async function CustomerDetailPage(props: {
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
                   <div className="border-b border-slate-200 bg-slate-50/80 px-3 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <div className="text-sm font-semibold text-slate-900">Other Visits</div>
+                      <div className="text-sm font-semibold text-navy">Other Visits</div>
                       <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
                         {ungroupedJobs.length} visit{ungroupedJobs.length === 1 ? "" : "s"}
                       </span>
@@ -3050,7 +3047,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "work" && isInternalViewer && estimatesEnabled ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Estimates</h2>
+              <h2 className="text-lg font-semibold text-navy">Estimates</h2>
               <p className="mt-0.5 text-sm text-slate-500">
                 Draft and sent estimates for this customer.
               </p>
@@ -3109,7 +3106,7 @@ export default async function CustomerDetailPage(props: {
         {activeWorkspaceTab === "service-plans" && isInternalViewer && maintenanceAgreementsEnabled ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Maintenance Agreements</h2>
+              <h2 className="text-lg font-semibold text-navy">Maintenance Agreements</h2>
               <p className="mt-0.5 text-sm text-slate-500">
                 Active and upcoming maintenance agreements for this customer.
               </p>
@@ -3117,7 +3114,7 @@ export default async function CustomerDetailPage(props: {
 
             <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="mb-3">
-                <h3 className="text-sm font-semibold text-slate-900">Service Plan Overview</h3>
+                <h3 className="text-sm font-semibold text-navy">Service Plan Overview</h3>
                 <p className="mt-1 text-xs text-slate-600">
                   Plan status and billing-period health at a glance.
                 </p>
@@ -3356,9 +3353,7 @@ export default async function CustomerDetailPage(props: {
                       ) : null}
 
                       <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">
-                        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                          Plan Snapshot
-                        </div>
+                        <SectionEyebrow>Plan Snapshot</SectionEyebrow>
                         <dl className="mt-2 grid gap-x-3 gap-y-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
                           <div>
                             <dt className="font-medium text-slate-500">Plan</dt>
@@ -3403,9 +3398,7 @@ export default async function CustomerDetailPage(props: {
                         </dl>
 
                         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                            What's Included
-                          </div>
+                          <SectionEyebrow>What's Included</SectionEyebrow>
                           {defaultPlanItems.length > 0 ? (
                             <ul className="mt-2 space-y-1.5 text-xs text-slate-700">
                               {defaultPlanItems.map((item) => (
@@ -3429,9 +3422,7 @@ export default async function CustomerDetailPage(props: {
                         </div>
 
                         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                            Checklist
-                          </div>
+                          <SectionEyebrow>Checklist</SectionEyebrow>
                           {agrChecklistItems.length > 0 ? (
                             <ul className="mt-2 space-y-1.5 text-xs text-slate-700">
                               {agrChecklistItems.map((item) => (
@@ -3488,9 +3479,7 @@ export default async function CustomerDetailPage(props: {
 
                       <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                            Billing Periods
-                          </div>
+                          <SectionEyebrow>Billing Periods</SectionEyebrow>
                           <p className="mt-1 text-xs text-slate-500">
                             Read status first, then open advanced controls only when needed.
                           </p>
