@@ -80,12 +80,12 @@ export function JobFieldActionButton({
 
   const pendingLabel =
     currentStatus === "open"
-      ? "Marking on the way..."
+      ? "Marking On The Way..."
       : currentStatus === "on_the_way"
-      ? "Marking in progress..."
+      ? "Starting Work..."
       : currentStatus === "in_process"
-      ? "Marking complete..."
-      : "Updating...";
+      ? "Completing..."
+      : "Saving...";
 
   if (isDone) {
     return (

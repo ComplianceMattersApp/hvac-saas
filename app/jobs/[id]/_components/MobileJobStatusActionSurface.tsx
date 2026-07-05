@@ -39,6 +39,7 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
     markServicePartOrderedFromForm,
     mobileCurrentStatusLabel,
     onTheWayUndoEligibility,
+    PendingRouteLink,
     primaryCloseoutMessage,
     revertOnTheWayFromForm,
     scheduleRetestNowFromForm,
@@ -505,12 +506,13 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
                 {primaryCloseoutMessage}
               </span>
               {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
-                <Link
+                <PendingRouteLink
                   href={`/jobs/${job.id}/tests`}
                   className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
+                  loadingLabel="Opening..."
                 >
                   Open Tests Workspace
-                </Link>
+                </PendingRouteLink>
               ) : null}
             </div>
           ) : null}
@@ -519,12 +521,12 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
             <form action={revertOnTheWayFromForm} className="mt-2.5">
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="tab" value={tab} />
-              <SubmitButton
-                loadingText="Undoing..."
+              <ImmediateSubmitButton
+                pendingText="Reverting..."
                 className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-base font-semibold text-amber-900"
               >
                 Undo On the Way
-              </SubmitButton>
+              </ImmediateSubmitButton>
             </form>
           ) : null}
         </div>

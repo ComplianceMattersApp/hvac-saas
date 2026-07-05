@@ -87,6 +87,7 @@ type MobileJobDetailCurrentProps = {
   jobWorkbenchTitle: any;
   lastAttemptLabel: any;
   Link: any;
+  PendingRouteLink: any;
   linkedRetestPassiveCopy: any;
   linkedRetestPassiveHeading: any;
   LockIcon: any;

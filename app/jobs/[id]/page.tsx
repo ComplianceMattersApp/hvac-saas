@@ -56,6 +56,7 @@ import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import type { JobStatus } from "@/lib/types/job";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
+import PendingRouteLink from "./_components/PendingRouteLink";
 import UnscheduleButton from "./_components/UnscheduleButton";
 import {
   getCloseoutNeeds,
@@ -3673,6 +3674,7 @@ const showCorrectionReviewResolution =
           jobWorkbenchTitle={jobWorkbenchTitle}
           lastAttemptLabel={lastAttemptLabel}
           Link={Link}
+          PendingRouteLink={PendingRouteLink}
           linkedRetestPassiveCopy={linkedRetestPassiveCopy}
           linkedRetestPassiveHeading={linkedRetestPassiveHeading}
           LockIcon={LockIcon}
@@ -3855,12 +3857,13 @@ const showCorrectionReviewResolution =
               completedLabel={surfaceProfile.labels.finishComplete}
             />
             {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
-              <Link
+              <PendingRouteLink
                 href={`/jobs/${job.id}/tests`}
                 className={`${compactWorkspaceActionButtonClass} min-h-11 shrink-0 px-4 shadow-[0_12px_24px_-20px_rgba(15,31,53,0.35)]`}
+                loadingLabel="Opening..."
               >
                 Open Tests Workspace
-              </Link>
+              </PendingRouteLink>
             ) : null}
           </div>
         ) : null}
@@ -4269,12 +4272,13 @@ const showCorrectionReviewResolution =
             ) : null}
 
             {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
-              <Link
+              <PendingRouteLink
                 href={`/jobs/${job.id}/tests`}
                 className={`${compactWorkspaceActionButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
+                loadingLabel="Opening..."
               >
                 Open Tests Workspace
-              </Link>
+              </PendingRouteLink>
             ) : null}
           </div>
         </div>
@@ -4301,9 +4305,9 @@ const showCorrectionReviewResolution =
             ) : null}
 
             {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
-              <Link href={`/jobs/${job.id}/tests`} className={compactWorkspaceActionButtonClass}>
+              <PendingRouteLink href={`/jobs/${job.id}/tests`} className={compactWorkspaceActionButtonClass} loadingLabel="Opening...">
                 Open Tests Workspace
-              </Link>
+              </PendingRouteLink>
             ) : null}
           </div>
         </details>
@@ -4347,12 +4351,12 @@ const showCorrectionReviewResolution =
               <form action={revertOnTheWayFromForm} className="w-full sm:w-auto">
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="tab" value={tab} />
-                <SubmitButton
-                  loadingText="Undoing..."
+                <ImmediateSubmitButton
+                  pendingText="Reverting..."
                   className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] sm:w-auto"
                 >
                   Undo On the Way
-                </SubmitButton>
+                </ImmediateSubmitButton>
               </form>
 
               <div className="text-xs text-slate-500 xl:text-right">
@@ -7348,9 +7352,9 @@ const showCorrectionReviewResolution =
           <div className="mt-4">
             <div className={jobRecordsDetailsDividerClass}>
             <div className={`mb-3 ${recordActionRowEndClass}`}>
-              <Link href={`/jobs/${job.id}/info?f=equipment`} className={recordSecondaryButtonClass}>
+              <PendingRouteLink href={`/jobs/${job.id}/info?f=equipment`} className={recordSecondaryButtonClass} loadingLabel="Opening...">
                 Manage Equipment
-              </Link>
+              </PendingRouteLink>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)]">
