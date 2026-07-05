@@ -738,41 +738,91 @@ export default async function JobTestsPage({
   const focused = String(sp.t ?? "").trim();
   const selectedSystemIdFromQuery = String(sp.s ?? "").trim();
   const notice = String(sp.notice ?? "").trim();
+  const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
+  const timingStartMs = Date.now();
+  const phaseDurationsMs: Record<string, number> = {};
+  const recordPhase = (phase: string, durationMs: number) => {
+    if (!timingEnabled) return;
+    phaseDurationsMs[phase] = durationMs;
+  };
+  const timedPhase = async <T,>(phase: string, work: () => T | PromiseLike<T>): Promise<T> => {
+    if (!timingEnabled) return work();
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      recordPhase(phase, Date.now() - startedAt);
+    }
+  };
+  const emitTimingLog = (labels: { hasContractor: boolean; hasCorrectionResolutionCandidate: boolean }) => {
+    if (!timingEnabled) return;
+    console.info(
+      "[job-tests-route-timing]",
+      JSON.stringify({
+        jobId: id,
+        route: "/jobs/[id]/tests",
+        labels: {
+          hasFocusedTest: Boolean(focused),
+          hasSelectedSystem: Boolean(selectedSystemIdFromQuery),
+          hasNotice: Boolean(notice),
+          hasContractor: labels.hasContractor,
+          hasCorrectionResolutionCandidate: labels.hasCorrectionResolutionCandidate,
+        },
+        totalMs: Date.now() - timingStartMs,
+        phasesMs: {
+          createClient: phaseDurationsMs.createClient ?? 0,
+          authInternalAccess: phaseDurationsMs.authInternalAccess ?? 0,
+          mainJobTestPayloadRead: phaseDurationsMs.mainJobTestPayloadRead ?? 0,
+          systemsEquipmentEccPayloadReads: phaseDurationsMs.systemsEquipmentEccPayloadReads ?? 0,
+          correctionResolutionEventRead: phaseDurationsMs.correctionResolutionEventRead ?? 0,
+          businessIdentityRead: phaseDurationsMs.businessIdentityRead ?? 0,
+          contractorRead: phaseDurationsMs.contractorRead ?? 0,
+          parentRetestPayloadRead: phaseDurationsMs.parentRetestPayloadRead ?? 0,
+          renderPrep: phaseDurationsMs.renderPrep ?? 0,
+          totalServerRenderBeforeResponse: Date.now() - timingStartMs,
+        },
+      }),
+    );
+  };
 
-  const supabase = await createClient();
+  const supabase = await timedPhase("createClient", () => createClient());
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user ?? null;
+  const { internalUser } = await timedPhase("authInternalAccess", async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user ?? null;
 
-  if (!user) redirect("/login");
+    if (!user) redirect("/login");
 
-  let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"] | null = null;
+    let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"] | null = null;
 
-  try {
-    const internalAccess = await requireInternalUser({ supabase, userId: user.id });
-    internalUser = internalAccess.internalUser;
-  } catch (error) {
-    if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorUserErr } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    try {
+      const internalAccess = await requireInternalUser({ supabase, userId: user.id });
+      internalUser = internalAccess.internalUser;
+    } catch (error) {
+      if (isInternalAccessError(error)) {
+        const { data: contractorUser, error: contractorUserErr } = await supabase
+          .from("contractor_users")
+          .select("contractor_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (contractorUserErr) throw contractorUserErr;
+        if (contractorUserErr) throw contractorUserErr;
 
-      if (contractorUser?.contractor_id) {
-        redirect(`/portal/jobs/${id}`);
+        if (contractorUser?.contractor_id) {
+          redirect(`/portal/jobs/${id}`);
+        }
+
+        redirect("/login");
       }
 
-      redirect("/login");
+      throw error;
     }
 
-    throw error;
-  }
+    return { internalUser };
+  });
   const isInternalUser = Boolean(internalUser?.user_id);
 
-  const { data: job, error } = await supabase
+  const { data: job, error } = await timedPhase("mainJobTestPayloadRead", () => supabase
     .from("jobs")
     .select(
       `
@@ -850,7 +900,8 @@ export default async function JobTestsPage({
     `
     )
     .eq("id", id)
-    .single();
+    .single());
+  recordPhase("systemsEquipmentEccPayloadReads", phaseDurationsMs.mainJobTestPayloadRead ?? 0);
 
   if (error) throw error;
   if (!job) return notFound();
@@ -867,13 +918,17 @@ export default async function JobTestsPage({
   });
   let hasCorrectionReviewResolution = false;
   if (hasCompletedFailedEccRun) {
-    const { data: correctionResolutionEvent, error: correctionResolutionErr } = await supabase
-      .from("job_events")
-      .select("id")
-      .eq("job_id", id)
-      .eq("event_type", "failure_resolved_by_correction_review")
-      .limit(1)
-      .maybeSingle();
+    const { data: correctionResolutionEvent, error: correctionResolutionErr } = await timedPhase(
+      "correctionResolutionEventRead",
+      () =>
+        supabase
+          .from("job_events")
+          .select("id")
+          .eq("job_id", id)
+          .eq("event_type", "failure_resolved_by_correction_review")
+          .limit(1)
+          .maybeSingle(),
+    );
 
     if (correctionResolutionErr) throw correctionResolutionErr;
     hasCorrectionReviewResolution = Boolean(correctionResolutionEvent?.id);
@@ -883,25 +938,28 @@ export default async function JobTestsPage({
   const jobOwnerUserId = String((job as any)?.contractors?.owner_user_id ?? "").trim();
   const internalBusinessOwnerId = jobOwnerUserId || String(internalUser?.account_owner_user_id ?? "").trim();
 
-  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+  const internalBusinessIdentity = await timedPhase("businessIdentityRead", () => resolveInternalBusinessIdentityByAccountOwnerId({
     supabase,
     accountOwnerUserId: internalBusinessOwnerId,
-  });
+  }));
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
   const contractorId = String(job.contractor_id ?? "").trim();
   let contractorName = internalBusinessDisplayName;
 
   if (contractorId) {
-    const { data: contractor, error: contractorError } = await supabase
-      .from("contractors")
-      .select("name")
-      .eq("id", contractorId)
-      .maybeSingle();
+    const { data: contractor, error: contractorError } = await timedPhase("contractorRead", () =>
+      supabase
+        .from("contractors")
+        .select("name")
+        .eq("id", contractorId)
+        .maybeSingle(),
+    );
 
     if (contractorError) throw contractorError;
     contractorName = fallbackText(contractor?.name);
   }
+  const renderPrepStartedAt = timingEnabled ? Date.now() : 0;
 
   const reportBusinessLabel = contractorId ? "Contractor Attached To" : "Internal Business";
   const reportBusinessName = contractorId ? contractorName : internalBusinessDisplayName;
@@ -998,40 +1056,42 @@ export default async function JobTestsPage({
 
   const parentJob = isRetestChild
     ? (
-        await supabase
-          .from("jobs")
-          .select(
+        await timedPhase("parentRetestPayloadRead", () =>
+          supabase
+            .from("jobs")
+            .select(
+              `
+              id,
+              title,
+              permit_number,
+              jurisdiction,
+              permit_date,
+              job_systems (
+                id,
+                name,
+                created_at
+              ),
+              ecc_test_runs (
+                id,
+                test_type,
+                system_id,
+                equipment_id,
+                system_key,
+                data,
+                computed,
+                computed_pass,
+                override_pass,
+                override_reason,
+                created_at,
+                updated_at,
+                is_completed,
+                visit_id
+              )
             `
-            id,
-            title,
-            permit_number,
-            jurisdiction,
-            permit_date,
-            job_systems (
-              id,
-              name,
-              created_at
-            ),
-            ecc_test_runs (
-              id,
-              test_type,
-              system_id,
-              equipment_id,
-              system_key,
-              data,
-              computed,
-              computed_pass,
-              override_pass,
-              override_reason,
-              created_at,
-              updated_at,
-              is_completed,
-              visit_id
             )
-          `
-          )
-          .eq("id", parentJobId)
-          .maybeSingle()
+            .eq("id", parentJobId)
+            .maybeSingle(),
+        )
       ).data
     : null;
 
@@ -1669,6 +1729,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   });
   const refrigerantEvidenceReportSystemId =
     systemSummaries.find((sys) => sys.showRefrigerantReport)?.systemId ?? "";
+  recordPhase("renderPrep", timingEnabled ? Date.now() - renderPrepStartedAt : 0);
+  emitTimingLog({
+    hasContractor: Boolean(contractorId),
+    hasCorrectionResolutionCandidate: hasCompletedFailedEccRun,
+  });
 
     return (
       <div className={eccPageShellClass}>

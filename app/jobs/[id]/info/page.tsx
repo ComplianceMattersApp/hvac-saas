@@ -98,39 +98,80 @@ export default async function JobInfoPage({
   const { id } = await params;
   const sp = (await searchParams) ?? {};
   const focused = sp.f ?? "";
+  const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
+  const timingStartMs = Date.now();
+  const phaseDurationsMs: Record<string, number> = {};
+  const recordPhase = (phase: string, durationMs: number) => {
+    if (!timingEnabled) return;
+    phaseDurationsMs[phase] = durationMs;
+  };
+  const timedPhase = async <T,>(phase: string, work: () => T | PromiseLike<T>): Promise<T> => {
+    if (!timingEnabled) return work();
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      recordPhase(phase, Date.now() - startedAt);
+    }
+  };
+  const emitTimingLog = () => {
+    if (!timingEnabled) return;
+    console.info(
+      "[job-equipment-route-timing]",
+      JSON.stringify({
+        jobId: id,
+        route: "/jobs/[id]/info",
+        focused: focused || "hub",
+        totalMs: Date.now() - timingStartMs,
+        phasesMs: {
+          createClient: phaseDurationsMs.createClient ?? 0,
+          authInternalAccess: phaseDurationsMs.authInternalAccess ?? 0,
+          jobEquipmentRead: phaseDurationsMs.jobEquipmentRead ?? 0,
+          jobSystemsRead: phaseDurationsMs.jobSystemsRead ?? 0,
+          systemFiltersRead: phaseDurationsMs.systemFiltersRead ?? 0,
+          renderPrep: phaseDurationsMs.renderPrep ?? 0,
+          totalServerRenderBeforeResponse: Date.now() - timingStartMs,
+        },
+      }),
+    );
+  };
 
-  const supabase = await createClient();
+  const supabase = await timedPhase("createClient", () => createClient());
 
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user ?? null;
+  const { internalAccess } = await timedPhase("authInternalAccess", async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user ?? null;
 
-  if (!user) redirect("/login");
+    if (!user) redirect("/login");
 
-  let internalAccess: Awaited<ReturnType<typeof requireInternalUser>>;
+    let internalAccess: Awaited<ReturnType<typeof requireInternalUser>>;
 
-  try {
-    internalAccess = await requireInternalUser({ supabase, userId: user.id });
-  } catch (error) {
-    if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorUserErr } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    try {
+      internalAccess = await requireInternalUser({ supabase, userId: user.id });
+    } catch (error) {
+      if (isInternalAccessError(error)) {
+        const { data: contractorUser, error: contractorUserErr } = await supabase
+          .from("contractor_users")
+          .select("contractor_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (contractorUserErr) throw contractorUserErr;
+        if (contractorUserErr) throw contractorUserErr;
 
-      if (contractorUser?.contractor_id) {
-        redirect(`/portal/jobs/${id}`);
+        if (contractorUser?.contractor_id) {
+          redirect(`/portal/jobs/${id}`);
+        }
+
+        redirect("/login");
       }
 
-      redirect("/login");
+      throw error;
     }
 
-    throw error;
-  }
+    return { user, internalAccess };
+  });
 
-const { data: job, error } = await supabase
+const { data: job, error } = await timedPhase("jobEquipmentRead", () => supabase
   .from("jobs")
   .select(
     `
@@ -167,17 +208,17 @@ const { data: job, error } = await supabase
   `
   )
   .eq("id", id)
-  .single();
+  .single());
 
 if (error) throw error;
 if (!job) return notFound();
 
 
-  const { data: systems, error: systemsErr } = await supabase
+  const { data: systems, error: systemsErr } = await timedPhase("jobSystemsRead", () => supabase
     .from("job_systems")
     .select("id, name")
     .eq("job_id", id)
-    .order("name", { ascending: true });
+    .order("name", { ascending: true }));
 
   if (systemsErr) throw systemsErr;
 
@@ -185,14 +226,17 @@ if (!job) return notFound();
     .map((system) => String(system.id ?? "").trim())
     .filter(Boolean);
 
-  const systemFilters = systemIds.length
-    ? await listSystemFiltersBySystemIds({
+  const systemFilters = await timedPhase("systemFiltersRead", () =>
+    systemIds.length
+      ? listSystemFiltersBySystemIds({
         supabase,
         accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
         systemIds,
       })
-    : [];
+      : Promise.resolve([]),
+  );
 
+  const renderPrepStartedAt = timingEnabled ? Date.now() : 0;
   const filtersBySystemId = systemFilters.reduce<Record<string, JobSystemFilterRow[]>>((acc, filter) => {
     if (!acc[filter.system_id]) acc[filter.system_id] = [];
     acc[filter.system_id].push(filter);
@@ -244,6 +288,8 @@ if (!job) return notFound();
 
     const normalizedStatus = String(job.status ?? "").trim().toLowerCase();
     const normalizedOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+    recordPhase("renderPrep", timingEnabled ? Date.now() - renderPrepStartedAt : 0);
+    emitTimingLog();
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6">

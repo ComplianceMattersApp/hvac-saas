@@ -526,6 +526,7 @@ type FieldActionTimingRecorder = (phase: string, elapsedMs: number) => void;
 async function getOnTheWayUndoEligibilityInternal(params: {
   supabase: any;
   jobId: string;
+  timing?: FieldActionTimingRecorder;
 }): Promise<OnTheWayUndoEligibility> {
   const jobId = String(params.jobId ?? "").trim();
 
@@ -539,11 +540,13 @@ async function getOnTheWayUndoEligibilityInternal(params: {
 
   const { supabase } = params;
 
+  const jobReadStartedAt = params.timing ? Date.now() : 0;
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select("status, on_the_way_at")
     .eq("id", jobId)
     .maybeSingle();
+  if (params.timing) params.timing("eligibilityJobRead", Date.now() - jobReadStartedAt);
 
   if (jobErr) throw jobErr;
 
@@ -571,6 +574,7 @@ async function getOnTheWayUndoEligibilityInternal(params: {
     };
   }
 
+  const latestEventReadStartedAt = params.timing ? Date.now() : 0;
   const { data: latestEvent, error: latestEventErr } = await supabase
     .from("job_events")
     .select("id, event_type, meta")
@@ -578,6 +582,7 @@ async function getOnTheWayUndoEligibilityInternal(params: {
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (params.timing) params.timing("latestEventRead", Date.now() - latestEventReadStartedAt);
 
   if (latestEventErr) throw latestEventErr;
 
@@ -10045,6 +10050,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
           "eventBreadcrumb.assignmentRead.completed": _ftSubphases["eventBreadcrumb.assignmentRead.completed"] ?? 0,
           "eventBreadcrumb.insertJobEvent.on_my_way": _ftSubphases["eventBreadcrumb.insertJobEvent.on_my_way"] ?? 0,
           "eventBreadcrumb.insertJobEvent.schedule_updated": _ftSubphases["eventBreadcrumb.insertJobEvent.schedule_updated"] ?? 0,
+          "eventBreadcrumb.smsOnTheWayIntentCreate": _ftSubphases["eventBreadcrumb.smsOnTheWayIntentCreate"] ?? 0,
           "eventBreadcrumb.insertJobEvent.tech_arrived": _ftSubphases["eventBreadcrumb.insertJobEvent.tech_arrived"] ?? 0,
           "eventBreadcrumb.insertJobEvent.job_started": _ftSubphases["eventBreadcrumb.insertJobEvent.job_started"] ?? 0,
           "eventBreadcrumb.insertJobEvent.job_completed": _ftSubphases["eventBreadcrumb.insertJobEvent.job_completed"] ?? 0,
@@ -10652,6 +10658,33 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 }
 
 export async function revertOnTheWayFromForm(formData: FormData) {
+  const _rtEnabled = process.env.FIELD_ACTION_TIMING_DEBUG === "true";
+  const _rtStart = Date.now();
+  let _rtPhaseStart = _rtStart;
+  const _rtPhases: Record<string, number> = {};
+  const _rtSubphases: Record<string, number> = {};
+  const _rtCompletePhase = (name: string) => {
+    if (!_rtEnabled) return;
+    const now = Date.now();
+    _rtPhases[name] = now - _rtPhaseStart;
+    _rtPhaseStart = now;
+  };
+  const _rtRecordSubphase = (name: string, elapsedMs: number) => {
+    if (!_rtEnabled) return;
+    _rtSubphases[name] = (_rtSubphases[name] ?? 0) + elapsedMs;
+  };
+  const _rtTimeSubphase = async <T,>(
+    name: string,
+    work: () => Promise<T>,
+  ): Promise<T> => {
+    if (!_rtEnabled) return work();
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      _rtRecordSubphase(name, Date.now() - startedAt);
+    }
+  };
   const id =
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
@@ -10660,12 +10693,50 @@ export async function revertOnTheWayFromForm(formData: FormData) {
 
   if (!id) throw new Error("Job ID is required");
 
-  const supabase = await createClient();
+  _rtCompletePhase("parseInput");
+
+  const supabase = await _rtTimeSubphase("createClient", () => createClient());
+  _rtCompletePhase("createClient");
+
+  const emitRevertTiming = (branch: string, banner: string) => {
+    if (!_rtEnabled) return;
+    console.info(
+      "[revert-on-the-way-timing]",
+      JSON.stringify({
+        jobId: id,
+        action: "revert_on_the_way",
+        branch,
+        banner,
+        totalMs: Date.now() - _rtStart,
+        phasesMs: {
+          parseInput: _rtPhases.parseInput ?? 0,
+          createClient: _rtPhases.createClient ?? 0,
+          authActorScope: _rtPhases.authActorScope ?? 0,
+          eligibilityRead: _rtPhases.eligibilityRead ?? 0,
+          guardedJobUpdate: _rtPhases.guardedJobUpdate ?? 0,
+          revertEventInsert: _rtPhases.revertEventInsert ?? 0,
+          revalidation: _rtPhases.revalidation ?? 0,
+        },
+        subphasesMs: {
+          "authActorScope.auth.getUser": _rtSubphases["authActorScope.auth.getUser"] ?? 0,
+          "authActorScope.internalUserLookup": _rtSubphases["authActorScope.internalUserLookup"] ?? 0,
+          "authActorScope.scopedJobLookup": _rtSubphases["authActorScope.scopedJobLookup"] ?? 0,
+          "authActorScope.customerOwnershipLookup": _rtSubphases["authActorScope.customerOwnershipLookup"] ?? 0,
+          "authActorScope.entitlementLookup": _rtSubphases["authActorScope.entitlementLookup"] ?? 0,
+          "eligibility.eligibilityJobRead": _rtSubphases["eligibility.eligibilityJobRead"] ?? 0,
+          "eligibility.latestEventRead": _rtSubphases["eligibility.latestEventRead"] ?? 0,
+          "guardedJobUpdate.jobsUpdate": _rtSubphases["guardedJobUpdate.jobsUpdate"] ?? 0,
+          "revertEventInsert.insertJobEvent": _rtSubphases["revertEventInsert.insertJobEvent"] ?? 0,
+        },
+      }),
+    );
+  };
 
   const redirectToJob = (banner: string) => {
     const params = new URLSearchParams();
     params.set("tab", tab);
     params.set("banner", banner);
+    emitRevertTiming("redirect", banner);
     redirect(`/jobs/${id}?${params.toString()}#${fieldStatusAnchor}`);
   };
 
@@ -10673,57 +10744,78 @@ export async function revertOnTheWayFromForm(formData: FormData) {
     supabase,
     jobId: id,
     onUnauthorized: () => redirect(`/jobs/${id}?notice=not_authorized#${fieldStatusAnchor}`),
+    timing: _rtEnabled
+      ? (name, elapsedMs) => _rtRecordSubphase(`authActorScope.${name}`, elapsedMs)
+      : undefined,
   });
   await requireOperationalScopedJobMutationAccessOrRedirect({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
+    timing: _rtEnabled
+      ? (name, elapsedMs) => _rtRecordSubphase(`authActorScope.${name}`, elapsedMs)
+      : undefined,
   });
+  _rtCompletePhase("authActorScope");
 
   const eligibility = await getOnTheWayUndoEligibilityInternal({
     supabase,
     jobId: id,
+    timing: _rtEnabled
+      ? (name, elapsedMs) => _rtRecordSubphase(`eligibility.${name}`, elapsedMs)
+      : undefined,
   });
+  _rtCompletePhase("eligibilityRead");
 
   if (!eligibility.eligible || !eligibility.onMyWayEventId) {
     revalidatePath(`/jobs/${id}`);
+    _rtCompletePhase("revalidation");
     redirectToJob("on_the_way_revert_unavailable");
   }
 
-  const { data: revertedJob, error: revertErr } = await supabase
-    .from("jobs")
-    .update({
-      status: "open",
-      on_the_way_at: null,
-    })
-    .eq("id", id)
-    .eq("status", "on_the_way")
-    .not("on_the_way_at", "is", null)
-    .select("id")
-    .maybeSingle();
+  const { data: revertedJob, error: revertErr } = await _rtTimeSubphase(
+    "guardedJobUpdate.jobsUpdate",
+    async () =>
+      supabase
+        .from("jobs")
+        .update({
+          status: "open",
+          on_the_way_at: null,
+        })
+        .eq("id", id)
+        .eq("status", "on_the_way")
+        .not("on_the_way_at", "is", null)
+        .select("id")
+        .maybeSingle(),
+  );
+  _rtCompletePhase("guardedJobUpdate");
 
   if (revertErr) throw revertErr;
 
   if (!revertedJob?.id) {
     revalidatePath(`/jobs/${id}`);
+    _rtCompletePhase("revalidation");
     redirectToJob("on_the_way_revert_unavailable");
   }
 
-  await insertJobEvent({
-    supabase,
-    jobId: id,
-    event_type: "on_the_way_reverted",
-    meta: {
-      ...buildMovementEventMeta({
-        from: "on_the_way",
-        to: "open",
-        trigger: "undo_action",
-        sourceAction: "revert_on_the_way_from_form",
-      }),
-      actor_user_id: actingUserId,
-      reverted_event_id: eligibility.onMyWayEventId,
-    },
-    userId: actingUserId,
-  });
+  await _rtTimeSubphase("revertEventInsert.insertJobEvent", async () =>
+    insertJobEvent({
+      supabase,
+      jobId: id,
+      event_type: "on_the_way_reverted",
+      meta: {
+        ...buildMovementEventMeta({
+          from: "on_the_way",
+          to: "open",
+          trigger: "undo_action",
+          sourceAction: "revert_on_the_way_from_form",
+        }),
+        actor_user_id: actingUserId,
+        reverted_event_id: eligibility.onMyWayEventId,
+      },
+      userId: actingUserId,
+    }),
+  );
+  _rtCompletePhase("revertEventInsert");
 
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/jobs`);
@@ -10731,6 +10823,7 @@ export async function revertOnTheWayFromForm(formData: FormData) {
   revalidatePath(`/calendar`);
   revalidatePath(`/portal`);
   revalidatePath(`/portal/jobs/${id}`);
+  _rtCompletePhase("revalidation");
 
   redirectToJob("on_the_way_reverted");
 }
