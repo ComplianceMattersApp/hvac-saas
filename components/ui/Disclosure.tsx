@@ -18,21 +18,26 @@ export function Disclosure({
   subtitle?: ReactNode;
   affordance?: ReactNode;
   defaultOpen?: boolean;
-  variant?: "default" | "danger";
+  variant?: "default" | "danger" | "flush";
   className?: string;
   children: ReactNode;
 }) {
   const isDanger = variant === "danger";
+  const isFlush = variant === "flush";
   return (
     <details
       open={defaultOpen}
-      className={`overflow-hidden rounded-xl border ${
-        isDanger ? "border-[#ffe4e6] bg-[#fff8f8]" : "border-slate-200 bg-white"
+      className={`${
+        isFlush
+          ? ""
+          : `overflow-hidden rounded-xl border ${
+              isDanger ? "border-[#ffe4e6] bg-[#fff8f8]" : "border-slate-200 bg-white"
+            }`
       } ${className}`}
     >
       <summary
-        className={`flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 ${
-          isDanger ? "" : "bg-slate-50"
+        className={`flex cursor-pointer list-none items-start justify-between gap-3 ${
+          isFlush ? "py-1.5" : `px-4 py-3 ${isDanger ? "" : "bg-slate-50"}`
         }`}
       >
         <div className="min-w-0">
@@ -43,7 +48,7 @@ export function Disclosure({
         </div>
         {affordance ?? <DisclosureChevron />}
       </summary>
-      <div className="px-4 py-3">{children}</div>
+      <div className={isFlush ? "pt-2" : "px-4 py-3"}>{children}</div>
     </details>
   );
 }

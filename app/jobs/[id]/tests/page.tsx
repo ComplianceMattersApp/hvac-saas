@@ -3827,7 +3827,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       </div>
                     </div>
                   </div>
-                  <Disclosure title="Calculation details" className="mt-2">
+                  <Disclosure title="Calculation details" variant="flush" className="mt-2">
                     <div className="space-y-1 text-xs text-slate-600">
                       <div>Design Airflow: {fmtValue(runFilter.data?.design_airflow_cfm, "CFM")}</div>
                       <div>Nominal Length: {fmtValue(runFilter.data?.nominal_length_inches, "in")}</div>
