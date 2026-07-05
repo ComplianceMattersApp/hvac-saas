@@ -75,7 +75,7 @@ export function ServicePlanCreateFlow({
       <button
         type="button"
         onClick={openPicker}
-        className="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-800"
+        className="inline-flex items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-blue-700"
       >
         Add service plan
       </button>
@@ -108,7 +108,7 @@ export function ServicePlanCreateFlow({
                 <button
                   type="button"
                   onClick={openBlankForm}
-                  className="w-full rounded-lg border border-slate-900 bg-slate-900 px-4 py-3.5 text-left text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-1"
+                  className="w-full rounded-lg border border-blue-600 bg-blue-600 px-4 py-3.5 text-left text-sm font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
                 >
                   Create new service plan
                 </button>
@@ -290,7 +290,7 @@ export function ServicePlanCreateFlow({
                   <div className="flex items-center gap-3 pt-1">
                     <button
                       type="submit"
-                      className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                      className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                     >
                       Save Maintenance Agreement
                     </button>

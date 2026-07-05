@@ -94,6 +94,13 @@ import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } fro
 import { equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 import ProfileEquipmentCreateForm from "./_components/ProfileEquipmentCreateForm";
+import { CustomerNotesTextarea } from "./_components/CustomerNotesTextarea";
+import {
+  WorkspaceTabsProvider,
+  WorkspaceTabsNav,
+  WorkspaceTabPanel,
+  WorkspaceTabJumpLink,
+} from "./_components/WorkspaceTabs";
 import { Disclosure } from "@/components/ui/Disclosure";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 
@@ -241,6 +248,13 @@ function formatBillingPeriodInvoiceDisplayLabel(params: {
     invoiceNumber: params.invoiceNumber,
     invoiceId: params.invoiceId,
   });
+}
+
+function jobContractorName(contractors: unknown): string {
+  // Supabase returns the joined `contractors` relation as an object or an
+  // array depending on how it infers the join cardinality — handle both.
+  const first = Array.isArray(contractors) ? contractors[0] : contractors;
+  return String((first as { name?: string | null } | null | undefined)?.name ?? "").trim();
 }
 
 function formatShortNote(value?: string | null, maxLength = 120) {
@@ -471,11 +485,6 @@ function normalizeOpsStatus(v?: string | null) {
 
 function normalizeLifecycleStatus(v?: string | null) {
   return String(v ?? "").trim().toLowerCase();
-}
-
-function isLifecycleComplete(v?: string | null) {
-  const status = normalizeLifecycleStatus(v);
-  return ["completed", "closed", "cancelled"].includes(status);
 }
 
 function isOperationallyActiveJob(job: Pick<JobRow, "status" | "ops_status" | "deleted_at">) {
@@ -1237,7 +1246,8 @@ export default async function CustomerDetailPage(props: {
           throw methodError;
         }
 
-        customerSavedPaymentMethods = (Array.isArray(methodRows) ? methodRows : []).map((row: any) => ({
+        const savedPaymentMethodRows = (Array.isArray(methodRows) ? methodRows : []) as unknown as Record<string, unknown>[];
+        customerSavedPaymentMethods = savedPaymentMethodRows.map((row) => ({
           id: String(row.id ?? "").trim(),
           payment_method_status: String(row.payment_method_status ?? "").trim(),
           payment_method_type: String(row.payment_method_type ?? "").trim(),
@@ -1612,40 +1622,26 @@ export default async function CustomerDetailPage(props: {
           </div>
         </div>
 
+        <WorkspaceTabsProvider initialTab={activeWorkspaceTab}>
         <nav
           aria-label="Customer workspace tabs"
           className="rounded-2xl border border-slate-300 bg-slate-100/95 p-3 shadow-sm ring-1 ring-slate-200 md:p-4"
         >
           <SectionEyebrow className="mb-3">Workspace Navigation</SectionEyebrow>
-          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
-            {workspaceNavigationItems.map((item) => (
-              <Link
-                key={item.id}
-                href={`${customerPath}?tab=${item.id}`}
-                className={[
-                  "inline-flex shrink-0 items-center rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors",
-                  activeWorkspaceTab === item.id
-                    ? "border-blue-600 bg-blue-600 text-white shadow-sm ring-1 ring-blue-600/30"
-                    : "border-slate-300 bg-white text-slate-700 hover:border-slate-500 hover:bg-slate-50",
-                ].join(" ")}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          <WorkspaceTabsNav tabs={workspaceNavigationItems} />
         </nav>
 
         <div className="space-y-6 md:space-y-7">
 
-        {activeWorkspaceTab === "overview" ? (
+        <WorkspaceTabPanel id="overview">
         <section className="grid gap-5 xl:grid-cols-[1.25fr_.9fr]">
           <div className="space-y-5">
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <SectionEyebrow className="mb-0">Service History</SectionEyebrow>
-                <Link href={`${customerPath}?tab=work`} className="text-xs font-medium text-blue-700 hover:underline">
+                <WorkspaceTabJumpLink id="work" className="text-xs font-medium text-blue-700 hover:underline">
                   View all in Work →
-                </Link>
+                </WorkspaceTabJumpLink>
               </div>
               <p className="mb-4 text-sm text-slate-500">
                 {jobs.filter((job) => !job.deleted_at).length} visit
@@ -1722,12 +1718,9 @@ export default async function CustomerDetailPage(props: {
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-1 flex items-center justify-between gap-3">
                   <SectionEyebrow className="mb-0">Systems at this Address</SectionEyebrow>
-                  <Link
-                    href={`${customerPath}?tab=systems-equipment`}
-                    className="text-xs font-medium text-blue-700 hover:underline"
-                  >
+                  <WorkspaceTabJumpLink id="systems-equipment" className="text-xs font-medium text-blue-700 hover:underline">
                     Manage →
-                  </Link>
+                  </WorkspaceTabJumpLink>
                 </div>
                 <p className="mb-3 text-sm text-slate-500">
                   {systemsEquipmentSummary.totalSystemCount} system{systemsEquipmentSummary.totalSystemCount === 1 ? "" : "s"} ·{" "}
@@ -1882,9 +1875,9 @@ export default async function CustomerDetailPage(props: {
             </div>
           </div>
         </section>
-        ) : null}
+        </WorkspaceTabPanel>
 
-        {activeWorkspaceTab === "money" ? (
+        <WorkspaceTabPanel id="money">
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3">
               <h2 className="text-sm font-semibold text-navy">Money Overview</h2>
@@ -1961,10 +1954,9 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
           </section>
-        ) : null}
 
         {/* Payment History (if authorized) */}
-        {activeWorkspaceTab === "money" && canViewPaymentHistory && (
+        {canViewPaymentHistory && (
           <PaymentHistoryCard
             payments={customerPaymentHistory}
             customerId={customerId}
@@ -1972,7 +1964,7 @@ export default async function CustomerDetailPage(props: {
           />
         )}
 
-        {activeWorkspaceTab === "money" && canManageSavedPaymentMethodSetup && (
+        {canManageSavedPaymentMethodSetup && (
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
@@ -2026,16 +2018,16 @@ export default async function CustomerDetailPage(props: {
           </section>
         )}
 
-        {activeWorkspaceTab === "money" && !canManageSavedPaymentMethodSetup ? (
+        {!canManageSavedPaymentMethodSetup ? (
           <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
             Saved card setup and status are limited for this viewer.
           </section>
         ) : null}
+        </WorkspaceTabPanel>
 
         {/* Settings: Account Summary detail (moved off Overview per redundancy rule — Overview now shows the condensed Quick Facts / Account & Access snapshot instead) */}
-        {activeWorkspaceTab === "settings" ? (
+        <WorkspaceTabPanel id="settings">
         <section className="grid gap-6 xl:grid-cols-[1.25fr_.9fr]">
-          {activeWorkspaceTab === "settings" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-navy">
@@ -2101,9 +2093,7 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
           </div>
-          ) : null}
 
-          {activeWorkspaceTab === "settings" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-navy">Billing / Paperwork Defaults</h2>
 
@@ -2194,11 +2184,11 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
           </div>
-          ) : null}
         </section>
-        ) : null}
+        </WorkspaceTabPanel>
 
-        {activeWorkspaceTab === "locations-contacts" && isInternalViewer ? (
+        <WorkspaceTabPanel id="locations-contacts">
+          {isInternalViewer ? (
           <section id="contact-overview" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-navy">Contact Overview</h2>
@@ -2274,9 +2264,11 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
           </section>
-        ) : null}
+          ) : null}
+        </WorkspaceTabPanel>
 
-        {activeWorkspaceTab === "locations-contacts" && isInternalViewer ? (
+        <WorkspaceTabPanel id="locations-contacts">
+          {isInternalViewer ? (
           <section id="role-contacts" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-navy">Account Contacts</h2>
@@ -2364,9 +2356,11 @@ export default async function CustomerDetailPage(props: {
               </form>
             </Disclosure>
           </section>
-        ) : null}
+          ) : null}
+        </WorkspaceTabPanel>
 
-        {activeWorkspaceTab === "history" && isInternalViewer ? (
+        <WorkspaceTabPanel id="history">
+          {isInternalViewer ? (
           <section id="customer-notes" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-navy">Customer Notes</h2>
@@ -2376,13 +2370,7 @@ export default async function CustomerDetailPage(props: {
             </div>
             <form action={updateCustomerNotesFromForm} className="space-y-3">
               <input type="hidden" name="customer_id" value={customerId} />
-              <textarea
-                name="notes"
-                defaultValue={customer.notes ?? ""}
-                rows={6}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-                placeholder="Add customer notes..."
-              />
+              <CustomerNotesTextarea defaultValue={customer.notes ?? ""} />
               <div>
                 <button
                   type="submit"
@@ -2393,16 +2381,15 @@ export default async function CustomerDetailPage(props: {
               </div>
             </form>
           </section>
-        ) : null}
-
-        {activeWorkspaceTab === "history" && !isInternalViewer ? (
+          ) : (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
             Customer notes are not available for this viewer.
           </section>
-        ) : null}
+          )}
+        </WorkspaceTabPanel>
 
         {/* Service Locations */}
-        {activeWorkspaceTab === "locations-contacts" ? (
+        <WorkspaceTabPanel id="locations-contacts">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -2767,9 +2754,10 @@ export default async function CustomerDetailPage(props: {
             </div>
           )}
         </section>
-        ) : null}
+        </WorkspaceTabPanel>
 
-        {activeWorkspaceTab === "systems-equipment" && isInternalViewer ? (
+        <WorkspaceTabPanel id="systems-equipment">
+        {isInternalViewer ? (
           <section id="systems-equipment" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -2982,16 +2970,15 @@ export default async function CustomerDetailPage(props: {
               </div>
             )}
           </section>
-        ) : null}
-
-        {activeWorkspaceTab === "systems-equipment" && !isInternalViewer ? (
+        ) : (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
             Systems and equipment records are not available for this viewer.
           </section>
-        ) : null}
+        )}
+        </WorkspaceTabPanel>
 
         {/* Job history */}
-        {activeWorkspaceTab === "work" ? (
+        <WorkspaceTabPanel id="work">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -3055,9 +3042,7 @@ export default async function CustomerDetailPage(props: {
                           jobId: job.id,
                         });
                         const jobStatusLabel = customerWorkJobStatusLabel(job);
-                        const contractorName = String(
-                          (job.contractors as any)?.name ?? (job.contractors as any)?.[0]?.name ?? "",
-                        ).trim();
+                        const contractorName = jobContractorName(job.contractors);
                         const assignedTeam = activeAssignmentDisplayMap[String(job.id ?? "")] ?? [];
                         const primaryAssignee = assignedTeam.find((assignee) => assignee.is_primary) ?? assignedTeam[0] ?? null;
                         const failureReason = formatCustomerWorkFailureReason(job);
@@ -3160,9 +3145,7 @@ export default async function CustomerDetailPage(props: {
                         jobId: job.id,
                       });
                       const jobStatusLabel = customerWorkJobStatusLabel(job);
-                      const contractorName = String(
-                        (job.contractors as any)?.name ?? (job.contractors as any)?.[0]?.name ?? "",
-                      ).trim();
+                      const contractorName = jobContractorName(job.contractors);
                       const assignedTeam = activeAssignmentDisplayMap[String(job.id ?? "")] ?? [];
                       const primaryAssignee = assignedTeam.find((assignee) => assignee.is_primary) ?? assignedTeam[0] ?? null;
                       const failureReason = formatCustomerWorkFailureReason(job);
@@ -3241,10 +3224,9 @@ export default async function CustomerDetailPage(props: {
             </div>
           )}
         </section>
-        ) : null}
 
         {/* Estimates — internal only, visible when ENABLE_ESTIMATES is on */}
-        {activeWorkspaceTab === "work" && isInternalViewer && estimatesEnabled ? (
+        {isInternalViewer && estimatesEnabled ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-navy">Estimates</h2>
@@ -3301,9 +3283,11 @@ export default async function CustomerDetailPage(props: {
             )}
           </section>
         ) : null}
+        </WorkspaceTabPanel>
 
         {/* Maintenance Agreements — internal only, visible when ENABLE_MAINTENANCE_AGREEMENTS is on */}
-        {activeWorkspaceTab === "service-plans" && isInternalViewer && maintenanceAgreementsEnabled ? (
+        <WorkspaceTabPanel id="service-plans">
+        {isInternalViewer && maintenanceAgreementsEnabled ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-navy">Maintenance Agreements</h2>
@@ -3523,20 +3507,7 @@ export default async function CustomerDetailPage(props: {
                         </div>
                       </div>
 
-                      <details
-                        open={
-                          agr.status === "draft" ||
-                          (maintenanceAgreementSaved === "created" &&
-                            maintenanceAgreementFocusId === agr.id &&
-                            agr.status === "active")
-                        }
-                        className="mt-3"
-                      >
-                        <summary className="cursor-pointer select-none text-xs font-medium text-slate-500 hover:text-slate-700">
-                          Plan details
-                        </summary>
-
-                        <div className="mt-3 space-y-3">
+                      <div className="mt-3 space-y-3">
 
                       {maintenanceAgreementSaved === "created" && maintenanceAgreementFocusId === agr.id && agr.status === "active" ? (
                         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-3">
@@ -3598,7 +3569,7 @@ export default async function CustomerDetailPage(props: {
                         </dl>
 
                         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                          <SectionEyebrow>What's Included</SectionEyebrow>
+                          <SectionEyebrow>What&apos;s Included</SectionEyebrow>
                           {defaultPlanItems.length > 0 ? (
                             <ul className="mt-2 space-y-1.5 text-xs text-slate-700">
                               {defaultPlanItems.map((item) => (
@@ -3683,23 +3654,22 @@ export default async function CustomerDetailPage(props: {
                           <p className="mt-1 text-xs text-slate-500">
                             Read status first, then open advanced controls only when needed.
                           </p>
-                          <details className="mt-2">
-                            <summary className="cursor-pointer text-xs font-medium text-slate-600">Billing period policy notes</summary>
-                            <div className="mt-1 space-y-1 text-xs text-slate-500">
+                          <Disclosure title="What do these mean?" variant="flush" className="mt-2">
+                            <div className="space-y-1 text-xs text-slate-500">
                               <div>Billing periods are for billing visibility only and do not control service visits.</div>
                               <div>Work orders, visits, next due date, and visit counting continue independently of billing period status.</div>
                             </div>
-                          </details>
+                          </Disclosure>
                         </div>
 
                         {canManageBillingPeriods ? (
-                          <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                              Add Billing Period
-                            </summary>
-                            <form action={createBillingPeriodAction} className="mt-3 grid gap-3 md:grid-cols-2">
+                          <Disclosure title="Add Billing Period" className="mt-3">
+                            <form action={createBillingPeriodAction} className="grid gap-3 md:grid-cols-2">
                               <input type="hidden" name="maintenance_agreement_id" value={agr.id} />
 
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:col-span-2">
+                                Coverage
+                              </div>
                               <div>
                                 <label className="mb-1 block text-xs font-medium text-slate-700">Coverage Start Date</label>
                                 <input
@@ -3720,7 +3690,7 @@ export default async function CustomerDetailPage(props: {
                                 />
                               </div>
 
-                              <div>
+                              <div className="md:col-span-2">
                                 <label className="mb-1 block text-xs font-medium text-slate-700">Billing Cadence</label>
                                 <select
                                   name="billing_cadence"
@@ -3735,6 +3705,9 @@ export default async function CustomerDetailPage(props: {
                                 </select>
                               </div>
 
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:col-span-2">
+                                Amount
+                              </div>
                               <div>
                                 <label className="mb-1 block text-xs font-medium text-slate-700">Amount Due (cents)</label>
                                 <input
@@ -3758,6 +3731,9 @@ export default async function CustomerDetailPage(props: {
                                 />
                               </div>
 
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:col-span-2">
+                                Status
+                              </div>
                               <div>
                                 <label className="mb-1 block text-xs font-medium text-slate-700">Billing Posture</label>
                                 <select
@@ -3788,7 +3764,7 @@ export default async function CustomerDetailPage(props: {
                                 </select>
                               </div>
 
-                              <div>
+                              <div className="md:col-span-2">
                                 <label className="mb-1 block text-xs font-medium text-slate-700">Billing Due Date (Optional)</label>
                                 <input
                                   type="date"
@@ -3797,7 +3773,25 @@ export default async function CustomerDetailPage(props: {
                                 />
                               </div>
 
-                              <div>
+                              <div className="md:col-span-2">
+                                <Disclosure title="What do these postures mean?" variant="flush">
+                                  <div className="space-y-1 text-xs text-slate-500">
+                                    <div>Create a billing period record only. This does not generate or link an invoice.</div>
+                                    <div>Billing periods are for billing visibility only and do not control service visits.</div>
+                                    <div>Internal invoice: Tracks a period intended for internal invoicing later. No invoice is created here.</div>
+                                    <div>External off-platform: Use when billing is handled outside Compliance Matters.</div>
+                                    <div>Manual: Use for internally tracked manual commercial handling without invoice linkage.</div>
+                                    <div>No charge: Use for zero-dollar coverage.</div>
+                                    <div>Waived: Use when charges are waived and a reason should be recorded.</div>
+                                    <div>Not billed through Compliance Matters: Use when coverage is tracked here but billing happens elsewhere.</div>
+                                  </div>
+                                </Disclosure>
+                              </div>
+
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400 md:col-span-2">
+                                Reference
+                              </div>
+                              <div className="md:col-span-2">
                                 <label className="mb-1 block text-xs font-medium text-slate-700">External Reference (Optional)</label>
                                 <input
                                   name="external_reference"
@@ -3823,27 +3817,16 @@ export default async function CustomerDetailPage(props: {
                                 />
                               </div>
 
-                              <div className="md:col-span-2 space-y-1 text-xs text-slate-500">
-                                <div>Create a billing period record only. This does not generate or link an invoice.</div>
-                                <div>Billing periods are for billing visibility only and do not control service visits.</div>
-                                <div>Internal invoice: Tracks a period intended for internal invoicing later. No invoice is created here.</div>
-                                <div>External off-platform: Use when billing is handled outside Compliance Matters.</div>
-                                <div>Manual: Use for internally tracked manual commercial handling without invoice linkage.</div>
-                                <div>No charge: Use for zero-dollar coverage.</div>
-                                <div>Waived: Use when charges are waived and a reason should be recorded.</div>
-                                <div>Not billed through Compliance Matters: Use when coverage is tracked here but billing happens elsewhere.</div>
-                              </div>
-
                               <div className="md:col-span-2">
                                 <button
                                   type="submit"
-                                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                                 >
                                   Add Billing Period
                                 </button>
                               </div>
                             </form>
-                          </details>
+                          </Disclosure>
                         ) : null}
 
                         {agreementBillingPeriods.length > 0 ? (
@@ -3934,17 +3917,11 @@ export default async function CustomerDetailPage(props: {
                                   ) : null}
 
                                   {canManageBillingPeriods ? (
-                                    <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                                      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                                        Advanced Billing Period Actions
-                                      </summary>
-                                      <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                                    <Disclosure title="Advanced Billing Period Actions" className="mt-3">
+                                      <div className="space-y-2">
                                       {!billingPeriod.internal_invoice_id ? (
-                                        <details className="rounded-lg border border-slate-200 bg-white p-3">
-                                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                                            Edit Billing Period
-                                          </summary>
-                                          <form action={updateBillingPeriodAction} className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <Disclosure title="Edit Billing Period">
+                                          <form action={updateBillingPeriodAction} className="grid gap-3 md:grid-cols-2">
                                             <input type="hidden" name="maintenance_agreement_id" value={agr.id} />
                                             <input type="hidden" name="billing_period_id" value={billingPeriod.id} />
 
@@ -4080,13 +4057,13 @@ export default async function CustomerDetailPage(props: {
                                             <div className="md:col-span-2">
                                               <button
                                                 type="submit"
-                                                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                                                className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                                               >
                                                 Save Billing Period
                                               </button>
                                             </div>
                                           </form>
-                                        </details>
+                                        </Disclosure>
                                       ) : (
                                         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
                                           Edit is disabled for invoice-linked billing periods.
@@ -4257,7 +4234,7 @@ export default async function CustomerDetailPage(props: {
                                         </details>
                                       ) : null}
                                       </div>
-                                    </details>
+                                    </Disclosure>
                                   ) : null}
                                 </li>
                               );
@@ -4276,11 +4253,8 @@ export default async function CustomerDetailPage(props: {
                         )}
                       </div>
 
-                      <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                          Edit Details
-                        </summary>
-                        <form action={updateAgreementAction} className="mt-3 grid gap-3 md:grid-cols-2">
+                      <Disclosure title="Edit Plan & Work" className="mt-3">
+                        <form action={updateAgreementAction} className="grid gap-3 md:grid-cols-2">
                           <input type="hidden" name="agreement_id" value={agr.id} />
                           <input type="hidden" name="customer_id" value={customerId} />
 
@@ -4551,7 +4525,7 @@ export default async function CustomerDetailPage(props: {
                               </div>
 
                               <div className="md:col-span-2">
-                                <label className="mb-1 block text-xs font-medium text-slate-700">What's Included (Optional)</label>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">What&apos;s Included (Optional)</label>
                                 <VisitScopeBuilder
                                   jobType="service"
                                   summaryName="default_visit_scope_summary"
@@ -4576,13 +4550,13 @@ export default async function CustomerDetailPage(props: {
                           <div className="md:col-span-2">
                             <button
                               type="submit"
-                              className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                              className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                             >
                               Save Changes
                             </button>
                           </div>
                         </form>
-                      </details>
+                      </Disclosure>
 
                       <ServicePlanTerminalActions
                         agreementId={agr.id}
@@ -4590,8 +4564,7 @@ export default async function CustomerDetailPage(props: {
                         cancelAction={cancelMaintenanceAgreementFromForm}
                         deleteAction={deleteMaintenanceAgreementDraftFromForm}
                       />
-                        </div>{/* end mt-3 space-y-3 */}
-                      </details>
+                      </div>
                     </div>
                   );
                 })}
@@ -4599,8 +4572,10 @@ export default async function CustomerDetailPage(props: {
             )}
           </section>
         ) : null}
+        </WorkspaceTabPanel>
 
-        {activeWorkspaceTab === "settings" && isInternalViewer ? (
+        <WorkspaceTabPanel id="settings">
+        {isInternalViewer ? (
           <Disclosure
             title="Danger Zone"
             subtitle="Archive this customer record after all related jobs have been removed or archived."
@@ -4617,7 +4592,9 @@ export default async function CustomerDetailPage(props: {
             </form>
           </Disclosure>
         ) : null}
+        </WorkspaceTabPanel>
       </div>
+      </WorkspaceTabsProvider>
       </div>
     </div>
   );

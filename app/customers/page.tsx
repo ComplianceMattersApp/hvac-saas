@@ -223,12 +223,9 @@ export default async function CustomersPage(props: {
                 className="scroll-mt-32 lg:scroll-mt-36"
               >
                 <div className={`${sectionIndex === 0 ? "" : "border-t border-slate-200"} bg-white px-4 py-3 sm:px-5`}>
-                  <h3
-                    id={`${section.anchorId}-heading`}
-                    className="text-sm font-semibold"
-                  >
+                  <div id={`${section.anchorId}-heading`}>
                     <SectionEyebrow className="mb-0">{section.key}</SectionEyebrow>
-                  </h3>
+                  </div>
                 </div>
                 <div className="divide-y divide-slate-200 border-t border-slate-100">
                   {section.customers.map((r) => {
