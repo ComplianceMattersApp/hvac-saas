@@ -292,7 +292,7 @@ if (!job) return notFound();
     emitTimingLog();
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6">
+    <div className="min-h-screen bg-slate-50/50 p-4 sm:p-6">
       <div className="mx-auto max-w-3xl space-y-6">
           <JobSubpageContextHeader
             workspaceLabel="Job Subpage"
@@ -311,8 +311,8 @@ if (!job) return notFound();
 
         {/* Hub */}
         {!focused ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-            <div className="text-sm font-semibold text-gray-900">Info Hub</div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)] space-y-4">
+            <div className="text-sm font-semibold text-navy">Info Hub</div>
             <div className="grid gap-3">
               <Link
                 href={`/jobs/${job.id}/info?f=equipment`}
@@ -323,7 +323,7 @@ if (!job) return notFound();
               {String(job.job_type ?? "").trim().toLowerCase() === "ecc" ? (
                 <Link
                   href={`/jobs/${job.id}/tests`}
-                  className="w-full inline-flex min-h-11 items-center justify-center px-4 py-3 rounded-md border border-gray-300 bg-white text-gray-900 font-medium hover:bg-gray-50 transition-colors"
+                  className="w-full inline-flex min-h-11 items-center justify-center px-4 py-3 rounded-md border border-slate-200 bg-white text-blue-700 font-medium hover:bg-blue-50 transition-colors"
                 >
                   Go to Tests
                 </Link>
@@ -359,21 +359,21 @@ if (!job) return notFound();
             ) : null}
 
             {/* System inventory */}
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-              <div className="border-b border-gray-200 px-5 py-4 sm:px-6">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)] overflow-hidden">
+              <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-semibold text-gray-950">System Inventory</h2>
-                    <p className="mt-0.5 text-xs text-gray-500">
+                    <h2 className="text-base font-semibold text-navy">System Inventory</h2>
+                    <p className="mt-0.5 text-xs text-slate-500">
                       Equipment and filters are organized under each system.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <div className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                    <div className="inline-flex items-center justify-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                       {(systems ?? []).length} system{(systems ?? []).length === 1 ? "" : "s"}
                     </div>
                     {equipmentRows.length + activeFilterCount > 0 ? (
-                      <div className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                      <div className="inline-flex items-center justify-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                         {equipmentRows.length + activeFilterCount} inventory item{equipmentRows.length + activeFilterCount === 1 ? "" : "s"}
                       </div>
                     ) : null}
@@ -470,8 +470,8 @@ if (!job) return notFound();
             <EquipmentCreateForm jobId={job.id} systems={systems ?? []} />
           </div>
         ) : (
-          <div className="rounded-lg border border-gray-200 bg-white p-6 text-center">
-            <p className="text-sm text-gray-600">Choose an option above to begin.</p>
+          <div className="rounded-lg border border-slate-200 bg-white p-6 text-center">
+            <p className="text-sm text-slate-600">Choose an option above to begin.</p>
           </div>
         )}
       </div>

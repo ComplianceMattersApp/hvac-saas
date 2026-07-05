@@ -207,7 +207,7 @@ export function CustomerSearchPanel({
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
               <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50/85 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Live Suggestions</div>
+                  <SectionEyebrow className="mb-0">Live Suggestions</SectionEyebrow>
                   <div className="mt-1 text-sm font-semibold text-slate-900">
                     {loading ? "Looking for matches..." : `Matches for "${query.trim()}"`}
                   </div>

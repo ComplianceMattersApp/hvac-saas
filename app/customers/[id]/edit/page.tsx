@@ -154,13 +154,13 @@ export default async function CustomerEditPage({
         <div className="flex gap-2">
           <Link
             href={`/customers/${id}`}
-            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+            className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
           >
             ← Back to Customer
           </Link>
           <Link
             href="/customers"
-            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+            className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
           >
             Customers
           </Link>
@@ -206,7 +206,7 @@ export default async function CustomerEditPage({
         <div className="flex gap-2">
           <Link
             href={`/customers/${customer.id}`}
-            className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
+            className="rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
           >
             ← Back
           </Link>

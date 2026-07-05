@@ -238,19 +238,19 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Invoice</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">{formatInvoiceReference(invoiceForMetrics)}</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">{formatInvoiceReference(invoiceForMetrics)}</div>
         </div>
         <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Total</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(invoiceForMetrics?.totalCents ?? 0)}</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyFromCents(invoiceForMetrics?.totalCents ?? 0)}</div>
         </div>
         <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Paid</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(paymentSummary?.amountPaidCents ?? 0)}</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyFromCents(paymentSummary?.amountPaidCents ?? 0)}</div>
         </div>
         <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Balance</div>
-          <div className="mt-1 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? invoiceForMetrics?.totalCents ?? 0)}</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">{formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? invoiceForMetrics?.totalCents ?? 0)}</div>
         </div>
       </div>
 
@@ -303,7 +303,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
       <div className="mt-4 border-t border-slate-200/80 pt-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h4 className="text-sm font-semibold text-slate-950">Field charge proposals</h4>
+            <h4 className="text-sm font-semibold text-navy">Field charge proposals</h4>
             <p className="mt-1 text-xs leading-5 text-slate-600">
               Office/billing review is required before these become invoice charges or collectible invoice balances.
             </p>
@@ -472,7 +472,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
               <div key={proposal.id} className="rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2.5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">{proposal.proposed_name || "Untitled proposal"}</div>
+                    <div className="text-sm font-semibold text-navy">{proposal.proposed_name || "Untitled proposal"}</div>
                     {proposal.proposed_description ? (
                       <div className="mt-1 text-xs leading-5 text-slate-600">{proposal.proposed_description}</div>
                     ) : null}
@@ -494,7 +494,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
                     <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                       {formatProposalStatus(proposal.status)}
                     </span>
-                    <span className="text-sm font-semibold text-slate-950">
+                    <span className="text-sm font-semibold text-slate-900">
                       {proposal.proposed_subtotal_cents == null
                         ? "Amount pending"
                         : formatCurrencyFromCents(proposal.proposed_subtotal_cents)}

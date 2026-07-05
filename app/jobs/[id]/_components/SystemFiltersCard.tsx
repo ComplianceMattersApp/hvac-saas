@@ -56,20 +56,20 @@ function FilterFields({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div className="sm:col-span-3">
-        <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`${prefix}-label`}>
+        <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`${prefix}-label`}>
           Filter location
         </label>
         <input
           id={`${prefix}-label`}
           name="label"
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           defaultValue={filter?.label ?? ""}
           placeholder="Hall return"
         />
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`${prefix}-length`}>
+        <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`${prefix}-length`}>
           Length
         </label>
         <input
@@ -79,14 +79,14 @@ function FilterFields({
           min="0.01"
           step="0.01"
           required
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           defaultValue={filter?.length ?? ""}
           placeholder="20"
         />
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`${prefix}-width`}>
+        <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`${prefix}-width`}>
           Width
         </label>
         <input
@@ -96,14 +96,14 @@ function FilterFields({
           min="0.01"
           step="0.01"
           required
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           defaultValue={filter?.width ?? ""}
           placeholder="25"
         />
       </div>
 
       <div>
-        <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`${prefix}-height`}>
+        <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`${prefix}-height`}>
           Height
         </label>
         <input
@@ -113,14 +113,14 @@ function FilterFields({
           min="0.01"
           step="0.01"
           required
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           defaultValue={filter?.height ?? ""}
           placeholder="1"
         />
       </div>
 
       <div className="sm:col-span-3">
-        <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`${prefix}-date`}>
+        <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`${prefix}-date`}>
           Date changed
         </label>
         <input
@@ -128,20 +128,20 @@ function FilterFields({
           name="date_changed"
           type="date"
           required
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           defaultValue={filter?.date_changed ?? todayYmd()}
         />
       </div>
 
       <div className="sm:col-span-3">
-        <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`${prefix}-notes`}>
+        <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`${prefix}-notes`}>
           Notes
         </label>
         <textarea
           id={`${prefix}-notes`}
           name="notes"
           rows={2}
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           defaultValue={filter?.notes ?? ""}
           placeholder="Optional notes"
         />
@@ -164,12 +164,12 @@ export default function SystemFiltersCard({
   const activeFilters = useMemo(() => filters.filter((filter) => !filter.archived_at), [filters]);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50/80">
-      <div className="border-b border-gray-200 px-4 py-3">
+    <div className="rounded-lg border border-slate-200 bg-slate-50/80">
+      <div className="border-b border-slate-200 px-4 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="text-sm font-semibold text-gray-950">System Filters</div>
-            <div className="mt-0.5 text-xs text-gray-600">
+            <div className="text-sm font-semibold text-slate-950">System Filters</div>
+            <div className="mt-0.5 text-xs text-slate-600">
               Filters for {system.name || "this system"}.
             </div>
           </div>
@@ -188,7 +188,7 @@ export default function SystemFiltersCard({
 
       <div className="space-y-3 px-4 py-3">
         {activeFilters.length === 0 ? (
-          <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+          <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
             No filters recorded for this system yet.
           </div>
         ) : (
@@ -196,11 +196,11 @@ export default function SystemFiltersCard({
             {activeFilters.map((filter) => {
               const editing = editingFilterId === filter.id;
               return (
-                <div key={filter.id} className="rounded-md border border-gray-200 bg-gray-50/70 p-3">
+                <div key={filter.id} className="rounded-md border border-slate-200 bg-slate-50/70 p-3">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium text-gray-900">{filterSummary(filter)}</div>
-                      {filter.notes ? <div className="mt-1 text-xs text-gray-600">{filter.notes}</div> : null}
+                      <div className="text-sm font-medium text-slate-900">{filterSummary(filter)}</div>
+                      {filter.notes ? <div className="mt-1 text-xs text-slate-600">{filter.notes}</div> : null}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
                       <button
@@ -209,7 +209,7 @@ export default function SystemFiltersCard({
                           setEditingFilterId(editing ? null : filter.id);
                           setAdding(false);
                         }}
-                        className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-800 transition-colors hover:bg-gray-50"
+                        className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
                       >
                         Edit
                       </button>
@@ -222,7 +222,7 @@ export default function SystemFiltersCard({
                   </div>
 
                   {editing ? (
-                    <form action={updateSystemFilterFromForm} className="mt-3 space-y-3 border-t border-gray-200 pt-3">
+                    <form action={updateSystemFilterFromForm} className="mt-3 space-y-3 border-t border-slate-200 pt-3">
                       <input type="hidden" name="job_id" value={jobId} />
                       <input type="hidden" name="filter_id" value={filter.id} />
                       <FilterFields filter={filter} prefix={`filter-${filter.id}`} />
@@ -236,7 +236,7 @@ export default function SystemFiltersCard({
                         <button
                           type="button"
                           onClick={() => setEditingFilterId(null)}
-                          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                          className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                         >
                           Cancel
                         </button>
@@ -265,7 +265,7 @@ export default function SystemFiltersCard({
               <button
                 type="button"
                 onClick={() => setAdding(false)}
-                className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
               >
                 Cancel
               </button>

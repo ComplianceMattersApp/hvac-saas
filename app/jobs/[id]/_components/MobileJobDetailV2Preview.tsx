@@ -849,7 +849,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                   {isEcc ? <ClipboardIcon className="h-5 w-5" /> : <ToolIcon className="h-5 w-5" />}
                 </span>
                 <div className="min-w-0">
-                  <h2 className="text-xl font-semibold leading-tight text-[#071225]">
+                  <h2 className="text-xl font-semibold leading-tight text-navy">
                     {isEcc ? "Compliance Work" : serviceWorkLaneTitle}
                   </h2>
                   <p className="mt-0.5 text-sm text-slate-600">
@@ -873,14 +873,14 @@ export default function MobileJobDetailV2Preview(props: any) {
               <>
                 <Link href={`/jobs/${job.id}/info?f=equipment`} className={previewRowClass}>
                   <span className={previewRowTextClass}>
-                    <span className="block font-semibold text-slate-950">Equipment</span>
+                    <span className="block font-semibold text-navy">Equipment</span>
                     <span className="block text-sm text-slate-600">Manage equipment and furnace details</span>
                   </span>
                   <span className={previewPillClass}>Open</span>
                 </Link>
                 <Link href={`/jobs/${job.id}/tests`} className={previewRowClass}>
                   <span className={previewRowTextClass}>
-                    <span className="block font-semibold text-slate-950">ECC Tests</span>
+                    <span className="block font-semibold text-navy">ECC Tests</span>
                     <span className="block text-sm text-slate-600">Open test workflow</span>
                   </span>
                   <span className={previewPillClass}>Open</span>
@@ -889,7 +889,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                   <summary className="cursor-pointer list-none">
                     <div className={previewRowClass}>
                       <span className={previewRowTextClass}>
-                        <span className="block font-semibold text-slate-950">Permit Information</span>
+                        <span className="block font-semibold text-navy">Permit Information</span>
                         <span className="block text-sm text-slate-600">
                           {isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"}
                         </span>

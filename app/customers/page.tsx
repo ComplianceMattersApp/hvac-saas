@@ -142,7 +142,7 @@ export default async function CustomersPage(props: {
           className="sticky top-16 z-20 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm shadow-slate-950/5 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:px-5 lg:top-20"
         >
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Starts with</div>
+            <SectionEyebrow className="mb-0">Starts with</SectionEyebrow>
             {(hasQuery || hasLetterFilter || sort !== "az") ? (
               <Link
                 href="/customers"
@@ -225,9 +225,9 @@ export default async function CustomersPage(props: {
                 <div className={`${sectionIndex === 0 ? "" : "border-t border-slate-200"} bg-white px-4 py-3 sm:px-5`}>
                   <h3
                     id={`${section.anchorId}-heading`}
-                    className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500"
+                    className="text-sm font-semibold"
                   >
-                    {section.key}
+                    <SectionEyebrow className="mb-0">{section.key}</SectionEyebrow>
                   </h3>
                 </div>
                 <div className="divide-y divide-slate-200 border-t border-slate-100">

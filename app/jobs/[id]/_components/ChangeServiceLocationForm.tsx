@@ -18,7 +18,7 @@ function UpdateLocationButton({ disabled }: { disabled: boolean }) {
       disabled={isDisabled}
       aria-disabled={isDisabled}
       aria-busy={pending}
-      className={`inline-flex rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 ${
+      className={`inline-flex rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 ${
         isDisabled ? "cursor-not-allowed opacity-60" : ""
       }`}
     >

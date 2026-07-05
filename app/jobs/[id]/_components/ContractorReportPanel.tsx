@@ -151,8 +151,8 @@ export default function ContractorReportPanel({
   }
 
   return (
-    <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white/96 p-4 text-gray-900 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.24)] sm:p-5">
-      <div className="mb-3 text-sm font-semibold text-slate-950">Contractor Report</div>
+    <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white/96 p-4 text-slate-900 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.24)] sm:p-5">
+      <div className="mb-3 text-sm font-semibold text-navy">Contractor Report</div>
 
       {contractorResponseLabel ? (
         <div className="mb-3 flex items-center gap-2">
@@ -197,7 +197,7 @@ export default function ContractorReportPanel({
           type="button"
           onClick={onSend}
           disabled={!canSend}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending && lastAction === "send"
             ? "Sending..."
@@ -255,7 +255,7 @@ export default function ContractorReportPanel({
           <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-3.5 py-3">
             <div className="mb-2.5 border-b border-slate-200/70 pb-2.5">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Report Type</div>
-              <div className="mt-0.5 font-semibold text-slate-950">{preview.title}</div>
+              <div className="mt-0.5 font-semibold text-navy">{preview.title}</div>
               <div className="mt-0.5 text-xs text-slate-500">
                 {preview.reasons.length} issue{preview.reasons.length === 1 ? "" : "s"} identified &middot; {preview.service_date_text}
               </div>

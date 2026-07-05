@@ -5,6 +5,7 @@ import { isDuctlessMiniSplitSystem, resolveEccScenario } from "@/lib/ecc/scenari
 import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
 import { Disclosure } from "@/components/ui/Disclosure";
+import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import SubmitButton from "@/components/SubmitButton";
 import AirflowEntryFields from "@/components/jobs/AirflowEntryFields";
 import EccLivePreview from "@/components/jobs/EccLivePreview";
@@ -2422,6 +2423,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       <section className={`${isCompletionReportFocused ? "hidden" : eccPanelClass} ${isCompactTestWorkspace ? "space-y-3" : "space-y-5"} print:hidden`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
+          <SectionEyebrow>Test Workspace</SectionEyebrow>
           <h2 className="text-lg font-semibold tracking-[-0.01em] text-navy">
             {isDuctLeakageFocused ? "Duct Leakage Entry" : isAirflowFocused ? "Airflow Entry" : "Tests to Run"}
           </h2>
@@ -2463,7 +2465,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     href={withS(focusedType || undefined, String(sys.id))}
                     className={`min-w-[15rem] rounded-lg border px-3 py-3 text-sm transition-colors ${
                       isActive
-                        ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                        ? "border-blue-600 bg-blue-600 text-white shadow-sm"
                         : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50"
                     }`}
                   >
@@ -2511,7 +2513,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   <div className="rounded-lg border bg-white p-4">
         {/* Test pills */}
         <div className="rounded-lg border bg-white p-4">
-          <div className="text-sm font-semibold mb-3 text-gray-900">ECC Tests</div>
+          <div className="text-sm font-semibold mb-3 text-slate-900">ECC Tests</div>
 
           {!selectedSystemId ? (
             <div className="text-sm text-muted-foreground">Select a system to begin.</div>
@@ -2531,14 +2533,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     ? "border-green-300 bg-green-50"
                     : res === "fail"
                     ? "border-red-300 bg-red-50"
-                    : "border-gray-200 bg-white";
+                    : "border-slate-200 bg-white";
 
                 return (
                   <Link
                     key={x.key}
                     href={open ? withS(undefined) : withS(x.key)}
-                    className={`w-full rounded border px-4 py-3 flex items-center justify-between hover:bg-gray-50 ${
-                      open ? "ring-2 ring-gray-300" : ""
+                    className={`w-full rounded border px-4 py-3 flex items-center justify-between hover:bg-slate-50 ${
+                      open ? "ring-2 ring-slate-300" : ""
                     } ${tone}`}
                   >
                     <div className="min-w-0">
@@ -2564,6 +2566,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)] sm:space-y-4 sm:rounded-lg sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
+                <SectionEyebrow>Status</SectionEyebrow>
                 <div className="text-lg font-semibold tracking-tight text-navy sm:text-base">Current Tests</div>
                 <div className="mt-1 hidden text-sm leading-6 text-slate-600 sm:block">
                   Required tests and selected add-ons. Profile:{" "}
@@ -2667,7 +2670,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             <input type="hidden" name="test_type" value={testType} />
             <SubmitButton
               loadingText="Starting..."
-              className={`inline-flex min-h-10 w-full items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition-colors sm:w-auto ${
+              className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition-colors sm:w-auto ${
                 isUpNextTest
                   ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700 sm:border-slate-300 sm:bg-white sm:text-slate-800 sm:hover:bg-slate-50"
                   : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
@@ -2679,7 +2682,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         ) : (
           <Link
             href={testHref}
-            className={`inline-flex min-h-10 w-full items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition-colors sm:w-auto ${
+            className={`inline-flex min-h-11 w-full items-center justify-center rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition-colors sm:w-auto ${
               isUpNextTest
                 ? "border-blue-600 bg-blue-600 text-white hover:bg-blue-700 sm:border-slate-300 sm:bg-white sm:text-slate-800 sm:hover:bg-slate-50"
                 : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
@@ -2697,7 +2700,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 {showInlineAddAnotherTestCard ? (
                   <Link
                     href={focusedType === "custom" ? withS(undefined) : withS("custom")}
-                    className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:hidden ${
+                    className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border border-dashed px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:hidden ${
                       focusedType === "custom"
                         ? "border-blue-600 bg-blue-600 text-white"
                         : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
@@ -2851,7 +2854,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               href={focusedType === "custom" ? withS(undefined) : withS("custom")}
               className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors ${
                 focusedType === "custom"
-                  ? "border-slate-900 bg-slate-900 text-white"
+                  ? "border-blue-600 bg-blue-600 text-white"
                   : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
               }`}
             >
@@ -2941,6 +2944,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className="min-w-0 space-y-3 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-white sm:p-5 sm:shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)]">
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
+                <SectionEyebrow>Result</SectionEyebrow>
                 <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-2xl">Duct Leakage Results</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <span className="font-medium text-slate-800">{selectedSystemName}</span>
@@ -3087,18 +3091,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     runId={runDL.id}
                   >
 
-                    <details className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.22)] sm:col-span-2 sm:p-4">
-                      <summary className="cursor-pointer list-none">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
-                            <div className="mt-1 text-sm font-medium text-slate-800">{ductSetupSummary}</div>
-                          </div>
-                          <span className="text-xs font-semibold text-slate-600">Show</span>
-                        </div>
-                      </summary>
-
-                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Disclosure title="Test Setup" subtitle={ductSetupSummary} className="sm:col-span-2">
+                      <div className="grid gap-3 sm:grid-cols-2">
                         <div className="grid gap-1">
                           <label className="text-sm font-medium" htmlFor={`dl-target-${runDL.id}`}>
                             Duct Leakage Target (%)
@@ -3130,14 +3124,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           defaultTonnage={runDL.data?.tonnage ?? defaultSystemTonnage}
                         />
                       </div>
-                    </details>
+                    </Disclosure>
 
                   </DuctLeakageEntryFields>
                 </form>
 
-                <details className="hidden rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
-                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
-                  <div className="mt-2 space-y-1">
+                <Disclosure title="Calculated / Result" className="hidden text-sm text-muted-foreground">
+                  <div className="space-y-1">
                     <div>
                       Method: {(savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling" ? savedDuctMethodRaw : defaultDuctAirflowMethod) === "heating" ? "Heating Method" : "Cooling Method"}
                     </div>
@@ -3149,7 +3142,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                     <div>Measured: {runDL.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
                   </div>
-                </details>
+                </Disclosure>
 
                 <form id={ductDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
@@ -3205,6 +3198,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
+                <SectionEyebrow>Result</SectionEyebrow>
                 <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-2xl">Airflow Results</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
                   <span className="font-medium text-slate-800">{selectedSystemName}</span>
@@ -3260,20 +3254,16 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     projectType={job.project_type}
                     runId={runAF.id}
                   >
-                  <details open className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">
-                            {fmtValue(runAF.data?.cfm_per_ton_required ?? (String(job.project_type ?? "").trim().toLowerCase() === "all_new" ? 350 : 300), "CFM/ton")} · {fmtValue(runAF.data?.tonnage ?? defaultSystemTonnage, "ton")}
-                          </div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
-                      </div>
-                    </summary>
-
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Disclosure
+                    title="Test Setup"
+                    subtitle={
+                      <>
+                        {fmtValue(runAF.data?.cfm_per_ton_required ?? (String(job.project_type ?? "").trim().toLowerCase() === "all_new" ? 350 : 300), "CFM/ton")} · {fmtValue(runAF.data?.tonnage ?? defaultSystemTonnage, "ton")}
+                      </>
+                    }
+                    defaultOpen
+                  >
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="grid gap-1">
                         <label className="text-sm font-medium" htmlFor={`af-target-${runAF.id}`}>
                           Airflow Target (CFM per ton)
@@ -3304,7 +3294,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         />
                       </div>
                     </div>
-                  </details>
+                  </Disclosure>
 
                   </AirflowEntryFields>
                 </form>
@@ -3474,20 +3464,16 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
 
-                  <details open className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Charge Readings</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">
-                            {fmtValue(runFan.data?.required_fan_efficacy_w_per_cfm ?? 0.45)} W/CFM · {fmtValue(runFan.data?.actual_tested_airflow_cfm ?? defaultFanActualAirflowCfm, "CFM")}
-                          </div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Open</span>
-                      </div>
-                    </summary>
-
-                    <div className="mt-3 grid gap-3">
+                  <Disclosure
+                    title="Charge Readings"
+                    subtitle={
+                      <>
+                        {fmtValue(runFan.data?.required_fan_efficacy_w_per_cfm ?? 0.45)} W/CFM · {fmtValue(runFan.data?.actual_tested_airflow_cfm ?? defaultFanActualAirflowCfm, "CFM")}
+                      </>
+                    }
+                    defaultOpen
+                  >
+                    <div className="grid gap-3">
 
                       <div className="grid gap-1">
                         <label className="text-sm font-medium" htmlFor={`fan-airflow-${runFan.id}`}>
@@ -3547,19 +3533,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         Photo evidence - attestation only
                       </label>
                     </div>
-                  </details>
+                  </Disclosure>
 
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">No override flow · Notes optional</div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Open</span>
-                      </div>
-                    </summary>
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Disclosure title="Review / Override" subtitle="No override flow · Notes optional">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
 
                       <div className="grid gap-1 sm:col-span-2">
                         <label className="text-sm font-medium" htmlFor={`fan-notes-${runFan.id}`}>
@@ -3574,21 +3551,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         />
                       </div>
                     </div>
-                  </details>
+                  </Disclosure>
                 </form>
 
                 <EccLivePreview mode="fan_watt_draw" formId={fanSaveFormId} projectType={job.project_type} />
 
-                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
-                  <div className="mt-2 space-y-1">
+                <Disclosure title="Calculated / Result" className="text-sm text-slate-700">
+                  <div className="space-y-1">
                     <div>Actual Tested Watts: {fmtValue(runFan.data?.actual_tested_watts, "W")}</div>
                     <div>Actual Tested Airflow from MCH-23: {fmtValue(runFan.data?.actual_tested_airflow_cfm, "CFM")}</div>
                     <div>Required Fan Efficacy: {formatFanEfficacy(runFan.computed?.required_fan_efficacy_w_per_cfm ?? runFan.data?.required_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
                     <div>Actual Fan Efficacy: {formatFanEfficacy(runFan.computed?.actual_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
                     <div>Compliance Statement: {fallbackText(runFan.computed?.compliance_statement)}</div>
                   </div>
-                </details>
+                </Disclosure>
 
                 <div className={eccActionRowClass}>
                   <div className="mr-auto text-sm">
@@ -3758,17 +3734,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
 
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold text-slate-900">Optional CF2R device details</div>
-                          <div className="mt-0.5 text-xs text-slate-600">Rack, pressure drop, and notes.</div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Open</span>
-                      </div>
-                    </summary>
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Disclosure title="Optional CF2R device details" subtitle="Rack, pressure drop, and notes.">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="grid gap-1">
                         <label className="text-sm font-medium" htmlFor={`filter-rack-${runFilter.id}`}>
                           Rack Type
@@ -3809,7 +3776,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       />
                       </div>
                     </div>
-                  </details>
+                  </Disclosure>
                 </form>
 
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
@@ -3860,15 +3827,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       </div>
                     </div>
                   </div>
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs font-semibold text-slate-600">Calculation details</summary>
-                    <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  <Disclosure title="Calculation details" className="mt-2">
+                    <div className="space-y-1 text-xs text-slate-600">
                       <div>Design Airflow: {fmtValue(runFilter.data?.design_airflow_cfm, "CFM")}</div>
                       <div>Nominal Length: {fmtValue(runFilter.data?.nominal_length_inches, "in")}</div>
                       <div>Nominal Width: {fmtValue(runFilter.data?.nominal_width_inches, "in")}</div>
                       <div>Compliance Statement: {fallbackText(runFilter.computed?.compliance_statement)}</div>
                     </div>
-                  </details>
+                  </Disclosure>
                 </div>
 
                 <div className={eccActionRowClass}>
@@ -4580,6 +4546,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
+                <SectionEyebrow>Result</SectionEyebrow>
                 <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-2xl">Refrigerant Charge Results</h2>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span>{" "}
@@ -4595,22 +4562,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             </div>
 
-            <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-              <summary className="cursor-pointer list-none">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
-                    <div className="mt-1 text-sm font-medium text-slate-800">{selectedSystemName}</div>
-                  </div>
-                  <span className="text-xs font-semibold text-slate-600">Show</span>
-                </div>
-              </summary>
-              <div className="mt-3 grid gap-2 text-sm text-slate-700">
+            <Disclosure title="Test Setup" subtitle={selectedSystemName}>
+              <div className="grid gap-2 text-sm text-slate-700">
               <div className="font-semibold text-slate-800">System Reference</div>
               <div>{selectedSystemName}</div>
               <div>Refrigerant type on run: {fallbackText(runRC?.data?.refrigerant_type)}</div>
               </div>
-            </details>
+            </Disclosure>
 
             {!runRC ? (
               carriedForwardRC ? (

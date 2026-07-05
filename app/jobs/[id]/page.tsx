@@ -8,6 +8,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
+import { Disclosure } from "@/components/ui/Disclosure";
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
@@ -1145,7 +1146,7 @@ function JobLocationPreviewFallback({
                 href={mapsDirectionsUrl}
                 target="_blank"
                 rel="noreferrer"
-                className={showActionsOnMobile ? "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50" : "hidden min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 sm:inline-flex"}
+                className={showActionsOnMobile ? "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50" : "hidden min-h-11 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 sm:inline-flex"}
               >
                 Navigate
               </a>
@@ -1155,7 +1156,7 @@ function JobLocationPreviewFallback({
                 href={mapsSearchUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
+                className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50"
               >
                 Open in Maps
               </a>
@@ -1250,7 +1251,7 @@ const secondaryButtonClass =
 const compactSecondaryButtonClass =
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:min-h-10 sm:px-4";
 const darkButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,23,42,0.55)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]";
+  "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,23,42,0.55)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
 const infoChipClass =
   "inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700 sm:px-2.5 sm:py-1 sm:text-xs";
 const compactUtilityButtonClass =
@@ -1258,13 +1259,13 @@ const compactUtilityButtonClass =
 const compactWorkspaceActionButtonClass =
   "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-blue-200/90 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 shadow-[0_10px_22px_-20px_rgba(37,99,235,0.35)] transition-[border-color,background-color,box-shadow,transform,color] hover:border-blue-300 hover:bg-blue-100 hover:text-blue-950 hover:shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] sm:min-h-9 sm:w-auto";
 const workspaceDetailsClass =
-  `${workspaceSectionClass} group text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
+  `${workspaceSectionClass} group text-slate-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const jobRecordsDetailsClass =
-  `${workspacePanelClass} group rounded-2xl border-slate-200/80 bg-white p-2.5 text-gray-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-white hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] sm:rounded-2xl sm:p-4 [&[open]_.disclosure-icon]:rotate-90 [&[open]]:border-blue-200/80 [&[open]]:xl:col-span-2 [&[open]]:2xl:col-span-3`;
+  `${workspacePanelClass} group rounded-2xl border-slate-200/80 bg-white p-2.5 text-slate-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-white hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] sm:rounded-2xl sm:p-4 [&[open]_.disclosure-icon]:rotate-90 [&[open]]:border-blue-200/80 [&[open]]:xl:col-span-2 [&[open]]:2xl:col-span-3`;
 const jobRecordsDetailsDividerClass = "mt-2 border-t border-slate-200/80 pt-2.5 sm:mt-3 sm:pt-4";
 const recordLauncherClass =
-  `${workspacePanelClass} group block rounded-2xl border-slate-200/80 bg-white p-2.5 text-left text-gray-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-blue-50/20 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:rounded-2xl sm:p-4`;
+  `${workspacePanelClass} group block rounded-2xl border-slate-200/80 bg-white p-2.5 text-left text-slate-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-blue-50/20 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:rounded-2xl sm:p-4`;
 const recordPanelClass =
   "scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.3)] ring-1 ring-blue-100/40 sm:rounded-2xl sm:p-5";
 const recordActionRowClass = "flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center";
@@ -2925,10 +2926,10 @@ function serviceChainBadgeClass(opsStatus?: string | null, isCurrent?: boolean) 
   }
 
   if (v === "closed") {
-    return "bg-gray-200 text-gray-800";
+    return "bg-slate-200 text-slate-800";
   }
 
-  return "bg-gray-100 text-gray-700";
+  return "bg-slate-100 text-slate-700";
 }
 
 function formatBillingAddress(a: {
@@ -3803,7 +3804,7 @@ const showCorrectionReviewResolution =
         </span>
         <span>Job Workbench</span>
       </div>
-      <h1 className="max-w-5xl text-[clamp(1.3rem,1.75vw,1.75rem)] font-semibold leading-tight text-[#0f1f35]">
+      <h1 className="max-w-5xl text-[clamp(1.3rem,1.75vw,1.75rem)] font-semibold leading-tight text-navy">
         {jobWorkbenchTitle}
       </h1>
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -4115,13 +4116,17 @@ const showCorrectionReviewResolution =
                     {serviceFollowUpProgressState.bridgeActionLabel}
                   </SubmitButton>
                 </form>
-                <details className="group rounded-xl border border-slate-200 bg-white/90 p-3.5 shadow-sm">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900">
-                    <span>Schedule Return Visit Now</span>
-                    <span className="text-xs font-medium text-slate-500 group-open:hidden">Choose date</span>
-                    <span className="hidden text-xs font-medium text-slate-500 group-open:inline">Close</span>
-                  </summary>
-                  <form action={createNextServiceVisitFromForm} className="mt-3 space-y-3.5">
+                <Disclosure
+                  className="group"
+                  title="Schedule Return Visit Now"
+                  affordance={
+                    <>
+                      <span className="text-xs font-medium text-slate-500 group-open:hidden">Choose date</span>
+                      <span className="hidden text-xs font-medium text-slate-500 group-open:inline">Close</span>
+                    </>
+                  }
+                >
+                  <form action={createNextServiceVisitFromForm} className="space-y-3.5">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="tab" value={tab} />
                     <input type="hidden" name="visit_intent" value="return_visit" />
@@ -4162,7 +4167,7 @@ const showCorrectionReviewResolution =
                       </SubmitButton>
                     </div>
                   </form>
-                </details>
+                </Disclosure>
               </div>
             ) : null}
           </div>
@@ -4295,11 +4300,8 @@ const showCorrectionReviewResolution =
           </div>
         </div>
 
-        <details className="sm:hidden">
-          <summary className="mt-2 inline-flex min-h-12 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
-            More job actions
-          </summary>
-          <div className="mt-2 flex flex-col gap-2">
+        <Disclosure className="mt-2 sm:hidden" title="More job actions">
+          <div className="flex flex-col gap-2">
             <Link href="/ops" className={compactUtilityButtonClass}>
               Back to Ops
             </Link>
@@ -4322,7 +4324,7 @@ const showCorrectionReviewResolution =
               </PendingRouteLink>
             ) : null}
           </div>
-        </details>
+        </Disclosure>
     </div>
   </div>
 
@@ -4635,7 +4637,7 @@ const showCorrectionReviewResolution =
             <PhoneIcon className="h-3.5 w-3.5" />
           </span>
           <div>
-            <div className="text-sm font-semibold text-[#0f1f35]">Contact Logging</div>
+            <div className="text-sm font-semibold text-navy">Contact Logging</div>
             <div className="text-xs text-slate-500">Customer account for this visit.</div>
           </div>
         </div>
@@ -4656,7 +4658,7 @@ const showCorrectionReviewResolution =
             <UserIcon className="h-3.5 w-3.5" />
           </span>
           <div>
-            <div className="text-sm font-semibold text-[#0f1f35]">{surfaceProfile.labels.fieldTeam} Assignment</div>
+            <div className="text-sm font-semibold text-navy">{surfaceProfile.labels.fieldTeam} Assignment</div>
             <div className="text-xs text-slate-500">Field ownership for this visit.</div>
           </div>
         </div>
@@ -4740,11 +4742,8 @@ const showCorrectionReviewResolution =
                 </Link>
               ) : null}
             </div>
-            <details className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-              <summary className="cursor-pointer text-xs font-semibold text-slate-800">
-                Change Service Location
-              </summary>
-              <div className="mt-2 space-y-2">
+            <Disclosure title="Change Service Location">
+              <div className="space-y-2">
                 <p className="text-xs leading-5 text-slate-600">
                   Use this if the job was created for the wrong saved address. To fix a typo in an address, edit the saved location instead.
                 </p>
@@ -4760,7 +4759,7 @@ const showCorrectionReviewResolution =
                   locations={serviceLocationOptions}
                 />
               </div>
-            </details>
+            </Disclosure>
           </div>
         ) : null}
       </div>
@@ -4773,11 +4772,8 @@ const showCorrectionReviewResolution =
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isInternalUser ? (
-              <details className="group">
-                <summary className="cursor-pointer list-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.24)] transition-colors hover:border-blue-200 hover:bg-white hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
-                  Edit
-                </summary>
-                <form action={updateJobVisitScopeFromForm} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:w-[22rem]">
+              <Disclosure className="w-full sm:w-[22rem]" title="Edit">
+                <form action={updateJobVisitScopeFromForm} className="w-full">
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="tab" value={tab} />
                   <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#visit-reason-card`} />
@@ -4801,7 +4797,7 @@ const showCorrectionReviewResolution =
                     </a>
                   </div>
                 </form>
-              </details>
+              </Disclosure>
             ) : null}
             {job.job_type === "service" ? (
               <a
@@ -4879,23 +4875,17 @@ const showCorrectionReviewResolution =
               </div>
             </div>
 
-            <details className="group w-full">
-              <summary className="inline-flex min-h-11 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-700 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.28)] transition-colors hover:border-blue-200 hover:bg-blue-50/40 hover:text-blue-800 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:min-h-9 sm:w-auto sm:py-1.5 sm:text-xs">
-                {hasVisitScopeDefined ? "Add or Update Work" : "Add Work"}
-              </summary>
-
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
-                <VisitScopeJobDetailForm
-                  jobId={job.id}
-                  jobType={job.job_type === "service" ? "service" : "ecc"}
-                  tab={tab}
-                  initialSummary={visitScopeSummary}
-                  initialItems={visitScopeItems}
-                  pricebookTemplateItems={visitScopePricebookTemplates}
-                  primaryButtonClass={primaryButtonClass}
-                />
-              </div>
-            </details>
+            <Disclosure className="w-full" title={hasVisitScopeDefined ? "Add or Update Work" : "Add Work"}>
+              <VisitScopeJobDetailForm
+                jobId={job.id}
+                jobType={job.job_type === "service" ? "service" : "ecc"}
+                tab={tab}
+                initialSummary={visitScopeSummary}
+                initialItems={visitScopeItems}
+                pricebookTemplateItems={visitScopePricebookTemplates}
+                primaryButtonClass={primaryButtonClass}
+              />
+            </Disclosure>
 
           </div>
 
@@ -5187,11 +5177,8 @@ const showCorrectionReviewResolution =
             </div>
           ) : null}
         </div>
-        <details className="mt-3 rounded-xl border border-slate-200/80 bg-white/88 px-3 py-2.5 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.25)]">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-800 transition-colors hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
-            View / Add Notes
-          </summary>
-          <div className="mt-3 space-y-3 border-t border-slate-200/80 pt-3">
+        <Disclosure className="mt-3" title="View / Add Notes">
+          <div className="space-y-3">
             {internalNoteBannerMessage ? (
               <FlashBanner
                 type={internalNoteBannerType as "success" | "warning" | "error"}
@@ -5220,7 +5207,7 @@ const showCorrectionReviewResolution =
               />
             </Suspense>
           </div>
-        </details>
+        </Disclosure>
       </div>
     </div>
   </div>
@@ -6911,7 +6898,7 @@ const showCorrectionReviewResolution =
                         defaultValue={timeToTimeInput(job.window_start)}
                         className={workspaceInputClass}
                       />
-                      <div className="text-[11px] text-gray-500">08:00</div>
+                      <div className="text-[11px] text-slate-500">08:00</div>
                     </div>
 
                     <div className="space-y-1">
@@ -6924,7 +6911,7 @@ const showCorrectionReviewResolution =
                         defaultValue={timeToTimeInput(job.window_end)}
                         className={workspaceInputClass}
                       />
-                      <div className="text-[11px] text-gray-500">10:00</div>
+                      <div className="text-[11px] text-slate-500">10:00</div>
                     </div>
                   </div>
 

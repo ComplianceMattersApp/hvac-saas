@@ -1525,7 +1525,7 @@ export default async function CustomerDetailPage(props: {
                 {callHref ? (
                   <a
                     href={callHref}
-                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                   >
                     Call
                   </a>
@@ -1533,7 +1533,7 @@ export default async function CustomerDetailPage(props: {
                 {customer.email ? (
                   <a
                     href={`mailto:${customer.email}`}
-                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                   >
                     Email
                   </a>
@@ -1542,7 +1542,7 @@ export default async function CustomerDetailPage(props: {
                   <>
                 <Link
                   href={`/customers/${customerId}/edit`}
-                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                 >
                   Edit Customer
                 </Link>
@@ -1550,7 +1550,7 @@ export default async function CustomerDetailPage(props: {
                 {estimatesEnabled && (
                   <Link
                     href={`/estimates/new?customer_id=${customerId}`}
-                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                   >
                     Create Estimate
                   </Link>
@@ -1558,7 +1558,7 @@ export default async function CustomerDetailPage(props: {
 
                 <Link
                   href={`/jobs/new?customer_id=${customerId}&source=customer`}
-                  className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
                   Create Job
                 </Link>
@@ -1582,7 +1582,7 @@ export default async function CustomerDetailPage(props: {
                 className={[
                   "inline-flex shrink-0 items-center rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors",
                   activeWorkspaceTab === item.id
-                    ? "border-slate-900 bg-slate-900 text-white shadow-sm ring-1 ring-slate-900/30"
+                    ? "border-blue-600 bg-blue-600 text-white shadow-sm ring-1 ring-blue-600/30"
                     : "border-slate-300 bg-white text-slate-700 hover:border-slate-500 hover:bg-slate-50",
                 ].join(" ")}
               >
@@ -1610,7 +1610,7 @@ export default async function CustomerDetailPage(props: {
               </div>
               <Link
                 href={`${customerPath}?tab=money`}
-                className="mt-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-100"
+                className="mt-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
               >
                 Open Money
               </Link>
@@ -1625,7 +1625,7 @@ export default async function CustomerDetailPage(props: {
               </div>
               <Link
                 href={`${customerPath}?tab=service-plans`}
-                className="mt-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-100"
+                className="mt-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
               >
                 Open Service Plans
               </Link>
@@ -1728,7 +1728,7 @@ export default async function CustomerDetailPage(props: {
                 {mostRecentInvoiceWorkspaceHref ? (
                   <Link
                     href={mostRecentInvoiceWorkspaceHref}
-                    className="mt-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-100"
+                    className="mt-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
                   >
                     Open invoice workspace
                   </Link>
@@ -1766,7 +1766,7 @@ export default async function CustomerDetailPage(props: {
                 <input type="hidden" name="return_path" value={customerPath} />
                 <button
                   type="submit"
-                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                 >
                   Set up saved card
                 </button>
@@ -1926,7 +1926,7 @@ export default async function CustomerDetailPage(props: {
               {callHref ? (
                 <a
                   href={callHref}
-                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                 >
                   Call Account Phone
                 </a>
@@ -1935,7 +1935,7 @@ export default async function CustomerDetailPage(props: {
               {smsHref ? (
                 <a
                   href={smsHref}
-                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                 >
                   Text Account Phone
                 </a>
@@ -1944,7 +1944,7 @@ export default async function CustomerDetailPage(props: {
               {customer.email ? (
                 <a
                   href={`mailto:${customer.email}`}
-                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                 >
                   Email Account Contact
                 </a>
@@ -1954,32 +1954,18 @@ export default async function CustomerDetailPage(props: {
               Calls and emails here use the account/customer contact and may not be the person on site for every job.
             </p>
 
-            <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Total Jobs
-                </div>
-                <div className="mt-2 text-2xl font-semibold text-slate-900">
-                  {jobs.length}
-                </div>
+            <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold text-slate-900">{jobs.length}</span>
+                <span className="text-xs uppercase tracking-wide text-slate-500">Total Jobs</span>
               </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Active Work (Incl. Closeout)
-                </div>
-                <div className="mt-2 text-2xl font-semibold text-slate-900">
-                  {activeWorkCount}
-                </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold text-slate-900">{activeWorkCount}</span>
+                <span className="text-xs uppercase tracking-wide text-slate-500">Active Work (Incl. Closeout)</span>
               </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs uppercase tracking-wide text-slate-500">
-                  Completed / Closed
-                </div>
-                <div className="mt-2 text-2xl font-semibold text-slate-900">
-                  {completedJobsCount}
-                </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold text-slate-900">{completedJobsCount}</span>
+                <span className="text-xs uppercase tracking-wide text-slate-500">Completed / Closed</span>
               </div>
             </div>
           </div>
@@ -2091,9 +2077,8 @@ export default async function CustomerDetailPage(props: {
               </div>
             )}
 
-            <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-800">Add account contact</summary>
-              <form action={addCustomerRoleContactFromForm} className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Disclosure title="Add account contact" className="mt-3">
+              <form action={addCustomerRoleContactFromForm} className="grid gap-2 sm:grid-cols-2">
                 <input type="hidden" name="customer_id" value={customerId} />
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-600">Role</label>
@@ -2146,13 +2131,13 @@ export default async function CustomerDetailPage(props: {
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
-                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                   >
                     Save account contact
                   </button>
                 </div>
               </form>
-            </details>
+            </Disclosure>
           </section>
         ) : null}
 
@@ -2176,7 +2161,7 @@ export default async function CustomerDetailPage(props: {
               <div>
                 <button
                   type="submit"
-                  className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
                   Save
                 </button>
@@ -2202,11 +2187,8 @@ export default async function CustomerDetailPage(props: {
               </p>
             </div>
             {isInternalViewer ? (
-              <details className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:min-w-80">
-                <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                  Add Location
-                </summary>
-                <form action={addCustomerServiceLocationFromForm} className="mt-3 grid gap-3">
+              <Disclosure title="Add Location" className="sm:min-w-80">
+                <form action={addCustomerServiceLocationFromForm} className="grid gap-3">
                   <input type="hidden" name="customer_id" value={customerId} />
                   <div className="grid gap-2 sm:grid-cols-2">
                     <label className="grid gap-1 text-xs font-medium text-slate-600">
@@ -2283,12 +2265,12 @@ export default async function CustomerDetailPage(props: {
                   </label>
                   <button
                     type="submit"
-                    className="inline-flex w-fit items-center rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    className="inline-flex w-fit items-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
                   >
                     Add Location
                   </button>
                 </form>
-              </details>
+              </Disclosure>
             ) : null}
           </div>
 
@@ -2388,11 +2370,8 @@ export default async function CustomerDetailPage(props: {
                             <div className="mt-1 text-xs text-slate-600">No linked location contacts saved yet.</div>
                           )}
 
-                          <details className="mt-2">
-                            <summary className="cursor-pointer text-xs font-semibold text-slate-700">
-                              Add site/access contact
-                            </summary>
-                            <form action={addLocationRoleContactFromForm} className="mt-2 grid gap-2 sm:grid-cols-2">
+                          <Disclosure title="Add site/access contact" className="mt-2">
+                            <form action={addLocationRoleContactFromForm} className="grid gap-2 sm:grid-cols-2">
                               <input type="hidden" name="customer_id" value={customerId} />
                               <input type="hidden" name="location_id" value={locId} />
                               <div>
@@ -2442,13 +2421,13 @@ export default async function CustomerDetailPage(props: {
                               <div className="sm:col-span-2">
                                 <button
                                   type="submit"
-                                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-100"
+                                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                                 >
                                   Save site/access contact
                                 </button>
                               </div>
                             </form>
-                          </details>
+                          </Disclosure>
                         </div>
                       ) : null}
 
@@ -2458,18 +2437,15 @@ export default async function CustomerDetailPage(props: {
                             href={mapsHref}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                           >
                             Open in Maps
                           </a>
                         ) : null}
 
                         {locId && isInternalViewer ? (
-                          <details className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
-                            <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                              Edit Service Address
-                            </summary>
-                            <form action={updateLocationServiceAddressFromForm} className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <Disclosure title="Edit Service Address" className="w-full">
+                            <form action={updateLocationServiceAddressFromForm} className="grid gap-3 sm:grid-cols-2">
                               <input type="hidden" name="location_id" value={locId} />
                               <input type="hidden" name="return_customer_id" value={customerId} />
                               <label className="grid gap-1 text-xs font-medium text-slate-600">
@@ -2544,19 +2520,19 @@ export default async function CustomerDetailPage(props: {
                               <div className="sm:col-span-2">
                                 <button
                                   type="submit"
-                                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                                 >
                                   Save Location
                                 </button>
                                 <Link
                                   href={`/locations/${locId}`}
-                                  className="ml-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                                  className="ml-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                                 >
                                   Open Location Record
                                 </Link>
                               </div>
                             </form>
-                          </details>
+                          </Disclosure>
                         ) : null}
                       </div>
                     </div>
@@ -2607,9 +2583,8 @@ export default async function CustomerDetailPage(props: {
                           <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
                             {location.systems.length} system{location.systems.length === 1 ? "" : "s"}
                           </span>
-                          <details className="w-full rounded-lg border border-slate-200 bg-white p-3 sm:w-72">
-                            <summary className="cursor-pointer text-xs font-semibold text-slate-800">Add System</summary>
-                            <form action={addCustomerLocationSystemFromForm} className="mt-3 space-y-3">
+                          <Disclosure title="Add System" className="w-full sm:w-72">
+                            <form action={addCustomerLocationSystemFromForm} className="space-y-3">
                               <input type="hidden" name="customer_id" value={customerId} />
                               <input type="hidden" name="location_id" value={location.id} />
                               <div>
@@ -2635,11 +2610,11 @@ export default async function CustomerDetailPage(props: {
                                   placeholder="Split system"
                                 />
                               </div>
-                              <button className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+                              <button className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">
                                 Add System
                               </button>
                             </form>
-                          </details>
+                          </Disclosure>
                         </div>
                       </div>
                     </div>
@@ -3058,7 +3033,7 @@ export default async function CustomerDetailPage(props: {
                 <p className="text-sm text-slate-500">No estimates yet.</p>
                 <Link
                   href={`/estimates/new?customer_id=${customerId}`}
-                  className="mt-3 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  className="mt-3 inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                 >
                   Create First Estimate
                 </Link>
@@ -3091,7 +3066,7 @@ export default async function CustomerDetailPage(props: {
                     </div>
                     <Link
                       href={`/estimates/${est.id}`}
-                      className="shrink-0 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                      className="shrink-0 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-50"
                     >
                       View
                     </Link>
@@ -4376,7 +4351,7 @@ export default async function CustomerDetailPage(props: {
                           <div className="md:col-span-2">
                             <button
                               type="submit"
-                              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                              className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
                             >
                               Save Changes
                             </button>
@@ -4401,24 +4376,21 @@ export default async function CustomerDetailPage(props: {
         ) : null}
 
         {activeWorkspaceTab === "settings" && isInternalViewer ? (
-          <section className="rounded-2xl border border-red-200 bg-red-50/40 p-5 shadow-sm">
-            <div className="mb-3">
-              <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
-              <p className="text-sm text-red-800/90">
-                Archive this customer record after all related jobs have been removed or archived.
-              </p>
-            </div>
-
+          <Disclosure
+            title="Danger Zone"
+            subtitle="Archive this customer record after all related jobs have been removed or archived."
+            variant="danger"
+          >
             <form action={archiveCustomerFromForm}>
               <input type="hidden" name="customer_id" value={customerId} />
               <button
                 type="submit"
-                className="inline-flex items-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-800 hover:bg-rose-100"
               >
                 Archive Customer
               </button>
             </form>
-          </section>
+          </Disclosure>
         ) : null}
       </div>
       </div>
