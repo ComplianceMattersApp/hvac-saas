@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { loadCustomerSystemsEquipmentSummary } from "@/lib/customers/customer-systems-equipment-read-model";
+import {
+  loadCustomerSystemsEquipmentSummary,
+  loadEquipmentReplacementHistory,
+} from "@/lib/customers/customer-systems-equipment-read-model";
 
 type TableData = Record<string, any[]>;
 
@@ -197,6 +200,8 @@ describe("loadCustomerSystemsEquipmentSummary", () => {
           manufacturer: "Bryant",
           model: "B80",
           serial: "S123",
+          status: "active",
+          install_source: "standalone",
           updated_at: "2026-06-26T12:00:00Z",
         },
       ],
@@ -247,5 +252,240 @@ describe("loadCustomerSystemsEquipmentSummary", () => {
     expect(summary.locations).toEqual([]);
     expect(supabase.calls.map((call) => call.table)).toEqual(["customers"]);
     expect(supabase.calls[0].filters).toContainEqual(["eq", "owner_user_id", "owner-1"]);
+  });
+
+  it("surfaces the immediate retired predecessor on an active component, one hop only", async () => {
+    const supabase = makeSupabase({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      locations: [{ id: "loc-1", customer_id: "cust-1", nickname: "Main House" }],
+      jobs: [],
+      customer_location_systems: [
+        { id: "sys-1", owner_user_id: "owner-1", customer_id: "cust-1", location_id: "loc-1", name: "Upstairs", archived_at: null },
+      ],
+      job_systems: [],
+      job_equipment: [],
+      equipment: [
+        {
+          id: "eq-active",
+          owner_user_id: "owner-1",
+          location_id: "loc-1",
+          system_id: "sys-1",
+          equipment_type: "furnace",
+          manufacturer: "Carrier",
+          status: "active",
+          install_source: "contractor",
+        },
+        {
+          id: "eq-retired-1",
+          owner_user_id: "owner-1",
+          location_id: "loc-1",
+          system_id: "sys-1",
+          equipment_type: "furnace",
+          manufacturer: "Old Furnace Co",
+          status: "retired",
+          retired_at: "2026-05-01T00:00:00Z",
+          retire_reason: "failure",
+          replaced_by_equipment_id: "eq-active",
+        },
+      ],
+    });
+
+    const summary = await loadCustomerSystemsEquipmentSummary({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+    });
+
+    // Only the active unit appears in the system's equipment list.
+    expect(summary.locations[0].systems[0].equipment).toHaveLength(1);
+    expect(summary.locations[0].systems[0].equipment[0]).toMatchObject({
+      id: "eq-active",
+      status: "active",
+      installSource: "contractor",
+      priorUnit: {
+        id: "eq-retired-1",
+        manufacturer: "Old Furnace Co",
+        retireReason: "failure",
+        hasDeeperHistory: false,
+      },
+    });
+  });
+
+  it("flags hasDeeperHistory when the immediate predecessor itself has an earlier one", async () => {
+    const supabase = makeSupabase({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      locations: [{ id: "loc-1", customer_id: "cust-1" }],
+      jobs: [],
+      customer_location_systems: [
+        { id: "sys-1", owner_user_id: "owner-1", customer_id: "cust-1", location_id: "loc-1", name: "System 1", archived_at: null },
+      ],
+      job_systems: [],
+      job_equipment: [],
+      equipment: [
+        { id: "eq-active", owner_user_id: "owner-1", location_id: "loc-1", system_id: "sys-1", equipment_type: "furnace", status: "active" },
+        {
+          id: "eq-retired-1",
+          owner_user_id: "owner-1",
+          location_id: "loc-1",
+          system_id: "sys-1",
+          equipment_type: "furnace",
+          status: "retired",
+          replaced_by_equipment_id: "eq-active",
+        },
+        {
+          id: "eq-retired-2",
+          owner_user_id: "owner-1",
+          location_id: "loc-1",
+          system_id: "sys-1",
+          equipment_type: "furnace",
+          status: "retired",
+          replaced_by_equipment_id: "eq-retired-1",
+        },
+      ],
+    });
+
+    const summary = await loadCustomerSystemsEquipmentSummary({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+    });
+
+    expect(summary.locations[0].systems[0].equipment[0].priorUnit).toMatchObject({
+      id: "eq-retired-1",
+      hasDeeperHistory: true,
+    });
+  });
+
+  it("shows a system as empty when its only unit was retired with no replacement", async () => {
+    const supabase = makeSupabase({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      locations: [{ id: "loc-1", customer_id: "cust-1" }],
+      jobs: [],
+      customer_location_systems: [
+        { id: "sys-1", owner_user_id: "owner-1", customer_id: "cust-1", location_id: "loc-1", name: "System 1", archived_at: null },
+      ],
+      job_systems: [],
+      job_equipment: [],
+      equipment: [
+        {
+          id: "eq-retired",
+          owner_user_id: "owner-1",
+          location_id: "loc-1",
+          system_id: "sys-1",
+          equipment_type: "furnace",
+          status: "retired",
+          replaced_by_equipment_id: null,
+        },
+      ],
+    });
+
+    const summary = await loadCustomerSystemsEquipmentSummary({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+    });
+
+    expect(summary.locations[0].systems[0].equipment).toEqual([]);
+    expect(summary.totalEquipmentCount).toBe(0);
+  });
+});
+
+describe("default system labels (§8.6)", () => {
+  it("gives a raw/blank job-sourced system name a 'System N' default, sharing numbering with profile systems", async () => {
+    const supabase = makeSupabase({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      locations: [{ id: "loc-1", customer_id: "cust-1", nickname: "Main House" }],
+      jobs: [{ id: "job-1", customer_id: "cust-1", location_id: "loc-1", title: "Service Visit", job_type: "service", deleted_at: null }],
+      job_systems: [{ id: "sys-unnamed", job_id: "job-1", name: "" }],
+      job_equipment: [{ id: "eq-1", job_id: "job-1", system_id: "sys-unnamed", equipment_role: "furnace" }],
+      customer_location_systems: [
+        { id: "profile-sys-1", owner_user_id: "owner-1", customer_id: "cust-1", location_id: "loc-1", name: "System 1", archived_at: null },
+      ],
+      equipment: [
+        { id: "profile-eq-1", owner_user_id: "owner-1", location_id: "loc-1", system_id: "profile-sys-1", equipment_type: "furnace", status: "active" },
+      ],
+    });
+
+    const summary = await loadCustomerSystemsEquipmentSummary({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+    });
+
+    const names = summary.locations[0].systems.map((system) => system.name).sort();
+    // "System 1" is taken by the real profile system — the blank job-sourced
+    // system must not collide with it.
+    expect(names).toEqual(["System 1", "System 2"]);
+  });
+
+  it("leaves a real job_systems name untouched", async () => {
+    const supabase = makeSupabase({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      locations: [{ id: "loc-1", customer_id: "cust-1" }],
+      jobs: [{ id: "job-1", customer_id: "cust-1", location_id: "loc-1", title: "Service Visit", deleted_at: null }],
+      job_systems: [{ id: "sys-1", job_id: "job-1", name: "Upstairs" }],
+      job_equipment: [{ id: "eq-1", job_id: "job-1", system_id: "sys-1", equipment_role: "furnace" }],
+    });
+
+    const summary = await loadCustomerSystemsEquipmentSummary({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+    });
+
+    expect(summary.locations[0].systems[0].name).toBe("Upstairs");
+  });
+});
+
+describe("loadEquipmentReplacementHistory", () => {
+  it("walks the replacement chain backward, stopping when there is no earlier predecessor", async () => {
+    const supabase = makeSupabase({
+      jobs: [{ id: "job-1", job_display_number: 42, title: "Furnace swap", job_type: "service" }],
+      equipment: [
+        {
+          id: "eq-retired-1",
+          owner_user_id: "owner-1",
+          replaced_by_equipment_id: "eq-active",
+          manufacturer: "Old Co",
+          status: "retired",
+          retired_at: "2026-05-01T00:00:00Z",
+          retire_reason: "failure",
+          install_source: "job",
+          source_job_id: "job-1",
+        },
+        {
+          id: "eq-retired-2",
+          owner_user_id: "owner-1",
+          replaced_by_equipment_id: "eq-retired-1",
+          manufacturer: "Older Co",
+          status: "retired",
+          retired_at: "2020-01-01T00:00:00Z",
+          retire_reason: "upgrade",
+          install_source: "standalone",
+        },
+      ],
+    });
+
+    const history = await loadEquipmentReplacementHistory({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      equipmentId: "eq-active",
+    });
+
+    expect(history.map((unit) => unit.id)).toEqual(["eq-retired-1", "eq-retired-2"]);
+    expect(history[0].sourceJob).toMatchObject({ id: "job-1", title: "Furnace swap" });
+    expect(history[1].sourceJob).toBeNull();
+  });
+
+  it("returns an empty list when the unit was the original install", async () => {
+    const supabase = makeSupabase({ equipment: [] });
+
+    const history = await loadEquipmentReplacementHistory({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      equipmentId: "eq-active",
+    });
+
+    expect(history).toEqual([]);
   });
 });

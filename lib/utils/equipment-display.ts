@@ -67,3 +67,55 @@ export function equipmentRoleLabel(role: string | null | undefined) {
       .join(" ")
   );
 }
+
+export function formatEquipmentNumber(value?: string | number | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return raw;
+  return Number.isInteger(parsed) ? String(parsed) : String(parsed).replace(/\.?0+$/, "");
+}
+
+export type EquipmentSpecGridField = { label: string; value: string };
+
+/**
+ * Spec-grid fields for a component — VISUAL-ALIGNMENT-SPEC.md §8a wants a
+ * label/value grid, not the chip list used on the Overview glance card
+ * (equipmentDetailChips in app/customers/[id]/page.tsx, left as-is there).
+ */
+export function equipmentSpecGridFields(eq: {
+  equipmentRole?: string | null;
+  componentType?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serial?: string | null;
+  tonnage?: string | number | null;
+  refrigerantType?: string | null;
+  heatingCapacityKbtu?: string | number | null;
+  heatingOutputBtu?: string | number | null;
+  heatingEfficiencyPercent?: string | number | null;
+}): EquipmentSpecGridField[] {
+  const rawRole = eq.equipmentRole || eq.componentType;
+  const fields: EquipmentSpecGridField[] = [];
+
+  if (eq.manufacturer) fields.push({ label: "Manufacturer", value: eq.manufacturer });
+  if (eq.model) fields.push({ label: "Model", value: eq.model });
+  if (eq.serial) fields.push({ label: "Serial", value: eq.serial });
+
+  if (rawRole && equipmentUsesRefrigerant(rawRole)) {
+    const tonnage = formatEquipmentNumber(eq.tonnage);
+    if (tonnage) fields.push({ label: "Tonnage", value: tonnage });
+    if (eq.refrigerantType) fields.push({ label: "Refrigerant", value: eq.refrigerantType });
+  }
+
+  if (rawRole && isHeatingOnlyEquipment(rawRole)) {
+    const heatingCapacity = formatEquipmentNumber(eq.heatingCapacityKbtu);
+    const heatingOutput = formatEquipmentNumber(eq.heatingOutputBtu);
+    const heatingEfficiency = formatEquipmentNumber(eq.heatingEfficiencyPercent);
+    if (heatingCapacity) fields.push({ label: "Heating Input", value: `${heatingCapacity} KBTU/h` });
+    if (heatingOutput) fields.push({ label: "Heating Output", value: `${heatingOutput} BTU/h` });
+    if (heatingEfficiency) fields.push({ label: "Efficiency / AFUE", value: `${heatingEfficiency}%` });
+  }
+
+  return fields;
+}

@@ -8,7 +8,13 @@ import {
   requireInternalUser,
 } from "@/lib/auth/internal-user";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
-import { mapToCanonicalRole } from "@/lib/utils/equipment-domain";
+import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
+import { nextDefaultSystemLabel } from "@/lib/customers/system-label";
+import { assertNoClientSuppliedOwnerId, requireScopedEquipmentForMutation } from "@/lib/customers/scoped-equipment";
+import {
+  loadEquipmentReplacementHistory,
+  type CustomerEquipmentHistoryUnitSummary,
+} from "@/lib/customers/customer-systems-equipment-read-model";
 import { redirect } from "next/navigation"
 
 function toFullName(first?: string | null, last?: string | null) {
@@ -543,13 +549,12 @@ export async function addCustomerLocationSystemFromForm(formData: FormData) {
 
   const customerId = readTrimmed(formData, "customer_id");
   const locationId = readTrimmed(formData, "location_id");
-  const name = readTrimmed(formData, "name");
+  const requestedName = readTrimmed(formData, "name");
   const systemType = readTrimmed(formData, "system_type");
   const notes = readTrimmed(formData, "notes");
 
   if (!customerId) throw new Error("Customer is required");
   if (!locationId) throw new Error("Location is required");
-  if (!name) redirect(customerSystemsEquipmentHref(customerId, { err: "system_required" }));
 
   const supabase = await createClient();
   let scoped;
@@ -563,6 +568,8 @@ export async function addCustomerLocationSystemFromForm(formData: FormData) {
     if (isInternalAccessError(error)) redirect("/login");
     throw error;
   }
+
+  const name = requestedName || (await nextDefaultSystemLabel({ admin: scoped.admin, locationId: scoped.locationId }));
 
   const { error } = await scoped.admin
     .from("customer_location_systems")
@@ -582,6 +589,134 @@ export async function addCustomerLocationSystemFromForm(formData: FormData) {
   redirect(customerSystemsEquipmentHref(customerId, { saved: "system_added" }));
 }
 
+export async function updateCustomerLocationSystemFromForm(formData: FormData) {
+  "use server";
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+  const systemId = readTrimmed(formData, "system_id");
+  const name = readTrimmed(formData, "name");
+  const systemType = readTrimmed(formData, "system_type");
+  const notes = readTrimmed(formData, "notes");
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+  if (!systemId) throw new Error("System is required");
+  if (!name) redirect(customerSystemsEquipmentHref(customerId, { err: "system_required" }));
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  const { error } = await scoped.admin
+    .from("customer_location_systems")
+    .update({
+      name,
+      system_type: emptyToNull(systemType),
+      notes: emptyToNull(notes),
+    })
+    .eq("id", systemId)
+    .eq("customer_id", scoped.customerId)
+    .eq("location_id", scoped.locationId)
+    .eq("owner_user_id", scoped.accountOwnerUserId)
+    .is("archived_at", null);
+
+  if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "system_failed" }));
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  redirect(customerSystemsEquipmentHref(customerId, { saved: "system_updated" }));
+}
+
+export async function archiveCustomerLocationSystemFromForm(formData: FormData) {
+  "use server";
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+  const systemId = readTrimmed(formData, "system_id");
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+  if (!systemId) throw new Error("System is required");
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  // Safety: mirrors archiveCustomerFromForm's "don't archive if it still has
+  // jobs" guard — don't archive a system that still has active equipment,
+  // since new equipment can't be attached to an archived system afterward.
+  const { count: activeEquipmentCount, error: countErr } = await scoped.admin
+    .from("equipment")
+    .select("id", { count: "exact", head: true })
+    .eq("system_id", systemId)
+    .eq("status", "active");
+
+  if (countErr) throw countErr;
+  if ((activeEquipmentCount ?? 0) > 0) {
+    redirect(customerSystemsEquipmentHref(customerId, { err: "system_has_active_equipment" }));
+  }
+
+  const { error } = await scoped.admin
+    .from("customer_location_systems")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", systemId)
+    .eq("customer_id", scoped.customerId)
+    .eq("location_id", scoped.locationId)
+    .eq("owner_user_id", scoped.accountOwnerUserId);
+
+  if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "system_archive_failed" }));
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  redirect(customerSystemsEquipmentHref(customerId, { saved: "system_archived" }));
+}
+
+/** Shared numeric-field parsing for equipment forms — mirrors job-actions.ts. */
+function readOptionalNumber(formData: FormData, key: string): number | null {
+  const raw = readTrimmed(formData, key);
+  return raw ? Number(raw) : null;
+}
+
+/**
+ * install_source / source_job_id read + validation, shared by create and
+ * replace. Defaults to 'standalone' with no job when the form doesn't supply
+ * a source (true for every current caller — no UI sets these fields yet).
+ * equipment_source_job_consistency_chk enforces the same rule at the DB
+ * layer; this just gives a friendlier redirect instead of a raw constraint error.
+ */
+function readInstallSource(formData: FormData): { installSource: string; sourceJobId: string | null } {
+  const installSource = readTrimmed(formData, "install_source") || "standalone";
+  const sourceJobId = readTrimmed(formData, "source_job_id") || null;
+
+  if (installSource === "job" && !sourceJobId) {
+    throw new Error("source_job_id is required when install_source is 'job'");
+  }
+  if (installSource !== "job" && sourceJobId) {
+    throw new Error("source_job_id must be empty unless install_source is 'job'");
+  }
+
+  return { installSource, sourceJobId };
+}
+
 export async function addCustomerLocationEquipmentFromForm(formData: FormData) {
   "use server";
 
@@ -589,16 +724,17 @@ export async function addCustomerLocationEquipmentFromForm(formData: FormData) {
   const locationId = readTrimmed(formData, "location_id");
   const systemId = readTrimmed(formData, "system_id");
   const rawEquipmentType = readTrimmed(formData, "equipment_role") || readTrimmed(formData, "equipment_type");
-  const equipmentType = mapToCanonicalRole(rawEquipmentType || "other");
+  const equipmentRole = mapToCanonicalRole(rawEquipmentType || "other");
   const manufacturer = readTrimmed(formData, "manufacturer");
   const model = readTrimmed(formData, "model");
   const serial = readTrimmed(formData, "serial");
   const notes = readTrimmed(formData, "notes");
+  const { installSource, sourceJobId } = readInstallSource(formData);
 
   if (!customerId) throw new Error("Customer is required");
   if (!locationId) throw new Error("Location is required");
   if (!systemId) throw new Error("System is required");
-  if (!equipmentType) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_required" }));
+  if (!equipmentRole) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_required" }));
 
   const supabase = await createClient();
   let scoped;
@@ -626,17 +762,37 @@ export async function addCustomerLocationEquipmentFromForm(formData: FormData) {
   if (systemErr) throw systemErr;
   if (!system?.id) throw new Error("System not found in internal account scope");
 
+  const eqFields = sanitizeEquipmentFields({
+    canonicalRole: equipmentRole,
+    manufacturer: emptyToNull(manufacturer),
+    model: emptyToNull(model),
+    serial: emptyToNull(serial),
+    notes: emptyToNull(notes),
+    tonnage: readOptionalNumber(formData, "tonnage"),
+    refrigerantType: emptyToNull(readTrimmed(formData, "refrigerant_type")),
+    heatingCapacityKbtu: readOptionalNumber(formData, "heating_capacity_kbtu"),
+    heatingOutputBtu: readOptionalNumber(formData, "heating_output_btu"),
+    heatingEfficiencyPercent: readOptionalNumber(formData, "heating_efficiency_percent"),
+  });
+
   const { error } = await scoped.admin
     .from("equipment")
     .insert({
       owner_user_id: scoped.accountOwnerUserId,
       location_id: scoped.locationId,
       system_id: systemId,
-      equipment_type: equipmentType,
-      manufacturer: emptyToNull(manufacturer),
-      model: emptyToNull(model),
-      serial: emptyToNull(serial),
-      notes: emptyToNull(notes),
+      equipment_type: eqFields.equipment_role,
+      manufacturer: eqFields.manufacturer,
+      model: eqFields.model,
+      serial: eqFields.serial,
+      notes: eqFields.notes,
+      tonnage: eqFields.tonnage,
+      refrigerant_type: eqFields.refrigerant_type,
+      heating_capacity_kbtu: eqFields.heating_capacity_kbtu,
+      heating_output_btu: eqFields.heating_output_btu,
+      heating_efficiency_percent: eqFields.heating_efficiency_percent,
+      install_source: installSource,
+      source_job_id: sourceJobId,
     });
 
   if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_failed" }));
@@ -644,4 +800,259 @@ export async function addCustomerLocationEquipmentFromForm(formData: FormData) {
   revalidatePath(`/customers/${customerId}`);
   revalidatePath("/customers");
   redirect(customerSystemsEquipmentHref(customerId, { saved: "equipment_added" }));
+}
+
+export async function updateCustomerLocationEquipmentFromForm(formData: FormData) {
+  "use server";
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+  const equipmentId = readTrimmed(formData, "equipment_id");
+  const rawEquipmentType = readTrimmed(formData, "equipment_role") || readTrimmed(formData, "equipment_type");
+  const equipmentRole = mapToCanonicalRole(rawEquipmentType || "other");
+  const manufacturer = readTrimmed(formData, "manufacturer");
+  const model = readTrimmed(formData, "model");
+  const serial = readTrimmed(formData, "serial");
+  const notes = readTrimmed(formData, "notes");
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+  if (!equipmentId) throw new Error("Equipment is required");
+  if (!equipmentRole) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_required" }));
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  const eqFields = sanitizeEquipmentFields({
+    canonicalRole: equipmentRole,
+    manufacturer: emptyToNull(manufacturer),
+    model: emptyToNull(model),
+    serial: emptyToNull(serial),
+    notes: emptyToNull(notes),
+    tonnage: readOptionalNumber(formData, "tonnage"),
+    refrigerantType: emptyToNull(readTrimmed(formData, "refrigerant_type")),
+    heatingCapacityKbtu: readOptionalNumber(formData, "heating_capacity_kbtu"),
+    heatingOutputBtu: readOptionalNumber(formData, "heating_output_btu"),
+    heatingEfficiencyPercent: readOptionalNumber(formData, "heating_efficiency_percent"),
+  });
+
+  const { error } = await scoped.admin
+    .from("equipment")
+    .update({
+      equipment_type: eqFields.equipment_role,
+      manufacturer: eqFields.manufacturer,
+      model: eqFields.model,
+      serial: eqFields.serial,
+      notes: eqFields.notes,
+      tonnage: eqFields.tonnage,
+      refrigerant_type: eqFields.refrigerant_type,
+      heating_capacity_kbtu: eqFields.heating_capacity_kbtu,
+      heating_output_btu: eqFields.heating_output_btu,
+      heating_efficiency_percent: eqFields.heating_efficiency_percent,
+    })
+    .eq("id", equipmentId)
+    .eq("location_id", scoped.locationId)
+    .eq("owner_user_id", scoped.accountOwnerUserId);
+
+  if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_failed" }));
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  redirect(customerSystemsEquipmentHref(customerId, { saved: "equipment_updated" }));
+}
+
+/** Retire with no replacement — the unit was removed, not swapped. */
+export async function retireCustomerLocationEquipmentFromForm(formData: FormData) {
+  "use server";
+
+  assertNoClientSuppliedOwnerId(formData);
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+  const equipmentId = readTrimmed(formData, "equipment_id");
+  const retireReason = readTrimmed(formData, "retire_reason");
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+  if (!equipmentId) throw new Error("Equipment is required");
+  if (!["failure", "warranty", "upgrade"].includes(retireReason)) {
+    redirect(customerSystemsEquipmentHref(customerId, { err: "retire_reason_required" }));
+  }
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  const { error } = await scoped.admin
+    .from("equipment")
+    .update({
+      status: "retired",
+      retired_at: new Date().toISOString(),
+      retire_reason: retireReason,
+    })
+    .eq("id", equipmentId)
+    .eq("location_id", scoped.locationId)
+    .eq("owner_user_id", scoped.accountOwnerUserId)
+    .eq("status", "active");
+
+  if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_retire_failed" }));
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  redirect(customerSystemsEquipmentHref(customerId, { saved: "equipment_retired" }));
+}
+
+/**
+ * Retire the old unit and install its replacement in one atomic DB
+ * transaction (public.replace_customer_location_equipment) — never leaves a
+ * retired unit with no successor, or two active units, if one write fails.
+ */
+export async function replaceCustomerLocationEquipmentFromForm(formData: FormData) {
+  "use server";
+
+  assertNoClientSuppliedOwnerId(formData);
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+  const oldEquipmentId = readTrimmed(formData, "equipment_id");
+  const systemId = readTrimmed(formData, "system_id");
+  const retireReason = readTrimmed(formData, "retire_reason");
+  const rawEquipmentType = readTrimmed(formData, "equipment_role") || readTrimmed(formData, "equipment_type");
+  const equipmentRole = mapToCanonicalRole(rawEquipmentType || "other");
+  const manufacturer = readTrimmed(formData, "manufacturer");
+  const model = readTrimmed(formData, "model");
+  const serial = readTrimmed(formData, "serial");
+  const notes = readTrimmed(formData, "notes");
+  const { installSource, sourceJobId } = readInstallSource(formData);
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+  if (!oldEquipmentId) throw new Error("Equipment to replace is required");
+  if (!systemId) throw new Error("System is required");
+  if (!["failure", "warranty", "upgrade"].includes(retireReason)) {
+    redirect(customerSystemsEquipmentHref(customerId, { err: "retire_reason_required" }));
+  }
+  if (!equipmentRole) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_required" }));
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  // The RPC only re-checks owner_user_id, not location — an equipment_id from
+  // a different location under the same account owner would otherwise still
+  // be accepted. Confirm it belongs to *this* scoped location before calling it.
+  let oldEquipment;
+  try {
+    oldEquipment = await requireScopedEquipmentForMutation({
+      admin: scoped.admin,
+      equipmentId: oldEquipmentId,
+      locationId: scoped.locationId,
+      ownerUserId: scoped.accountOwnerUserId,
+    });
+  } catch {
+    redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_not_found" }));
+  }
+  if (oldEquipment.status !== "active") {
+    redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_already_retired" }));
+  }
+
+  const eqFields = sanitizeEquipmentFields({
+    canonicalRole: equipmentRole,
+    manufacturer: emptyToNull(manufacturer),
+    model: emptyToNull(model),
+    serial: emptyToNull(serial),
+    notes: emptyToNull(notes),
+    tonnage: readOptionalNumber(formData, "tonnage"),
+    refrigerantType: emptyToNull(readTrimmed(formData, "refrigerant_type")),
+    heatingCapacityKbtu: readOptionalNumber(formData, "heating_capacity_kbtu"),
+    heatingOutputBtu: readOptionalNumber(formData, "heating_output_btu"),
+    heatingEfficiencyPercent: readOptionalNumber(formData, "heating_efficiency_percent"),
+  });
+
+  const { error } = await scoped.admin.rpc("replace_customer_location_equipment", {
+    p_owner_user_id: scoped.accountOwnerUserId,
+    p_old_equipment_id: oldEquipmentId,
+    p_retire_reason: retireReason,
+    p_location_id: scoped.locationId,
+    p_system_id: systemId,
+    p_equipment_type: eqFields.equipment_role,
+    p_manufacturer: eqFields.manufacturer,
+    p_model: eqFields.model,
+    p_serial: eqFields.serial,
+    p_notes: eqFields.notes,
+    p_tonnage: eqFields.tonnage,
+    p_refrigerant_type: eqFields.refrigerant_type,
+    p_heating_capacity_kbtu: eqFields.heating_capacity_kbtu,
+    p_heating_output_btu: eqFields.heating_output_btu,
+    p_heating_efficiency_percent: eqFields.heating_efficiency_percent,
+    p_install_source: installSource,
+    p_source_job_id: sourceJobId,
+  });
+
+  if (error) redirect(customerSystemsEquipmentHref(customerId, { err: "equipment_replace_failed" }));
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  redirect(customerSystemsEquipmentHref(customerId, { saved: "equipment_replaced" }));
+}
+
+/**
+ * On-demand "view full history" — called directly from a client component
+ * (not a <form action>), so it returns data instead of redirecting. Never
+ * called as part of the main page render; the read model deliberately stops
+ * at one hop (CustomerEquipmentSummaryRow.priorUnit) so a long replacement
+ * chain costs nothing until a user explicitly asks to see it.
+ */
+export async function loadEquipmentReplacementHistoryForCustomer(params: {
+  customerId: string;
+  locationId: string;
+  equipmentId: string;
+}): Promise<CustomerEquipmentHistoryUnitSummary[]> {
+  "use server";
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId: params.customerId,
+      locationId: params.locationId,
+    });
+  } catch {
+    return [];
+  }
+
+  return loadEquipmentReplacementHistory({
+    supabase: scoped.admin,
+    accountOwnerUserId: scoped.accountOwnerUserId,
+    equipmentId: params.equipmentId,
+  });
 }

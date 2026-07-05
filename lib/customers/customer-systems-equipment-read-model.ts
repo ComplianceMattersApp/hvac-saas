@@ -3,10 +3,30 @@ import {
   type JobSystemFilterRow,
 } from "@/lib/customers/system-filters-read-model";
 
+export type EquipmentRetireReason = "failure" | "warranty" | "upgrade";
+export type EquipmentInstallSource = "job" | "contractor" | "standalone";
+export type EquipmentLifecycleStatus = "active" | "retired";
+
+/** The one immediate predecessor of an active component — one hop back only. */
+export type CustomerEquipmentPriorUnitSummary = {
+  id: string;
+  manufacturer: string | null;
+  model: string | null;
+  serial: string | null;
+  retiredAt: string | null;
+  retireReason: EquipmentRetireReason | null;
+  /** True if this prior unit itself has an earlier predecessor — "view full history" has more to show. */
+  hasDeeperHistory: boolean;
+};
+
 export type CustomerEquipmentSummaryRow = {
   id: string;
   jobId: string | null;
   sourceType: "job" | "profile";
+  /** null for legacy job_equipment rows — no lifecycle concept exists there (frozen snapshots). */
+  status: EquipmentLifecycleStatus | null;
+  /** null for legacy job_equipment rows. */
+  installSource: EquipmentInstallSource | null;
   equipmentRole: string | null;
   componentType: string | null;
   manufacturer: string | null;
@@ -20,6 +40,7 @@ export type CustomerEquipmentSummaryRow = {
   updatedAt: string | null;
   createdAt: string | null;
   sourceJob: CustomerEquipmentSourceJob | null;
+  priorUnit: CustomerEquipmentPriorUnitSummary | null;
 };
 
 export type CustomerEquipmentSourceJob = {
@@ -134,8 +155,29 @@ type ProfileEquipmentRow = {
   model?: string | null;
   serial?: string | null;
   notes?: string | null;
+  tonnage?: string | number | null;
+  refrigerant_type?: string | null;
+  heating_capacity_kbtu?: string | number | null;
+  heating_output_btu?: string | number | null;
+  heating_efficiency_percent?: string | number | null;
+  status?: string | null;
+  retired_at?: string | null;
+  retire_reason?: string | null;
+  replaced_by_equipment_id?: string | null;
+  install_source?: string | null;
+  source_job_id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+type ProfileEquipmentPriorRow = {
+  id?: string | null;
+  replaced_by_equipment_id?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  serial?: string | null;
+  retired_at?: string | null;
+  retire_reason?: string | null;
 };
 
 function clean(value: unknown) {
@@ -188,6 +230,33 @@ function compareLatestEquipment(a: CustomerEquipmentSummaryRow, b: CustomerEquip
 
 function compareSystems(a: CustomerSystemSummary, b: CustomerSystemSummary) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+/**
+ * §8.6: job-sourced systems with no real name (job_systems.name blank, or the
+ * old raw "System" fallback) get the same "System N" default-label treatment
+ * as profile systems — one shared numbering per location so job- and
+ * profile-sourced systems never collide on the same number.
+ */
+function applyDefaultSystemLabels(systems: CustomerSystemSummary[]): CustomerSystemSummary[] {
+  const takenNumbers = new Set<number>();
+  for (const system of systems) {
+    const match = /^system\s+(\d+)$/i.exec(system.name.trim());
+    if (match) takenNumbers.add(Number(match[1]));
+  }
+
+  let candidate = 1;
+  function nextFreeNumber() {
+    while (takenNumbers.has(candidate)) candidate += 1;
+    takenNumbers.add(candidate);
+    return candidate;
+  }
+
+  return systems.map((system) => {
+    const trimmed = system.name.trim();
+    const isRawFallback = !trimmed || /^system$/i.test(trimmed);
+    return isRawFallback ? { ...system, name: `System ${nextFreeNumber()}` } : system;
+  });
 }
 
 function compareFilters(a: CustomerSystemFilterSummary, b: CustomerSystemFilterSummary) {
@@ -320,16 +389,98 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
 
     const profileSystemIds = profileSystemRows.map((system) => clean(system.id)).filter(Boolean);
     if (profileSystemIds.length > 0) {
+      // Only active components — a system's equipment list is "what's installed
+      // now," not history. Retired predecessors are fetched separately, one hop
+      // back, below; deeper history is loaded on demand via
+      // loadEquipmentReplacementHistory, never eagerly here.
       const { data: profileEquipmentData, error: profileEquipmentErr } = await params.supabase
         .from("equipment")
-        .select("id, location_id, system_id, equipment_type, manufacturer, model, serial, notes, created_at, updated_at")
+        .select(
+          [
+            "id",
+            "location_id",
+            "system_id",
+            "equipment_type",
+            "manufacturer",
+            "model",
+            "serial",
+            "notes",
+            "tonnage",
+            "refrigerant_type",
+            "heating_capacity_kbtu",
+            "heating_output_btu",
+            "heating_efficiency_percent",
+            "status",
+            "retired_at",
+            "retire_reason",
+            "replaced_by_equipment_id",
+            "install_source",
+            "source_job_id",
+            "created_at",
+            "updated_at",
+          ].join(", "),
+        )
         .eq("owner_user_id", accountOwnerUserId)
         .in("system_id", profileSystemIds)
+        .eq("status", "active")
         .order("updated_at", { ascending: false });
 
       if (profileEquipmentErr) throw profileEquipmentErr;
       profileEquipmentRows = (profileEquipmentData ?? []) as ProfileEquipmentRow[];
     }
+  }
+
+  const activeProfileEquipmentIds = profileEquipmentRows.map((equipment) => clean(equipment.id)).filter(Boolean);
+
+  const priorUnitByActiveId = new Map<string, ProfileEquipmentPriorRow>();
+  const deeperHistoryPriorIds = new Set<string>();
+
+  if (activeProfileEquipmentIds.length > 0) {
+    const { data: priorRowsData, error: priorErr } = await params.supabase
+      .from("equipment")
+      .select("id, replaced_by_equipment_id, manufacturer, model, serial, retired_at, retire_reason")
+      .in("replaced_by_equipment_id", activeProfileEquipmentIds)
+      .eq("status", "retired");
+
+    if (priorErr) throw priorErr;
+
+    const priorRows = (priorRowsData ?? []) as ProfileEquipmentPriorRow[];
+    for (const row of priorRows) {
+      const activeId = clean(row.replaced_by_equipment_id);
+      if (activeId) priorUnitByActiveId.set(activeId, row);
+    }
+
+    const priorUnitIds = priorRows.map((row) => clean(row.id)).filter(Boolean);
+    if (priorUnitIds.length > 0) {
+      // Existence-only check: does any of these prior units itself have an
+      // earlier predecessor? Drives the "view full history" affordance without
+      // ever walking the chain further than one hop up front.
+      const { data: deeperRowsData, error: deeperErr } = await params.supabase
+        .from("equipment")
+        .select("replaced_by_equipment_id")
+        .in("replaced_by_equipment_id", priorUnitIds);
+
+      if (deeperErr) throw deeperErr;
+      for (const row of (deeperRowsData ?? []) as { replaced_by_equipment_id?: string | null }[]) {
+        const priorId = clean(row.replaced_by_equipment_id);
+        if (priorId) deeperHistoryPriorIds.add(priorId);
+      }
+    }
+  }
+
+  function buildPriorUnitSummary(activeEquipmentId: string): CustomerEquipmentPriorUnitSummary | null {
+    const prior = priorUnitByActiveId.get(activeEquipmentId);
+    const priorId = clean(prior?.id);
+    if (!prior || !priorId) return null;
+    return {
+      id: priorId,
+      manufacturer: cleanNullable(prior.manufacturer),
+      model: cleanNullable(prior.model),
+      serial: cleanNullable(prior.serial),
+      retiredAt: cleanNullable(prior.retired_at),
+      retireReason: (cleanNullable(prior.retire_reason) as EquipmentRetireReason | null),
+      hasDeeperHistory: deeperHistoryPriorIds.has(priorId),
+    };
   }
 
   const locationsById = new Map<string, LocationRow>();
@@ -341,6 +492,30 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
   const jobsById = new Map<string, JobRow>();
   for (const job of jobs) {
     jobsById.set(clean(job.id), job);
+  }
+
+  // Canonical equipment rows with install_source='job' carry their own
+  // source_job_id, which may point outside the customer's jobLimit window —
+  // fetch anything missing so their provenance line can still resolve.
+  const missingSourceJobIds = Array.from(
+    new Set(
+      profileEquipmentRows
+        .map((equipment) => clean(equipment.source_job_id))
+        .filter((id) => id && !jobsById.has(id)),
+    ),
+  );
+
+  if (missingSourceJobIds.length > 0) {
+    const { data: extraJobRows, error: extraJobErr } = await params.supabase
+      .from("jobs")
+      .select("id, job_display_number, title, job_type, location_id, job_address, city, scheduled_date, created_at")
+      .in("id", missingSourceJobIds);
+
+    if (extraJobErr) throw extraJobErr;
+    for (const job of (extraJobRows ?? []) as JobRow[]) {
+      const id = clean(job.id);
+      if (id) jobsById.set(id, job);
+    }
   }
 
   const systemsById = new Map<string, SystemRow>();
@@ -466,6 +641,10 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
       id: equipmentId,
       jobId: clean(job.id),
       sourceType: "job",
+      // Legacy job_equipment has no lifecycle columns — these snapshots are
+      // frozen per §8.3 and never gain retire/replace tracking.
+      status: null,
+      installSource: null,
       equipmentRole: cleanNullable(equipment.equipment_role),
       componentType: cleanNullable(equipment.component_type),
       manufacturer: cleanNullable(equipment.manufacturer),
@@ -479,6 +658,7 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
       updatedAt: cleanNullable(equipment.updated_at),
       createdAt: cleanNullable(equipment.created_at),
       sourceJob: sourceJob(job),
+      priorUnit: null,
     });
     totalEquipmentCount += 1;
   }
@@ -495,23 +675,29 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     const system = profileSystem ? ensureProfileSystem(profileSystem) : null;
     if (!equipmentId || !system) continue;
 
+    const sourceJobId = clean(equipment.source_job_id);
+    const equipmentSourceJob = sourceJobId ? jobsById.get(sourceJobId) : null;
+
     system.equipment.push({
       id: equipmentId,
       jobId: null,
       sourceType: "profile",
+      status: (cleanNullable(equipment.status) as EquipmentLifecycleStatus | null) ?? "active",
+      installSource: cleanNullable(equipment.install_source) as EquipmentInstallSource | null,
       equipmentRole: cleanNullable(equipment.equipment_type),
       componentType: cleanNullable(equipment.equipment_type),
       manufacturer: cleanNullable(equipment.manufacturer),
       model: cleanNullable(equipment.model),
       serial: cleanNullable(equipment.serial),
-      tonnage: null,
-      refrigerantType: null,
-      heatingCapacityKbtu: null,
-      heatingOutputBtu: null,
-      heatingEfficiencyPercent: null,
+      tonnage: cleanNullable(equipment.tonnage),
+      refrigerantType: cleanNullable(equipment.refrigerant_type),
+      heatingCapacityKbtu: cleanNullable(equipment.heating_capacity_kbtu),
+      heatingOutputBtu: cleanNullable(equipment.heating_output_btu),
+      heatingEfficiencyPercent: cleanNullable(equipment.heating_efficiency_percent),
       updatedAt: cleanNullable(equipment.updated_at),
       createdAt: cleanNullable(equipment.created_at),
-      sourceJob: null,
+      sourceJob: equipmentSourceJob ? sourceJob(equipmentSourceJob) : null,
+      priorUnit: buildPriorUnitSummary(equipmentId),
     });
     totalEquipmentCount += 1;
   }
@@ -523,17 +709,21 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
   }
 
   const locations = Array.from(locationMap.values())
-    .map((location) => ({
-      ...location,
-      systems: location.systems
-        .filter((system) => system.equipment.length > 0 || system.sourceJob || system.id.startsWith("profile:"))
-        .map((system) => ({
-          ...system,
-          filters: system.filters.slice().sort(compareFilters),
-          equipment: system.equipment.slice().sort(compareLatestEquipment),
-        }))
-        .sort(compareSystems),
-    }))
+    .map((location) => {
+      const visibleSystems = location.systems.filter(
+        (system) => system.equipment.length > 0 || system.sourceJob || system.id.startsWith("profile:"),
+      );
+      return {
+        ...location,
+        systems: applyDefaultSystemLabels(visibleSystems)
+          .map((system) => ({
+            ...system,
+            filters: system.filters.slice().sort(compareFilters),
+            equipment: system.equipment.slice().sort(compareLatestEquipment),
+          }))
+          .sort(compareSystems),
+      };
+    })
     .filter((location) => location.systems.length > 0);
 
   return {
@@ -541,4 +731,79 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     totalSystemCount: locations.reduce((count, location) => count + location.systems.length, 0),
     totalEquipmentCount,
   };
+}
+
+export type CustomerEquipmentHistoryUnitSummary = {
+  id: string;
+  manufacturer: string | null;
+  model: string | null;
+  serial: string | null;
+  retiredAt: string | null;
+  retireReason: EquipmentRetireReason | null;
+  installSource: EquipmentInstallSource | null;
+  sourceJob: CustomerEquipmentSourceJob | null;
+};
+
+/**
+ * Walks the replacement chain backward one predecessor at a time, starting
+ * from a given (normally active) equipment id. Only call this when the user
+ * explicitly opens "view full history" — the main summary above deliberately
+ * stops at one hop (CustomerEquipmentSummaryRow.priorUnit) so a long
+ * replacement history never costs anything on the default render path.
+ */
+export async function loadEquipmentReplacementHistory(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  equipmentId: string;
+  maxHops?: number;
+}): Promise<CustomerEquipmentHistoryUnitSummary[]> {
+  const accountOwnerUserId = clean(params.accountOwnerUserId);
+  const maxHops = params.maxHops ?? 25;
+  const history: CustomerEquipmentHistoryUnitSummary[] = [];
+
+  let currentId = clean(params.equipmentId);
+  const seen = new Set<string>();
+
+  for (let hop = 0; hop < maxHops && currentId && !seen.has(currentId); hop += 1) {
+    seen.add(currentId);
+
+    const { data: priorRow, error } = await params.supabase
+      .from("equipment")
+      .select("id, manufacturer, model, serial, retired_at, retire_reason, install_source, source_job_id")
+      .eq("replaced_by_equipment_id", currentId)
+      .eq("owner_user_id", accountOwnerUserId)
+      .eq("status", "retired")
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!priorRow?.id) break;
+
+    let sourceJobSummary: CustomerEquipmentSourceJob | null = null;
+    const sourceJobId = clean(priorRow.source_job_id);
+    if (sourceJobId) {
+      const { data: jobRow, error: jobErr } = await params.supabase
+        .from("jobs")
+        .select("id, job_display_number, title, job_type, location_id, job_address, city, scheduled_date, created_at")
+        .eq("id", sourceJobId)
+        .maybeSingle();
+
+      if (jobErr) throw jobErr;
+      if (jobRow) sourceJobSummary = sourceJob(jobRow as JobRow);
+    }
+
+    history.push({
+      id: clean(priorRow.id),
+      manufacturer: cleanNullable(priorRow.manufacturer),
+      model: cleanNullable(priorRow.model),
+      serial: cleanNullable(priorRow.serial),
+      retiredAt: cleanNullable(priorRow.retired_at),
+      retireReason: cleanNullable(priorRow.retire_reason) as EquipmentRetireReason | null,
+      installSource: cleanNullable(priorRow.install_source) as EquipmentInstallSource | null,
+      sourceJob: sourceJobSummary,
+    });
+
+    currentId = clean(priorRow.id);
+  }
+
+  return history;
 }

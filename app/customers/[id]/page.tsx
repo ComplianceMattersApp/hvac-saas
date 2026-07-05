@@ -91,9 +91,15 @@ import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/li
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
-import { equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
+import {
+  equipmentRoleLabel,
+  equipmentUsesRefrigerant,
+  isHeatingOnlyEquipment,
+  equipmentSpecGridFields,
+} from "@/lib/utils/equipment-display";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 import ProfileEquipmentCreateForm from "./_components/ProfileEquipmentCreateForm";
+import { EquipmentComponentCard } from "./_components/EquipmentComponentCard";
 import { CustomerNotesTextarea } from "./_components/CustomerNotesTextarea";
 import {
   WorkspaceTabsProvider,
@@ -280,6 +286,22 @@ function formatEquipmentSourceJobLabel(job: CustomerEquipmentSourceJob) {
   const title = normalizeRetestLinkedJobTitle(job.title) || "Job";
   const date = formatDate(job.scheduledDate ?? job.createdAt);
   return `${reference} | ${title} | ${date}`;
+}
+
+function equipmentProvenanceLabel(eq: CustomerEquipmentSummaryRow) {
+  if (eq.sourceJob) return `From ${formatEquipmentSourceJobLabel(eq.sourceJob)}`;
+  if (eq.installSource === "contractor") return `Installed by a contractor · ${formatDate(eq.createdAt)}`;
+  return `Added ${formatDate(eq.createdAt)}`;
+}
+
+function priorUnitSummaryLabel(prior: CustomerEquipmentSummaryRow["priorUnit"]) {
+  if (!prior) return null;
+  const identity = [prior.manufacturer, prior.model].filter(Boolean).join(" ") || "Equipment";
+  const parts = [`Previously: ${identity}`];
+  if (prior.serial) parts.push(`Serial ${prior.serial}`);
+  if (prior.retiredAt) parts.push(`retired ${formatDate(prior.retiredAt)}`);
+  if (prior.retireReason) parts.push(prior.retireReason);
+  return parts.join(" · ");
 }
 
 function equipmentDetailChips(eq: CustomerEquipmentSummaryRow) {
@@ -1491,12 +1513,56 @@ export default async function CustomerDetailPage(props: {
             Equipment added
           </div>
         )}
-        {["system_failed", "equipment_failed", "system_required", "equipment_required"].includes(systemsEquipmentError) && (
+        {systemsEquipmentSaved === "system_updated" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            System updated
+          </div>
+        )}
+        {systemsEquipmentSaved === "system_archived" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            System archived
+          </div>
+        )}
+        {systemsEquipmentSaved === "equipment_updated" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Equipment updated
+          </div>
+        )}
+        {systemsEquipmentSaved === "equipment_retired" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Equipment retired
+          </div>
+        )}
+        {systemsEquipmentSaved === "equipment_replaced" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Equipment replaced — the old unit is retired and the new one is active.
+          </div>
+        )}
+        {[
+          "system_failed",
+          "equipment_failed",
+          "system_required",
+          "equipment_required",
+          "system_has_active_equipment",
+          "system_archive_failed",
+          "equipment_retire_failed",
+          "equipment_replace_failed",
+          "equipment_not_found",
+          "equipment_already_retired",
+          "retire_reason_required",
+        ].includes(systemsEquipmentError) && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
             {systemsEquipmentError === "system_required" && "System name is required."}
             {systemsEquipmentError === "equipment_required" && "Equipment type is required."}
             {systemsEquipmentError === "system_failed" && "Could not add system. Verify the customer and property scope, then try again."}
             {systemsEquipmentError === "equipment_failed" && "Could not add equipment. Verify the system and property scope, then try again."}
+            {systemsEquipmentError === "system_has_active_equipment" && "Can't archive a system with active equipment — retire or replace its components first."}
+            {systemsEquipmentError === "system_archive_failed" && "Could not archive system. Try again."}
+            {systemsEquipmentError === "equipment_retire_failed" && "Could not retire equipment. Try again."}
+            {systemsEquipmentError === "equipment_replace_failed" && "Could not replace equipment. Verify the new unit's details and try again."}
+            {systemsEquipmentError === "equipment_not_found" && "That equipment record couldn't be found in this property's scope."}
+            {systemsEquipmentError === "equipment_already_retired" && "That unit is already retired."}
+            {systemsEquipmentError === "retire_reason_required" && "Select a retire reason (Failure, Warranty, or Upgrade)."}
           </div>
         )}
         {/* Header */}
@@ -2761,6 +2827,7 @@ export default async function CustomerDetailPage(props: {
           <section id="systems-equipment" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
+                <SectionEyebrow>Property Equipment</SectionEyebrow>
                 <h2 className="text-lg font-semibold text-navy">Systems &amp; Equipment</h2>
                 <p className="mt-0.5 text-sm text-slate-500">
                   Systems and equipment saved for each customer property.
@@ -2796,32 +2863,23 @@ export default async function CustomerDetailPage(props: {
                           <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
                             {location.systems.length} system{location.systems.length === 1 ? "" : "s"}
                           </span>
-                          <Disclosure title="Add System" className="w-full sm:w-72">
-                            <form action={addCustomerLocationSystemFromForm} className="space-y-3">
+                          <Disclosure title="+ Add system" variant="flush" className="w-full sm:w-56">
+                            <form action={addCustomerLocationSystemFromForm} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                               <input type="hidden" name="customer_id" value={customerId} />
                               <input type="hidden" name="location_id" value={location.id} />
                               <div>
                                 <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={`system-name-${location.id}`}>
-                                  System name
+                                  System name (optional)
                                 </label>
                                 <input
                                   id={`system-name-${location.id}`}
                                   name="name"
-                                  required
                                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
-                                  placeholder="Upstairs"
+                                  placeholder={`System ${location.systems.length + 1}`}
                                 />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-700" htmlFor={`system-type-${location.id}`}>
-                                  System type
-                                </label>
-                                <input
-                                  id={`system-type-${location.id}`}
-                                  name="system_type"
-                                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900"
-                                  placeholder="Split system"
-                                />
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Leave blank for a default label like "System {location.systems.length + 1}" — rename anytime.
+                                </p>
                               </div>
                               <button className="rounded-md bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700">
                                 Add System
@@ -2838,109 +2896,89 @@ export default async function CustomerDetailPage(props: {
                       </div>
                     ) : (
                     <div className="divide-y divide-slate-200">
-                      {location.systems.map((system) => (
+                      {location.systems.map((system) => {
+                        const rawSystemId = system.id.replace(/^profile:/, "");
+                        return (
                         <div key={system.id} className="p-4">
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                              <h4 className="text-sm font-semibold text-slate-900">{system.name}</h4>
-                              {system.sourceJob ? (
-                                <div className="mt-0.5 text-xs text-slate-500">
-                                  Latest source: {formatEquipmentSourceJobLabel(system.sourceJob)}
-                                </div>
-                              ) : null}
-                              {!system.sourceJob ? (
-                                <div className="mt-0.5 text-xs text-slate-500">Saved property equipment</div>
-                              ) : null}
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+                                  System
+                                </span>
+                                <h4 className="text-sm font-semibold text-navy">{system.name}</h4>
+                              </div>
+                              <div className="mt-0.5 text-xs text-slate-500">
+                                {system.sourceJob ? `From ${formatEquipmentSourceJobLabel(system.sourceJob)}` : "Saved property equipment"}
+                              </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              {!system.sourceJob ? (
-                              <Disclosure title="Add Equipment" className="w-full sm:w-72">
-                                <ProfileEquipmentCreateForm
-                                  customerId={customerId}
-                                  locationId={location.id}
-                                  systemId={system.id.replace(/^profile:/, "")}
-                                />
-                              </Disclosure>
-                              ) : null}
+                            <div className="flex shrink-0 flex-wrap items-start gap-2">
                               {system.sourceJob ? (
-                                <>
-                                <Link
-                                  href={`/jobs/${system.sourceJob.id}/equipment`}
-                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                                >
-                                  View Equipment
-                                </Link>
-                                <Link
-                                  href={`/jobs/${system.sourceJob.id}/info?f=equipment`}
-                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                                >
-                                  Manage Equipment
-                                </Link>
                                 <Link
                                   href={`/jobs/${system.sourceJob.id}`}
                                   className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
                                 >
                                   Open Job
                                 </Link>
-                                </>
+                              ) : null}
+                              {!system.sourceJob ? (
+                                <Disclosure title="Add Equipment" className="w-full sm:w-72">
+                                  <ProfileEquipmentCreateForm
+                                    customerId={customerId}
+                                    locationId={location.id}
+                                    systemId={rawSystemId}
+                                  />
+                                </Disclosure>
                               ) : null}
                             </div>
                           </div>
 
                           {system.equipment.length === 0 ? (
-                            <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                              No equipment records under this system yet.
+                            <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">
+                              {system.sourceJob ? (
+                                "No equipment records under this system yet."
+                              ) : (
+                                <>
+                                  <div className="mb-2">No components saved under this system yet.</div>
+                                  <Disclosure title="Add details" className="mx-auto w-full text-left sm:w-72">
+                                    <ProfileEquipmentCreateForm
+                                      customerId={customerId}
+                                      locationId={location.id}
+                                      systemId={rawSystemId}
+                                    />
+                                  </Disclosure>
+                                </>
+                              )}
                             </div>
                           ) : (
                             <div className="mt-3 space-y-2">
                               {system.equipment.map((equipment) => {
-                                const chips = equipmentDetailChips(equipment);
+                                // §8.6: Open Job + the provenance line are hoisted to the
+                                // system header. Only repeat them per-component when this
+                                // component's source job differs from the system's — e.g.
+                                // a canonical component installed on a different job (or
+                                // by a contractor, or standalone) than what the system
+                                // header is showing. Never suppress a component's own
+                                // contractor/standalone provenance (it has no system-level
+                                // equivalent to dedupe against).
+                                const sameJobAsSystem = Boolean(
+                                  equipment.sourceJob && system.sourceJob && equipment.sourceJob.id === system.sourceJob.id,
+                                );
                                 return (
-                                  <div key={equipment.id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                      <div className="min-w-0">
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {chips.map((chip) => (
-                                            <span
-                                              key={chip}
-                                              className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700"
-                                            >
-                                              {chip}
-                                            </span>
-                                          ))}
-                                        </div>
-                                        {equipment.sourceJob ? (
-                                          <div className="mt-2 text-xs text-slate-500">
-                                            Source: {formatEquipmentSourceJobLabel(equipment.sourceJob)}
-                                          </div>
-                                        ) : (
-                                          <div className="mt-2 text-xs text-slate-500">Saved property equipment</div>
-                                        )}
-                                      </div>
-                                      {equipment.sourceJob ? (
-                                      <div className="flex shrink-0 flex-wrap gap-2">
-                                        <Link
-                                          href={`/jobs/${equipment.sourceJob.id}/equipment`}
-                                          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                                        >
-                                          View Equipment
-                                        </Link>
-                                        <Link
-                                          href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}
-                                          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                                        >
-                                          Manage Equipment
-                                        </Link>
-                                        <Link
-                                          href={`/jobs/${equipment.sourceJob.id}`}
-                                          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
-                                        >
-                                          Open Job
-                                        </Link>
-                                      </div>
-                                      ) : null}
-                                    </div>
-                                  </div>
+                                  <EquipmentComponentCard
+                                    key={equipment.id}
+                                    customerId={customerId}
+                                    locationId={location.id}
+                                    systemId={equipment.status !== null ? rawSystemId : null}
+                                    equipment={equipment}
+                                    roleLabel={equipmentRoleLabel(equipment.equipmentRole || equipment.componentType)}
+                                    specFields={equipmentSpecGridFields(equipment)}
+                                    provenanceLabel={sameJobAsSystem ? null : equipmentProvenanceLabel(equipment)}
+                                    jobHref={!sameJobAsSystem && equipment.sourceJob ? `/jobs/${equipment.sourceJob.id}` : null}
+                                    jobManageHref={equipment.sourceJob ? `/jobs/${equipment.sourceJob.id}/info?f=equipment` : null}
+                                    priorUnitLabel={priorUnitSummaryLabel(equipment.priorUnit)}
+                                    hasDeeperHistory={equipment.priorUnit?.hasDeeperHistory ?? false}
+                                  />
                                 );
                               })}
                             </div>
@@ -2962,7 +3000,8 @@ export default async function CustomerDetailPage(props: {
                             </div>
                           ) : null}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     )}
                   </div>
