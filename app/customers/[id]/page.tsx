@@ -193,6 +193,17 @@ function formatDate(value?: string | null) {
   return formatTimestampDateDisplayLA(raw) || "—";
 }
 
+function daysAgoLabel(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const then = new Date(raw).getTime();
+  if (!Number.isFinite(then)) return null;
+  const days = Math.max(0, Math.round((Date.now() - then) / 86_400_000));
+  if (days === 0) return "today";
+  if (days === 1) return "1 day ago";
+  return `${days} days ago`;
+}
+
 function formatSavedCardLabel(row: CustomerSavedPaymentMethodRow) {
   const brand = String(row.display_brand ?? "").trim();
   const last4 = String(row.display_last4 ?? "").trim();
@@ -583,20 +594,6 @@ function billingPeriodStatusLabel(value: string) {
   return value;
 }
 
-function summaryOrder() {
-  return [
-    "need_to_schedule",
-    "scheduled",
-    "pending_info",
-    "failed",
-    "pending_office_review",
-    "retest_needed",
-    "paperwork_required",
-    "invoice_required",
-    "on_hold",
-  ] as const;
-}
-
 export default async function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
   searchParams?: Promise<{
@@ -951,9 +948,6 @@ export default async function CustomerDetailPage(props: {
   const hasDisplayableRoleContacts = customerRoleContacts.some((recipient) =>
     isDisplayableRole(recipient.recipient_role),
   );
-  const displayableRoleContactCount = customerRoleContacts.filter((recipient) =>
-    isDisplayableRole(recipient.recipient_role),
-  ).length;
   const savedBillingContact = customerRoleContacts.find((recipient) => {
     const role = String(recipient.recipient_role ?? "").trim().toLowerCase();
     const status = String(recipient.status ?? "").trim().toLowerCase();
@@ -1321,6 +1315,48 @@ export default async function CustomerDetailPage(props: {
     ? (workspaceTabParam as WorkspaceTabId)
     : "overview";
 
+  // Overview call-in command center — spec §7.1
+  const ATTENTION_OPS_STATUSES = [
+    "pending_info",
+    "on_hold",
+    "failed",
+    "retest_needed",
+    "paperwork_required",
+    "invoice_required",
+    "pending_office_review",
+  ] as const;
+  const jobAttentionItems = ATTENTION_OPS_STATUSES.flatMap((key) => {
+    const count = opsCounts[key] ?? 0;
+    if (count === 0) return [];
+    const job = activeJobs.find((j) => normalizeOpsStatus(j.ops_status) === key) ?? null;
+    const reason = job ? job.pending_info_reason || job.on_hold_reason || null : null;
+    const jobTitle = job ? normalizeRetestLinkedJobTitle(job.title) || "Job" : null;
+    return [
+      {
+        key,
+        label: `${count} job${count === 1 ? "" : "s"} ${opsStatusLabel(key).toLowerCase()}`,
+        detail: jobTitle ? `${jobTitle}${reason ? ` — ${reason}` : ""}` : opsStatusLabel(key),
+      },
+    ];
+  });
+
+  const paymentsAttentionActive = canViewPaymentHistory && failedPaymentAttentionCount > 0;
+  const servicePlansAttentionActive =
+    maintenanceAgreementsEnabled && canManageBillingPeriods && billingPeriodsNeedingAttentionCount > 0;
+  const moneyAndPlansAttentionActive = paymentsAttentionActive || servicePlansAttentionActive;
+
+  const recentServiceHistoryJobs = [...jobs]
+    .filter((job) => !job.deleted_at)
+    .sort(compareCustomerWorkJobsLatestFirst)
+    .slice(0, 4);
+
+  const overviewEquipmentCards = systemsEquipmentLocations
+    .flatMap((location) => location.systems.flatMap((system) => system.equipment))
+    .slice(0, 4);
+
+  const additionalContactCount = Math.max(totalContactCount - (primaryAccountContact ? 1 : 0), 0);
+  const primaryLocationCity = String(firstLocationWithAddress?.city ?? "").trim();
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl space-y-7 p-4 md:space-y-8 md:p-6">
@@ -1473,98 +1509,105 @@ export default async function CustomerDetailPage(props: {
               </p>
             </div>
 
-            <div className="space-y-1.5 text-sm text-slate-600">
-              <div>
-                <span className="font-medium text-slate-800">Primary contact:</span>{" "}
+            <div className="space-y-1">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">Primary Contact</div>
+              <div className="text-sm font-semibold text-navy">
                 {customer.phone ? formatPhone(customer.phone) : "No phone on file"}
-                {customer.email ? ` | ${customer.email}` : ""}
               </div>
-              <div>
-                <span className="font-medium text-slate-800">Primary service location:</span>{" "}
-                {serviceAddressFallback
-                  ? `${serviceAddressFallback.label}: ${serviceAddressFallback.address}`
-                  : "No service address on file"}
-              </div>
-              <div>
-                <span className="font-medium text-slate-800">Billing relationship:</span>{" "}
-                {hasSavedBillingContact ? "Saved billing contact on this account" : "Defaults to responsible account contact"}
-              </div>
+              {customer.email ? <div className="text-sm text-slate-600">{customer.email}</div> : null}
             </div>
 
-            <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200/80 bg-white/70 p-2 text-xs text-slate-600">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                {locations.length} location{locations.length === 1 ? "" : "s"}
-              </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                {activeJobs.length} open job{activeJobs.length === 1 ? "" : "s"}
-              </span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                {displayableRoleContactCount} contact{displayableRoleContactCount === 1 ? "" : "s"}
-              </span>
-              {maintenanceAgreementsEnabled ? (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                  {activeServicePlanCount} active service plan{activeServicePlanCount === 1 ? "" : "s"}
-                </span>
+            <div className="flex flex-wrap gap-2">
+              {callHref ? (
+                <a
+                  href={callHref}
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  Call
+                </a>
               ) : null}
-              {canViewPaymentHistory ? (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                  {failedPaymentAttentionCount} payment attention
-                </span>
+              {smsHref ? (
+                <a
+                  href={smsHref}
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  Text
+                </a>
               ) : null}
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                Last scheduled:{" "}
-                {formatDate(lastScheduledActiveDate)}
-              </span>
+              {customer.email ? (
+                <a
+                  href={`mailto:${customer.email}`}
+                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                >
+                  Email
+                </a>
+              ) : null}
+            </div>
+
+            <div className="space-y-1 border-t border-slate-200/70 pt-3">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+                Primary Service Address
+              </div>
+              {serviceAddressFallback ? (
+                <div className="text-sm text-slate-600">
+                  <span className="font-semibold text-navy">{serviceAddressFallback.address}</span>
+                  {makeMapsHref(serviceAddressFallback.address) ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={makeMapsHref(serviceAddressFallback.address)!}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-blue-700 hover:underline"
+                      >
+                        Map
+                      </a>
+                    </>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="text-sm text-slate-600">No service address on file</div>
+              )}
+              <div className="text-xs text-slate-500">
+                Billing: {hasSavedBillingContact ? "saved billing contact" : "same as service address"}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-col items-stretch gap-3 rounded-xl border border-slate-200 bg-white/85 p-3 md:items-end">
-            <div className="space-y-2">
-              <SectionEyebrow>Quick Actions</SectionEyebrow>
-              <div className="flex flex-wrap gap-2">
-                {callHref ? (
-                  <a
-                    href={callHref}
-                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                  >
-                    Call
-                  </a>
-                ) : null}
-                {customer.email ? (
-                  <a
-                    href={`mailto:${customer.email}`}
-                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                  >
-                    Email
-                  </a>
-                ) : null}
-                {isInternalViewer ? (
-                  <>
-                <Link
-                  href={`/customers/${customerId}/edit`}
-                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                >
-                  Edit Customer
-                </Link>
-
-                {estimatesEnabled && (
-                  <Link
-                    href={`/estimates/new?customer_id=${customerId}`}
-                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                  >
-                    Create Estimate
-                  </Link>
-                )}
-
+          <div className="flex flex-col items-stretch gap-3 md:items-end">
+            {isInternalViewer ? (
+              <div className="flex flex-col items-stretch gap-2 md:items-end">
                 <Link
                   href={`/jobs/new?customer_id=${customerId}&source=customer`}
-                  className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
                 >
-                  Create Job
+                  + Create Job
                 </Link>
-                  </>
-                ) : null}
+                <div className="flex gap-2">
+                  {estimatesEnabled && (
+                    <Link
+                      href={`/estimates/new?customer_id=${customerId}`}
+                      className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                    >
+                      Estimate
+                    </Link>
+                  )}
+                  <Link
+                    href={`/customers/${customerId}/edit`}
+                    className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                  >
+                    Edit
+                  </Link>
+                </div>
               </div>
+            ) : null}
+
+            <div className="rounded-xl border border-slate-200 bg-white/85 p-3 md:w-64">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">Last Visit</div>
+              <div className="mt-1 text-base font-semibold text-navy">{formatDate(lastScheduledActiveDate)}</div>
+              {daysAgoLabel(lastScheduledActiveDate) ? (
+                <div className="text-xs text-slate-500">{daysAgoLabel(lastScheduledActiveDate)}</div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -1595,66 +1638,248 @@ export default async function CustomerDetailPage(props: {
         <div className="space-y-6 md:space-y-7">
 
         {activeWorkspaceTab === "overview" ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-navy">Attention Snapshot</h2>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              <div className="font-medium text-slate-900">Money</div>
-              <div className="mt-1">
-                {canViewPaymentHistory
-                  ? `${failedPaymentAttentionCount} payment attention item${failedPaymentAttentionCount === 1 ? "" : "s"}`
-                  : "Payment history access is limited for this viewer."}
+        <section className="grid gap-5 xl:grid-cols-[1.25fr_.9fr]">
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <SectionEyebrow className="mb-0">Service History</SectionEyebrow>
+                <Link href={`${customerPath}?tab=work`} className="text-xs font-medium text-blue-700 hover:underline">
+                  View all in Work →
+                </Link>
               </div>
-              <Link
-                href={`${customerPath}?tab=money`}
-                className="mt-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
-              >
-                Open Money
-              </Link>
+              <p className="mb-4 text-sm text-slate-500">
+                {jobs.filter((job) => !job.deleted_at).length} visit
+                {jobs.filter((job) => !job.deleted_at).length === 1 ? "" : "s"} total · {activeJobs.length} open
+              </p>
+
+              {recentServiceHistoryJobs.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                  No jobs found for this customer yet.
+                </div>
+              ) : (
+                <div>
+                  {recentServiceHistoryJobs.map((job, index) => {
+                    const isOpen = isOperationallyActiveJob(job);
+                    const isClosed = !isOpen && normalizeOpsStatus(job.ops_status) === "closed";
+                    const dotClass = isOpen ? "bg-blue-600" : isClosed ? "bg-emerald-600" : "bg-slate-300";
+                    const isLast = index === recentServiceHistoryJobs.length - 1;
+                    return (
+                      <div key={job.id} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                          <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
+                          {!isLast ? <span className="w-px flex-1 bg-slate-200" /> : null}
+                        </div>
+                        <div className={`min-w-0 flex-1 ${isLast ? "" : "pb-4"}`}>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-semibold text-navy">
+                              {normalizeRetestLinkedJobTitle(job.title) || "Job"}
+                            </div>
+                            <span
+                              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${opsBadgeClass(job.ops_status)}`}
+                            >
+                              {customerWorkJobStatusLabel(job)}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 text-xs text-slate-500">
+                            {formatDate(job.scheduled_date ?? job.created_at)} ·{" "}
+                            {formatJobDisplayReference({ jobDisplayNumber: job.job_display_number, jobId: job.id })}
+                            {job.contractors?.name ? ` · ${job.contractors.name}` : ""} ·{" "}
+                            <Link
+                              href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
+                              className="font-medium text-blue-700 hover:underline"
+                            >
+                              Open Job
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {isInternalViewer ? (
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                  <Link
+                    href={`/jobs/new?customer_id=${customerId}&source=customer`}
+                    className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    Schedule Next Visit
+                  </Link>
+                  {estimatesEnabled ? (
+                    <Link
+                      href={`/estimates/new?customer_id=${customerId}`}
+                      className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                    >
+                      Create Estimate
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              <div className="font-medium text-slate-900">Service Plans</div>
-              <div className="mt-1">
-                {maintenanceAgreementsEnabled
-                  ? `${activeServicePlanCount} active service plan${activeServicePlanCount === 1 ? "" : "s"}`
-                  : "Service plans are hidden in this environment or viewer scope."}
+            {isInternalViewer ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-1 flex items-center justify-between gap-3">
+                  <SectionEyebrow className="mb-0">Systems at this Address</SectionEyebrow>
+                  <Link
+                    href={`${customerPath}?tab=systems-equipment`}
+                    className="text-xs font-medium text-blue-700 hover:underline"
+                  >
+                    Manage →
+                  </Link>
+                </div>
+                <p className="mb-3 text-sm text-slate-500">
+                  {systemsEquipmentSummary.totalSystemCount} system{systemsEquipmentSummary.totalSystemCount === 1 ? "" : "s"} ·{" "}
+                  {systemsEquipmentSummary.totalEquipmentCount} equipment record
+                  {systemsEquipmentSummary.totalEquipmentCount === 1 ? "" : "s"}
+                </p>
+                {overviewEquipmentCards.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+                    No systems or equipment saved for this property yet.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {overviewEquipmentCards.map((equipment) => {
+                      const chips = equipmentDetailChips(equipment);
+                      return (
+                        <div key={equipment.id} className="rounded-xl border border-slate-200 p-3.5">
+                          <div className="text-sm font-semibold text-navy">{chips[0] ?? "Equipment"}</div>
+                          <div className="mt-0.5 text-xs text-slate-500">
+                            {chips.slice(1, 4).join(" · ") || "No details on file"}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              <Link
-                href={`${customerPath}?tab=service-plans`}
-                className="mt-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
-              >
-                Open Service Plans
-              </Link>
+            ) : null}
+          </div>
+
+          <div className="space-y-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionEyebrow>Needs Attention</SectionEyebrow>
+              <div className="mt-3 space-y-2">
+                {jobAttentionItems.length === 0 ? (
+                  <div className="flex items-center gap-2.5 text-sm text-emerald-700">
+                    <span className="flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white">
+                      ✓
+                    </span>
+                    Jobs all clear
+                  </div>
+                ) : (
+                  jobAttentionItems.map((item) => (
+                    <div
+                      key={item.key}
+                      className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3"
+                    >
+                      <span className="mt-1 h-[7px] w-[7px] shrink-0 rounded-full bg-amber-600" />
+                      <div>
+                        <div className="text-sm font-semibold text-navy">{item.label}</div>
+                        <div className="text-xs text-amber-800">{item.detail}</div>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {moneyAndPlansAttentionActive ? (
+                  <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3.5 py-3">
+                    <span className="mt-1 h-[7px] w-[7px] shrink-0 rounded-full bg-amber-600" />
+                    <div>
+                      <div className="text-sm font-semibold text-navy">
+                        {paymentsAttentionActive
+                          ? `${failedPaymentAttentionCount} payment attention item${failedPaymentAttentionCount === 1 ? "" : "s"}`
+                          : "Billing period needs attention"}
+                      </div>
+                      <div className="text-xs text-amber-800">Review in Money or Service Plans.</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2.5 text-sm text-emerald-700">
+                    <span className="flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] text-white">
+                      ✓
+                    </span>
+                    Payments &amp; plans all clear
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </section>
-        ) : null}
 
-        {/* Open status summary */}
-        {activeWorkspaceTab === "overview" ? (
-        <section className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-3">
-            <SectionEyebrow className="mb-0">Open Jobs Summary</SectionEyebrow>
-          </div>
-
-          <div className="flex flex-wrap gap-1 sm:gap-1.5">
-            {summaryOrder().map((key) => (
-              <div
-                key={key}
-                className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/80 px-2.5 py-2"
-              >
-                <div className="text-lg font-semibold leading-none tracking-tight text-slate-900">
-                  {opsCounts[key] ?? 0}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionEyebrow>Quick Facts</SectionEyebrow>
+              <div className="mt-3 space-y-2.5 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Locations</span>
+                  <span className="font-semibold text-navy">
+                    {locations.length}
+                    {primaryLocationCity ? ` · ${primaryLocationCity}` : ""}
+                  </span>
                 </div>
-                <div className="whitespace-nowrap text-[9px] font-medium uppercase tracking-[0.08em] text-slate-500">
-                  {opsStatusLabel(key)}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Additional contacts</span>
+                  <span className="font-semibold text-slate-400">
+                    {additionalContactCount > 0 ? additionalContactCount : "None"}
+                  </span>
+                </div>
+                {maintenanceAgreementsEnabled ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Service plan</span>
+                    <span className="font-semibold text-slate-400">
+                      {activeServicePlanCount > 0 ? `${activeServicePlanCount} active` : "None active"}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Lifetime jobs</span>
+                  <span className="font-semibold text-navy">{jobs.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Balance</span>
+                  <span
+                    className={`font-semibold ${
+                      canViewPaymentHistory
+                        ? failedPaymentAttentionCount > 0
+                          ? "text-rose-700"
+                          : "text-emerald-700"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    {canViewPaymentHistory
+                      ? failedPaymentAttentionCount > 0
+                        ? "Payment attention"
+                        : "No open balance"
+                      : "Limited"}
+                  </span>
                 </div>
               </div>
-            ))}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <SectionEyebrow>Account &amp; Access</SectionEyebrow>
+              <div className="mt-2 text-sm font-bold text-navy">{customerDisplayName(customer)}</div>
+              <div className="mb-3 text-xs text-slate-500">
+                {hasSavedBillingContact ? "Responsible account contact" : "Responsible account & billing contact"}
+              </div>
+              <div className="border-t border-slate-100 pt-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">Site Access</div>
+                {siteAccessContact ? (
+                  <>
+                    <div className="mt-1 text-sm font-bold text-navy">
+                      {String(siteAccessContact.display_name ?? "").trim() || "—"}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {siteAccessContact.phone_e164 ? formatPhone(siteAccessContact.phone_e164) : "No phone on file"}
+                      {isDisplayableRole(siteAccessContact.recipient_role)
+                        ? ` · ${formatRoleForInternalDisplay(siteAccessContact.recipient_role)}`
+                        : ""}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-1 text-sm text-slate-500">No site access contact saved.</div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
         ) : null}
@@ -1807,10 +2032,10 @@ export default async function CustomerDetailPage(props: {
           </section>
         ) : null}
 
-        {/* Overview + Settings */}
-        {(activeWorkspaceTab === "overview" || activeWorkspaceTab === "settings") ? (
+        {/* Settings: Account Summary detail (moved off Overview per redundancy rule — Overview now shows the condensed Quick Facts / Account & Access snapshot instead) */}
+        {activeWorkspaceTab === "settings" ? (
         <section className="grid gap-6 xl:grid-cols-[1.25fr_.9fr]">
-          {activeWorkspaceTab === "overview" ? (
+          {activeWorkspaceTab === "settings" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-navy">
