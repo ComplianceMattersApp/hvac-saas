@@ -2276,19 +2276,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
 
                   <div className="grid gap-4 py-4 text-sm text-slate-900 print:gap-2 print:py-3 print:text-[12px]">
-                    <div>
-                      <span className="font-semibold text-slate-950">System Label:</span> {fallbackText(sys.systemLocationLabel)}
-                    </div>
-
-                    <div className="break-inside-avoid border-t border-slate-200 pt-3 print:border-slate-300 print:pt-2">
-                      <div className="font-bold text-slate-950">Equipment Evidence</div>
+                    <div className="break-inside-avoid print:pt-2">
                       {sys.hasEquipment ? (
-                        <div className="mt-3 space-y-3 text-slate-800 print:mt-2 print:space-y-2 print:text-slate-950">
+                        <div className="space-y-3 text-slate-800 print:space-y-2 print:text-slate-950">
                           {sys.packageSystem ? (
                             <>
                               {sys.packageEquipment.length > 0 ? (
                                 <div className="space-y-3 print:space-y-2">
-                                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">Package Unit</div>
                                   {sys.packageEquipment.map((eq: any, index: number) =>
                                     renderEquipmentReportItem(eq, index, `package-${sys.systemId}`),
                                   )}
@@ -2299,9 +2293,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                             <>
                               {sys.indoorEquipment.length > 0 ? (
                                 <div className="space-y-3 print:space-y-2">
-                                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">
-                                    {sys.systemIsDuctlessMiniSplit ? "Mini-Split Indoor Head Equipment" : "Indoor Equipment"}
-                                  </div>
                                   {sys.indoorEquipment.map((eq: any, index: number) =>
                                     renderEquipmentReportItem(eq, index, `indoor-${sys.systemId}`),
                                   )}
@@ -2310,9 +2301,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                               {sys.outdoorEquipment.length > 0 ? (
                                 <div className="space-y-3 pt-1 print:space-y-2 print:pt-0.5">
-                                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">
-                                    {sys.systemIsDuctlessMiniSplit ? "Mini-Split Outdoor Equipment" : "Condenser"}
-                                  </div>
                                   {sys.outdoorEquipment.map((eq: any, index: number) =>
                                     renderEquipmentReportItem(eq, index, `outdoor-${sys.systemId}`),
                                   )}
@@ -2323,7 +2311,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                           {sys.otherEquipment.length > 0 ? (
                             <div className="space-y-3 pt-1 print:space-y-2 print:pt-0.5">
-                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">Other Equipment</div>
                               {sys.otherEquipment.map((eq: any, index: number) =>
                                 renderEquipmentReportItem(eq, index, `other-${sys.systemId}`),
                               )}

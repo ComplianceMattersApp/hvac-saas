@@ -94,7 +94,7 @@ describe("equipment label photo evidence", () => {
     expect(completionReportSource).toContain("CHEERS Entry Summary");
     expect(completionReportSource).toContain("System Sections");
     expect(completionReportSource).toContain("System Section");
-    expect(completionReportSource).toContain("Equipment Evidence");
+    expect(completionReportSource).toContain("renderEquipmentReportItem");
     expect(completionReportSource).toContain("reportFieldRows");
     expect(completionReportSource).toContain("cheersEntrySummaryFields");
     expect(completionReportSource).toContain("reportLogoUrl");
