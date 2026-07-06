@@ -246,6 +246,7 @@ function makeAdminFixture() {
 describe("contractor portal intake proposal scope hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createAdminClientMock.mockReset();
     vi.resetModules();
   });
 
@@ -305,6 +306,25 @@ describe("contractor portal intake proposal scope hardening", () => {
 
   it("resolves valid active contractor membership into the portal context used by routing", async () => {
     const supabase = makeContractorPortalSupabaseFixture();
+
+    const { requireCurrentContractorPortalContext } = await import(
+      "@/lib/portal/intake-proposal-read-model"
+    );
+
+    await expect(requireCurrentContractorPortalContext({ supabase })).resolves.toEqual({
+      contractorId: "contractor-1",
+      contractorName: "Alpha Heating",
+      accountOwnerUserId: "owner-1",
+      userId: "contractor-user-1",
+    });
+  });
+
+  it("keeps portal context visible when RLS hides the contractor row from the session client", async () => {
+    const supabase = makeContractorPortalSupabaseFixture({
+      contractorId: "contractor-1",
+      contractorName: null,
+    });
+    createAdminClientMock.mockReturnValue(makeContractorPortalSupabaseFixture());
 
     const { requireCurrentContractorPortalContext } = await import(
       "@/lib/portal/intake-proposal-read-model"

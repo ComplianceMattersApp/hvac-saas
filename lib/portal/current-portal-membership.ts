@@ -1,3 +1,5 @@
+import { createAdminClient } from "@/lib/supabase/server";
+
 export type ActiveContractorPortalMembership = {
   contractorId: string;
   contractorName: string | null;
@@ -18,14 +20,47 @@ function uniqueNonEmpty(values: unknown[]) {
 export async function resolveActiveContractorPortalMembership(input: {
   supabase: any;
   userId: string;
+  admin?: any;
 }): Promise<ActiveContractorPortalMembership | null> {
   const userId = normalizeText(input.userId);
   if (!userId) return null;
 
+  const sessionLookup = await resolveActiveContractorPortalMembershipWithClient({
+    supabase: input.supabase,
+    userId,
+  });
+  if (sessionLookup.portal) return sessionLookup.portal;
+  if (!sessionLookup.hadMembership) return null;
+
+  const admin = input.admin ?? safeCreateAdminClient();
+  if (!admin) return null;
+
+  const adminLookup = await resolveActiveContractorPortalMembershipWithClient({
+    supabase: admin,
+    userId,
+  });
+  return adminLookup.portal;
+}
+
+function safeCreateAdminClient() {
+  try {
+    return createAdminClient();
+  } catch {
+    return null;
+  }
+}
+
+async function resolveActiveContractorPortalMembershipWithClient(input: {
+  supabase: any;
+  userId: string;
+}): Promise<{
+  portal: ActiveContractorPortalMembership | null;
+  hadMembership: boolean;
+}> {
   const { data: membershipRows, error: membershipErr } = await input.supabase
     .from("contractor_users")
     .select("contractor_id")
-    .eq("user_id", userId)
+    .eq("user_id", input.userId)
     .limit(20);
 
   if (membershipErr) throw membershipErr;
@@ -34,7 +69,9 @@ export async function resolveActiveContractorPortalMembership(input: {
     (Array.isArray(membershipRows) ? membershipRows : [])
       .map((row: any) => row?.contractor_id),
   );
-  if (contractorIds.length === 0) return null;
+  if (contractorIds.length === 0) {
+    return { portal: null, hadMembership: false };
+  }
 
   const { data: contractorRows, error: contractorErr } = await input.supabase
     .from("contractors")
@@ -61,5 +98,5 @@ export async function resolveActiveContractorPortalMembership(input: {
     })
     .find(Boolean);
 
-  return activeContractor ?? null;
+  return { portal: activeContractor ?? null, hadMembership: true };
 }
