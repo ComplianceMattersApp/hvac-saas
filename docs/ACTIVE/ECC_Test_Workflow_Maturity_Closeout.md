@@ -79,6 +79,15 @@ Key boundary:
 - Complete Test returns to the job detail test section.
 - Future V3 mobile UX may convert documentation method and photo result choices into large stacked mobile buttons for faster field use.
 
+### Equipment Label Photo Evidence
+
+- Add Equipment now supports equipment label photo evidence as an inline field workflow.
+- Take Label Photo and Upload Label Photo sit with the add-equipment actions instead of in a detached panel.
+- Add Equipment is withheld until either manual equipment details are entered or label photo evidence has been saved.
+- For cooling equipment, Tonnage stays visible in the primary add flow even when using photo evidence because airflow and related ECC defaults depend on that value.
+- Enter Details contains secondary optional fields such as manufacturer, model, serial, refrigerant, and notes.
+- System Inventory shows equipment by its main equipment name and avoids duplicate system labels or placeholder rows when details are blank.
+
 ### Completion Report
 
 - Completion Report now opens as a report-first surface.
