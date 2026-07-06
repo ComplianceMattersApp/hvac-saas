@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -11,6 +12,7 @@ import {
   listSystemFiltersBySystemIds,
   type JobSystemFilterRow,
 } from "@/lib/customers/system-filters-read-model";
+import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
 import EquipmentCreateForm from "../_components/EquipmentCreateForm";
@@ -267,6 +269,25 @@ if (!job) return notFound();
   const unassignedEquipmentRows = equipmentRows.filter(
     (equipment) => !equipmentIdsAssignedToSystemCards.has(String(equipment.id)),
   );
+  const equipmentLabelPhotoAttachments = equipmentRows.length
+    ? await listJobEquipmentLabelPhotoImages({
+        supabase,
+        admin: createAdminClient(),
+        jobId: id,
+        equipmentIds: equipmentRows.map((equipment) => String(equipment.id)),
+        limit: 100,
+      })
+    : [];
+  const labelPhotosByEquipmentId = equipmentLabelPhotoAttachments.reduce<Record<string, typeof equipmentLabelPhotoAttachments>>(
+    (acc, attachment) => {
+      const equipmentId = String(attachment.equipmentId ?? "").trim();
+      if (!equipmentId) return acc;
+      if (!acc[equipmentId]) acc[equipmentId] = [];
+      acc[equipmentId].push(attachment);
+      return acc;
+    },
+    {},
+  );
 
     const customerName =
       [job.customer_first_name, job.customer_last_name]
@@ -415,6 +436,7 @@ if (!job) return notFound();
                                       eq={eq}
                                       systems={systems ?? []}
                                       jobId={job.id}
+                                      labelPhotoAttachments={labelPhotosByEquipmentId[String(eq.id)] ?? []}
                                     />
                                   ))}
                                   {systemFiltersForInventory.map((filter) => (
@@ -452,6 +474,7 @@ if (!job) return notFound();
                             eq={eq}
                             systems={systems ?? []}
                             jobId={job.id}
+                            labelPhotoAttachments={labelPhotosByEquipmentId[String(eq.id)] ?? []}
                           />
                         ))}
                       </div>

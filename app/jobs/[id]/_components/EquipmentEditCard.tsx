@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { updateJobEquipmentFromForm, deleteJobEquipmentFromForm } from "@/lib/actions/job-actions";
 import SubmitButton from "@/components/SubmitButton";
+import EquipmentLabelPhotoEvidencePanel from "@/components/jobs/EquipmentLabelPhotoEvidencePanel";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import { Disclosure } from "@/components/ui/Disclosure";
 import {
@@ -36,6 +37,7 @@ type SystemRow = { id: string; name: string | null };
 
 type EquipmentRow = {
   id: string;
+  system_id?: string | null;
   equipment_role: string | null;
   component_type?: string | null;
   system_location: string | null;
@@ -50,14 +52,24 @@ type EquipmentRow = {
   notes: string | null;
 };
 
+type EvidenceAttachment = {
+  id: string;
+  fileName: string;
+  uploadedAt: string;
+  caption: string | null;
+  signedUrl: string | null;
+};
+
 export default function EquipmentEditCard({
   eq,
   systems,
   jobId,
+  labelPhotoAttachments = [],
 }: {
   eq: EquipmentRow;
   systems: SystemRow[];
   jobId: string;
+  labelPhotoAttachments?: EvidenceAttachment[];
 }) {
   const [editing, setEditing] = useState(false);
   const [role, setRole] = useState(eq.equipment_role ?? "outdoor_unit");
@@ -127,6 +139,14 @@ export default function EquipmentEditCard({
             ) : null}
 
             {eq.notes ? <div className="text-xs italic text-slate-600">"{eq.notes}"</div> : null}
+            <EquipmentLabelPhotoEvidencePanel
+              jobId={jobId}
+              equipmentId={eq.id}
+              systemId={eq.system_id}
+              systemName={eq.system_location}
+              equipmentLabel={equipmentRoleLabel(eq.equipment_role)}
+              evidenceAttachments={labelPhotoAttachments}
+            />
           </div>
 
           <div className="shrink-0">
@@ -388,6 +408,15 @@ export default function EquipmentEditCard({
             </div>
           </div>
         </Disclosure>
+
+        <EquipmentLabelPhotoEvidencePanel
+          jobId={jobId}
+          equipmentId={eq.id}
+          systemId={eq.system_id}
+          systemName={eq.system_location}
+          equipmentLabel={equipmentRoleLabel(role)}
+          evidenceAttachments={labelPhotoAttachments}
+        />
 
         <div className="pt-2">
           <SubmitButton

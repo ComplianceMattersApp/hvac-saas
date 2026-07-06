@@ -1,6 +1,7 @@
 export const REFRIGERANT_CHARGE_ATTACHMENT_TAG = "[refrigerant-charge-evidence]";
+export const EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG = "[equipment-label-photo]";
 
-export type JobAttachmentEvidenceContext = "refrigerant_charge_photo";
+export type JobAttachmentEvidenceContext = "refrigerant_charge_photo" | "equipment_label_photo";
 
 export type RefrigerantChargeEvidenceImageAttachment = {
   id: string;
@@ -12,6 +13,11 @@ export type RefrigerantChargeEvidenceImageAttachment = {
   signedUrl: string | null;
 };
 
+export type EquipmentLabelPhotoAttachment = RefrigerantChargeEvidenceImageAttachment & {
+  equipmentId: string | null;
+  systemId: string | null;
+};
+
 function normalizeWhitespace(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
@@ -21,6 +27,7 @@ export function normalizeJobAttachmentEvidenceContext(
 ): JobAttachmentEvidenceContext | null {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "refrigerant_charge_photo") return "refrigerant_charge_photo";
+  if (normalized === "equipment_label_photo") return "equipment_label_photo";
   return null;
 }
 
@@ -35,16 +42,16 @@ export function buildAttachmentCaptionWithEvidenceContext(params: {
     return normalizedCaption || null;
   }
 
-  if (
-    normalizedCaption &&
-    normalizedCaption.toLowerCase().startsWith(REFRIGERANT_CHARGE_ATTACHMENT_TAG)
-  ) {
+  const tag =
+    context === "equipment_label_photo"
+      ? EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG
+      : REFRIGERANT_CHARGE_ATTACHMENT_TAG;
+
+  if (normalizedCaption && normalizedCaption.toLowerCase().startsWith(tag)) {
     return normalizedCaption;
   }
 
-  return normalizedCaption
-    ? `${REFRIGERANT_CHARGE_ATTACHMENT_TAG} ${normalizedCaption}`
-    : REFRIGERANT_CHARGE_ATTACHMENT_TAG;
+  return normalizedCaption ? `${tag} ${normalizedCaption}` : tag;
 }
 
 export function isRefrigerantChargeEvidenceCaption(caption: unknown) {
@@ -58,6 +65,54 @@ export function stripRefrigerantChargeEvidenceTag(caption: unknown) {
   if (!normalized) return "";
   if (!isRefrigerantChargeEvidenceCaption(normalized)) return normalized;
   return normalizeWhitespace(normalized.slice(REFRIGERANT_CHARGE_ATTACHMENT_TAG.length));
+}
+
+export function isEquipmentLabelPhotoCaption(caption: unknown) {
+  const normalized = normalizeWhitespace(String(caption ?? "")).toLowerCase();
+  if (!normalized) return false;
+  return normalized.startsWith(EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG);
+}
+
+export function buildEquipmentLabelPhotoCaption(params: {
+  equipmentId: string;
+  systemId?: string | null;
+  caption?: string | null;
+}) {
+  const equipmentId = normalizeWhitespace(String(params.equipmentId ?? ""));
+  const systemId = normalizeWhitespace(String(params.systemId ?? ""));
+  const caption = normalizeWhitespace(String(params.caption ?? ""));
+  const tokens = [
+    equipmentId ? `[equipment-id:${equipmentId}]` : "",
+    systemId ? `[system-id:${systemId}]` : "",
+    caption,
+  ].filter(Boolean);
+
+  return buildAttachmentCaptionWithEvidenceContext({
+    context: "equipment_label_photo",
+    caption: tokens.join(" "),
+  });
+}
+
+export function parseEquipmentLabelPhotoCaption(caption: unknown) {
+  const normalized = normalizeWhitespace(String(caption ?? ""));
+  if (!isEquipmentLabelPhotoCaption(normalized)) {
+    return { equipmentId: null, systemId: null, caption: normalized };
+  }
+
+  const body = normalizeWhitespace(normalized.slice(EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG.length));
+  const equipmentId = body.match(/\[equipment-id:([^\]]+)\]/i)?.[1]?.trim() || null;
+  const systemId = body.match(/\[system-id:([^\]]+)\]/i)?.[1]?.trim() || null;
+  const displayCaption = normalizeWhitespace(
+    body
+      .replace(/\[equipment-id:[^\]]+\]/gi, "")
+      .replace(/\[system-id:[^\]]+\]/gi, ""),
+  );
+
+  return {
+    equipmentId,
+    systemId,
+    caption: displayCaption,
+  };
 }
 
 export function isInlineReportImageAttachment(row: { content_type?: unknown }) {
@@ -114,6 +169,73 @@ export async function listJobRefrigerantChargeEvidenceImages(params: {
         uploadedAt: String(row?.created_at ?? "").trim(),
         uploadedBy: null,
         caption: stripRefrigerantChargeEvidenceTag(row?.caption) || null,
+        signedUrl,
+      };
+    }),
+  );
+
+  return signedEvidence.filter((row) => Boolean(row.id));
+}
+
+export async function listJobEquipmentLabelPhotoImages(params: {
+  supabase: any;
+  admin: any;
+  jobId: string;
+  equipmentIds?: string[];
+  limit?: number;
+}): Promise<EquipmentLabelPhotoAttachment[]> {
+  const jobId = String(params.jobId ?? "").trim();
+  if (!jobId) return [];
+
+  const { data: evidenceRows, error: evidenceErr } = await params.supabase
+    .from("attachments")
+    .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
+    .eq("entity_type", "job")
+    .eq("entity_id", jobId)
+    .ilike("caption", `${EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG}%`)
+    .order("created_at", { ascending: false })
+    .limit(params.limit ?? 100);
+
+  if (evidenceErr) throw evidenceErr;
+
+  const equipmentIdFilter = new Set(
+    (params.equipmentIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean),
+  );
+  const imageRows = ((evidenceRows ?? []) as any[])
+    .filter(isInlineReportImageAttachment)
+    .map((row) => ({ row, parsed: parseEquipmentLabelPhotoCaption(row?.caption) }))
+    .filter(({ parsed }) => !equipmentIdFilter.size || (parsed.equipmentId && equipmentIdFilter.has(parsed.equipmentId)));
+
+  const signedEvidence = await Promise.all(
+    imageRows.map(async ({ row, parsed }: any) => {
+      const id = String(row?.id ?? "").trim();
+      const bucket = String(row?.bucket ?? "").trim();
+      const storagePath = String(row?.storage_path ?? "")
+        .trim()
+        .replace(/^\/+/, "");
+      const contentType = String(row?.content_type ?? "").trim() || null;
+
+      let signedUrl: string | null = null;
+
+      if (bucket && storagePath) {
+        const { data: signed, error: signErr } = await params.admin.storage
+          .from(bucket)
+          .createSignedUrl(storagePath, 60 * 60);
+
+        if (!signErr && signed?.signedUrl) {
+          signedUrl = signed.signedUrl;
+        }
+      }
+
+      return {
+        id,
+        fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
+        contentType,
+        uploadedAt: String(row?.created_at ?? "").trim(),
+        uploadedBy: null,
+        caption: parsed.caption || null,
+        equipmentId: parsed.equipmentId,
+        systemId: parsed.systemId,
         signedUrl,
       };
     }),

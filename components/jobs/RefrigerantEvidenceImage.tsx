@@ -5,10 +5,19 @@ import { useState } from "react";
 type RefrigerantEvidenceImageProps = {
   src: string | null;
   alt: string;
+  variant?: "refrigerant" | "equipmentLabel";
 };
 
-export default function RefrigerantEvidenceImage({ src, alt }: RefrigerantEvidenceImageProps) {
+export default function RefrigerantEvidenceImage({
+  src,
+  alt,
+  variant = "refrigerant",
+}: RefrigerantEvidenceImageProps) {
   const [failed, setFailed] = useState(false);
+  const imageClass =
+    variant === "equipmentLabel"
+      ? "block h-72 w-full rounded-md border border-slate-200 bg-white object-contain print:h-52 print:rounded-none print:border-slate-400"
+      : "block max-h-[28rem] w-full rounded-md border border-slate-200 bg-white object-contain print:max-h-[7.5in] print:rounded-none print:border-slate-400";
 
   if (!src || failed) {
     return (
@@ -23,7 +32,7 @@ export default function RefrigerantEvidenceImage({ src, alt }: RefrigerantEviden
       src={src}
       alt={alt}
       loading="lazy"
-      className="block max-h-[28rem] w-full rounded-md border border-slate-200 bg-white object-contain print:max-h-[7.5in] print:rounded-none print:border-slate-400"
+      className={imageClass}
       onError={() => setFailed(true)}
     />
   );

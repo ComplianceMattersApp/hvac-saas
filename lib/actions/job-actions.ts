@@ -4235,6 +4235,7 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   "use server";
 
   const jobId = String(formData.get("job_id") || "").trim();
+  const requestedEquipmentId = String(formData.get("equipment_id") || "").trim();
   const equipmentRole = String(formData.get("equipment_role") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
@@ -4324,6 +4325,7 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   });
 
   const { error: eqErr } = await supabase.from("job_equipment").insert({
+    ...(requestedEquipmentId ? { id: requestedEquipmentId } : {}),
     job_id: jobId,
     system_id: systemId,
     system_location: systemLocation,

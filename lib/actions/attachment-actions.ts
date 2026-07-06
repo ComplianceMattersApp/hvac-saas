@@ -13,8 +13,10 @@ import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/plat
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import {
   buildAttachmentCaptionWithEvidenceContext,
+  isEquipmentLabelPhotoCaption,
   isRefrigerantChargeEvidenceCaption,
   normalizeJobAttachmentEvidenceContext,
+  parseEquipmentLabelPhotoCaption,
 } from "@/lib/jobs/refrigerant-charge-evidence";
 
 function safeFileName(name: string) {
@@ -386,12 +388,29 @@ export async function updateInternalJobAttachmentCaption(input: {
   const previousCaption = sanitizeAttachmentCaption(attachment.caption);
   const requestedCaption = sanitizeAttachmentCaption(input.caption);
   const shouldPreserveRefrigerantEvidenceContext = isRefrigerantChargeEvidenceCaption(previousCaption);
+  const shouldPreserveEquipmentLabelContext = isEquipmentLabelPhotoCaption(previousCaption);
+  const previousEquipmentLabelContext = shouldPreserveEquipmentLabelContext
+    ? parseEquipmentLabelPhotoCaption(previousCaption)
+    : null;
   const normalizedCaption = shouldPreserveRefrigerantEvidenceContext
     ? buildAttachmentCaptionWithEvidenceContext({
         caption: requestedCaption,
         context: "refrigerant_charge_photo",
       })
-    : requestedCaption;
+    : shouldPreserveEquipmentLabelContext
+      ? buildAttachmentCaptionWithEvidenceContext({
+          caption: [
+            previousEquipmentLabelContext?.equipmentId
+              ? `[equipment-id:${previousEquipmentLabelContext.equipmentId}]`
+              : "",
+            previousEquipmentLabelContext?.systemId
+              ? `[system-id:${previousEquipmentLabelContext.systemId}]`
+              : "",
+            requestedCaption,
+          ].filter(Boolean).join(" "),
+          context: "equipment_label_photo",
+        })
+      : requestedCaption;
 
   if (previousCaption === normalizedCaption) {
     return {

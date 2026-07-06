@@ -15,7 +15,10 @@ import RefrigerantChargeExceptionFields from "@/components/jobs/RefrigerantCharg
 import RefrigerantEvidenceImage from "@/components/jobs/RefrigerantEvidenceImage";
 import RefrigerantChargeInlinePreview from "@/components/jobs/RefrigerantChargeInlinePreview";
 import RefrigerantChargePhotoEvidencePanel from "@/components/jobs/RefrigerantChargePhotoEvidencePanel";
-import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import {
+  resolveInternalBusinessIdentityByAccountOwnerId,
+  resolveInternalBusinessProfileLogoUrl,
+} from "@/lib/business/internal-business-profile";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -59,13 +62,13 @@ import {
 import { isEccTestApplicableToSystem } from "@/lib/ecc/test-applicability";
 import { formatAreaSquareInches } from "@/lib/ecc/air-filter-device";
 import { formatFanEfficacy } from "@/lib/ecc/fan-watt-draw";
-import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
-import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
+import { equipmentRoleLabel, formatEquipmentNumber, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import { isPackagedUnitEquipmentType } from "@/lib/utils/equipment-domain";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
+  listJobEquipmentLabelPhotoImages,
   listJobRefrigerantChargeEvidenceImages,
 } from "@/lib/jobs/refrigerant-charge-evidence";
 import { hasMeaningfulRefrigerantChargeDetail } from "@/lib/jobs/refrigerant-charge-report-detail";
@@ -275,6 +278,12 @@ const eccSecondaryButtonClass =
   "inline-flex min-h-11 w-full items-center justify-center rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:w-auto";
 const eccPrimaryButtonClass =
   "inline-flex min-h-11 w-full items-center justify-center rounded-[10px] border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 sm:w-auto";
+const reportDetailSectionClass =
+  "break-inside-avoid rounded-lg border border-slate-200 bg-slate-50 p-3 print:rounded-none print:border-slate-300 print:bg-white print:p-2";
+const reportDetailHeadingClass =
+  "text-sm font-bold text-slate-950 print:text-[12px]";
+const reportDetailBodyClass =
+  "mt-2 space-y-1 text-sm text-slate-800 print:mt-1 print:text-[11px]";
 
 function TestsStatusBar({
   completedCount,
@@ -421,6 +430,20 @@ function fallbackText(value: unknown) {
   return rendered || "—";
 }
 
+function reportValue(value: unknown) {
+  const rendered = String(value ?? "").trim();
+  if (!rendered || rendered === "â€”") return "";
+  return rendered;
+}
+
+function reportFieldRows(
+  fields: Array<{ label: string; value: unknown; className?: string }>,
+) {
+  return fields
+    .map((field) => ({ ...field, value: reportValue(field.value) }))
+    .filter((field) => field.value);
+}
+
 function ahriStatusLabel(value: unknown) {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "verified_listed") return "Verified / Listed";
@@ -476,10 +499,6 @@ function formatBusinessDateTimeUS(value?: string | null) {
     hour: "numeric",
     minute: "2-digit",
   }).format(parsed);
-}
-
-function equipmentSummaryLine(eq: any) {
-  return buildEquipmentSummaryLine(eq);
 }
 
 function canonicalId(value: unknown) {
@@ -944,6 +963,13 @@ export default async function JobTestsPage({
     accountOwnerUserId: internalBusinessOwnerId,
   }));
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
+  const internalBusinessLogoUrl = await timedPhase("businessLogoRead", () =>
+    resolveInternalBusinessProfileLogoUrl({
+      logoUrl: internalBusinessIdentity.logo_url,
+      expiresIn: 60 * 60,
+    }),
+  );
+  const reportLogoUrl = internalBusinessLogoUrl || "/cm-logo.png";
 
   const contractorId = String(job.contractor_id ?? "").trim();
   let contractorName = internalBusinessDisplayName;
@@ -1120,6 +1146,23 @@ export default async function JobTestsPage({
   const reportPermitJurisdiction = firstNonBlank((job as any).jurisdiction, parentJob?.jurisdiction);
   const reportPermitDateRaw = firstNonBlank((job as any).permit_date, parentJob?.permit_date);
   const reportPermitDate = reportPermitDateRaw ? formatBusinessDateUS(reportPermitDateRaw) : "";
+  const reportGeneratedAt = formatBusinessDateTimeUS(new Date().toISOString());
+  const completedReportRunCount = (job.ecc_test_runs ?? []).filter((run: any) => run?.is_completed === true).length;
+  const reportHeaderFields = reportFieldRows([
+    { label: "Customer", value: customerName },
+    { label: "Service Location", value: [reportAddress, reportCityStateZip].filter(Boolean).join(", ") },
+    { label: reportBusinessLabel, value: reportBusinessName },
+    { label: "Job", value: normalizeRetestLinkedJobTitle(job.title) },
+    { label: "Date Tested", value: reportTestedDate },
+  ]);
+  const cheersEntrySummaryFields = reportFieldRows([
+    { label: "Permit Number", value: reportPermitNumber },
+    { label: "Jurisdiction", value: reportPermitJurisdiction },
+    { label: "Permit Date", value: reportPermitDate },
+    { label: "Project Type", value: projectTypeLabel },
+    { label: "Systems", value: systems.length ? `${systems.length}` : "" },
+    { label: "Completed Test Runs", value: completedReportRunCount ? `${completedReportRunCount}` : "" },
+  ]);
 
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
@@ -1188,13 +1231,32 @@ export default async function JobTestsPage({
     caption: string | null;
     signedUrl: string | null;
   }> = [];
+  let equipmentLabelPhotoAttachments: Awaited<ReturnType<typeof listJobEquipmentLabelPhotoImages>> = [];
+
+  const reportAdminClient =
+    focusedType === "refrigerant_charge" || isCompletionReportFocused
+      ? createAdminClient()
+      : null;
 
   if (focusedType === "refrigerant_charge" || isCompletionReportFocused) {
     refrigerantEvidenceAttachments = await listJobRefrigerantChargeEvidenceImages({
       supabase,
-      admin: createAdminClient(),
+      admin: reportAdminClient,
       jobId: id,
       limit: 20,
+    });
+  }
+
+  if (isCompletionReportFocused) {
+    const equipmentIds = (job.job_equipment ?? [])
+      .map((equipment: any) => String(equipment?.id ?? "").trim())
+      .filter(Boolean);
+    equipmentLabelPhotoAttachments = await listJobEquipmentLabelPhotoImages({
+      supabase,
+      admin: reportAdminClient,
+      jobId: id,
+      equipmentIds,
+      limit: 100,
     });
   }
 
@@ -1732,6 +1794,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   });
   const refrigerantEvidenceReportSystemId =
     systemSummaries.find((sys) => sys.showRefrigerantReport)?.systemId ?? "";
+  const equipmentLabelPhotosByEquipmentId = equipmentLabelPhotoAttachments.reduce<
+    Record<string, typeof equipmentLabelPhotoAttachments>
+  >((acc, attachment) => {
+    const equipmentId = String(attachment.equipmentId ?? "").trim();
+    if (!equipmentId) return acc;
+    if (!acc[equipmentId]) acc[equipmentId] = [];
+    acc[equipmentId].push(attachment);
+    return acc;
+  }, {});
   recordPhase("renderPrep", timingEnabled ? Date.now() - renderPrepStartedAt : 0);
   emitTimingLog({
     hasContractor: Boolean(contractorId),
@@ -1945,72 +2016,95 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
       <div className={isCompletionReportFocused ? "block space-y-4 print:block print:space-y-0" : "hidden space-y-4 peer-checked:block print:block"}>
       <div className="hidden border-b border-slate-400 pb-2 print:block">
-        <h1 className="text-lg font-bold text-slate-950">{internalBusinessDisplayName} Test Results</h1>
+        <h1 className="text-lg font-bold text-slate-950">CHEERS Completion Report</h1>
+        <div className="mt-0.5 text-xs text-slate-700">{internalBusinessDisplayName}</div>
       </div>
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)] space-y-4 text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none">
-        <div>
-          <h2 className="text-lg font-bold text-slate-950 print:text-base">Customer / Job Info</h2>
-          <p className="text-sm text-slate-700 print:text-xs">Who and where for this CHEERS packet.</p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-2">
-          <div className="space-y-3 print:space-y-2">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Customer Name</div>
-              <div className="text-sm font-medium text-slate-950">{customerName}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Address</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(reportAddress)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Phone</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(job.customer_phone)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Email</div>
-              <div className="text-sm font-medium text-slate-950 break-all">{fallbackText(job.customer_email)}</div>
-            </div>
-          </div>
-
-          <div className="space-y-3 print:space-y-2">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">{reportBusinessLabel}</div>
-              <div className="text-sm font-medium text-slate-950">{reportBusinessName}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">City / State / ZIP</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(reportCityStateZip)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Number</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(reportPermitNumber)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Jurisdiction</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(reportPermitJurisdiction)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Permit Date</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(reportPermitDate || null)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Project Type</div>
-              <div className="text-sm font-medium capitalize text-slate-950">{fallbackText(projectTypeLabel)}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-700">Date Tested</div>
-              <div className="text-sm font-medium text-slate-950">{fallbackText(reportTestedDate || null)}</div>
+      <section className="break-inside-avoid rounded-xl border border-slate-200 bg-white p-5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)] text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:shadow-none">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between print:gap-2 print:pb-2">
+          <div className="flex min-w-0 items-start gap-3">
+            {reportLogoUrl ? (
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm print:h-12 print:w-12 print:rounded-none print:border-slate-300 print:p-1 print:shadow-none">
+                <img
+                  src={reportLogoUrl}
+                  alt={`${internalBusinessDisplayName} logo`}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : null}
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 print:text-[10px]">
+                {internalBusinessDisplayName}
+              </div>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 print:text-lg">
+                CHEERS Completion Report
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm text-slate-700 print:text-xs">
+                Field evidence packet for CHEERS completion entry.
+              </p>
             </div>
           </div>
+          {reportGeneratedAt ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 print:border-slate-300 print:bg-white">
+              <div className="font-semibold uppercase tracking-wide text-slate-500">Generated</div>
+              <div className="mt-0.5 font-medium text-slate-950">{reportGeneratedAt}</div>
+            </div>
+          ) : null}
         </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 print:mt-3 print:grid-cols-3 print:gap-2">
+          {reportHeaderFields.map((field) => (
+            <div
+              key={field.label}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:rounded-none print:border-slate-300 print:bg-white print:px-2 print:py-1.5"
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">
+                {field.label}
+              </div>
+              <div className="mt-0.5 break-words text-sm font-semibold text-slate-950 print:text-[11px]">
+                {field.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="break-inside-avoid rounded-xl border border-slate-200 bg-white p-5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)] text-slate-900 print:rounded-none print:border-slate-500 print:p-3 print:shadow-none">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950 print:text-base">CHEERS Entry Summary</h2>
+            <p className="mt-0.5 text-sm text-slate-700 print:text-xs">
+              Compact saved values for end-of-day CHEERS entry.
+            </p>
+          </div>
+        </div>
+        {cheersEntrySummaryFields.length ? (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 print:mt-3 print:grid-cols-3">
+            {cheersEntrySummaryFields.map((field) => (
+              <div
+                key={field.label}
+                className="flex min-h-14 flex-col justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 print:min-h-0 print:rounded-none print:border-slate-300 print:bg-white print:px-2 print:py-1.5"
+              >
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">
+                  {field.label}
+                </div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-950 print:text-[11px]">
+                  {field.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 text-sm text-slate-700 print:text-xs">
+            No permit or CHEERS summary values have been saved yet.
+          </div>
+        )}
       </section>
 
       <section id="cheers-fast-view" className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)] space-y-5 text-slate-900 print:border-0 print:bg-white print:p-0 print:space-y-4 print:shadow-none">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-bold text-slate-950 print:text-base">Results</h2>
-            <p className="text-sm text-slate-700 print:text-xs">Read-only summary from saved ECC test results, grouped by system.</p>
+            <h2 className="text-lg font-bold text-slate-950 print:text-base">System Sections</h2>
+            <p className="text-sm text-slate-700 print:text-xs">Saved equipment, evidence, and ECC result context grouped by system.</p>
           </div>
         </div>
 
@@ -2085,57 +2179,144 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
                 </div>
               );
+              const renderEquipmentReportItem = (eq: any, index: number, keyPrefix: string) => {
+                const equipmentId = String(eq?.id ?? `${keyPrefix}-${index}`);
+                const role = equipmentRoleLabel(eq?.equipment_role ?? eq?.component_type);
+                const details = [
+                  { label: "Manufacturer", value: eq?.manufacturer ? String(eq.manufacturer).trim() : "" },
+                  { label: "Model", value: eq?.model ? String(eq.model).trim() : "" },
+                  { label: "Serial", value: eq?.serial ? String(eq.serial).trim() : "" },
+                  { label: "", value: eq?.tonnage ? `${formatEquipmentNumber(eq.tonnage)} tons` : "" },
+                  { label: "Heating Input", value: eq?.heating_capacity_kbtu ? `${formatEquipmentNumber(eq.heating_capacity_kbtu)} KBTU/h` : "" },
+                  { label: "Heating Output", value: eq?.heating_output_btu ? `${Number(eq.heating_output_btu).toLocaleString()} BTU/h` : "" },
+                  { label: "Efficiency / AFUE", value: eq?.heating_efficiency_percent ? `${formatEquipmentNumber(eq.heating_efficiency_percent)}%` : "" },
+                  { label: "Refrigerant", value: eq?.refrigerant_type ? String(eq.refrigerant_type).trim() : "" },
+                ].filter((detail) => detail.value);
+                const labelPhotos = equipmentLabelPhotosByEquipmentId[String(eq?.id ?? "").trim()] ?? [];
+
+                return (
+                  <div
+                    key={equipmentId}
+                    className="break-inside-avoid rounded-lg border border-slate-200 bg-white p-3 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.35)] print:rounded-none print:border-slate-300 print:p-2 print:shadow-none"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">
+                          Equipment {index + 1}
+                        </div>
+                        <div className="text-base font-bold text-slate-950 print:text-[12px]">
+                          {role}
+                        </div>
+                      </div>
+                      {labelPhotos.length ? (
+                        <div className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 print:border-slate-300 print:bg-white print:text-[9px] print:text-slate-700">
+                          Label photo evidence
+                        </div>
+                      ) : null}
+                    </div>
+                    {details.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-slate-800 print:gap-1 print:text-[10px]">
+                        {details.map((detail) => (
+                          <div
+                            key={`${detail.label}-${detail.value}`}
+                            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 print:rounded-none print:border-slate-300 print:bg-white"
+                          >
+                            {detail.label ? (
+                              <>
+                                <span className="font-semibold text-slate-600">{detail.label}: </span>
+                                <span className="font-medium text-slate-950">{detail.value}</span>
+                              </>
+                            ) : (
+                              <span className="font-semibold text-slate-950">{detail.value}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    {labelPhotos.length ? (
+                      <div className="mt-3 grid gap-3 md:grid-cols-2 print:grid-cols-2 print:gap-2">
+                        {labelPhotos.map((attachment) => {
+                          const uploadedAtLabel = formatBusinessDateTimeUS(attachment.uploadedAt);
+                          const caption = "Equipment label photo";
+                          return (
+                            <figure
+                              key={attachment.id}
+                              className="break-inside-avoid overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-2 print:rounded-none print:border-slate-300 print:bg-white"
+                            >
+                              <RefrigerantEvidenceImage
+                                src={attachment.signedUrl}
+                                alt={`${role} equipment label photo: ${caption}`}
+                                variant="equipmentLabel"
+                              />
+                              <figcaption className="mt-2 flex flex-wrap items-center justify-between gap-1 text-xs text-slate-700 print:text-[10px]">
+                                <div className="font-semibold text-slate-900">{caption}</div>
+                                {uploadedAtLabel ? <div>Uploaded {uploadedAtLabel}</div> : null}
+                              </figcaption>
+                            </figure>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              };
 
               return (
-                <div key={sys.systemId} className={`break-inside-avoid rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.34)] print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none ${shouldForcePrintBreak ? "print:break-before-page" : ""}`}>
-                  <div className="text-sm font-bold text-slate-950 print:text-[13px]">{sys.systemName}</div>
+                <div key={sys.systemId} className={`break-inside-avoid overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_14px_30px_-28px_rgba(15,23,42,0.34)] print:rounded-none print:border-slate-500 print:shadow-none ${shouldForcePrintBreak ? "print:break-before-page" : ""}`}>
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3 print:bg-white print:px-3 print:py-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 print:text-[9px]">
+                      System Section
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap items-end justify-between gap-2">
+                      <div className="text-xl font-bold tracking-tight text-slate-950 print:text-[14px]">
+                        {sys.systemName}
+                      </div>
+                      <div className="text-xs font-medium text-slate-600 print:text-[10px]">
+                        {sys.hasEquipment ? `${sys.packageEquipment.length + sys.indoorEquipment.length + sys.outdoorEquipment.length + sys.otherEquipment.length} equipment item(s)` : "No equipment located"}
+                      </div>
+                    </div>
+                  </div>
 
-                  <div className="grid gap-3 text-sm text-slate-900 print:gap-2 print:text-[12px]">
+                  <div className="grid gap-4 p-4 text-sm text-slate-900 print:gap-2 print:p-3 print:text-[12px]">
                     <div>
-                      <span className="font-semibold text-slate-950">System:</span> {fallbackText(sys.systemLocationLabel)}
+                      <span className="font-semibold text-slate-950">System Label:</span> {fallbackText(sys.systemLocationLabel)}
                     </div>
 
-                    <div>
-                      <span className="font-semibold text-slate-950">Equipment Summary:</span>
+                    <div className="break-inside-avoid rounded-lg border border-slate-200 bg-slate-50 p-3 print:rounded-none print:border-slate-300 print:bg-white print:p-2">
+                      <div className="font-bold text-slate-950">Equipment Evidence</div>
                       {sys.hasEquipment ? (
-                        <div className="mt-1 space-y-1 text-slate-800 print:text-slate-950">
+                        <div className="mt-3 space-y-3 text-slate-800 print:mt-2 print:space-y-2 print:text-slate-950">
                           {sys.packageSystem ? (
                             <>
-                              <div className="font-semibold text-slate-900">Package Unit</div>
+                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">Package Unit</div>
                               {sys.packageEquipment.length > 0 ? (
-                                sys.packageEquipment.map((eq: any, index: number) => (
-                                  <div key={String(eq?.id ?? `package-${sys.systemId}-${index}`)}>
-                                    {index + 1}. {equipmentSummaryLine(eq)}
-                                  </div>
-                                ))
+                                sys.packageEquipment.map((eq: any, index: number) =>
+                                  renderEquipmentReportItem(eq, index, `package-${sys.systemId}`),
+                                )
                               ) : (
                                 <div>—</div>
                               )}
                             </>
                           ) : (
                             <>
-                              <div className="font-semibold text-slate-900">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 print:text-[9px]">
                                 {sys.systemIsDuctlessMiniSplit ? "Mini-Split Indoor Head Equipment" : "Indoor Equipment"}
                               </div>
                               {sys.indoorEquipment.length > 0 ? (
-                                sys.indoorEquipment.map((eq: any, index: number) => (
-                                  <div key={String(eq?.id ?? `indoor-${sys.systemId}-${index}`)}>
-                                    {index + 1}. {equipmentSummaryLine(eq)}
-                                  </div>
-                                ))
+                                sys.indoorEquipment.map((eq: any, index: number) =>
+                                  renderEquipmentReportItem(eq, index, `indoor-${sys.systemId}`),
+                                )
                               ) : (
                                 <div>—</div>
                               )}
 
-                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">
+                              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-500 print:pt-0.5 print:text-[9px]">
                                 {sys.systemIsDuctlessMiniSplit ? "Mini-Split Outdoor Equipment" : "Condenser"}
                               </div>
                               {sys.outdoorEquipment.length > 0 ? (
-                                sys.outdoorEquipment.map((eq: any, index: number) => (
-                                  <div key={String(eq?.id ?? `outdoor-${sys.systemId}-${index}`)}>
-                                    {index + 1}. {equipmentSummaryLine(eq)}
-                                  </div>
-                                ))
+                                sys.outdoorEquipment.map((eq: any, index: number) =>
+                                  renderEquipmentReportItem(eq, index, `outdoor-${sys.systemId}`),
+                                )
                               ) : (
                                 <div>—</div>
                               )}
@@ -2144,12 +2325,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                           {sys.otherEquipment.length > 0 ? (
                             <>
-                              <div className="font-semibold text-slate-900 pt-1 print:pt-0.5">Other Equipment</div>
-                              {sys.otherEquipment.map((eq: any, index: number) => (
-                                <div key={String(eq?.id ?? `other-${sys.systemId}-${index}`)}>
-                                  {index + 1}. {equipmentSummaryLine(eq)}
-                                </div>
-                              ))}
+                              <div className="pt-1 text-xs font-semibold uppercase tracking-wide text-slate-500 print:pt-0.5 print:text-[9px]">Other Equipment</div>
+                              {sys.otherEquipment.map((eq: any, index: number) =>
+                                renderEquipmentReportItem(eq, index, `other-${sys.systemId}`),
+                              )}
                             </>
                           ) : null}
                         </div>
@@ -2159,9 +2338,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
 
                     {sys.showAhriReport ? (
-                    <div>
-                      <span className="font-semibold text-slate-950">AHRI Matched System Verification (Office):</span>
-                      <div className="mt-1 space-y-1 text-slate-800">
+                    <div className={reportDetailSectionClass}>
+                      <div className={reportDetailHeadingClass}>AHRI Matched System Verification (Office)</div>
+                      <div className={reportDetailBodyClass}>
                         {!sys.runAhri ? (
                           <div>No AHRI office verification run found for this system.</div>
                         ) : (
@@ -2181,9 +2360,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     ) : null}
 
                     {sys.showLocalExhaustReport ? (
-                    <div>
-                      <span className="font-semibold text-slate-950">Local Mechanical Exhaust Verification:</span>
-                      <div className="mt-1 space-y-1 text-slate-800">
+                    <div className={reportDetailSectionClass}>
+                      <div className={reportDetailHeadingClass}>Local Mechanical Exhaust Verification</div>
+                      <div className={reportDetailBodyClass}>
                         {!sys.runLocalExhaust ? (
                           <div>No local mechanical exhaust verification run found for this system.</div>
                         ) : (
@@ -2197,7 +2376,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                             <div>System Name: {fallbackText(sys.runLocalExhaust?.data?.system_name)}</div>
                             <div>Manufacturer: {fallbackText(sys.runLocalExhaust?.data?.manufacturer_name)}</div>
                             <div>System Type: {fallbackText(sys.runLocalExhaust?.data?.system_type)}</div>
-                            <div className="text-slate-500 italic text-xs mt-2">Directory Research Values:</div>
+                            <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Directory Research Values</div>
                             <div>HVI/AHAM Directory Model Number: {fallbackText(sys.runLocalExhaust?.data?.hvi_aham_model_number)}</div>
                             <div>
                               HVI/AHAM Directory Rated Airflow: {fmtValue(sys.runLocalExhaust?.data?.hvi_aham_rated_airflow_cfm, "CFM")}
@@ -2216,9 +2395,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     ) : null}
 
                     {sys.showQiiInsulationReport ? (
-                    <div>
-                      <span className="font-semibold text-slate-950">QII / ENV-22 Insulation Verification:</span>
-                      <div className="mt-1 space-y-1 text-slate-800">
+                    <div className={reportDetailSectionClass}>
+                      <div className={reportDetailHeadingClass}>QII / ENV-22 Insulation Verification</div>
+                      <div className={reportDetailBodyClass}>
                         {!sys.runQiiInsulation ? (
                           <div>No QII insulation verification run found for this system.</div>
                         ) : (
@@ -2237,7 +2416,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                               Failed Locations: {Array.isArray(sys.runQiiInsulation?.computed?.failed_locations) && sys.runQiiInsulation.computed.failed_locations.length > 0 ? sys.runQiiInsulation.computed.failed_locations.join(", ") : "None"}
                             </div>
                             {parseQiiInsulationEntries(sys.runQiiInsulation?.data?.insulation_entries).length > 0 ? (
-                              <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-2">
+                              <div className="space-y-1 rounded-md border border-slate-200 bg-white px-2 py-2 print:rounded-none print:border-slate-300">
                                 {parseQiiInsulationEntries(sys.runQiiInsulation?.data?.insulation_entries).map((entry: any, entryIndex: number) => (
                                   <div key={`qii-report-entry-${sys.systemId}-${entryIndex}`}>
                                     {entryIndex + 1}. {fallbackText(entry?.insulation_location)} | {fallbackText(entry?.insulation_type)} | Status: {qiiStatusLabel(entry?.verification_status)} | Required R: {fallbackText(entry?.required_r_value)} | Installed R: {fallbackText(entry?.installed_r_value)}
@@ -2252,9 +2431,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     ) : null}
 
                     {sys.showAirflowReport ? (
-                    <div>
-                      <span className="font-semibold text-slate-950">Airflow Summary:</span>
-                      <div className="mt-1 space-y-1 text-slate-800">
+                    <div className={reportDetailSectionClass}>
+                      <div className={reportDetailHeadingClass}>Airflow Summary</div>
+                      <div className={reportDetailBodyClass}>
                         {sys.systemIsDuctlessMiniSplit ? (
                           <div>Not applicable for ductless mini split systems.</div>
                         ) : sys.systemIsHeatOnly ? (
@@ -2272,9 +2451,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     ) : null}
 
                     {sys.showFanReport ? (
-                    <div>
-                      <span className="font-semibold text-slate-950">Forced Air System Fan Efficacy Measurement:</span>
-                      <div className="mt-1 space-y-1 text-slate-800">
+                    <div className={reportDetailSectionClass}>
+                      <div className={reportDetailHeadingClass}>Forced Air System Fan Efficacy Measurement</div>
+                      <div className={reportDetailBodyClass}>
                         {sys.systemIsDuctlessMiniSplit ? (
                           <div>Not applicable for ductless mini split systems.</div>
                         ) : !sys.runFan ? (
@@ -2299,9 +2478,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     ) : null}
 
                     {sys.showFilterReport ? (
-                    <div>
-                      <span className="font-semibold text-slate-950">Air Filter Device Verification:</span>
-                      <div className="mt-1 space-y-1 text-slate-800">
+                    <div className={reportDetailSectionClass}>
+                      <div className={reportDetailHeadingClass}>Air Filter Device Verification</div>
+                      <div className={reportDetailBodyClass}>
                         {sys.systemIsDuctlessMiniSplit ? (
                           <div>Not applicable for ductless mini split systems.</div>
                         ) : !sys.runFilter ? (
@@ -2337,9 +2516,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     ) : null}
 
                     {sys.showDuctReport ? (
-                    <div>
-                      <span className="font-semibold text-slate-950">Duct Leakage Summary:</span>
-                      <div className="mt-1 space-y-1 text-slate-800">
+                    <div className={reportDetailSectionClass}>
+                      <div className={reportDetailHeadingClass}>Duct Leakage Summary</div>
+                      <div className={reportDetailBodyClass}>
                         {sys.systemIsDuctlessMiniSplit ? (
                           <div>Not applicable for ductless mini split systems.</div>
                         ) : (
@@ -2357,12 +2536,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                   {sys.showRefrigerantReport ? (
                     showCompactRefrigerantEvidenceOnly ? (
-                      <div className="rounded-md border border-slate-300 bg-slate-100 p-3 print:rounded-none print:border-slate-400 print:bg-white print:p-2.5">
+                      <div className={reportDetailSectionClass}>
                         {renderRefrigerantEvidenceSection(true)}
                       </div>
                     ) : (
-                  <div className="rounded-md border border-slate-300 bg-slate-100 p-3 space-y-3 print:rounded-none print:border-slate-400 print:bg-white print:p-2.5 print:space-y-2">
-                    <div className="text-sm font-bold text-slate-950 print:text-[13px]">Refrigerant Charge — Full Detailed Result</div>
+                  <div className={`${reportDetailSectionClass} space-y-3 print:space-y-2`}>
+                    <div className={reportDetailHeadingClass}>Refrigerant Charge - Full Detailed Result</div>
 
                     {sys.systemIsHeatOnly ? (
                       <div className="text-sm text-slate-700 print:text-[12px]">
@@ -2379,7 +2558,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       </div>
                     ) : (
                       <>
-                        <div className="space-y-1 text-sm text-slate-900 print:text-[12px]">
+                        <div className="space-y-1 rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-900 print:rounded-none print:border-slate-300 print:text-[11px]">
                           <div className="font-semibold text-slate-950">F. Data Collection and Calculations</div>
                           <ol className="list-decimal pl-5 space-y-1">
                             <li>Lowest Return Air Dry Bulb Temperature: {fmtValue(rcData.lowest_return_air_db_f, "°F")}</li>
@@ -2394,7 +2573,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           </ol>
                         </div>
 
-                        <div className="space-y-1 text-sm text-slate-900 print:text-[12px]">
+                        <div className="space-y-1 rounded-md border border-slate-200 bg-white p-2 text-sm text-slate-900 print:rounded-none print:border-slate-300 print:text-[11px]">
                           <div className="font-semibold text-slate-950">G. Metering Device Verification</div>
                           <ol className="list-decimal pl-5 space-y-1">
                             <li>Measured Suction Line Temperature: {fmtValue(rcData.suction_line_temp_f, "°F")}</li>
