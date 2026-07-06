@@ -1163,6 +1163,7 @@ export default async function JobTestsPage({
   const selectedSystemApplicability = {
     heatOnlySystem: selectedSystemIsHeatOnly,
     ductlessMiniSplit: selectedSystemIsDuctlessMiniSplit,
+    projectType: job.project_type,
   };
   const manualAddTestsForSystem = manualAddTests.filter((test) =>
     isEccTestApplicableToSystem(String(test.code), selectedSystemApplicability)
@@ -1648,6 +1649,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     const systemApplicability = {
       heatOnlySystem: systemIsHeatOnly,
       ductlessMiniSplit: systemIsDuctlessMiniSplit,
+      projectType: job.project_type,
     };
     const systemSuggestedTests = resolveEccScenario({
       projectType: job.project_type,

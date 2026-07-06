@@ -11,6 +11,7 @@ describe("isEccTestApplicableToSystem", () => {
         isEccTestApplicableToSystem(testType, {
           heatOnlySystem: false,
           ductlessMiniSplit: true,
+          projectType: "alteration",
         }),
       );
 
@@ -23,22 +24,37 @@ describe("isEccTestApplicableToSystem", () => {
     expect(manualAddForDuctless).toContain("qii_insulation");
   });
 
-  it("retains existing manual add applicability for non-ductless systems", () => {
-    const manualAddForDucted = getActiveManualAddTests()
+  it("excludes air filter from alteration systems", () => {
+    const manualAddForAlteration = getActiveManualAddTests()
       .map((test) => String(test.code))
       .filter((testType) =>
         isEccTestApplicableToSystem(testType, {
           heatOnlySystem: false,
           ductlessMiniSplit: false,
+          projectType: "alteration",
         }),
       );
 
-    expect(manualAddForDucted).toContain("duct_leakage");
-    expect(manualAddForDucted).toContain("airflow");
-    expect(manualAddForDucted).toContain("fan_watt_draw");
-    expect(manualAddForDucted).toContain("air_filter_device");
-    expect(manualAddForDucted).toContain("refrigerant_charge");
-    expect(manualAddForDucted).toContain("local_mechanical_exhaust");
-    expect(manualAddForDucted).toContain("qii_insulation");
+    expect(manualAddForAlteration).toContain("duct_leakage");
+    expect(manualAddForAlteration).toContain("airflow");
+    expect(manualAddForAlteration).toContain("fan_watt_draw");
+    expect(manualAddForAlteration).not.toContain("air_filter_device");
+    expect(manualAddForAlteration).toContain("refrigerant_charge");
+    expect(manualAddForAlteration).toContain("local_mechanical_exhaust");
+    expect(manualAddForAlteration).toContain("qii_insulation");
+  });
+
+  it("allows air filter only for all-new systems", () => {
+    const manualAddForAllNew = getActiveManualAddTests()
+      .map((test) => String(test.code))
+      .filter((testType) =>
+        isEccTestApplicableToSystem(testType, {
+          heatOnlySystem: false,
+          ductlessMiniSplit: false,
+          projectType: "all_new",
+        }),
+      );
+
+    expect(manualAddForAllNew).toContain("air_filter_device");
   });
 });

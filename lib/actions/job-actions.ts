@@ -67,6 +67,8 @@ import { resolveInternalOpsRecipientEmails } from "@/lib/notifications/internal-
 import { buildNotePreview, normalizeTaggedUserIds } from "@/lib/notifications/internal-note-tagging";
 import { assertAssignableInternalUser, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { getThresholdRuleForTest } from "@/lib/ecc/rule-profiles";
+import { isDuctlessMiniSplitSystem } from "@/lib/ecc/scenario-resolver";
+import { isEccTestApplicableToSystem } from "@/lib/ecc/test-applicability";
 import {
   buildAirFilterDevicePayload,
   ensureAirFilterDeviceCompletionFields,
@@ -90,7 +92,7 @@ import {
 import type { JobStatus } from "@/lib/types/job";
 import { buildAutoScheduleWindowLA, displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
-import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
+import { equipmentRoleLabel, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import {
   buildContractorProposalSubmissionFields,
   deriveInternalIntakeJobTitle,
@@ -4953,6 +4955,49 @@ export async function addEccTestRunFromForm(formData: FormData) {
     supabase,
     accountOwnerUserId: scoped.internalUser.account_owner_user_id,
   });
+
+  const [{ data: jobRuleContext, error: jobRuleContextErr }, { data: systemEquipmentRows, error: systemEquipmentErr }] =
+    await Promise.all([
+      supabase.from("jobs").select("project_type").eq("id", jobId).maybeSingle(),
+      supabase
+        .from("job_equipment")
+        .select("component_type, equipment_role")
+        .eq("job_id", jobId)
+        .eq("system_id", systemId),
+    ]);
+
+  if (jobRuleContextErr) throw jobRuleContextErr;
+  if (systemEquipmentErr) throw systemEquipmentErr;
+
+  const systemEquipment = systemEquipmentRows ?? [];
+  const hasHeatingOnlyEquipment = systemEquipment.some((eq: any) =>
+    isHeatingOnlyEquipment(String(eq?.equipment_role ?? eq?.component_type ?? ""))
+  );
+  const hasCoolingEquipment = systemEquipment.some((eq: any) => {
+    const tokens = [
+      String(eq?.equipment_role ?? "").trim().toLowerCase(),
+      String(eq?.component_type ?? "").trim().toLowerCase(),
+    ].map((token) => token.replace(/[\s-]+/g, "_"));
+
+    return tokens.some(
+      (token) =>
+        token.includes("outdoor") ||
+        token.includes("condenser") ||
+        token.includes("heat_pump") ||
+        token.includes("compressor") ||
+        token.includes("package")
+    );
+  });
+
+  if (
+    !isEccTestApplicableToSystem(testType, {
+      heatOnlySystem: hasHeatingOnlyEquipment && !hasCoolingEquipment,
+      ductlessMiniSplit: isDuctlessMiniSplitSystem(systemEquipment),
+      projectType: (jobRuleContext as any)?.project_type,
+    })
+  ) {
+    throw new Error("This test type is not applicable to the selected system and project type.");
+  }
 
   // Attach to Visit #1 (create it if missing)
   const { data: visitExisting, error: visitFindErr } = await supabase
