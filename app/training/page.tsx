@@ -23,7 +23,7 @@ import {
   resolveDualContextAccess,
 } from "@/lib/auth/dual-context-access";
 import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 export const metadata = {
   title: "Training Room",
@@ -131,7 +131,10 @@ function RoleTrackDetails({
 
 export default async function TrainingRoomPage() {
   const supabase = await createClient();
-  const access = await resolveDualContextAccess({ supabase });
+  const access = await resolveDualContextAccess({
+    supabase,
+    getPortalAdmin: createAdminClient,
+  });
 
   if (!access.user) redirect("/login");
   if (!access.hasActiveAppAccess) redirect(landingPathForDualContextAccess(access));

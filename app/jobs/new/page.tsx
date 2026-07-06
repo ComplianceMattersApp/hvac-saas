@@ -1,6 +1,6 @@
 // app/jobs/new/page.tsx
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import NewJobForm from "./NewJobForm";
 import {
@@ -95,7 +95,11 @@ export default async function NewJobPage(props: {
   const sp = props.searchParams ? await props.searchParams : undefined;
   const requestedContext = String(sp?.context ?? "").trim().toLowerCase();
   const explicitPortalContext = requestedContext === "portal";
-  const access = await resolveDualContextAccess({ supabase, user });
+  const access = await resolveDualContextAccess({
+    supabase,
+    user,
+    getPortalAdmin: createAdminClient,
+  });
 
   if (explicitPortalContext) {
     if (!access.hasPortalAccess || !access.portal) redirect("/portal");

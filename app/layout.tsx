@@ -20,7 +20,7 @@ import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import { shouldShowPortalMenuItem } from "@/lib/portal/partner-work-access";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
@@ -74,7 +74,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const supabase = await createClient();
-  const access = await resolveDualContextAccess({ supabase });
+  const access = await resolveDualContextAccess({
+    supabase,
+    getPortalAdmin: createAdminClient,
+  });
   const user = access.user;
 
   let profileFullName: string | null = null;

@@ -8,7 +8,7 @@ import {
   resolveAppAccessCta,
 } from "@/lib/business/app-access-cta";
 import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -73,7 +73,10 @@ export default async function AccessInactivePage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
   const supabase = await createClient();
-  const access = await resolveDualContextAccess({ supabase });
+  const access = await resolveDualContextAccess({
+    supabase,
+    getPortalAdmin: createAdminClient,
+  });
 
   if (!access.user) redirect("/login");
   if (access.hasActiveAppAccess) redirect("/today");

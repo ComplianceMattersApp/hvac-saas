@@ -227,7 +227,11 @@ export default async function OpsPage({
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
   const user = actorContext.user;
-  const access = await resolveDualContextAccess({ supabase, user });
+  const access = await resolveDualContextAccess({
+    supabase,
+    user,
+    getPortalAdmin: createAdminClient,
+  });
 
   const signal = (sp.signal ?? "").trim().toLowerCase() || "";
 

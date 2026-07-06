@@ -1,5 +1,3 @@
-import { createAdminClient } from "@/lib/supabase/server";
-
 export type ActiveContractorPortalMembership = {
   contractorId: string;
   contractorName: string | null;
@@ -20,7 +18,7 @@ function uniqueNonEmpty(values: unknown[]) {
 export async function resolveActiveContractorPortalMembership(input: {
   supabase: any;
   userId: string;
-  admin?: any;
+  getAdmin?: () => any;
 }): Promise<ActiveContractorPortalMembership | null> {
   const userId = normalizeText(input.userId);
   if (!userId) return null;
@@ -32,7 +30,7 @@ export async function resolveActiveContractorPortalMembership(input: {
   if (sessionLookup.portal) return sessionLookup.portal;
   if (!sessionLookup.hadMembership) return null;
 
-  const admin = input.admin ?? safeCreateAdminClient();
+  const admin = input.getAdmin?.() ?? null;
   if (!admin) return null;
 
   const adminLookup = await resolveActiveContractorPortalMembershipWithClient({
@@ -40,14 +38,6 @@ export async function resolveActiveContractorPortalMembership(input: {
     userId,
   });
   return adminLookup.portal;
-}
-
-function safeCreateAdminClient() {
-  try {
-    return createAdminClient();
-  } catch {
-    return null;
-  }
 }
 
 async function resolveActiveContractorPortalMembershipWithClient(input: {

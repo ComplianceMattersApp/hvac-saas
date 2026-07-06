@@ -48,7 +48,11 @@ export async function requireCurrentContractorPortalContext(input?: {
   if (userErr) throw userErr;
   if (!userId) throw resolvePortalAccessError("NOT_AUTHENTICATED");
 
-  const portal = await resolveActiveContractorPortalMembership({ supabase, userId });
+  const portal = await resolveActiveContractorPortalMembership({
+    supabase,
+    userId,
+    getAdmin: createAdminClient,
+  });
   if (!portal) throw resolvePortalAccessError("NOT_CONTRACTOR");
 
   return {

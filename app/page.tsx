@@ -3,7 +3,7 @@ import {
   landingPathForDualContextAccess,
   resolveDualContextAccess,
 } from "@/lib/auth/dual-context-access";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
   const supabase = await createClient();
@@ -14,6 +14,7 @@ export default async function HomePage() {
   const access = await resolveDualContextAccess({
     supabase,
     user: userData.user,
+    getPortalAdmin: createAdminClient,
   });
 
   redirect(landingPathForDualContextAccess(access));

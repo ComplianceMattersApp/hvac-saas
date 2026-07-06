@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppAccessCtaCard } from "@/components/AppAccessCtaCard";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import PortalAccessIssue from "@/components/portal/PortalAccessIssue";
 import {
@@ -87,6 +87,7 @@ export default async function PortalPage({
   const access = await resolveDualContextAccess({
     supabase,
     user: userData.user,
+    getPortalAdmin: createAdminClient,
   });
   const appAccessCtaEntitlement = await loadAppAccessCtaEntitlementSnapshot({
     supabase,

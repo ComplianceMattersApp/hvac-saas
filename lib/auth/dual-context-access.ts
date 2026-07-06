@@ -60,6 +60,7 @@ export function landingPathForDualContextAccess(access: DualContextAccess) {
 export async function resolveDualContextAccess(input: {
   supabase: any;
   user?: any | null;
+  getPortalAdmin?: () => any;
 }): Promise<DualContextAccess> {
   const supabase = input.supabase;
   let user = input.user ?? null;
@@ -117,6 +118,7 @@ export async function resolveDualContextAccess(input: {
   const portal = await resolveActiveContractorPortalMembership({
     supabase,
     userId: user.id,
+    getAdmin: input.getPortalAdmin,
   });
 
   let hasActiveAppAccess = false;
