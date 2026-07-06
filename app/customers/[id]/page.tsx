@@ -976,6 +976,14 @@ export default async function CustomerDetailPage(props: {
     },
     {},
   );
+  const customerLocationIds = new Set(
+    locations
+      .map((location) => String(location.id ?? location.location_id ?? "").trim())
+      .filter(Boolean),
+  );
+  const customerLocationRoleContacts = locationRoleContacts.filter((recipient) =>
+    customerLocationIds.has(String(recipient.linked_entity_id ?? "").trim()),
+  );
   const hasDisplayableRoleContacts = customerRoleContacts.some((recipient) =>
     isDisplayableRole(recipient.recipient_role),
   );
@@ -1007,9 +1015,13 @@ export default async function CustomerDetailPage(props: {
   const siteAccessContact =
     activeDisplayableCustomerRoleContacts.find(
       (recipient) => String(recipient.recipient_role ?? "").trim().toLowerCase() === "site_access_contact",
-    ) ?? locationRoleContacts[0] ?? null;
+    ) ?? customerLocationRoleContacts.find(
+      (recipient) => String(recipient.recipient_role ?? "").trim().toLowerCase() === "site_access_contact",
+    ) ?? null;
   const totalContactCount = new Set(
-    [...customerRoleContacts, ...locationRoleContacts].map((recipient) => String(recipient.id ?? "").trim()).filter(Boolean),
+    [...customerRoleContacts, ...customerLocationRoleContacts]
+      .map((recipient) => String(recipient.id ?? "").trim())
+      .filter(Boolean),
   ).size;
   const primaryServiceLocationId = String(
     firstLocationWithAddress?.id ?? firstLocationWithAddress?.location_id ?? "",
