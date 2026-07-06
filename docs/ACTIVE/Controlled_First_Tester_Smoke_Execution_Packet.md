@@ -33,6 +33,34 @@ Strict non-actions:
 - No Stripe/payment behavior changes.
 - No schema, migration, Supabase, env, feature-flag, fallback, desktop, or runtime behavior changes.
 
+## 1A. First Tester Smoke Closeout
+
+Status: **Complete - no issues reported**
+
+First tester smoke execution is complete. Results:
+
+- No S1 blockers were reported.
+- No S2 serious issues were reported.
+- No S3 polish/confusion items were reported from this pass.
+- No future requests were reported from this pass.
+- Controlled owner-led launch posture remains **Go**.
+- Launch blocker count remains **0**.
+
+Preserved status:
+
+- Mobile V2 remains launch-ready / monitoring with current/classic fallback retained.
+- Support V0 / Support Case V1 remain the active support model.
+- Support Console remains parked/runbook-gated.
+- Live SMS remains disabled/deferred.
+- QBO remains deferred/downstream-only.
+- Customer portal, online booking, GPS/routing, marketing/reviews, AI/call answering, inventory/job costing/payroll remain future/deferred lanes.
+
+## 1B. Daily-Use Baseline Context
+
+Compliance Matters / EveryStep FieldWorks is not a cold first-use product. The app has been in daily owner/operator use for several months.
+
+This first tester smoke closeout validates controlled onboarding and external/user expansion readiness on top of an already-used operational baseline. It is distinct from daily operational use, and it is not the first proof that the app can operate day to day.
+
 ## 2. Severity Labels
 
 | Severity | Meaning | Owner response |

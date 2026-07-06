@@ -50,6 +50,12 @@ Current Compliance Matters is no longer a bare scheduling/ECC prototype. The rep
 - SMS readiness foundations and admin template governance, but real provider-powered SMS remains non-sending/deferred
 - checklist foundations and job checklist completions, with Cleaning/HVAC checklist models separated
 
+Daily-use baseline note:
+- Compliance Matters / EveryStep FieldWorks is not a cold first-use product.
+- The app has been in daily owner/operator use for several months.
+- Current readiness work is controlled expansion / first tester validation on top of an already-used operational baseline.
+- First tester smoke validates controlled onboarding and external/user expansion readiness; it is not the first proof that the app can operate day to day.
+
 ## 4. Stale Or Resolved Open Items
 
 | Historical item | Current finding | Update |
