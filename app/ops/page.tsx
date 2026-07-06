@@ -881,7 +881,7 @@ export default async function OpsPage({
         key: "field_work",
         label: "Field Work",
         count: Number(fieldWorkCountRes.count ?? 0),
-        href: `/ops/field${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+        href: "/ops/field",
       },
       {
         key: "without_tech",

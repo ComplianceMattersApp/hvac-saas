@@ -14,6 +14,7 @@ import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
+import { jobAddressLine as addressLine } from "@/lib/ops/focused-queues";
 import {
   canShowExternalInvoiceSentAction,
   listCloseoutQueueJobs,
@@ -76,13 +77,6 @@ function customerDisplayName(j: any) {
   const first = String(j?.customer_first_name ?? "").trim();
   const last = String(j?.customer_last_name ?? "").trim();
   return [first, last].filter(Boolean).join(" ") || "Unnamed Customer";
-}
-
-function addressLine(j: any) {
-  const addr = String(j?.job_address ?? "").trim();
-  const city = String(j?.city ?? "").trim();
-  if (addr && city) return `${addr}, ${city}`;
-  return addr || city || "No address";
 }
 
 function contractorDisplayName(j: any, internalBusinessDisplayName: string) {

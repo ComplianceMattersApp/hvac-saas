@@ -44,6 +44,11 @@ const opsFieldPageSource = readFileSync(
   "utf-8",
 );
 
+const fieldQueueLibSource = readFileSync(
+  resolve(__dirname, "../field-queue.ts"),
+  "utf-8",
+);
+
 const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
@@ -587,9 +592,9 @@ describe("focused ops queue pages", () => {
   });
 
   it("field My Work uses the scheduled/actionable contract and no unscheduled section", () => {
-    expect(opsFieldPageSource).toContain("isScheduledAssignedMyWorkEligible");
-    expect(opsFieldPageSource).toContain("isActiveFieldWorkStatus");
-    expect(opsFieldPageSource).toContain("Unscheduled work is managed by dispatch");
+    expect(fieldQueueLibSource).toContain("isScheduledAssignedMyWorkEligible");
+    expect(fieldQueueLibSource).toContain("isActiveFieldWorkStatus");
+    expect(opsFieldPageSource).toContain("All caught up");
     expect(opsFieldPageSource).not.toContain('key: "unscheduled"');
     expect(opsFieldPageSource).not.toContain('title: "Unscheduled"');
   });

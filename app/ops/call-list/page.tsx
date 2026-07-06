@@ -7,6 +7,7 @@ import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-act
 import { updateJobScheduleFromForm } from "@/lib/actions";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
+import { jobAddressLine as addressLine } from "@/lib/ops/focused-queues";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import {
   buildLatestCustomerAttemptByJob,
@@ -34,13 +35,6 @@ function customerDisplayName(j: any) {
   const first = String(j?.customer_first_name ?? "").trim();
   const last = String(j?.customer_last_name ?? "").trim();
   return [first, last].filter(Boolean).join(" ") || "Unnamed Customer";
-}
-
-function addressLine(j: any) {
-  const addr = String(j?.job_address ?? "").trim();
-  const city = String(j?.city ?? "").trim();
-  if (addr && city) return `${addr}, ${city}`;
-  return addr || city || "No address";
 }
 
 function contractorDisplayName(j: any, internalBusinessDisplayName: string) {

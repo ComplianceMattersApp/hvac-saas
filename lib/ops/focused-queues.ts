@@ -134,10 +134,20 @@ export function buildWithoutTechQueueRows(params: {
   });
 }
 
+export function titleCaseFromSnake(value: string): string {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
 export function formatOpsStatusLabel(opsStatus: unknown): string {
   const normalized = normalize(opsStatus);
   if (!normalized) return "Unknown";
-  return normalized.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+  return titleCaseFromSnake(normalized);
+}
+
+export function jobAddressLine(job: { job_address?: string | null; city?: string | null }): string {
+  const address = String(job?.job_address ?? "").trim();
+  const city = String(job?.city ?? "").trim();
+  return [address, city].filter(Boolean).join(", ") || "No address";
 }
 
 export function getWaitingQueueDisplay(job: Pick<FocusedQueueJob, "ops_status" | "pending_info_reason" | "on_hold_reason">): {
