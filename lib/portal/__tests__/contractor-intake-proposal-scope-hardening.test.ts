@@ -69,11 +69,15 @@ function makeContractorPortalSupabaseFixture(options?: {
   userId?: string;
   contractorId?: string | null;
   contractorName?: string | null;
+  ownedContractorId?: string | null;
+  ownedContractorName?: string | null;
 }) {
   const userId = options?.userId ?? "contractor-user-1";
   const contractorId = options?.contractorId === undefined ? "contractor-1" : options.contractorId;
   const contractorName =
     options?.contractorName === undefined ? "Alpha Heating" : options.contractorName;
+  const ownedContractorId = options?.ownedContractorId ?? null;
+  const ownedContractorName = options?.ownedContractorName ?? "Legacy Owner Heating";
 
   const contractorRow = contractorId && contractorName
     ? {
@@ -81,6 +85,14 @@ function makeContractorPortalSupabaseFixture(options?: {
         name: contractorName,
         lifecycle_state: "active",
         owner_user_id: "owner-1",
+      }
+    : null;
+  const ownedContractorRow = ownedContractorId
+    ? {
+        id: ownedContractorId,
+        name: ownedContractorName,
+        lifecycle_state: "active",
+        owner_user_id: userId,
       }
     : null;
 
@@ -108,9 +120,10 @@ function makeContractorPortalSupabaseFixture(options?: {
 
       if (table === "contractors") {
         const query: any = {
+          eq: vi.fn(() => query),
           in: vi.fn(() => query),
           limit: vi.fn(async () => ({
-            data: contractorRow ? [contractorRow] : [],
+            data: [contractorRow, ownedContractorRow].filter(Boolean),
             error: null,
           })),
         };
@@ -301,7 +314,7 @@ describe("contractor portal intake proposal scope hardening", () => {
       }),
     ).rejects.toThrow("NOT_CONTRACTOR");
 
-    expect(createAdminClientMock).not.toHaveBeenCalled();
+    expect(createAdminClientMock).toHaveBeenCalledTimes(1);
   });
 
   it("resolves valid active contractor membership into the portal context used by routing", async () => {
@@ -335,6 +348,34 @@ describe("contractor portal intake proposal scope hardening", () => {
       contractorName: "Alpha Heating",
       accountOwnerUserId: "owner-1",
       userId: "contractor-user-1",
+    });
+  });
+
+  it("keeps legacy contractor owner portal context visible without a contractor_users row", async () => {
+    const supabase = makeContractorPortalSupabaseFixture({
+      userId: "legacy-owner-user-1",
+      contractorId: null,
+      contractorName: null,
+    });
+    createAdminClientMock.mockReturnValue(
+      makeContractorPortalSupabaseFixture({
+        userId: "legacy-owner-user-1",
+        contractorId: null,
+        contractorName: null,
+        ownedContractorId: "legacy-contractor-1",
+        ownedContractorName: "Legacy Owner Heating",
+      }),
+    );
+
+    const { requireCurrentContractorPortalContext } = await import(
+      "@/lib/portal/intake-proposal-read-model"
+    );
+
+    await expect(requireCurrentContractorPortalContext({ supabase })).resolves.toEqual({
+      contractorId: "legacy-contractor-1",
+      contractorName: "Legacy Owner Heating",
+      accountOwnerUserId: "legacy-owner-user-1",
+      userId: "legacy-owner-user-1",
     });
   });
 

@@ -19,6 +19,10 @@ type FixtureInput = {
     contractorId: string;
     lifecycleState?: string | null;
   } | null;
+  legacyOwnerPortal?: {
+    contractorId: string;
+    lifecycleState?: string | null;
+  } | null;
 };
 
 function makeSupabaseFixture(input: FixtureInput) {
@@ -69,6 +73,14 @@ function makeSupabaseFixture(input: FixtureInput) {
               name: "Second Partner Co",
               owner_user_id: "compliance-owner-2",
               lifecycle_state: input.extraPortal.lifecycleState ?? "active",
+            });
+          }
+          if (input.legacyOwnerPortal && filters.owner_user_id === user.id) {
+            rows.push({
+              id: input.legacyOwnerPortal.contractorId,
+              name: "Legacy Partner Co",
+              owner_user_id: user.id,
+              lifecycle_state: input.legacyOwnerPortal.lifecycleState ?? "active",
             });
           }
           return { data: rows, error: null };
@@ -183,6 +195,27 @@ describe("resolveDualContextAccess", () => {
     expect(access.portal).toMatchObject({
       contractorId: "contractor-1",
       accountOwnerUserId: "compliance-owner-1",
+    });
+    expect(access.preferredLandingContext).toBe("app");
+  });
+
+  it("treats a legacy contractor owner as dual-context without a contractor_users row", async () => {
+    const supabase = makeSupabaseFixture({
+      internal: { entitlementStatus: "active" },
+      legacyOwnerPortal: { contractorId: "legacy-contractor-1", lifecycleState: "active" },
+    });
+
+    const access = await resolveDualContextAccess({
+      supabase,
+      getPortalAdmin: () => supabase,
+    });
+
+    expect(access.isDualContextUser).toBe(true);
+    expect(access.hasActiveAppAccess).toBe(true);
+    expect(access.hasPortalAccess).toBe(true);
+    expect(access.portal).toMatchObject({
+      contractorId: "legacy-contractor-1",
+      accountOwnerUserId: "user-1",
     });
     expect(access.preferredLandingContext).toBe("app");
   });

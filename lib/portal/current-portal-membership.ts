@@ -28,10 +28,16 @@ export async function resolveActiveContractorPortalMembership(input: {
     userId,
   });
   if (sessionLookup.portal) return sessionLookup.portal;
-  if (!sessionLookup.hadMembership) return null;
 
   const admin = input.getAdmin?.() ?? null;
   if (!admin) return null;
+
+  if (!sessionLookup.hadMembership) {
+    return resolveActiveContractorPortalOwner({
+      supabase: admin,
+      userId,
+    });
+  }
 
   const adminLookup = await resolveActiveContractorPortalMembershipWithClient({
     supabase: admin,
@@ -89,4 +95,36 @@ async function resolveActiveContractorPortalMembershipWithClient(input: {
     .find(Boolean);
 
   return { portal: activeContractor ?? null, hadMembership: true };
+}
+
+async function resolveActiveContractorPortalOwner(input: {
+  supabase: any;
+  userId: string;
+}): Promise<ActiveContractorPortalMembership | null> {
+  const { data: contractorRows, error: contractorErr } = await input.supabase
+    .from("contractors")
+    .select("id, name, lifecycle_state, owner_user_id")
+    .eq("owner_user_id", input.userId)
+    .limit(20);
+
+  if (contractorErr) throw contractorErr;
+
+  const activeContractor = (Array.isArray(contractorRows) ? contractorRows : [])
+    .map((row: any) => {
+      const contractorId = normalizeText(row?.id);
+      const accountOwnerUserId = normalizeText(row?.owner_user_id);
+      const lifecycleState = normalizeText(row?.lifecycle_state).toLowerCase() || null;
+      if (!contractorId || !accountOwnerUserId) return null;
+      if (lifecycleState && lifecycleState !== "active") return null;
+
+      return {
+        contractorId,
+        contractorName: normalizeText(row?.name) || null,
+        accountOwnerUserId,
+        lifecycleState,
+      };
+    })
+    .find(Boolean);
+
+  return activeContractor ?? null;
 }
