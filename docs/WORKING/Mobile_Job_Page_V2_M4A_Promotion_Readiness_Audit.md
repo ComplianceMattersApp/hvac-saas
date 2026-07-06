@@ -4,15 +4,29 @@ Status: Phase M4-A promotion-readiness audit only
 Date: 2026-06-26  
 Scope: internal mobile `/jobs/[id]` preview only
 
+## 0. Current-Truth Correction (2026-07-06)
+
+This M4-A audit is historical and has been superseded by later M5 parity/default work.
+
+Current source truth:
+
+- Canonical mobile `/jobs/[id]` now selects `MobileJobDetailV2Preview` by default.
+- `mobileLayout=current` and `mobileLayout=classic` remain explicit fallback controls that force `MobileJobDetailCurrent`.
+- Standard View / current-mobile exits from V2 must continue to include `mobileLayout=current` so fallback anchors do not bounce back into V2.
+- Desktop rendering remains separate.
+- This correction is documentation/readiness only and does not authorize or imply any runtime behavior change.
+
+Do not use the older statements below that say default `/jobs/[id]` renders `MobileJobDetailCurrent` as current truth. Use the M5 parity/checklist docs and current source/tests for the active posture.
+
 ## 1. Executive Verdict
 
 Mobile Job Page V2 should not be promoted to default mobile behavior yet.
 
-The preview is now a strong field-facing shell: it has the photo-led command header, display-only lifecycle rail, dominant Next Step, ECC Compliance Work, Service Work lane, Evidence & Notes action list, Billing / Closeout summary, and collapsed More Details / Tools. It also preserves the important safety boundary: default `/jobs/[id]` still renders `MobileJobDetailCurrent`, while `/jobs/[id]?mobileLayout=v2` renders `MobileJobDetailV2Preview`.
+Historical finding at the time: the preview was a strong field-facing shell with the photo-led command header, display-only lifecycle rail, dominant Next Step, ECC Compliance Work, Service Work lane, Evidence & Notes action list, Billing / Closeout summary, and collapsed More Details / Tools. Current source truth has since advanced: canonical mobile `/jobs/[id]` now renders `MobileJobDetailV2Preview` by default, while `/jobs/[id]?mobileLayout=current` and `/jobs/[id]?mobileLayout=classic` force `MobileJobDetailCurrent`.
 
 However, promotion would still be premature because V2 does not directly render several behavior-heavy current-mobile capabilities. Most are reachable through standard-current-view links, which is safe for preview. Before default rollout, the owner must decide which of those current actions can remain as standard-view escapes and which must be promoted into V2 with exact form/action/return behavior.
 
-Recommended path: keep V2 query-param preview for now, then move toward an env-flagged internal mobile default only after a targeted parity pass promotes or explicitly standard-links the remaining action families. Do not promote all mobile users immediately.
+Historical recommendation at the time was to keep V2 query-param preview only. Current readiness recommendation is different: keep canonical mobile V2 default, preserve current-mobile fallback, and complete final state-matrix smoke before any universal-promotion-complete claim.
 
 ## 2. Route And Rendering Gate Confirmation
 
@@ -20,14 +34,15 @@ Source inspection confirms:
 
 - `app/jobs/[id]/page.tsx` imports both `MobileJobDetailCurrent` and `MobileJobDetailV2Preview`.
 - The route parses `sp.mobileLayout`.
-- `useMobileV2Preview` is derived as `mobileLayout === "v2"`.
-- `MobileJobDetailMobileComponent` selects `MobileJobDetailV2Preview` only when that boolean is true; otherwise it selects `MobileJobDetailCurrent`.
+- Current source no longer uses the older `useMobileV2Preview` / `mobileLayout === "v2"` preview-only selector described in the original M4-A audit.
+- `MobileJobDetailMobileComponent` selects `MobileJobDetailCurrent` only when `mobileLayout=current` / `classic` forces current; otherwise it selects `MobileJobDetailV2Preview`.
 - The desktop branch remains separate under existing `lg:block` rendering.
 
 Promotion invariant:
 
-- Current default route `/jobs/[id]`: must continue to render `MobileJobDetailCurrent` until a later promotion slice changes this intentionally.
-- Preview route `/jobs/[id]?mobileLayout=v2`: may render `MobileJobDetailV2Preview`.
+- Current canonical mobile route `/jobs/[id]`: renders `MobileJobDetailV2Preview`.
+- Fallback routes `/jobs/[id]?mobileLayout=current` and `/jobs/[id]?mobileLayout=classic`: render `MobileJobDetailCurrent`.
+- V2 Standard View exits must preserve `mobileLayout=current`.
 - Desktop: still owned by the current desktop branch and should remain unchanged.
 
 ## 3. Current-Mobile Capability Inventory
@@ -281,11 +296,11 @@ Next safest target: promote behind a feature flag for internal users only, after
 
 ## 11. Required Implementation Sequence For Recommended Path
 
-1. Add an M4-B source/CTA guard test pass:
-   - default mobile remains `MobileJobDetailCurrent`;
-   - V2 remains query-param or future flag gated;
-   - preview standard-view anchors omit `mobileLayout=v2`;
-   - no preview CTA hash targets a missing in-preview anchor.
+1. Run a final source/CTA guard check:
+   - canonical mobile remains `MobileJobDetailV2Preview`;
+   - `mobileLayout=current` / `classic` remains available;
+   - Standard View anchors include `mobileLayout=current`;
+   - no V2 CTA hash targets a missing in-preview anchor.
 
 2. Complete Service-specific V2 variant hardening:
    - promote or safely standard-link `FieldOutcomePanel` outcomes;
@@ -307,9 +322,9 @@ Next safest target: promote behind a feature flag for internal users only, after
    - Service scheduled/open, in progress, field complete billing, waiting/parts/approval;
    - closed/cancelled/archived.
 
-6. Add an env flag for default mobile selection:
-   - keep `?mobileLayout=v2` as explicit override;
-   - keep a fallback path to current mobile;
+6. Preserve default/fallback selection:
+   - keep canonical mobile V2 default unchanged;
+   - keep `mobileLayout=current` / `classic` as explicit current-mobile fallback;
    - do not affect desktop.
 
 7. Run focused and stateful validation:

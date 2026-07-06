@@ -7,7 +7,8 @@ Everything the dev pass needs to implement the approved navy visual direction.
 
 | File | What it is |
 |---|---|
-| `VISUAL-ALIGNMENT-SPEC.md` | **The spec.** Tokens, component rules, per-area work, mobile rules, guardrails, build order. Drop this in your repo root — Claude Code reads it natively. |
+| `VISUAL-ALIGNMENT-SPEC.md` | **The spec.** Tokens, component rules, per-area work, customer page (§7), Systems & Equipment + lifecycle (§8, schema-first), guardrails, build order. Drop this in your repo root — Claude Code reads it natively. |
+| `EQUIPMENT-AUDIT-PROMPT.md` | The read-only audit prompt used to inventory the equipment schema before building §8. |
 | `Navy-vs-Slate-mockups.html` | The full mockup canvas, self-contained. Open in any browser (offline). Pan/zoom the design doc. |
 | `screens/` | PNG reference of each key before/after (see below). |
 
@@ -24,6 +25,8 @@ Everything the dev pass needs to implement the approved navy visual direction.
 - `08-customer-overview-desktop.png` — Customer Overview, call-in command center (7a) — spec §7.1
 - `09-service-plans-readfirst.png` — Service Plans read-first + drawer (7b) — spec §7.2
 - `10-customer-overview-mobile.png` — Customer Overview on mobile (7c) — spec §7.1
+- `11-systems-equipment-browse.png` — Systems & Equipment browse redesign (8a) — spec §8
+- `12-equipment-lifecycle.png` — Equipment lifecycle + system labels, Replace drawer (8b) — spec §8
 
 ## How to run it in Claude Code
 
@@ -33,7 +36,7 @@ Everything the dev pass needs to implement the approved navy visual direction.
 
 ### Kickoff prompt
 
-> Read `VISUAL-ALIGNMENT-SPEC.md` from App compliance visual design customers. We're doing a visual-alignment pass on EveryStep FieldWorks — a token + component change, **no functionality changes** (see the guardrails). Start with step 1: global tokens + the eyebrow-tick component. Show me the token/theme changes and the reusable **eyebrow** and **disclosure** components before applying them broadly, then stop for review before Equipment.
+> Read `VISUAL-ALIGNMENT-SPEC.md`. We're doing a visual-alignment pass on EveryStep FieldWorks — a token + component change, **no functionality changes** (see the guardrails). Start with step 1: global tokens + the eyebrow-tick component. Show me the token/theme changes and the reusable **eyebrow** and **disclosure** components before applying them broadly, then stop for review before Equipment.
 
 ### Two things to get right as you go
 - Make the **eyebrow** and **disclosure** shared components — they're used on every page.

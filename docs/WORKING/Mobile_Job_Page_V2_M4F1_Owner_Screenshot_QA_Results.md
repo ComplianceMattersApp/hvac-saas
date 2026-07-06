@@ -4,6 +4,18 @@ Status: Phase M4-F1 QA results report only
 Date: 2026-06-26  
 Scope: preview-only internal mobile `/jobs/[id]?mobileLayout=v2`
 
+## 0. Current-Truth Correction (2026-07-06)
+
+This M4-F1 screenshot QA report is historical and predates the later M5 default/parity slices.
+
+Current source truth:
+
+- Canonical mobile `/jobs/[id]` now defaults to `MobileJobDetailV2Preview`.
+- `mobileLayout=current` and `mobileLayout=classic` remain explicit Standard View / current-mobile fallback controls.
+- Standard-current exits from V2 must preserve `mobileLayout=current`.
+- The open QA value of this report is the uncompleted visual/state fixture matrix, not its older preview-only/default-current route statement.
+- This correction is documentation/readiness only and does not authorize or imply a runtime behavior change.
+
 ## Executive Summary
 
 No authenticated browser session or representative owner-approved fixture set was available in this run, so no visual screenshot state is marked as passing.
@@ -14,7 +26,7 @@ This report therefore records:
 - The exact states and viewport checks still needing owner/fixture review.
 - A final recommendation based on the absence of completed screenshot evidence.
 
-Recommendation: **Keep query-param preview only** until owner screenshots are captured and approved.
+Historical recommendation at the time was **keep query-param preview only** until owner screenshots were captured and approved. Current source truth has since advanced to canonical mobile V2 default with explicit `mobileLayout=current` / `classic` fallback; the remaining value of this report is the uncompleted screenshot/state matrix.
 
 ## Inputs Reviewed
 
@@ -35,9 +47,9 @@ No jobs were created or mutated for this report.
 
 These items were confirmed by source inspection only:
 
-- `/jobs/[id]` still defaults to `MobileJobDetailCurrent`.
-- `/jobs/[id]?mobileLayout=v2` remains gated by `mobileLayout === "v2"` and selects `MobileJobDetailV2Preview`.
-- The V2 preview uses `standardJobHref = /jobs/${job.id}?tab=${tab}` for standard/current-view exits.
+- `/jobs/[id]` now defaults to `MobileJobDetailV2Preview`.
+- `/jobs/[id]?mobileLayout=current` and `/jobs/[id]?mobileLayout=classic` force `MobileJobDetailCurrent`.
+- The V2 surface uses `standardJobHref` with `mobileLayout=current` for standard/current-view exits.
 - The V2 preview uses `standardJobAnchorHref(anchor)` for standard-current-view anchor links, omitting `mobileLayout=v2`.
 - The V2 hero title uses a display-only `heroDisplayTitle` derived from `jobWorkbenchTitle` and `serviceCity`.
 - Behavior-heavy current-only destinations remain standard-current-view exits rather than duplicated forms.
@@ -122,14 +134,15 @@ Source inspection confirms:
 
 - `page.tsx` imports `MobileJobDetailCurrent`.
 - `page.tsx` imports `MobileJobDetailV2Preview`.
-- `page.tsx` derives `useMobileV2Preview` from `mobileLayout === "v2"`.
-- `MobileJobDetailMobileComponent` selects `MobileJobDetailV2Preview` only when `useMobileV2Preview` is true.
-- Otherwise, `MobileJobDetailMobileComponent` selects `MobileJobDetailCurrent`.
+- `page.tsx` derives `forceCurrentMobileLayout` from `mobileLayout=current` / `classic`.
+- `MobileJobDetailMobileComponent` selects `MobileJobDetailCurrent` only when current/classic fallback is forced.
+- Otherwise, `MobileJobDetailMobileComponent` selects `MobileJobDetailV2Preview`.
 
 Browser confirmation is still required:
 
-- [ ] `/jobs/{id}` renders current mobile.
-- [ ] `/jobs/{id}?mobileLayout=v2` renders preview.
+- [ ] `/jobs/{id}` renders Mobile V2.
+- [ ] `/jobs/{id}?mobileLayout=current` renders current mobile.
+- [ ] `/jobs/{id}?mobileLayout=classic` renders current mobile.
 
 ## Desktop Confirmation
 
@@ -142,7 +155,7 @@ Source review did not identify a desktop selection change in this report. Deskto
 
 ## Open QA Blockers
 
-Before any env-flagged internal default:
+Before any universal-promotion-complete claim:
 
 1. Provide or identify representative ECC and Service job IDs for the M4-F matrix.
 2. Capture 390px screenshots for every required state.
@@ -163,24 +176,26 @@ Before any env-flagged internal default:
 
 ## Final Recommendation
 
-Decision: **Keep query-param preview only**.
+Historical decision: **Keep query-param preview only**.
+
+Current readiness decision: **Keep canonical mobile V2 default, preserve current/classic fallback, and complete final state-matrix smoke before calling universal promotion complete**.
 
 Reason:
 
 - No representative authenticated screenshots were captured.
 - No state in the M4-F matrix can be marked as visually passing.
-- Source inspection supports the safety posture, but owner visual QA is still required before env-flagged default rollout.
+- Source inspection supports the safety posture, but final state-matrix visual/fixture QA is still required before universal-promotion-complete wording.
 
 Promotion status:
 
-- Ready for env-flagged internal default: **No**
+- Ready to remove fallback or call universal promotion complete: **No**
 - Needs one more polish slice: **Not determined from this pass**
-- Keep query-param preview only: **Yes**
+- Keep current/classic fallback: **Yes**
 
 ## Sign-Off
 
 Reviewer: Not completed  
 Date: 2026-06-26  
-Decision: Keep query-param preview only pending owner screenshots  
+Decision: Historical preview-only decision superseded; current posture is canonical Mobile V2 with current/classic fallback pending final state-matrix smoke
 Notes: Source safety posture was reviewed; visual fixture review remains open.
 

@@ -147,7 +147,43 @@ Apply the existing system directly:
 
 ---
 
-## 8. Suggested build order
+## 8. Systems & Equipment + equipment lifecycle (SCHEMA-FIRST — its own project)
+
+> ⚠️ This is **not** a UI pass. An audit found the data model can't support the feature yet, so build the schema first, then the screens. Mockups: **8a** (browse redesign) and **8b** (lifecycle + system labels) in `Navy vs Slate.dc.html`.
+
+### 8.1 The model (target)
+- **Equipment belongs to the address (location), not the job.** A job is *provenance* (an event that installed/replaced a unit), never the owner.
+- **Location → System → Components.** A **system** is a user-labeled grouping (default `System 1/2/3`, renameable to "Upstairs"/"Downstairs"). A **component** (furnace, condenser, coil, package unit, mini-split head…) is the unit with specs and its own lifecycle.
+- **Lifecycle per component:** `Active` → **Replace** retires the old unit (never deletes) and installs the new active one. Retire reasons: **Failure / Warranty / Upgrade**. Provenance on install: **this job / other contractor / standalone**.
+- **Serves both sides:** compliance (Title-24 alteration paper trail) + service (what's installed + how old, per address).
+
+### 8.2 Current state (from audit) — why schema-first
+- **Two parallel schemas**, merged only at render: job-scoped (`job_systems` / `job_equipment`, both `job_id` NOT NULL) and the newer location-scoped (`customer_location_systems` / `equipment`). Same physical unit across 3 jobs = 3 systems today.
+- **No lifecycle columns anywhere** (`status` / `retired_at` / `replaced_by`) — the core gap.
+- **Provenance is implicit** (which table the row is in), not a column.
+- Location path is **add-only** (no edit/archive/delete) and **missing** tonnage/refrigerant/heating fields.
+- RLS on `equipment` requires `system_id IS NOT NULL` (in tension with standalone units).
+- "View Equipment" and "Manage Equipment" **resolve to the same URL** (one is a redirect hop) — genuinely redundant, drop one.
+
+### 8.3 Decision (locked)
+**Historical `job_equipment` = immutable snapshots** (shown on their job, never rewritten). **The location-owned schema is canonical going forward.** Do NOT fuzzy-migrate old rows into physical units — for compliance the job records stay frozen. Optionally a one-time *assisted* "link this active unit to the location" step, never automatic.
+
+### 8.4 Migration shape (describe → review → then write)
+- **Canonical system** = `customer_location_systems` (already location-scoped, has `archived_at`, a `name` for the label). Default label `System N`; user-renameable.
+- **Extend `equipment`** with: `status` (active|retired), `retired_at`, `retire_reason` (failure|warranty|upgrade), `replaced_by_equipment_id` (self-FK), `install_source` (job|contractor|standalone), `source_job_id` (nullable FK — provenance made explicit). **Backfill** the tonnage/refrigerant/heating fields it currently lacks.
+- **Loosen** the `system_id IS NOT NULL` RLS if standalone equipment must be internally readable.
+- Extend `job_system_filters` to reference the persistent system (later, not blocking).
+
+### 8.5 Build order (within this project)
+1. **Migration + field backfill** (§8.4) — schema before anything.
+2. **CRUD on the location path** — add edit / archive / delete (missing today) for systems + components.
+3. **Lifecycle** — the Replace flow (retire reason → new unit → provenance) writing the new columns.
+4. **UI 8a/8b** — label-led systems, spec-grid components, triad → **Open Job + ⋯** (and drop the redundant View/Manage duplicate), Replace drawer, retired-inline + "view full history", empty → "Add details", Add System → blue drawer, ticks/navy.
+5. Re-point consumers (Overview glance, job detail badge, ECC scenario resolution) at the canonical reads; verify the flagged `ecc_test_runs.equipment_id` FK.
+
+---
+
+## 9. Suggested build order (whole engagement)
 
 1. **Global tokens + the eyebrow tick** (touches everything; do first).
 2. **Equipment rebuild** — the real work.
@@ -155,7 +191,8 @@ Apply the existing system directly:
 4. **Mobile Tests layout** — status bar + grid rules.
 5. **Customer Overview reorganization** (§7.1) + lighter-tab token/disclosure pass (§7.3).
 6. **Customer Notes wire-up + tab client-side switching** (§7.4).
-7. **Service Plans read-first restructure** (§7.2) — larger; can be its own project.
+7. **Service Plans read-first restructure** (§7.2) — larger; its own project.
+8. **Systems & Equipment + equipment lifecycle** (§8) — schema-first; its own project.
 
 ---
 
@@ -165,5 +202,6 @@ Mockups live in `Navy vs Slate.dc.html` (open in a browser). Turn map:
 - **3a–3f** mobile Tests flow (3f = final: option-C status bar) · **3d** status-aid rationale
 - **4a/4b** Customers retint · **5a/5b** the eyebrow tick · **6a** Equipment mobile · **6b** Test Workflows desktop
 - **7a** Customer Overview desktop (call-in) · **7b** Service Plans read-first + drawer · **7c** Customer Overview mobile
+- **8a** Systems & Equipment browse redesign · **8b** equipment lifecycle + system labels (Replace drawer, retired chain)
 
 Attach screenshots of the relevant turns alongside this file when prompting.

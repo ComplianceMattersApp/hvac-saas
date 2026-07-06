@@ -1,5 +1,7 @@
 # PROJECT AUDIT — SPINE GAP REPORT
 
+> Superseded status note, 2026-07-06: this April 2026 audit is retained as historical evidence only. Several findings below are stale against the current repo and ACTIVE docs baseline: notifications now have in-app and web-push surfaces, saved service-location address editing exists with sync/guard tests, invite delivery/redirect/acceptance tests exist, and calendar/dispatch has moved from "next-phase major scope" into the current closed/monitored baseline. Use `docs/ACTIVE/Current_App_Baseline_and_Competitive_Audit_2026-07-06.md` plus the current Active Spine and Release Roadmap for present-state planning.
+
 Status: Pass 1 complete, Pass 2 complete (implementation mapping)
 Scope: Locked spine docs vs current repository implementation
 Method: Two-pass audit (objective extraction, then code/schema mapping)

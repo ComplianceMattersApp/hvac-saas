@@ -1,24 +1,25 @@
 # Mobile Job Page V2 M5-B0 Blueprint / Code Integrity Audit
 
-Status: Phase M5-B0 audit only  
-Date: 2026-06-26  
-Scope: owner-only production field-test posture for internal mobile `/jobs/[id]`
+Status: Phase M5-B0 audit only
+Date: 2026-06-26
+Scope: canonical mobile `/jobs/[id]` V2 default and current-mobile fallback posture
 
 ## Executive Verdict
 
 Mobile Job Page V2 is intact against the original blueprint direction and the later owner-requested preview additions.
 
-The current implementation is best described as a strong owner-only field-test shell, not a full default-rollout replacement. It correctly preserves the high-risk boundaries: route reads remain in `page.tsx`, desktop remains separate, V2 does not own server actions or source-of-truth writes, and behavior-heavy forms intentionally escape to the standard/current mobile view or real workspaces.
+The current implementation is **launch-ready / monitoring** and **accepted for controlled owner-led launch use**. It is the controlled canonical mobile job surface with an explicit Standard View fallback retained. It correctly preserves the high-risk boundaries: route reads remain in `page.tsx`, desktop remains separate, V2 does not own server actions or source-of-truth writes, and fallback/current-mobile exits intentionally remain available where needed.
 
-The owner-only production posture is present in source:
+No Mobile V2 source-truth blocker was found in the final source/test smoke review. The owner is actively using the V2 default mobile job page with no reported issues. Full fixture state-matrix screenshots remain recommended monitoring evidence, but they are not a launch blocker for controlled owner-led launch use.
 
-- `ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT`
-- `MOBILE_JOB_V2_ALLOWED_EMAILS`
-- `MOBILE_JOB_V2_ALLOWED_USER_IDS`
+The current default/fallback posture is present in source:
+
+- canonical mobile `/jobs/[id]` selects `MobileJobDetailV2Preview` unless forced otherwise
 - `mobileLayout=current` / `mobileLayout=classic` force current mobile
 - Standard View exits include `mobileLayout=current`
+- fallback retained; do not remove fallback paths
 
-Recommended next slice: **continue owner-only V2 field test, then promote native Notes if field testing shows the notes hot-link is too disruptive**. The current notes hot-links are expected and safe for M5-A, but they are likely the first workflow friction point now that the visual layout is approved.
+Recommended next slice: **continued Mobile V2 state-matrix screenshot monitoring**, not promotion behavior work. Keep the Standard View fallback intact. Do not claim every possible fixture screenshot has been captured, and do not claim fallback can be removed.
 
 ## Source Basis
 
@@ -64,9 +65,9 @@ Reviewed:
 | Job Status Tools | Implemented | Row | No | `mobile-tools` | Native status forms not promoted | Expected escape. |
 | Timeline / History | Implemented | Row | No | `mobile-tools-timeline` | Deferred body not promoted | Expected escape; timeline stays deferred/current. |
 | Location & Address / Edit service location | Implemented when available | Row inside expanded tools | Existing `serviceLocationEditHref` | No | No | Does not duplicate edit form. |
-| Standard View fallback | Implemented | Header link | No | Standard current route | No | Uses `mobileLayout=current` to avoid owner-default bounce-back. |
-| Owner-only env default | Implemented | Selection gate in `page.tsx` | No | No | Browser smoke still needed | Env + allowlist + internal/active checks. |
-| `mobileLayout=current/classic` fallback | Implemented | Route selection | No | Forces current component | No | Force-current wins over owner-default and explicit V2. |
+| Standard View fallback | Implemented | Header/current exits | No | Standard current route | No | Uses `mobileLayout=current` to avoid canonical-default bounce-back. |
+| Canonical mobile V2 default | Implemented | Selection in `page.tsx` | No | No | Final state-matrix smoke still needed | V2 is selected unless `mobileLayout=current/classic` is supplied. |
+| `mobileLayout=current/classic` fallback | Implemented | Route selection | No | Forces current component | No | Force-current wins over canonical V2 default. |
 
 ## 2. Latest Owner-Requested Additions
 
@@ -79,7 +80,7 @@ Reviewed:
 | Generic field completion wording | Yes | `Finish field visit`; `Mark Field Work Complete`; helper `When the field work is done, mark this visit complete.` | Source guards cover this wording. |
 | Lifecycle rail uses checkmarks/dot/empty circles, not letters | Yes | V2 lifecycle rendering uses checkmark icon/current dot/empty future circle styling | Needs real-device visual smoke, but code no longer uses letter glyphs. |
 | Redundant city suffix removed from V2 hero title only | Yes | `getHeroDisplayTitle(jobWorkbenchTitle, serviceCity)` | Display-only cleanup; does not mutate job title truth. |
-| Standard View exits include `mobileLayout=current` | Yes | `standardJobHref = /jobs/${job.id}?tab=${tab}&mobileLayout=current` | Prevents owner-default bounce-back. |
+| Standard View exits include `mobileLayout=current` | Yes | `standardJobHref = /jobs/${job.id}?tab=${tab}&mobileLayout=current` | Prevents canonical-default bounce-back. |
 
 ## 3. Expected Standard-Current-View Escapes
 
@@ -110,7 +111,7 @@ Source-inspected V2 CTA targets:
 | CTA / target | Type | Safety status |
 | --- | --- | --- |
 | `Standard view` | Standard-current route with `mobileLayout=current` | Safe |
-| Primary Next Step with `nextStep.anchor` | `standardJobAnchorHref(nextStep.anchor)` | Safe: exits owner-default V2 to current mobile |
+| Primary Next Step with `nextStep.anchor` | `standardJobAnchorHref(nextStep.anchor)` | Safe: exits canonical V2 to current mobile |
 | Primary Next Step with `nextStep.href` | Real route, currently tests workspace when required | Safe |
 | Undo On the Way text link | `standardJobHref` | Safe |
 | Compliance details | `standardJobAnchorHref("mobile-work-scope")` | Safe escape |
@@ -156,39 +157,37 @@ Source inspection confirms:
 - Route reads remain in `page.tsx`.
 - Desktop branch remains separate under existing desktop rendering.
 
-## 6. Owner-Only Production Field-Test Posture
+## 6. Current Default / Fallback Posture
 
 | Requirement | Source status | Notes |
 | --- | --- | --- |
-| Env gate exists | Present | `ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT` must equal `true`. |
-| Allowlist email behavior exists | Present | `MOBILE_JOB_V2_ALLOWED_EMAILS`, comma-separated, lowercased. |
-| Allowlist user id behavior exists | Present | `MOBILE_JOB_V2_ALLOWED_USER_IDS`, comma-separated, lowercased. |
-| Contractors do not get owner-default V2 | Present | Contractor actors redirect to portal; shadow contractor membership blocks owner-default. |
-| Portal-only users do not get owner-default V2 | Present | Non-internal actor resolution does not reach internal mobile component selection. |
-| Inactive users do not get owner-default V2 | Present | Checks `status !== inactive` and `active !== false`. |
-| Env off returns current mobile behavior | Present | `mobileV2OwnerDefaultAllowed` false when env is absent/false. |
-| `mobileLayout=v2` explicit preview remains | Present | `explicitlyRequestedMobileV2Preview`. |
+| Canonical mobile defaults to V2 | Present | `MobileJobDetailMobileComponent` selects `MobileJobDetailV2Preview` unless `forceCurrentMobileLayout` is true. |
+| Current mobile fallback remains | Present | `mobileLayout=current` or `mobileLayout=classic` forces `MobileJobDetailCurrent`. |
+| Standard-current exits avoid bounce-back | Present | V2 Standard View/current links include `mobileLayout=current`. |
+| Contractors do not reach internal job detail V2 through portal routes | Present | Contractor actors are routed through contractor portal access boundaries. |
+| Portal-only users do not reach internal job detail V2 | Present | Non-internal actor resolution does not reach the internal mobile component selection path. |
 | `mobileLayout=current/classic` forces current mobile | Present | `forceCurrentMobileLayout` wins before V2 selection. |
 | Desktop remains separate | Present | Source tests assert desktop branch excludes V2 selector. |
 
 Important nuance:
 
-- `mobileLayout=v2` remains available to authenticated internal job-detail users who already pass the route's internal authorization path. It does not override contractor/unauthorized redirects.
-- Owner-default is narrower than explicit preview: owner-default requires env + allowlist + active internal posture.
+- Current mobile fallback is still a required safety valve. Do not remove `mobileLayout=current` / `classic`, and do not remove Standard View exits.
+- Full fixture state-matrix screenshots remain recommended monitoring evidence, but they are not a launch blocker for controlled owner-led launch use.
+- This document correction reflects current source/tests only; it does not change product behavior.
 
 ## 7. Field-Test Reconciliation
 
-Use this table for owner field notes during the production owner-only test.
+Use this table for field notes during controlled Mobile V2 validation.
 
 | Job URL | Job type/state | What Eddie clicked | Expected behavior | Actual behavior | Was Standard View needed? | Severity | Recommended fix slice |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Owner field observation | General active field-test use | Visual V2 layout reviewed | V2 should provide approved hero, lifecycle, Next Step, work lane, Evidence & Notes, Billing / Closeout, and tools hierarchy | Visual layout is approved/great | Not for layout | Cosmetic / none | Continue field test |
-| Owner field observation | Notes / behavior-heavy areas | Notes or other behavior-heavy rows | V2 should route to current mobile for unpromoted forms/bodies | Notes and behavior-heavy areas hot-link to old/current mobile page | Yes, intentionally | Navigation | Expected for M5-A owner-only field test unless target is broken/confusing |
+| Field observation | General active field use | Visual V2 layout reviewed | V2 should provide approved hero, lifecycle, Next Step, work lane, Evidence & Notes, Billing / Closeout, and tools hierarchy | Visual layout is approved/great | Not for layout | Cosmetic / none | Continue controlled validation |
+| Field observation | Behavior-heavy areas | Any row that exits to current mobile | V2 should route to current mobile where fallback/current surfaces remain intentional | Standard View exits include `mobileLayout=current` | Yes, intentionally | Navigation | Expected unless target is broken/confusing |
 | TODO | Specific job URL | TODO | TODO | TODO | TODO | cosmetic / navigation / workflow blocker / data risk | TODO |
 
 Interpretation:
 
-- Hot-linking to the current mobile page is expected for M5-A because V2 is owner-only field-test shell and behavior-heavy forms are not native.
+- Routing to the current mobile page remains expected where V2 intentionally preserves Standard View fallback for behavior-heavy surfaces.
 - This should be treated as a navigation friction issue, not a data risk, unless a target anchor is broken, confusing, or loses return context.
 - If notes are the most frequently used escape, native Notes should be the first promotion candidate.
 
@@ -206,24 +205,25 @@ Interpretation:
 
 ## 9. Final Recommendation
 
-Decision: **Keep owner-only V2 default and continue field test**.
+Decision: **Accepted for controlled owner-led launch use; keep canonical mobile V2 default with explicit current-mobile fallback retained**.
 
 Why:
 
 - Blueprint hierarchy is intact.
 - Owner-requested visual/layout additions are present.
 - Source-of-truth and action boundaries remain protected.
-- Owner-default is tightly gated by env + allowlist + current/internal posture.
 - Standard View fallback is explicit and includes `mobileLayout=current`.
-- Hot-linking to current mobile for behavior-heavy Notes/tools is expected in this phase.
+- No Mobile V2 source-truth blocker was found in the final source/test smoke review.
+- Owner is actively using the V2 default mobile job page with no reported issues.
+- Full fixture screenshot/state-matrix smoke remains recommended monitoring evidence, but is not a launch blocker for controlled owner-led use.
 
-Do not promote beyond owner-only yet.
+Do not remove fallback paths. Do not claim every possible fixture screenshot was captured. Do not claim fallback can be removed.
 
 Recommended next slice:
 
-1. If field notes show Notes are the main annoyance: **M5-B1 native Notes entry/body promotion audit or implementation slice**.
-2. If field notes show navigation wording confusion: **small CTA copy polish for standard-view escapes**.
-3. If field notes show workflow blockers: stop native expansion and fix the specific broken target/anchor first.
+1. Continue final Mobile V2 state-matrix screenshot monitoring where safe local/non-production fixtures exist.
+2. If monitoring finds only documentation drift, update readiness docs.
+3. If monitoring finds workflow blockers, stop native expansion and fix the specific broken target/anchor first in a separate implementation slice.
 
 ## 10. Explicit Non-Actions
 
@@ -237,6 +237,5 @@ It did not:
 - change helpers/source-of-truth logic;
 - change desktop rendering;
 - change auth/RLS policies;
-- promote V2 to all users;
+- change Mobile V2 promotion behavior;
 - mutate jobs, notes, invoices, permits, service plans, timeline, or Visit Scope truth.
-

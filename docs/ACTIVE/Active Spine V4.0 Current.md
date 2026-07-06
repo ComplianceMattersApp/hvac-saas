@@ -3721,8 +3721,8 @@ Current confirmed state:
   - `support_access_audit_events`
   - support access resolver + support audit helper
   - DB-level session/grant/account consistency invariant
-- V1A migration is applied to sandbox only.
-- Production support-access migration/apply remains intentionally deferred.
+- V1A migration is applied to sandbox and production.
+- Production support-access schema apply is complete and intentionally dormant: `20260501120000_support_access_v1a_foundation.sql` was applied to production with zero support rows, no support table grants/policies for app users, no support seeding, no grants, no sessions, and `ENABLE_SUPPORT_CONSOLE` still false/unset.
 - V1C feature exposure guard is implemented and fail-closed: `ENABLE_SUPPORT_CONSOLE` must be explicitly enabled to expose support console routes/actions.
 - Production `ENABLE_SUPPORT_CONSOLE` remains intentionally unset/false.
 - No production support access is live.
@@ -3754,12 +3754,11 @@ Locked support boundaries:
 Parked/deferred production enablement decision:
 - Support V1 architecture is complete enough to park; this is not unfinished architecture.
 - Production enablement is intentionally deferred pending better timing and explicit rollout need.
-- Do not proceed now with production support migration apply, production support seeding, or production feature-flag enablement.
-- H1-H5 hardening implementation does not change deferment: production migration apply, production feature flag enablement, production support-user/grant setup, controlled smoke, and rollback rehearsal remain explicit later approvals.
+- Do not proceed now with production support seeding, production grants/sessions, or production feature-flag enablement.
+- H1-H5 hardening implementation does not change deferment: production feature flag enablement, production support-user/grant setup, controlled smoke, and rollback rehearsal remain explicit later approvals.
 - Execution-controlled runbook is documented at `docs/ACTIVE/Support_Console_Production_Enablement_Runbook.md` and must be committed before any production support-console action.
 
 Keep-ready rollout checklist (later, explicit approval only):
-- production migration approval
 - production `support_user` seed
 - one read_only grant
 - explicit `ENABLE_SUPPORT_CONSOLE` enablement

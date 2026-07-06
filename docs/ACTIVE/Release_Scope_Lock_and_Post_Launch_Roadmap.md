@@ -1132,6 +1132,8 @@ Recommended order after owner-release:
 11. Customer Communication Polish V1.
 12. Owner Visibility / Business Pulse V2 follow-ups (field-feedback gated only).
 
+Current baseline and competitive gap audit: [Current_App_Baseline_and_Competitive_Audit_2026-07-06.md](./Current_App_Baseline_and_Competitive_Audit_2026-07-06.md). This audit confirms stale historical open items, records the true open/deferred work register, and compares the current product posture against Housecall Pro, Jobber, and Workiz.
+
 Ordering rationale:
 - support safety first,
 - controlled adoption second,

@@ -580,7 +580,7 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 
 Summary of locked posture:
 - Notifications, calendar, contractor portal, reports, admin/setup, job workspace, ops, product mode matrix, and customer continuity V1 are closed for the current owner-release pass.
-- Deferred/parked items (customer portal, QBO, tenant payment execution, estimates/support-console production enablement, mode-switch UI) are not release blockers unless the owner explicitly reopens them.
+- Deferred/parked items (customer portal, QBO, payment V2 add-ons beyond current tenant customer invoice payment V1, estimates/support-console expansion, mode-switch UI) are not release blockers unless the owner explicitly reopens them.
 - True App Package / Device-App Experience is complete for controlled rollout use and is not an open blocker.
 - Runbook-gated items (estimates enablement, support console enablement, first-owner provisioning) remain parked behind their runbooks.
 - No codebase split. ECC/HERS-first with HVAC Service-ready shared foundation.
@@ -1465,8 +1465,8 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 ### 3.1 Remote support access model
 - Customer Support / Remote Assistance V1A is implemented, committed, and pushed on `main`.
 - V1A includes `support_users`, `support_account_grants`, `support_access_sessions`, `support_access_audit_events`, resolver/audit helpers, and DB-level session/grant/account consistency invariant.
-- V1A migration `20260501120000_support_access_v1a_foundation.sql` is applied to sandbox only.
-- Production support-access migration/apply remains intentionally deferred.
+- V1A migration `20260501120000_support_access_v1a_foundation.sql` is applied to sandbox and production.
+- Production support-access schema apply is complete and intentionally dormant: production has the support-access foundation schema with zero support rows, no support table grants/policies for app users, no support seeding/grants/sessions, and `ENABLE_SUPPORT_CONSOLE` remains false/unset.
 - V1C exposure control is implemented and fail-closed by default: `ENABLE_SUPPORT_CONSOLE` must be explicitly enabled to expose `/ops/admin/users/support`.
 - Production `ENABLE_SUPPORT_CONSOLE` remains intentionally unset/false.
 - No production support access is live.
@@ -1495,12 +1495,11 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 ### 3.3 Deferred production enablement and next support slices
 - Support V1 is intentionally parked from production enablement; this is not unfinished architecture.
 - Production enablement is deferred pending explicit rollout timing/need decision.
-- Do not proceed now with production support migration apply, production support seeding, or production `ENABLE_SUPPORT_CONSOLE` enablement.
-- Hardening implementation above does not change deferred status: production migration apply, production flag enablement, production support-user/grant setup, and production smoke/rollback remain explicit later decisions.
+- Do not proceed now with production support seeding, production support grants/sessions, or production `ENABLE_SUPPORT_CONSOLE` enablement.
+- Hardening implementation above does not change deferred status: production flag enablement, production support-user/grant setup, and production smoke/rollback remain explicit later decisions.
 - Execution-controlled runbook for later approved enablement is documented at `docs/ACTIVE/Support_Console_Production_Enablement_Runbook.md` and must be committed/used before any production support-console action.
-- Production support-console enablement later requires both decisions together: production support migration apply decision and explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
+- Production support-console enablement later requires explicit support-user/grant setup plus explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
 - Keep-ready rollout checklist (later, explicit approval only):
-  - production migration approval
 
 ### 3.4 Support Case / Call Log V1 production closeout (completed — May 2026)
 
@@ -1611,7 +1610,7 @@ Before launch, confirm:
 - internal/admin critical paths still behave correctly
 - notifications and awareness surfaces are honest and current
 - billing/payment wording remains truthful
-- tenant customer invoice payment execution is still not live
+- tenant customer invoice payment V1 remains truthful/current and any payment add-ons beyond current scope are either completed or intentionally deferred
 - pre-launch enablements above are either completed or intentionally deferred with explicit decision
 - no deferred hardening item has been silently forgotten
 

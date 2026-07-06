@@ -1,8 +1,19 @@
 # Mobile Job Page V2 M5-I0 Parity Checkpoint
 
-Status: Phase M5-I0 documentation only  
-Date: 2026-06-27  
-Scope: owner-only Mobile Job Page V2 parity status after accepted M5 native wiring/presentation slices
+Status: Phase M5-I0 documentation only
+Date: 2026-06-27
+Scope: canonical Mobile Job Page V2 parity status after accepted M5 native wiring/presentation slices
+
+## Owner-Use Readiness Closeout
+
+Status: **Launch-ready / monitoring**
+Decision: **Accepted for controlled owner-led launch use**
+
+Mobile Job V2 is accepted for controlled owner-led launch use. Canonical mobile `/jobs/[id]` already defaults to `MobileJobDetailV2Preview`, while `mobileLayout=current` and `mobileLayout=classic` remain the required current-mobile fallback paths. Standard View exits must continue to preserve `mobileLayout=current`, and desktop `/jobs/[id]` remains separate.
+
+No Mobile V2 source-truth blocker was found in the final source/test smoke review. The owner is actively using the V2 default mobile job page with no reported issues. Full fixture state-matrix screenshots remain recommended monitoring evidence, but they are not a launch blocker for this controlled owner-led use.
+
+This closeout is docs/readiness only. It does not authorize product code, schema, migration, Supabase, Stripe, SMS, QBO, env, feature-flag, production, fallback-removal, desktop, or runtime behavior changes.
 
 ## Purpose
 
@@ -58,12 +69,27 @@ Reviewed:
 
 ## Current Safety Invariants
 
-- V2 remains owner/default-gated and query-param preview capable through `page.tsx`.
+- Canonical mobile `/jobs/[id]` defaults to `MobileJobDetailV2Preview` through `page.tsx` unless explicitly forced to current.
 - `mobileLayout=current` / `classic` remains the fallback path.
+- Standard View / current-mobile exits from V2 must continue to include `mobileLayout=current`.
 - Desktop remains separate.
 - Route reads remain in `page.tsx`.
 - Native V2 extracted panels reuse already-loaded props and existing action components/forms.
 - No new schema, Supabase reads, server actions, helper/source-of-truth logic, or RLS/auth changes are implied by this checkpoint.
+
+## Final State-Matrix Monitoring Checklist
+
+For monitoring evidence and broader fixture confidence, continue to run the final state-matrix smoke checklist where safe local/non-production fixtures exist. This evidence is still recommended, but it is no longer a launch blocker for controlled owner-led launch use:
+
+- closed / cancelled / archived read-only jobs;
+- ECC failed / pending-office-review / correction-review / retest-ready / linked-retest states;
+- permit-needed and permit-info states;
+- billing / closeout blockers, including invoice, external billing, certs, and no-action states;
+- waiting / release / parts / approval / hold states;
+- service-plan visit-count and next-due action states;
+- fallback behavior for `mobileLayout=current`, `mobileLayout=classic`, Standard View exits, and desktop separation.
+
+The checklist is tracked in `docs/WORKING/Mobile_Job_Page_V2_Final_State_Matrix_Smoke_Checklist.md`.
 
 ## Updated Known Field Findings
 
