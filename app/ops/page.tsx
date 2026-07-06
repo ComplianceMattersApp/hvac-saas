@@ -21,6 +21,8 @@ import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
+import { listOpenWorkflowHandoffRequestsForInstallerAccount } from "@/lib/workflows/workflow-handoff-requests-read";
+import { listActiveConnectedRecipientHandoffProjectionsForAccount } from "@/lib/workflows/connected-recipient-handoff-projection-read";
 
 import {
   formatBusinessDateUS,
@@ -77,10 +79,22 @@ import {
 import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
+  getOpsBoardReasonLabel,
   getOpsBoardVisibleReason,
   normalizeOpsBoardReason,
   type OpsBoardVisibleReason,
 } from "@/lib/ops/ops-board-reasons";
+import OpsBoardActiveQueuePanel, {
+  type OpsBoardActiveQueueRow,
+} from "./_components/OpsBoardActiveQueuePanel";
+import type {
+  CloseoutRowView,
+  FieldPaymentReviewRowView,
+  FollowUpRowView,
+  GenericRowView,
+  NeedsSchedulingRowView,
+  OpsQueueRowView,
+} from "./_components/OpsQueueRowCard";
 import {
   formatAssignmentSummaryForJob,
   formatFailedEccQueueReasonFromRun,
@@ -262,6 +276,15 @@ export default async function OpsPage({
     })
     : null;
 
+  const [handoffRequestsPendingRows, connectedHandoffPartnerRows] = await Promise.all([
+    listOpenWorkflowHandoffRequestsForInstallerAccount(supabase, {
+      installerAccountOwnerUserId: internalUser.account_owner_user_id,
+    }),
+    listActiveConnectedRecipientHandoffProjectionsForAccount(supabase, internalUser.account_owner_user_id),
+  ]);
+  const handoffRequestsPendingCount = handoffRequestsPendingRows.filter((row) => row.handoff_status === "sent").length;
+  const connectedHandoffPartnerCount = connectedHandoffPartnerRows.length;
+
   const showTeamClockStatusCardForRole =
     internalUser.role === "admin" || internalUser.role === "office";
 
@@ -343,19 +366,6 @@ export default async function OpsPage({
     return result;
   });
 
-  function digitsOnly(v?: string | null) {
-  return String(v ?? "").replace(/\D/g, "");
-}
-
-function smsHref(phone?: string | null) {
-  const p = digitsOnly(phone);
-  return p ? `sms:${p}` : "";
-}
-
-function telHref(phone?: string | null) {
-  const p = digitsOnly(phone);
-  return p ? `tel:${p}` : "";
-}
   function cityFromPermitJurisdiction(value?: string | null) {
     const raw = String(value ?? "").trim();
     if (!raw) return "";
@@ -555,6 +565,50 @@ function telHref(phone?: string | null) {
     const enteredAt = workspaceQueueEnteredAt(job, queueKey);
     if (!enteredAt) return workspaceAgeLabel(job);
     return `${compactDurationSince(enteredAt)} · ${formatWorkspaceTimestamp(enteredAt)}`;
+  }
+
+  function workspaceQueueAgeDays(job: any, queueKey: string): number | null {
+    const enteredAt = workspaceQueueEnteredAt(job, queueKey);
+    const startMs = toEpochMs(enteredAt);
+    if (!startMs) return null;
+    return Math.floor(Math.max(0, Date.now() - startMs) / 86_400_000);
+  }
+
+  function workspaceQueueAgeChipLabel(job: any, queueKey: string): string {
+    const days = workspaceQueueAgeDays(job, queueKey);
+    return days === null ? "In queue" : `In queue ${days}d`;
+  }
+
+  function deriveOpsQueueStateChips(
+    reasonLabel: string,
+    assignmentSummary?: string
+  ): { label: string; tone: "rose" | "amber" | "slate" | "green" }[] {
+    const chips: { label: string; tone: "rose" | "amber" | "slate" | "green" }[] = [];
+    const normalized = reasonLabel.trim().toLowerCase();
+
+    if (normalized.startsWith("failed ecc")) {
+      chips.push({ label: "Failed ECC", tone: "rose" });
+    } else if (normalized === "needs retest") {
+      chips.push({ label: "Needs Retest", tone: "amber" });
+    } else if (normalized === "on hold") {
+      chips.push({ label: "On Hold", tone: "slate" });
+    } else if (normalized === "blocked" || normalized === "missing information") {
+      chips.push({ label: reasonLabel, tone: "amber" });
+    }
+
+    if (assignmentSummary && assignmentSummary.trim().toLowerCase() === "unassigned") {
+      chips.push({ label: "Unassigned", tone: "amber" });
+    }
+
+    return chips;
+  }
+
+  function deriveOpsQueueCardTone(
+    stateChips: { tone: "rose" | "amber" | "slate" | "green" }[]
+  ): "rose" | "amber" | "slate" | "green" {
+    if (stateChips.some((chip) => chip.tone === "rose")) return "rose";
+    if (stateChips.some((chip) => chip.tone === "amber")) return "amber";
+    return "slate";
   }
 
   function workspaceLastActionTag(job: any) {
@@ -1131,6 +1185,9 @@ function telHref(phone?: string | null) {
         })}#ops-workspace`,
       };
     });
+    const hiddenTodayWorkspaceTabs = workspaceTabs.filter(
+      (tab) => tab.key === "without_tech" || tab.key === "updates"
+    );
     const clearOpsBoardFiltersHref = `/ops${buildQueryString({
       bucket: effectiveBoardBucketFilter,
       sort: boardSort === "oldest" ? "" : boardSort,
@@ -1246,183 +1303,41 @@ function telHref(phone?: string | null) {
       signal,
     })}`;
     const activeWorkspaceHref = `${activeWorkspaceBaseHref}#ops-workspace`;
-    const opsExportBaseParams = {
-      queue: selectedWorkspaceKey,
-      bucket: effectiveBoardBucketFilter,
-      contractor: contractorFocusFilter ?? "",
-      reason: effectiveBoardReasonFilter ?? "",
-      sort: boardSort === "oldest" ? "" : boardSort,
-    };
-    const internalOpsExportHref = `/ops/export${buildQueryString({
-      ...opsExportBaseParams,
-      mode: "internal",
-    })}`;
-    const contractorSafeOpsExportHref = `/ops/export${buildQueryString({
-      ...opsExportBaseParams,
-      mode: "contractor_safe",
-    })}`;
     const canShowJobQueueExport = selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake";
     const canExportContractorSafeCsv = contractorFocusIds.length > 0;
 
-    function workspaceNeedsSchedulingRichCard(job: any, visibleReason: OpsBoardVisibleReason) {
+    function buildNeedsSchedulingRowView(job: any, visibleReason: OpsBoardVisibleReason): NeedsSchedulingRowView {
       const jobId = String(job?.id ?? "").trim();
-      const phone = String(job?.customer_phone ?? "").trim();
-      const phoneHref = telHref(phone);
-      const textHref = smsHref(phone);
-      const scheduleDateText = job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Not scheduled";
-      const scheduleWindowText = displayWindowLA(job?.window_start, job?.window_end) || (job?.scheduled_date ? "Window TBD" : "");
       const recentAttemptDisplay = resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null);
       const contractorName = workspaceContractorName(job) || operationalTenantIdentity.displayName;
-      const utilityLabelClass =
-        "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
-      const inlineActionClass =
-        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
-      const compactContactActionClass =
-        "inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
-      const inlinePrimaryActionClass =
-        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
-      const scheduleFieldClass =
-        "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
+      const needsSchedulingStateChips = deriveOpsQueueStateChips(visibleReason.label);
 
-      return (
-        <QueueCard
-          key={jobId}
-          variant="needs-scheduling-rich"
-          href={`/jobs/${jobId}?tab=ops`}
-          title={workspaceTitle(job)}
-          subtitle={workspaceCustomerLocation(job)}
-          actionLabel="Open Job"
-          tags={[
-            {
-              label: "Status",
-              value: visibleReason.label,
-              detail: visibleReason.detail || undefined,
-            },
-            { label: "In Queue", value: workspaceQueueClockTag(job, "need_to_schedule") },
-            { label: "Last Action", value: workspaceLastActionTag(job), fullWidth: true },
-            { label: "Last Attempt", value: recentAttemptDisplay },
-          ]}
-        >
-          <QueueCardOpenAndAct>
-            <div className="space-y-3">
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Contractor</span>
-                <span className="text-sm font-medium text-slate-700">{contractorName}</span>
-              </div>
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Phone</span>
-                {phone ? (
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    {phoneHref || textHref ? (
-                      <a
-                        href={phoneHref || textHref}
-                        className="text-sm font-semibold text-slate-800 transition-colors hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                      >
-                        {phone}
-                      </a>
-                    ) : (
-                      <span className="text-sm font-medium text-slate-800">{phone}</span>
-                    )}
-                    <div className="flex items-center gap-1.5">
-                      {phoneHref ? (
-                        <a href={phoneHref} className={compactContactActionClass}>
-                          Call
-                        </a>
-                      ) : null}
-                      {textHref ? (
-                        <a href={textHref} className={compactContactActionClass}>
-                          Open SMS App
-                        </a>
-                      ) : null}
-                    </div>
-                  </div>
-                ) : (
-                  <span className="text-sm text-slate-400">No phone on file</span>
-                )}
-              </div>
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Schedule</span>
-                <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                  {scheduleWindowText ? `${scheduleDateText} / ${scheduleWindowText}` : scheduleDateText}
-                </span>
-              </div>
-
-              <form action={updateJobScheduleFromForm} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
-                <input type="hidden" name="job_id" value={jobId} />
-                <input type="hidden" name="permit_number" value={String(job?.permit_number ?? "")} />
-                <input type="hidden" name="jurisdiction" value={String(job?.jurisdiction ?? "")} />
-                <input type="hidden" name="permit_date" value={String(job?.permit_date ?? "")} />
-                <input type="hidden" name="return_to" value={activeWorkspaceHref} />
-
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Date
-                    <input
-                      type="date"
-                      name="scheduled_date"
-                      defaultValue={String(job?.scheduled_date ?? "")}
-                      className={scheduleFieldClass}
-                    />
-                  </label>
-                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Start
-                    <input
-                      type="time"
-                      name="window_start"
-                      defaultValue={timeToTimeInput(job?.window_start)}
-                      className={scheduleFieldClass}
-                    />
-                  </label>
-                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    End
-                    <input
-                      type="time"
-                      name="window_end"
-                      defaultValue={timeToTimeInput(job?.window_end)}
-                      className={scheduleFieldClass}
-                    />
-                  </label>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <button type="submit" className={inlinePrimaryActionClass}>
-                    Save Schedule
-                  </button>
-                  <button type="submit" name="unschedule" value="1" className={inlineActionClass}>
-                    Clear
-                  </button>
-                </div>
-              </form>
-
-              <div className="flex flex-wrap items-center gap-1.5">
-                <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="method" value="call" />
-                  <input type="hidden" name="result" value="no_answer" />
-                  <input type="hidden" name="return_to" value={activeWorkspaceHref} />
-                  <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
-                  <button type="submit" className={inlineActionClass}>
-                    Log Call
-                  </button>
-                </form>
-                <form action={logCustomerContactAttemptFromForm}>
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="method" value="text" />
-                  <input type="hidden" name="result" value="sent" />
-                  <input type="hidden" name="return_to" value={activeWorkspaceHref} />
-                  <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
-                  <button type="submit" className={inlineActionClass}>
-                    Log Text Attempt
-                  </button>
-                </form>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Logs communication attempts only; does not confirm carrier delivery.
-              </p>
-            </div>
-          </QueueCardOpenAndAct>
-        </QueueCard>
-      );
+      return {
+        kind: "need_to_schedule",
+        jobId,
+        href: `/jobs/${jobId}?tab=ops`,
+        title: workspaceTitle(job),
+        subtitle: workspaceCustomerLocation(job),
+        reasonLabel: visibleReason.label,
+        reasonDetail: visibleReason.detail,
+        ageLabel: workspaceQueueAgeChipLabel(job, "need_to_schedule"),
+        ageDays: workspaceQueueAgeDays(job, "need_to_schedule"),
+        stateChips: needsSchedulingStateChips,
+        tone: deriveOpsQueueCardTone(needsSchedulingStateChips),
+        lastActionText: workspaceLastActionTag(job),
+        recentAttemptText: recentAttemptDisplay,
+        contractorName,
+        phone: String(job?.customer_phone ?? "").trim(),
+        scheduleDateText: job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Not scheduled",
+        scheduleWindowText: displayWindowLA(job?.window_start, job?.window_end) || (job?.scheduled_date ? "Window TBD" : ""),
+        scheduledDateRaw: String(job?.scheduled_date ?? ""),
+        windowStartInput: timeToTimeInput(job?.window_start),
+        windowEndInput: timeToTimeInput(job?.window_end),
+        permitNumber: String(job?.permit_number ?? ""),
+        jurisdiction: String(job?.jurisdiction ?? ""),
+        permitDate: String(job?.permit_date ?? ""),
+        returnToHref: activeWorkspaceHref,
+      };
     }
 
     function formatWorkspaceUsdFromCents(cents: number | null | undefined) {
@@ -1453,105 +1368,48 @@ function telHref(phone?: string | null) {
       }).format(parsed);
     }
 
-    function workspaceCloseoutRichCard(job: any, visibleReason: OpsBoardVisibleReason) {
+    function buildCloseoutRowView(job: any, visibleReason: OpsBoardVisibleReason): CloseoutRowView {
       const jobId = String(job?.id ?? "").trim();
-      const phone = String(job?.customer_phone ?? "").trim();
-      const phoneHref = telHref(phone);
-      const textHref = smsHref(phone);
       const projection = selectedWorkspaceCloseoutProjectionByJob.get(jobId) ?? job;
       const needs = getCloseoutNeeds(projection);
       const canMarkExternalInvoiceSent = canShowExternalInvoiceSentAction({
         needsInvoice: needs.needsInvoice,
         billingState: projection?.billingState ?? null,
       });
-      const scheduledText = job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "";
       const assignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
-      const contractorName = workspaceContractorName(job);
-      const utilityLabelClass =
-        "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
-      const inlineActionClass =
-        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
-      const primaryActionClass =
-        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
-      const chipClass =
-        "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
+      const closeoutStateChips = deriveOpsQueueStateChips(visibleReason.label, assignmentSummary);
+      const needsLabel =
+        needs.needsInvoice && needs.needsCerts
+          ? "Invoice + paperwork"
+          : needs.needsInvoice
+          ? "Invoice"
+          : needs.needsCerts
+          ? "Paperwork"
+          : "Review";
 
-      return (
-        <QueueCard
-          key={jobId}
-          id={`ops-workspace-closeout-job-${jobId}`}
-          variant="closeout-rich"
-          href={`/jobs/${jobId}?tab=ops`}
-          title={workspaceTitle(job)}
-          subtitle={workspaceCustomerLocation(job)}
-          actionLabel="Open Job"
-          tags={[
-            {
-              label: "Reason",
-              value: visibleReason.label,
-              detail: visibleReason.detail || undefined,
-            },
-            { label: "In Queue", value: workspaceQueueClockTag(job, "closeout") },
-            { label: "Last Action", value: workspaceLastActionTag(job), fullWidth: true },
-            {
-              label: "Needs",
-              value:
-                needs.needsInvoice && needs.needsCerts
-                  ? "Invoice + paperwork"
-                  : needs.needsInvoice
-                  ? "Invoice"
-                  : needs.needsCerts
-                  ? "Paperwork"
-                  : "Review",
-            },
-            ...(contractorName ? [{ label: "Contractor", value: contractorName }] : []),
-          ]}
-        >
-          <QueueCardOpenAndAct>
-            <div className="space-y-3">
-              {scheduledText ? (
-                <div className="grid gap-1.5">
-                  <span className={utilityLabelClass}>Scheduled</span>
-                  <span className={chipClass}>{scheduledText}</span>
-                </div>
-              ) : null}
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Assignment</span>
-                <span className={chipClass}>{assignmentSummary}</span>
-              </div>
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Next Step</span>
-                <p className="text-sm leading-5 text-slate-700">{getCloseoutQueueNextStepLabel(projection)}</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Link href={`/jobs/${jobId}?tab=ops`} className={primaryActionClass}>
-                  View Job
-                </Link>
-                {phoneHref ? (
-                  <a href={phoneHref} className={inlineActionClass}>
-                    Call
-                  </a>
-                ) : null}
-                {textHref ? (
-                  <a href={textHref} className={inlineActionClass}>
-                    Open SMS App
-                  </a>
-                ) : null}
-                {canMarkExternalInvoiceSent ? (
-                  <form action={markInvoiceCompleteFromForm}>
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input type="hidden" name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-closeout-job-${jobId}`} />
-                    <input type="hidden" name="success_notice" value="external_billing_complete" />
-                    <button type="submit" className={inlineActionClass}>
-                      External Billing Complete
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-            </div>
-          </QueueCardOpenAndAct>
-        </QueueCard>
-      );
+      return {
+        kind: "closeout",
+        jobId,
+        cardDomId: `ops-workspace-closeout-job-${jobId}`,
+        href: `/jobs/${jobId}?tab=ops`,
+        title: workspaceTitle(job),
+        subtitle: workspaceCustomerLocation(job),
+        reasonLabel: visibleReason.label,
+        reasonDetail: visibleReason.detail,
+        ageLabel: workspaceQueueAgeChipLabel(job, "closeout"),
+        ageDays: workspaceQueueAgeDays(job, "closeout"),
+        stateChips: closeoutStateChips,
+        tone: deriveOpsQueueCardTone(closeoutStateChips),
+        lastActionText: workspaceLastActionTag(job),
+        needsLabel,
+        contractorName: workspaceContractorName(job),
+        scheduledText: job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "",
+        assignmentSummary,
+        nextStepText: getCloseoutQueueNextStepLabel(projection),
+        phone: String(job?.customer_phone ?? "").trim(),
+        canMarkExternalInvoiceSent,
+        returnToHref: `${activeWorkspaceBaseHref}#ops-workspace-closeout-job-${jobId}`,
+      };
     }
 
     function formatFollowUpOwner(value: unknown) {
@@ -1604,139 +1462,83 @@ function telHref(phone?: string | null) {
       };
     }
 
-    function workspaceFollowUpRichCard(job: any) {
+    function buildFollowUpRowView(job: any): FollowUpRowView {
       const jobId = String(job?.id ?? "").trim();
       const note = String(job?.next_action_note ?? "").trim() || "No reminder note added.";
       const dueDate = String(job?.follow_up_date ?? "").trim();
       const owner = formatFollowUpOwner(job?.action_required_by);
       const statusLabel = getOpsQueueCardStatusReason(job);
       const urgency = followUpUrgency(dueDate);
+      const urgencyTone =
+        urgency.variant === "follow-up-overdue" || urgency.variant === "follow-up-due"
+          ? "rose"
+          : urgency.variant === "follow-up-soon" || urgency.variant === "follow-up-unscheduled"
+          ? "amber"
+          : "slate";
 
-      return (
-        <QueueCard
-          key={jobId}
-          id={`ops-workspace-follow-up-job-${jobId}`}
-          variant={urgency.variant}
-          href={`/jobs/${jobId}/v2#followup`}
-          title={workspaceTitle(job)}
-          subtitle={workspaceCustomerLocation(job)}
-          actionLabel="Open Follow Up"
-          tags={[
-            { label: "Due", value: dueDate ? formatBusinessDateUS(dueDate) : "No date set" },
-            { label: "Urgency", value: urgency.label },
-            { label: "In Queue", value: workspaceQueueClockTag(job, "follow_ups") },
-            { label: "Last Action", value: workspaceLastActionTag(job), fullWidth: true },
-            { label: "Owner", value: owner },
-            { label: "Status", value: statusLabel },
-            { label: "Reminder", value: note, fullWidth: true },
-          ]}
-        />
-      );
+      return {
+        kind: "follow_ups",
+        jobId,
+        cardDomId: `ops-workspace-follow-up-job-${jobId}`,
+        href: `/jobs/${jobId}/v2#followup`,
+        title: workspaceTitle(job),
+        subtitle: workspaceCustomerLocation(job),
+        dueText: dueDate ? formatBusinessDateUS(dueDate) : "No date set",
+        urgencyLabel: urgency.label,
+        urgencyTone,
+        ageLabel: workspaceQueueAgeChipLabel(job, "follow_ups"),
+        ageDays: workspaceQueueAgeDays(job, "follow_ups"),
+        lastActionText: workspaceLastActionTag(job),
+        owner,
+        statusLabel,
+        note,
+      };
     }
 
-    function workspaceFieldPaymentReviewCard(item: NonNullable<typeof fieldPaymentReconciliationAttention>["items"][number]) {
-      const isSelfReported = item.reportedByUserId === user.id;
-      const utilityLabelClass =
-        "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
-      const inlineActionClass =
-        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
-      const primaryActionClass =
-        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
-      const inputClass =
-        "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900";
-      const chipClass =
-        "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
+    function buildGenericRowView(job: any, visibleReason: OpsBoardVisibleReason, queueKey: string): GenericRowView {
+      const jobId = String(job?.id ?? "").trim();
+      const fallbackAssignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
+      const fallbackStateChips = deriveOpsQueueStateChips(visibleReason.label, fallbackAssignmentSummary);
 
-      return (
-        <QueueCard
-          key={`field-payment-${item.reportId}`}
-          id={`ops-workspace-field-payment-${item.reportId}`}
-          variant="closeout-payment-review"
-          href={item.links.jobHref}
-          title={item.jobTitle || item.jobReference}
-          subtitle={item.customerDisplayName || "Customer"}
-          actionLabel="Open Job"
-          tags={[
-            { label: "Amount", value: formatWorkspaceUsdFromCents(item.amountCents) },
-            { label: "Method", value: formatWorkspaceFieldPaymentMethod(item.paymentMethod) },
-            {
-              label: "Reported",
-              value: formatWorkspaceTimestamp(item.reportedAt),
-              detail: `by ${item.reportedByDisplayName}`,
-            },
-          ]}
-        >
-          <QueueCardOpenAndAct>
-            <div className="space-y-3">
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Invoice</span>
-                <span className="text-sm font-medium text-slate-700">{item.invoiceReference}</span>
-              </div>
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Next Step</span>
-                <p className="text-sm leading-5 text-slate-700">Confirm only after verifying the money was received.</p>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <Link href={item.links.jobHref} className={primaryActionClass}>
-                  View Job
-                </Link>
-                <Link href={item.links.invoiceWorkspaceHref} className={inlineActionClass}>
-                  Open invoice workspace
-                </Link>
-              </div>
-              {isSelfReported ? (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
-                  Reporter cannot verify their own report.
-                </div>
-              ) : (
-                <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">
-                  <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
-                    <input type="hidden" name="field_payment_report_id" value={item.reportId} />
-                    <input type="hidden" name="report_id" value={item.reportId} />
-                    <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
-                    <input type="hidden" name="job_id" value={item.jobId} />
-                    <input type="hidden" name="tab" value="info" />
-                    <input type="hidden" name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`} />
-                    <label className="block">
-                      <span className="mb-1 block font-semibold text-slate-900">Verification note</span>
-                      <input
-                        name="verification_note"
-                        type="text"
-                        className={inputClass}
-                        placeholder="Optional office confirmation details"
-                      />
-                    </label>
-                    <button type="submit" className={inlineActionClass}>
-                      Confirm Payment
-                    </button>
-                  </form>
-                  <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
-                    <input type="hidden" name="field_payment_report_id" value={item.reportId} />
-                    <input type="hidden" name="report_id" value={item.reportId} />
-                    <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
-                    <input type="hidden" name="job_id" value={item.jobId} />
-                    <input type="hidden" name="tab" value="info" />
-                    <input type="hidden" name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`} />
-                    <label className="block">
-                      <span className="mb-1 block font-semibold text-slate-900">Rejection reason</span>
-                      <input
-                        name="rejection_reason"
-                        type="text"
-                        required
-                        className={inputClass}
-                        placeholder="Required"
-                      />
-                    </label>
-                    <button type="submit" className={inlineActionClass}>
-                      Reject Report
-                    </button>
-                  </form>
-                </div>
-              )}
-            </div>
-          </QueueCardOpenAndAct>
-        </QueueCard>
-      );
+      return {
+        kind: "generic",
+        jobId,
+        href: `/jobs/${jobId}?tab=ops`,
+        title: workspaceTitle(job),
+        subtitle: workspaceCustomerLocation(job),
+        reasonLabel: visibleReason.label,
+        reasonDetail: visibleReason.detail,
+        ageLabel: workspaceQueueAgeChipLabel(job, queueKey),
+        ageDays: workspaceQueueAgeDays(job, queueKey),
+        stateChips: fallbackStateChips,
+        tone: deriveOpsQueueCardTone(fallbackStateChips),
+        lastActionText: workspaceLastActionTag(job),
+        assignmentSummary: fallbackAssignmentSummary,
+        contractorName: workspaceContractorName(job),
+      };
+    }
+
+    function buildFieldPaymentReviewRowView(
+      item: NonNullable<typeof fieldPaymentReconciliationAttention>["items"][number]
+    ): FieldPaymentReviewRowView {
+      return {
+        kind: "field_payment_review",
+        reportId: item.reportId,
+        cardDomId: `ops-workspace-field-payment-${item.reportId}`,
+        jobId: item.jobId,
+        internalInvoiceId: item.internalInvoiceId,
+        jobHref: item.links.jobHref,
+        invoiceWorkspaceHref: item.links.invoiceWorkspaceHref,
+        title: item.jobTitle || item.jobReference,
+        subtitle: item.customerDisplayName || "Customer",
+        amountText: formatWorkspaceUsdFromCents(item.amountCents),
+        methodText: formatWorkspaceFieldPaymentMethod(item.paymentMethod),
+        reportedText: formatWorkspaceTimestamp(item.reportedAt),
+        reportedDetail: item.reportedByDisplayName,
+        invoiceReference: item.invoiceReference,
+        isSelfReported: item.reportedByUserId === user.id,
+        returnToHref: `${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`,
+      };
     }
 
     const selectedWorkspaceItemNoun =
@@ -1751,6 +1553,76 @@ function telHref(phone?: string | null) {
       selectedWorkspacePreviewCount === selectedWorkspaceTotalCount
         ? `${selectedWorkspaceTotalCount} ${selectedWorkspaceItemNoun}`
         : `Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount} ${selectedWorkspaceItemNoun}`;
+    const activeQueueRows: OpsBoardActiveQueueRow[] =
+      canShowJobQueueExport && selectedWorkspaceSection
+        ? selectedWorkspaceSection.previewRows.map((job: any) => {
+            const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);
+            const view: OpsQueueRowView =
+              selectedWorkspaceSection.key === "need_to_schedule"
+                ? buildNeedsSchedulingRowView(job, visibleReason)
+                : selectedWorkspaceSection.key === "closeout"
+                ? buildCloseoutRowView(job, visibleReason)
+                : selectedWorkspaceSection.key === "follow_ups"
+                ? buildFollowUpRowView(job)
+                : buildGenericRowView(job, visibleReason, selectedWorkspaceSection.key);
+            return {
+              id: String(job?.id ?? ""),
+              reasonKey: getOpsBoardReasonLabel(workspaceReasonInput(job), { queueKey: selectedWorkspaceSection.key })?.key ?? null,
+              sortable: {
+                created_at: job?.created_at ?? null,
+                scheduled_date: job?.scheduled_date ?? null,
+                window_start: job?.window_start ?? null,
+                customer_first_name: job?.customer_first_name ?? null,
+                customer_last_name: job?.customer_last_name ?? null,
+                contractors: { name: workspaceContractorName(job) || null },
+              },
+              view,
+            };
+          })
+        : [];
+    const activeQueuePinnedViews: FieldPaymentReviewRowView[] =
+      canShowJobQueueExport && selectedWorkspaceSection?.key === "closeout" && canViewFieldPaymentVerificationAttention
+        ? (fieldPaymentReconciliationAttention?.items ?? []).map((item) => buildFieldPaymentReviewRowView(item))
+        : [];
+    const queueHealthAgingOver30 = activeQueueRows.filter((row) => (row.view as any).ageDays != null && (row.view as any).ageDays > 30).length;
+    const queueHealthBreakdown = new Map<string, number>();
+    let queueHealthUnassigned = 0;
+    for (const row of activeQueueRows) {
+      const stateChips = "stateChips" in row.view ? row.view.stateChips : [];
+      for (const chip of stateChips) {
+        if (chip.label === "Unassigned") {
+          queueHealthUnassigned += 1;
+          continue;
+        }
+        queueHealthBreakdown.set(chip.label, (queueHealthBreakdown.get(chip.label) ?? 0) + 1);
+      }
+    }
+    const queueHealthStats = {
+      agingOver30: queueHealthAgingOver30,
+      unassigned: queueHealthUnassigned,
+      breakdown: Array.from(queueHealthBreakdown.entries()).map(([label, count]) => ({ label, count })),
+    };
+    const opsBoardHeaderRightActionByBucket: Partial<Record<string, { label: string; href: string }>> = {
+      closeout: {
+        label: "View all",
+        href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+      },
+    };
+    const JOB_QUEUE_BUCKETS = new Set(["pending", "field_work", "waiting", "exceptions", "closeout", "follow_ups"]);
+    const opsBoardClientChips = workspaceQueueChips.map((chip) =>
+      JOB_QUEUE_BUCKETS.has(chip.bucket)
+        ? { kind: "switchable" as const, key: chip.key, bucket: chip.bucket, label: chip.label, mobileLabel: chip.mobileLabel, count: chip.count }
+        : { kind: "link" as const, key: chip.key, href: chip.href, label: chip.label, mobileLabel: chip.mobileLabel, count: chip.count }
+    );
+    const opsBoardHiddenTodayChips = hiddenTodayWorkspaceTabs.map((tab) => ({
+      key: tab.key,
+      label: tab.label,
+      count: tab.count,
+      href: tab.href,
+    }));
+    const opsBoardBucketPreviewLimits = Object.fromEntries(
+      workspaceQueueChips.map((chip) => [chip.bucket, Math.max(chip.count, 10)])
+    );
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const selectedPermitAttachmentResult = selectedPermitRows.length
@@ -1874,11 +1746,16 @@ function telHref(phone?: string | null) {
           </section>
         ) : null}
 
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+        <div className="min-w-0 space-y-3 sm:space-y-4">
         <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_56%,rgba(219,234,254,0.56))] p-4 shadow-[0_22px_54px_-34px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/70 sm:p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">{operationalTenantIdentity.displayName}</div>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[2rem]">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                <span className="inline-block h-[13px] w-[3px] rounded-full bg-blue-600" aria-hidden="true" />
+                {operationalTenantIdentity.displayName}
+              </div>
+              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-navy sm:text-[2rem]">
                 Operations Workspace
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
@@ -1912,6 +1789,8 @@ function telHref(phone?: string | null) {
             </div>
           </div>
 
+          {!canShowJobQueueExport ? (
+          <>
           <div className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector">
             {workspaceQueueChips.map((chip) => (
               <Link
@@ -1920,12 +1799,27 @@ function telHref(phone?: string | null) {
                 aria-current={chip.isSelected ? "page" : undefined}
                 className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
                   chip.isSelected
-                    ? "border-slate-900 bg-slate-900 text-white"
+                    ? "border-navy bg-navy text-white"
+                    : chip.count === 0
+                    ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"
                     : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
                 <span className="sm:hidden">{chip.mobileLabel} · {chip.count}</span>
                 <span className="hidden sm:inline">{chip.label} · {chip.count}</span>
+              </Link>
+            ))}
+            {hiddenTodayWorkspaceTabs.map((tab) => (
+              <Link
+                key={tab.key}
+                href={tab.href}
+                className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
+                  tab.count === 0
+                    ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span>{tab.label} · {tab.count}</span>
               </Link>
             ))}
           </div>
@@ -1989,38 +1883,6 @@ function telHref(phone?: string | null) {
             ) : null}
           </div>
 
-          {canShowJobQueueExport ? (
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-              <div className="min-w-0 text-xs text-slate-600">
-                <div className="font-semibold text-slate-800">Exports the current queue and filters.</div>
-                <div>Contractor-safe CSV excludes internal notes, billing, and payment details.</div>
-                {!canExportContractorSafeCsv ? (
-                  <div className="mt-1 font-semibold text-amber-700">Choose a contractor to create a contractor-safe CSV.</div>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={internalOpsExportHref}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
-                >
-                  Internal CSV
-                </Link>
-                {canExportContractorSafeCsv ? (
-                  <Link
-                    href={contractorSafeOpsExportHref}
-                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    Contractor-Safe CSV
-                  </Link>
-                ) : (
-                  <span className="inline-flex min-h-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-400">
-                    Contractor-Safe CSV
-                  </span>
-                )}
-              </div>
-            </div>
-          ) : null}
-
           <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
             <div>
@@ -2038,13 +1900,6 @@ function telHref(phone?: string | null) {
                 className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
               >
                 Export CSV
-              </Link>
-            ) : selectedWorkspaceKey === "closeout" ? (
-              <Link
-                href={`/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
-                className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
-              >
-                View all
               </Link>
             ) : null}
           </div>
@@ -2634,99 +2489,113 @@ function telHref(phone?: string | null) {
                   ))}
                 </div>
               )
-            ) : !selectedWorkspaceSection || selectedWorkspaceSection.previewRows.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
-                {hasActiveOpsBoardFilters ? (
-                  <Link href={clearOpsBoardFiltersHref} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
-                    Clear filters
-                  </Link>
-                ) : null}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {selectedWorkspaceSection.key === "closeout" && canViewFieldPaymentVerificationAttention
-                  ? (fieldPaymentReconciliationAttention?.items ?? []).map((item) => workspaceFieldPaymentReviewCard(item))
-                  : null}
-                {selectedWorkspaceSection.previewRows.map((job: any) => {
-                  const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);
-                  if (selectedWorkspaceSection.key === "need_to_schedule") {
-                    return workspaceNeedsSchedulingRichCard(job, visibleReason);
-                  }
-                  if (selectedWorkspaceSection.key === "closeout") {
-                    return workspaceCloseoutRichCard(job, visibleReason);
-                  }
-                  if (selectedWorkspaceSection.key === "follow_ups") {
-                    return workspaceFollowUpRichCard(job);
-                  }
-
-                  return (
-                    <QueueCard
-                      key={String(job?.id ?? "")}
-                      href={`/jobs/${job.id}?tab=ops`}
-                      title={workspaceTitle(job)}
-                      subtitle={workspaceCustomerLocation(job)}
-                      actionLabel="Open Job"
-                      tags={[
-                        {
-                          label: "Status/Reason",
-                          value: visibleReason.label,
-                          detail: visibleReason.detail || undefined,
-                        },
-                        {
-                          label: "In Queue",
-                          value: workspaceQueueClockTag(job, selectedWorkspaceSection.key),
-                        },
-                        {
-                          label: "Last Action",
-                          value: workspaceLastActionTag(job),
-                          fullWidth: true,
-                        },
-                        {
-                          label: "Assignment",
-                          value: formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap),
-                        },
-                        ...(workspaceContractorName(job)
-                          ? [{ label: "Contractor", value: workspaceContractorName(job) }]
-                          : []),
-                      ]}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            ) : null}
           </article>
+          </>
+          ) : (
+            <OpsBoardActiveQueuePanel
+              chips={opsBoardClientChips}
+              hiddenTodayChips={opsBoardHiddenTodayChips}
+              contractorFocusSelector={
+                showWorkspaceContractorFilter ? (
+                  <ContractorFocusSelector
+                    allCount={contractorFocusAllCount}
+                    internalWorkCount={contractorFocusInternalCount}
+                    internalWorkId={INTERNAL_WORK_CONTRACTOR_FOCUS_ID}
+                    options={contractorFocusOptions}
+                    selectedIds={contractorFocusIds}
+                  />
+                ) : null
+              }
+              initialBucket={effectiveBoardBucketFilter}
+              initialPanel={{
+                queueLabel: selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label,
+                itemNoun: selectedWorkspaceItemNoun,
+                reasonOptions: workspaceReasonOptions,
+                rows: activeQueueRows,
+                pinnedViews: activeQueuePinnedViews,
+                canExportContractorSafeCsv,
+              }}
+              bucketPreviewLimits={opsBoardBucketPreviewLimits}
+              contractorParam={contractorFocusFilter ?? ""}
+              hasContractorFilter={contractorFocusIds.length > 0}
+              clearContractorHref={clearOpsBoardFiltersHref}
+              headerRightActionByBucket={opsBoardHeaderRightActionByBucket}
+            />
+          )}
         </section>
+        </div>
 
-        {showTeamClockStatusCard ? (
+        <aside className="space-y-3 sm:space-y-4">
           <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Operations</div>
-                <div className="text-[15px] font-semibold tracking-tight text-slate-950">Team Clock Status</div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Queue Health</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className={`rounded-xl border px-3 py-2 ${queueHealthStats.agingOver30 > 0 ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-slate-50"}`}>
+                <div className={`text-xl font-semibold ${queueHealthStats.agingOver30 > 0 ? "text-rose-700" : "text-slate-500"}`}>{queueHealthStats.agingOver30}</div>
+                <div className="text-[11px] font-medium text-slate-600">Aging &gt; 30d</div>
               </div>
-              <Link href="/time-clock" className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
-                Open time clock
-              </Link>
+              <div className={`rounded-xl border px-3 py-2 ${queueHealthStats.unassigned > 0 ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+                <div className={`text-xl font-semibold ${queueHealthStats.unassigned > 0 ? "text-amber-700" : "text-slate-500"}`}>{queueHealthStats.unassigned}</div>
+                <div className="text-[11px] font-medium text-slate-600">Unassigned</div>
+              </div>
             </div>
-
-            {teamClockStatusRows.length === 0 ? (
-              <div className="text-xs text-slate-600">No team members are clocked in right now.</div>
-            ) : (
-              <div className="space-y-1.5">
-                {teamClockStatusRows.slice(0, 8).map((row) => (
-                  <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
-                    <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
-                      <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>
-                    </div>
-                    <span className="shrink-0 text-[11px] font-medium text-slate-700">{row.statusLabel} · {row.elapsed}</span>
+            {queueHealthStats.breakdown.length > 0 ? (
+              <div className="mt-2 space-y-1 border-t border-slate-200 pt-2">
+                {queueHealthStats.breakdown.map((entry) => (
+                  <div key={entry.label} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600">{entry.label}</span>
+                    <span className="font-semibold text-slate-800">{entry.count}</span>
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </section>
-        ) : null}
+
+          <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Handoffs</div>
+            <div className="space-y-2">
+              <Link href="/ops/handoffs" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
+                <span className="font-medium text-slate-700">{handoffRequestsPendingCount} requests pending</span>
+                <span className="font-semibold text-blue-700">Review &rarr;</span>
+              </Link>
+              <Link href="/ops/connected-handoffs" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
+                <span className="font-medium text-slate-700">{connectedHandoffPartnerCount} connected</span>
+                <span className="font-semibold text-blue-700">View &rarr;</span>
+              </Link>
+            </div>
+          </section>
+
+          {showTeamClockStatusCard ? (
+            <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Operations</div>
+                  <div className="text-[15px] font-semibold tracking-tight text-slate-950">Team Clock Status</div>
+                </div>
+                <Link href="/time-clock" className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
+                  Open time clock
+                </Link>
+              </div>
+
+              {teamClockStatusRows.length === 0 ? (
+                <div className="text-xs text-slate-600">No team members are clocked in right now.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {teamClockStatusRows.slice(0, 8).map((row) => (
+                    <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
+                        <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>
+                      </div>
+                      <span className="shrink-0 text-[11px] font-medium text-slate-700">{row.statusLabel} · {row.elapsed}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : null}
+        </aside>
+        </div>
       </div>
     );
 }

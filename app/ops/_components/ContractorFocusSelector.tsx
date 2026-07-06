@@ -87,20 +87,15 @@ export default function ContractorFocusSelector({
   }
 
   return (
-    <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Focus</div>
-          <div className="truncate text-sm font-semibold text-slate-950">{summary || `All Contractors · ${allCount}`}</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex min-h-8 items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-        >
-          Change
-        </button>
-      </div>
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
+      >
+        <span className="truncate">{summary || `All Contractors · ${allCount}`}</span>
+        <span className="text-[10px] text-slate-500" aria-hidden="true">▾</span>
+      </button>
 
       {open ? (
         <div className="fixed inset-0 z-50 bg-slate-950/35 p-3 sm:flex sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Contractor Focus selector">
@@ -108,7 +103,10 @@ export default function ContractorFocusSelector({
             <div className="border-b border-slate-200 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Focus</div>
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                    <span className="inline-block h-[13px] w-[3px] rounded-full bg-blue-600" aria-hidden="true" />
+                    Contractor Focus
+                  </div>
                   <div className="text-sm font-semibold text-slate-950">{draftIds.length || "All"} selected</div>
                 </div>
                 <button type="button" onClick={() => setOpen(false)} className="rounded-full px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
@@ -129,22 +127,45 @@ export default function ContractorFocusSelector({
                 onClick={() => setDraftIds([])}
                 className={[
                   "mb-1 flex min-h-10 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-semibold",
-                  draftIds.length === 0 ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50",
+                  draftIds.length === 0 ? "border-navy bg-navy text-white" : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50",
                 ].join(" ")}
               >
                 <span>All Contractors</span>
-                <span className={draftIds.length === 0 ? "text-slate-200" : "text-slate-500"}>{allCount}</span>
+                <span
+                  className={
+                    draftIds.length === 0
+                      ? "rounded-full bg-white/15 px-2 py-0.5 text-xs font-semibold text-white"
+                      : allCount === 0
+                      ? "rounded-full bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-300"
+                      : "rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700"
+                  }
+                >
+                  {allCount}
+                </span>
               </button>
 
-              <label className="mb-1 flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+              <label
+                className={[
+                  "mb-1 flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50",
+                  draftSet.has(internalWorkId) ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white",
+                ].join(" ")}
+              >
                 <input
                   type="checkbox"
                   checked={draftSet.has(internalWorkId)}
                   onChange={(event) => setDraftValue(internalWorkId, event.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-700"
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus-visible:ring-blue-300"
                 />
                 <span className="min-w-0 flex-1 truncate">Internal Work</span>
-                <span className="text-slate-500">{internalWorkCount}</span>
+                <span
+                  className={
+                    internalWorkCount === 0
+                      ? "rounded-full bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-300"
+                      : "rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700"
+                  }
+                >
+                  {internalWorkCount}
+                </span>
               </label>
 
               {filteredOptions.length === 0 ? (
@@ -153,18 +174,36 @@ export default function ContractorFocusSelector({
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {filteredOptions.map((option) => (
-                    <label key={option.id} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
-                      <input
-                        type="checkbox"
-                        checked={draftSet.has(option.id)}
-                        onChange={(event) => setDraftValue(option.id, event.target.checked)}
-                        className="h-4 w-4 rounded border-slate-300 text-blue-700"
-                      />
-                      <span className="min-w-0 flex-1 truncate">{option.name}</span>
-                      <span className="text-slate-500">{option.count}</span>
-                    </label>
-                  ))}
+                  {filteredOptions.map((option) => {
+                    const isSelected = draftSet.has(option.id);
+                    return (
+                      <label
+                        key={option.id}
+                        className={[
+                          "flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50",
+                          isSelected ? "border-slate-200 bg-slate-50 text-slate-900" : "border-slate-200 bg-white text-slate-800",
+                          option.count === 0 && !isSelected ? "text-slate-400" : "",
+                        ].join(" ")}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(event) => setDraftValue(option.id, event.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus-visible:ring-blue-300"
+                        />
+                        <span className="min-w-0 flex-1 truncate">{option.name}</span>
+                        <span
+                          className={
+                            option.count === 0
+                              ? "rounded-full bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-300"
+                              : "rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700"
+                          }
+                        >
+                          {option.count}
+                        </span>
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -177,7 +216,7 @@ export default function ContractorFocusSelector({
                 <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                   Cancel
                 </button>
-                <button type="button" onClick={() => apply()} className="inline-flex min-h-9 items-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">
+                <button type="button" onClick={() => apply()} className="inline-flex min-h-9 items-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
                   Apply
                 </button>
               </div>

@@ -6,6 +6,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const rowCardSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
+  "utf-8",
+);
 
 const workspaceSelectStart = opsPageSource.indexOf("const workspaceSelect =");
 const workspaceSelectEnd = opsPageSource.indexOf("const scheduledSnapshotSelect", workspaceSelectStart);
@@ -28,20 +32,25 @@ const loadCloseoutWorkspaceRowsSource =
     ? opsPageSource.slice(loadCloseoutWorkspaceRowsStart, loadCloseoutWorkspaceRowsEnd)
     : "";
 
-const workspaceCloseoutCardStart = opsPageSource.indexOf("function workspaceCloseoutRichCard(");
-const workspaceCloseoutCardEnd = opsPageSource.indexOf("function workspaceFieldPaymentReviewCard(", workspaceCloseoutCardStart);
-const workspaceCloseoutCardSource =
-  workspaceCloseoutCardStart > -1 && workspaceCloseoutCardEnd > workspaceCloseoutCardStart
-    ? opsPageSource.slice(workspaceCloseoutCardStart, workspaceCloseoutCardEnd)
+const buildCloseoutStart = opsPageSource.indexOf("function buildCloseoutRowView(");
+const buildCloseoutEnd = opsPageSource.indexOf("function formatFollowUpOwner", buildCloseoutStart);
+const buildCloseoutSource =
+  buildCloseoutStart > -1 && buildCloseoutEnd > buildCloseoutStart
+    ? opsPageSource.slice(buildCloseoutStart, buildCloseoutEnd)
     : "";
 
-const workspaceListStart = opsPageSource.indexOf(
-  'selectedWorkspaceSection.key === "closeout" && canViewFieldPaymentVerificationAttention',
-);
-const workspaceListEnd = opsPageSource.indexOf("</article>", workspaceListStart);
-const workspaceListSource =
-  workspaceListStart > -1 && workspaceListEnd > workspaceListStart
-    ? opsPageSource.slice(workspaceListStart, workspaceListEnd)
+const closeoutCardStart = rowCardSource.indexOf("function CloseoutCard(");
+const closeoutCardEnd = rowCardSource.indexOf("function FollowUpCard(", closeoutCardStart);
+const closeoutCardSource =
+  closeoutCardStart > -1 && closeoutCardEnd > closeoutCardStart
+    ? rowCardSource.slice(closeoutCardStart, closeoutCardEnd)
+    : "";
+
+const activeQueueRowsStart = opsPageSource.indexOf("const activeQueueRows: OpsBoardActiveQueueRow[]");
+const activeQueueRowsEnd = opsPageSource.indexOf("const activeQueuePinnedViews", activeQueueRowsStart);
+const activeQueueRowsSource =
+  activeQueueRowsStart > -1 && activeQueueRowsEnd > activeQueueRowsStart
+    ? opsPageSource.slice(activeQueueRowsStart, activeQueueRowsEnd)
     : "";
 
 describe("/ops Closeout rich card contractor visibility", () => {
@@ -52,29 +61,29 @@ describe("/ops Closeout rich card contractor visibility", () => {
   });
 
   it("renders contractor name in always-visible closeout card metadata when present", () => {
-    expect(workspaceCloseoutCardSource).toContain("const contractorName = workspaceContractorName(job);");
-    expect(workspaceCloseoutCardSource).toContain('...(contractorName ? [{ label: "Contractor", value: contractorName }] : [])');
-    expect(workspaceCloseoutCardSource).toContain('variant="closeout-rich"');
+    expect(buildCloseoutSource).toContain("contractorName: workspaceContractorName(job)");
+    expect(closeoutCardSource).toContain('...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : [])');
+    expect(closeoutCardSource).toContain('variant="closeout-rich"');
   });
 
   it("does not duplicate contractor inside the expandable closeout action area", () => {
-    const expandedAreaStart = workspaceCloseoutCardSource.indexOf("<QueueCardOpenAndAct>");
-    const expandedAreaSource = expandedAreaStart > -1 ? workspaceCloseoutCardSource.slice(expandedAreaStart) : "";
+    const expandedAreaStart = closeoutCardSource.indexOf("<QueueCardOpenAndAct>");
+    const expandedAreaSource = expandedAreaStart > -1 ? closeoutCardSource.slice(expandedAreaStart) : "";
 
     expect(expandedAreaSource).toContain("<QueueCardOpenAndAct>");
     expect(expandedAreaSource).not.toContain(">Contractor<");
   });
 
   it("omits contractor metadata quietly when the closeout job has no contractor", () => {
-    expect(workspaceCloseoutCardSource).toContain("contractorName ? ");
-    expect(workspaceCloseoutCardSource).toContain(": [])");
-    expect(workspaceCloseoutCardSource).not.toContain("operationalTenantIdentity.displayName");
-    expect(workspaceCloseoutCardSource).not.toContain("Unassigned contractor");
+    expect(closeoutCardSource).toContain("view.contractorName ? ");
+    expect(closeoutCardSource).toContain(": [])");
+    expect(buildCloseoutSource).not.toContain("operationalTenantIdentity.displayName");
+    expect(closeoutCardSource).not.toContain("Unassigned contractor");
   });
 
   it("keeps the selected closeout workspace on the rich card path", () => {
-    expect(workspaceListSource).toContain('if (selectedWorkspaceSection.key === "closeout")');
-    expect(workspaceListSource).toContain("return workspaceCloseoutRichCard(job, visibleReason);");
+    expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "closeout"');
+    expect(activeQueueRowsSource).toContain("buildCloseoutRowView(job, visibleReason)");
   });
 
   it("preserves closeout queue inclusion and count derivation", () => {

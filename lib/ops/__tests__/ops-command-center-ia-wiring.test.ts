@@ -57,6 +57,16 @@ const contractorFocusSelectorSource = readFileSync(
   "utf-8",
 );
 
+const opsRowCardSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
+  "utf-8",
+);
+
+const opsActiveQueuePanelSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_components/OpsBoardActiveQueuePanel.tsx"),
+  "utf-8",
+);
+
 function assertFound(label: string, index: number) {
   expect(index, `${label} marker should exist in the Full Ops branch`).toBeGreaterThan(-1);
 }
@@ -79,7 +89,7 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("keeps the board queue preview compact with job actions still reachable", () => {
     expect(opsPageSource).toContain("Active Queue");
-    expect(opsPageSource).toContain("Open Job");
+    expect(opsRowCardSource).toContain("Open Job");
     expect(opsPageSource).toContain("selectedWorkspacePreviewCount");
     expect(opsPageSource).toContain("selectedWorkspaceTotalCount");
     expect(opsPageSource).toContain("Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount}");
@@ -211,8 +221,8 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)");
     expect(opsPageSource).toContain("return sortOpsBoardRows(queueRes.data ?? [], boardSort);");
     expect(opsPageSource).toContain("workspaceContractorName(job)");
-    expect(opsPageSource).toContain('href={`/jobs/${job.id}?tab=ops`}');
-    expect(opsPageSource).toContain("Open Job");
+    expect(opsPageSource).toContain('href: `/jobs/${jobId}?tab=ops`');
+    expect(opsRowCardSource).toContain("Open Job");
   });
 
   it("keeps sorting combined with Contractor and selected queue", () => {
@@ -237,21 +247,19 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("function workspaceVisibleReasonDisplay(job: any, queueKey: string): OpsBoardVisibleReason");
     expect(opsPageSource).toContain("return getOpsBoardVisibleReason(workspaceReasonInput(job), () => wsStatusReason(job, queueKey), { queueKey });");
     expect(opsPageSource).toContain("const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);");
-    expect(opsPageSource).toContain("value: visibleReason.label");
-    expect(opsPageSource).toContain("detail: visibleReason.detail");
+    expect(opsPageSource).toContain("reasonLabel: visibleReason.label");
+    expect(opsPageSource).toContain("reasonDetail: visibleReason.detail");
   });
 
   it("guards Ops card reason rendering from bypassing the structured visible reason helper", () => {
     const fullCardRenderStart = opsPageSource.indexOf("selectedWorkspaceSection.previewRows.map");
-    const fullCardRenderEnd = opsPageSource.indexOf("workspaceQueueClockTag(job", fullCardRenderStart);
+    const fullCardRenderEnd = opsPageSource.indexOf("sortable: {", fullCardRenderStart);
     const fullCardRenderSource =
       fullCardRenderStart > -1 && fullCardRenderEnd > fullCardRenderStart
         ? opsPageSource.slice(fullCardRenderStart, fullCardRenderEnd)
         : "";
 
     expect(fullCardRenderSource).toContain("workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key)");
-    expect(fullCardRenderSource).toContain("value: visibleReason.label");
-    expect(fullCardRenderSource).toContain("detail: visibleReason.detail || undefined");
     expect(fullCardRenderSource).not.toContain("wsStatusReason(job");
     expect(fullCardRenderSource).not.toContain("workspaceStatusReason(job");
   });
@@ -291,7 +299,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("bucket: effectiveBoardBucketFilter");
     expect(opsPageSource).toContain('boardSort === "oldest" ? "" : boardSort');
     expect(opsPageSource).toContain("Clear filters");
-    expect(opsPageSource).toContain("No jobs match these filters.");
+    expect(opsActiveQueuePanelSource).toContain("No jobs match these filters.");
   });
 
   it("removes visible focused queue route entry points from the main Ops surface", () => {

@@ -49,6 +49,11 @@ const opsPageSource = readFileSync(
   "utf-8",
 );
 
+const opsRowCardSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
+  "utf-8",
+);
+
 describe("focused ops queue filtering", () => {
   it("waiting queue includes waiting states but not office review exceptions", () => {
     const rows = buildWaitingQueueRows([
@@ -450,7 +455,7 @@ describe("focused queue display labels", () => {
 
   it("Operations Workspace cards use formatted status/reason copy instead of raw Ops Status", () => {
     expect(opsPageSource).toContain("getOpsQueueCardStatusReason");
-    expect(opsPageSource).toContain("Status/Reason");
+    expect(opsRowCardSource).toContain('label: "Reason"');
     expect(opsPageSource).not.toContain("Ops Status:");
   });
 
@@ -494,14 +499,14 @@ describe("focused queue display labels", () => {
   it("early Operations Workspace preview cards use an initialized preview assignment map", () => {
     expect(opsPageSource).toContain("selectedPreviewAssignmentDisplayMap");
     expect(opsPageSource).toContain(
-      "formatAssignmentSummaryForJob(String(job?.id ?? \"\"), selectedPreviewAssignmentDisplayMap)",
+      "formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap)",
     );
   });
 
   it("Operations Workspace rows include contractor context only when a job contractor exists", () => {
     expect(opsPageSource).toContain("contractors(name)");
     expect(opsPageSource).toContain("workspaceContractorName(job)");
-    expect(opsPageSource).toContain("Contractor");
+    expect(opsRowCardSource).toContain("Contractor");
     expect(opsPageSource).not.toContain("Contractor:</span> -");
     expect(opsPageSource).not.toContain("formatCityNamePart(workspaceContractorName");
     expect(opsPageSource).not.toContain("formatPersonNamePart(workspaceContractorName");
@@ -518,13 +523,13 @@ describe("focused queue display labels", () => {
   it("Operations Workspace rows normalize person and city casing without touching companies", () => {
     expect(opsPageSource).toContain("formatPersonNamePart(job?.customer_first_name)");
     expect(opsPageSource).toContain("formatCityNamePart(job?.city)");
-    expect(opsPageSource).toContain("value: workspaceContractorName(job)");
+    expect(opsPageSource).toContain("contractorName: workspaceContractorName(job)");
   });
 
   it("Operations Workspace rows keep queue/action timing and avoid dash-only metadata fallbacks", () => {
-    expect(opsPageSource).toContain("In Queue");
-    expect(opsPageSource).toContain("Last Action");
-    expect(opsPageSource).toContain("workspaceQueueClockTag");
+    expect(opsPageSource).toContain("In queue");
+    expect(opsRowCardSource).toContain("Last Action");
+    expect(opsPageSource).toContain("workspaceQueueAgeChipLabel");
     expect(opsPageSource).toContain("workspaceLastActionTag");
     expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
     expect(opsPageSource).toContain("Not available");

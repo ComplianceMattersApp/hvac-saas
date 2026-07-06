@@ -7,7 +7,7 @@ const opsPageSource = readFileSync(resolve(__dirname, "../../../app/ops/page.tsx
 function permitRenderBranch() {
   const selectedRowsIndex = opsPageSource.indexOf("selectedPermitRows.length === 0");
   const start = opsPageSource.lastIndexOf('{selectedWorkspaceKey === "permits" ? (', selectedRowsIndex);
-  const end = opsPageSource.indexOf(") : !selectedWorkspaceSection", start);
+  const end = opsPageSource.indexOf(') : selectedWorkspaceKey === "contractor_intake"', start);
   expect(selectedRowsIndex).toBeGreaterThanOrEqual(0);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
