@@ -25,6 +25,8 @@ type Props = {
   systemName?: string | null;
   equipmentLabel?: string | null;
   evidenceAttachments?: EvidenceAttachment[];
+  variant?: "panel" | "action";
+  onSavedChange?: (saved: boolean) => void;
 };
 
 function formatUploadDate(value: string) {
@@ -40,6 +42,8 @@ export default function EquipmentLabelPhotoEvidencePanel({
   systemName,
   equipmentLabel,
   evidenceAttachments = [],
+  variant = "panel",
+  onSavedChange,
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -56,6 +60,8 @@ export default function EquipmentLabelPhotoEvidencePanel({
     equipmentLabel ? `- ${equipmentLabel}` : "",
   ].filter(Boolean).join(" ");
   const savedCount = evidenceAttachments.length;
+  const isActionVariant = variant === "action";
+  const secondaryButtonClass = `${isActionVariant ? "flex-1 sm:flex-none" : ""} inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50`;
 
   function pickWith(ref: RefObject<HTMLInputElement | null>) {
     setError(null);
@@ -133,6 +139,7 @@ export default function EquipmentLabelPhotoEvidencePanel({
 
         setPendingFiles([]);
         setOk("Label photo captured.");
+        onSavedChange?.(true);
         router.refresh();
       } catch (uploadError) {
         for (const attachmentId of uploadedIds) {
@@ -148,7 +155,7 @@ export default function EquipmentLabelPhotoEvidencePanel({
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-700">
+    <div className={isActionVariant ? "min-w-0 text-xs text-slate-700" : "border-t border-slate-200 pt-3 text-xs text-slate-700"}>
       <input
         ref={takePhotoRef}
         type="file"
@@ -169,15 +176,19 @@ export default function EquipmentLabelPhotoEvidencePanel({
         disabled={isPending}
       />
 
-      <div className="font-medium text-slate-900">Equipment Label Photo</div>
-      {savedCount ? (
-        <div className="mt-1 font-medium text-emerald-700">
-          Label photo captured
-        </div>
-      ) : (
-        <div className="mt-1 text-slate-600">
-          Take or upload the nameplate label as supporting evidence.
-        </div>
+      {isActionVariant ? null : (
+        <>
+          <div className="font-medium text-slate-900">Equipment Label Photo</div>
+          {savedCount ? (
+            <div className="mt-1 font-medium text-emerald-700">
+              Label photo captured
+            </div>
+          ) : (
+            <div className="mt-1 text-slate-600">
+              Take or upload the nameplate label as supporting evidence.
+            </div>
+          )}
+        </>
       )}
 
       {error ? (
@@ -191,12 +202,12 @@ export default function EquipmentLabelPhotoEvidencePanel({
         </div>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className={`${isActionVariant ? "flex" : "mt-3 flex"} flex-wrap items-center gap-2`}>
         <button
           type="button"
           onClick={() => pickWith(takePhotoRef)}
           disabled={isPending}
-          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          className={secondaryButtonClass}
         >
           Take Label Photo
         </button>
@@ -204,11 +215,11 @@ export default function EquipmentLabelPhotoEvidencePanel({
           type="button"
           onClick={() => pickWith(uploadPhotoRef)}
           disabled={isPending}
-          className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          className={secondaryButtonClass}
         >
           Upload Label Photo
         </button>
-        <span className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600">
+        <span className={`${isActionVariant && !pendingFiles.length && !savedCount ? "sr-only" : "inline-flex"} min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600`}>
           {pendingFiles.length ? `${pendingFiles.length} selected` : savedCount ? `${savedCount} saved` : "No photo selected"}
         </span>
       </div>
@@ -242,16 +253,16 @@ export default function EquipmentLabelPhotoEvidencePanel({
               href={attachment.signedUrl ?? undefined}
               target="_blank"
               rel="noreferrer"
-              className="block overflow-hidden rounded-md border border-emerald-200 bg-white"
+              className="block overflow-hidden border-l-2 border-emerald-200 bg-white pl-2"
             >
               {attachment.signedUrl ? (
                 <img
                   src={attachment.signedUrl}
                   alt={attachment.caption || "Equipment label photo"}
-                  className="h-24 w-full object-cover"
+                  className="h-24 w-full rounded-md object-cover"
                 />
               ) : null}
-              <div className="px-2 py-1.5">
+              <div className="py-1.5">
                 <div className="truncate font-medium text-emerald-900">
                   {attachment.caption || "Equipment label photo"}
                 </div>

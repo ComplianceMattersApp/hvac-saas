@@ -403,33 +403,21 @@ if (!job) return notFound();
               </div>
 
               {(systems && systems.length > 0) || unassignedEquipmentRows.length > 0 ? (
-                <div className="space-y-4 p-4 sm:p-5">
+                <div className="space-y-5 px-5 py-4 sm:px-6 sm:py-5">
                   {(systems ?? []).map((system) => {
                     const systemEquipment = equipmentBySystemId[system.id] ?? [];
                     const systemFiltersForInventory = (filtersBySystemId[system.id] ?? []).filter((filter) => !filter.archived_at);
                     const systemInventoryCount = systemEquipment.length + systemFiltersForInventory.length;
                     return (
-                      <div key={system.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-14px_rgba(15,23,42,0.12)]">
-                        <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3">
-                          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                            <div>
-                              <h3 className="text-sm font-semibold text-navy">{system.name || "System"}</h3>
-                              <p className="mt-0.5 text-xs text-slate-500">System details, equipment, and filters.</p>
-                            </div>
-                            <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                              {systemInventoryCount} inventory item{systemInventoryCount === 1 ? "" : "s"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4 p-4">
+                      <div key={system.id} className="border-t border-slate-200 pt-4 first:border-t-0 first:pt-0">
+                        <div className="space-y-4">
                           <div>
                             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                               Inventory
                             </div>
                             {systemInventoryCount > 0 ? (
-                              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-                                <div className="divide-y divide-slate-200">
+                              <div>
+                                <div className="divide-y divide-slate-200 border-t border-slate-200">
                                   {systemEquipment.map((eq) => (
                                     <EquipmentEditCard
                                       key={eq.id}

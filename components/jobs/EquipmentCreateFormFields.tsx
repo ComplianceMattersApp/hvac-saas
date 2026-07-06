@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import SystemLocationPicker from "@/components/jobs/SystemLocationPicker";
 import SubmitButton from "@/components/SubmitButton";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
@@ -23,6 +23,8 @@ export default function EquipmentCreateFormFields({
   description = "Add an equipment record or a system-level filter to the selected system.",
   role: controlledRole,
   onRoleChange,
+  actionAccessory,
+  showSubmitButton = true,
 }: {
   systems: SystemRow[];
   includeSystemPicker: boolean;
@@ -31,6 +33,8 @@ export default function EquipmentCreateFormFields({
   description?: string;
   role?: string;
   onRoleChange?: (role: string) => void;
+  actionAccessory?: ReactNode;
+  showSubmitButton?: boolean;
 }) {
   const [uncontrolledRole, setUncontrolledRole] = useState("outdoor_unit");
   const [filterDateDefault] = useState(() => new Date().toISOString().slice(0, 10));
@@ -165,9 +169,29 @@ export default function EquipmentCreateFormFields({
             </div>
           </div>
         ) : (
+        <>
+        {!showHeatingCapacity ? (
+          <div>
+            <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="tonnage">
+              Tonnage (optional)
+            </label>
+            <input
+              id="tonnage"
+              name="tonnage"
+              type="number"
+              step="0.5"
+              min="0"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              placeholder="3.5"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Used for airflow and related ECC calculations when available.
+            </p>
+          </div>
+        ) : null}
         <Disclosure
-          title="Advanced Details"
-          subtitle="Manufacturer, serial, tonnage, refrigerant, and notes (all optional)"
+          title="Enter Details"
+          subtitle={showHeatingCapacity ? "Manufacturer, serial, heating capacity, and notes (all optional)" : "Manufacturer, serial, refrigerant, and notes (all optional)"}
           className="mt-2"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -207,25 +231,25 @@ export default function EquipmentCreateFormFields({
               />
             </div>
 
+            {showHeatingCapacity ? (
             <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}>
-                {showHeatingCapacity ? "Heating Input (KBTU/h)" : "Tonnage"} (optional)
+              <label className="text-xs font-medium text-slate-700 block mb-1.5" htmlFor="heating_capacity_kbtu">
+                Heating Input (KBTU/h) (optional)
               </label>
               <input
-                id={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}
-                name={showHeatingCapacity ? "heating_capacity_kbtu" : "tonnage"}
+                id="heating_capacity_kbtu"
+                name="heating_capacity_kbtu"
                 type="number"
-                step={showHeatingCapacity ? "1" : "0.5"}
+                step="1"
                 min="0"
                 className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                placeholder={showHeatingCapacity ? "120" : "5"}
+                placeholder="120"
               />
-              {showHeatingCapacity ? (
-                <p className="mt-1 text-xs text-slate-500">
-                  Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
-                </p>
-              ) : null}
+              <p className="mt-1 text-xs text-slate-500">
+                Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
+              </p>
             </div>
+            ) : null}
 
             {showHeatingCapacity && (
               <div>
@@ -298,13 +322,19 @@ export default function EquipmentCreateFormFields({
             </div>
           </div>
         </Disclosure>
+        </>
         )}
       </div>
 
-      <div className="mt-6 pt-4 border-t border-slate-200">
-        <SubmitButton loadingText="Adding..." className="w-fit rounded-[10px] bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
-          {addingFilter ? "Add Filter" : "Add Equipment"}
-        </SubmitButton>
+      <div className="mt-6 border-t border-slate-200 pt-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start">
+          {!addingFilter ? actionAccessory : null}
+          {showSubmitButton ? (
+            <SubmitButton loadingText="Adding..." className="w-full rounded-[10px] bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 sm:w-fit">
+              {addingFilter ? "Add Filter" : "Add Equipment"}
+            </SubmitButton>
+          ) : null}
+        </div>
       </div>
     </div>
   );

@@ -112,7 +112,7 @@ describe("job equipment system filter management wiring", () => {
   it("preserves normal equipment create routing and submits selected system context", () => {
     expect(equipmentCreateFormSource).toContain("addJobEquipmentFromForm");
     expect(equipmentCreateFormSource).toContain("<EquipmentCreateFormFields");
-    expect(equipmentCreateFormFieldsSource).toContain("Advanced Details");
+    expect(equipmentCreateFormFieldsSource).toContain("Enter Details");
     expect(equipmentCreateFormFieldsSource).toContain('name="manufacturer"');
     expect(equipmentCreateFormFieldsSource).toContain('name="serial"');
     expect(equipmentDisplaySource).toContain('value: "gas_pack_unit", label: "Gas Pack Unit"');

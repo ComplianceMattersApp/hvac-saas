@@ -106,16 +106,13 @@ export default function EquipmentEditCard({
                   Legacy filter equipment record. Add new filters from Add Equipment or Filter.
                 </div>
               ) : null}
-              {eq.system_location ? (
-                <div className="mt-0.5 text-xs text-slate-500">System: {eq.system_location}</div>
-              ) : null}
             </div>
 
-            <div>
+            {[eq.manufacturer, eq.model].filter(Boolean).length > 0 ? (
               <div className="text-sm font-medium text-slate-700">
-                {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "-"}
+                {[eq.manufacturer, eq.model].filter(Boolean).join(" ")}
               </div>
-            </div>
+            ) : null}
 
             {eq.serial ||
             eq.tonnage ||
@@ -250,7 +247,7 @@ export default function EquipmentEditCard({
           )}
         </div>
 
-        <Disclosure title="Advanced Details" subtitle="Manufacturer, serial, tonnage, refrigerant, and notes" defaultOpen>
+        <Disclosure title="Enter Details" subtitle="Manufacturer, serial, tonnage, refrigerant, and notes" defaultOpen>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-700" htmlFor={`mfr-${eq.id}`}>

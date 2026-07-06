@@ -57,6 +57,9 @@ describe("equipment label photo evidence", () => {
     expect(equipmentPhotoPanelSource).toContain('attachmentEvidenceContext: "equipment_label_photo"');
     expect(equipmentCreateFormSource).toContain("<EquipmentLabelPhotoEvidencePanel");
     expect(equipmentCreateFormSource).toContain('name="equipment_id"');
+    expect(equipmentCreateFormSource).toContain("hasManualEquipmentDetails || hasLabelPhotoEvidence");
+    expect(equipmentCreateFormSource).toContain("onSavedChange={setHasLabelPhotoEvidence}");
+    expect(equipmentPhotoPanelSource).toContain("onSavedChange?.(true)");
     expect(equipmentEditCardSource).toContain("<EquipmentLabelPhotoEvidencePanel");
   });
 
