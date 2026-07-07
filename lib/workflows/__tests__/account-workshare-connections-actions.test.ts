@@ -519,4 +519,28 @@ describe("account workshare connections actions", () => {
     expect(source).not.toContain("customers");
     expect(source).not.toContain("ecc_test_runs");
   });
+
+  it("source guard: company profile copy describes directional connection invites only", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "app", "ops", "admin", "company-profile", "page.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("Contractor Sending Connections");
+    expect(source).toContain("Invite contractor accounts that are allowed to send ECC/HERS requests to this rater account.");
+    expect(source).toContain("No contractor sending connections yet.");
+    expect(source).toContain("Invite contractor account");
+    expect(source).toContain("This only creates a connection invite. It does not share jobs, create portal users, or create ECC/HERS requests.");
+    expect(source).toContain("Contractor sender account ID");
+    expect(source).toContain("Known contractor account ID");
+    expect(source).toContain("Enter the contractor account ID, not this rater account ID.");
+    expect(source).toContain("Create connection invite");
+    expect(source).toContain("Rater accounts this company can send to");
+    expect(source).toContain("A rater must invite this account before ECC/HERS requests can be sent.");
+    expect(source).not.toContain("ECC/HERS Work-Sharing Network");
+    expect(source).not.toContain("Sender account ID");
+    expect(source).not.toContain("Create invite");
+  });
 });

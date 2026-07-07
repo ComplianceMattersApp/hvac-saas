@@ -154,23 +154,23 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   },
   workshare_connection_invited: {
     tone: "success",
-    message: "ECC/HERS work-sharing invite created.",
+    message: "ECC/HERS contractor sending connection invite created.",
   },
   workshare_connection_accepted: {
     tone: "success",
-    message: "ECC/HERS work-sharing invite accepted.",
+    message: "ECC/HERS contractor sending connection invite accepted.",
   },
   workshare_connection_disabled: {
     tone: "warn",
-    message: "ECC/HERS work-sharing connection disabled.",
+    message: "ECC/HERS contractor sending connection disabled.",
   },
   workshare_connection_revoked: {
     tone: "warn",
-    message: "ECC/HERS work-sharing connection revoked.",
+    message: "ECC/HERS contractor sending connection revoked.",
   },
   workshare_connection_error: {
     tone: "error",
-    message: "Could not update ECC/HERS work-sharing connection.",
+    message: "Could not update ECC/HERS contractor sending connection.",
   },
 };
 
@@ -300,7 +300,7 @@ export default async function AdminCompanyProfilePage({
   const workshareAsSender = accountWorkshareConnections.filter((connection) =>
     connection.sender_account_id === internalUser.account_owner_user_id,
   );
-  const workshareActive = accountWorkshareConnections.filter((connection) =>
+  const workshareReceiverActive = workshareAsReceiver.filter((connection) =>
     connection.status === "active",
   );
 
@@ -583,26 +583,26 @@ export default async function AdminCompanyProfilePage({
 
       <div id="authorized-ecc-raters" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected ECC Raters</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Default ECC/HERS Rater Details</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Choose who receives ECC/HERS handoffs when jobs need rater review.
+            Optional rater contact details used for coordination. This does not create an account-to-account connection.
           </p>
         </div>
 
         <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-700">
           <div className="font-semibold text-slate-900">
             {authorizedEccRecipients.length === 0
-              ? "No ECC/HERS rater selected yet"
+              ? "No default ECC/HERS rater details yet"
               : authorizedEccRecipients.length === 1
-                ? "1 ECC/HERS rater available"
-                : `${authorizedEccRecipients.length} ECC/HERS raters available`}
+                ? "1 ECC/HERS rater detail record available"
+                : `${authorizedEccRecipients.length} ECC/HERS rater detail records available`}
           </div>
           <div className="mt-1 text-slate-600">
             {authorizedEccSelection.mode === "none"
-              ? "Add this only when jobs need ECC/HERS coordination."
+              ? "Add these details only when your team needs a default rater reference."
               : authorizedEccSelection.mode === "single"
-                ? "Handoffs will default to the selected rater."
-                : "Your team will choose a rater during handoff."}
+                ? "This rater detail record is selected as the default."
+                : "Your team can choose among these rater detail records."}
           </div>
         </div>
 
@@ -638,18 +638,18 @@ export default async function AdminCompanyProfilePage({
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
           {authorizedEccSelection.mode === "none" ? (
-            <span>ECC/HERS handoff setup is available when needed.</span>
+            <span>Default ECC/HERS rater details are optional and can be added when needed.</span>
           ) : authorizedEccSelection.mode === "single" ? (
-            <span>Workflow handoff will default to this rater.</span>
+            <span>Default rater coordination will use this detail record.</span>
           ) : (
-            <span>Workflow handoff will ask the user to choose a rater.</span>
+            <span>Your team can choose a rater detail record during coordination.</span>
           )}
         </div>
 
         <div className="mt-5 space-y-3">
           {authorizedEccRecipients.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
-              No connected ECC raters are set up yet. Add Compliance Matters or another authorized rater account to enable ECC handoffs.
+              No default ECC/HERS rater details yet. Add a connected account reference or manual rater contact details for coordination.
             </div>
           ) : (
             authorizedEccRecipients.map((recipient) => {
@@ -872,7 +872,7 @@ export default async function AdminCompanyProfilePage({
           </label>
 
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            Manual/external rater records are tracking only. Use connected ECC raters when the rater provides an ECC/HERS handoff ID.
+            Manual/external rater records are tracking only. Use connected account rater details when the rater provides an ECC/HERS handoff ID.
           </div>
 
           <div className="flex justify-end">
@@ -890,35 +890,35 @@ export default async function AdminCompanyProfilePage({
 
       <div id="account-workshare-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">ECC/HERS Work-Sharing Network</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Contractor Sending Connections</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Invite paid EveryStep accounts that can send ECC/HERS work to your rater account.
+            Invite contractor accounts that are allowed to send ECC/HERS requests to this rater account.
           </p>
         </div>
 
         <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-700">
           <div className="font-semibold text-slate-900">
-            {workshareActive.length === 0
-              ? "No active ECC/HERS work-sharing connections"
-              : workshareActive.length === 1
-                ? "1 active ECC/HERS work-sharing connection"
-                : `${workshareActive.length} active ECC/HERS work-sharing connections`}
+            {workshareReceiverActive.length === 0
+              ? "No contractor sending connections yet"
+              : workshareReceiverActive.length === 1
+                ? "1 active contractor sending connection"
+                : `${workshareReceiverActive.length} active contractor sending connections`}
           </div>
           <div className="mt-1 text-slate-600">
-            Connections here are directional. A contractor/sender account can send ECC/HERS work to a receiver/rater account only after the invite is accepted.
+            Create an invite when a contractor account should be allowed to send ECC/HERS requests here.
           </div>
         </div>
 
         <form action={createAccountWorkshareInviteFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-semibold text-slate-900">Invite sender account</div>
+          <div className="text-sm font-semibold text-slate-900">Invite contractor account</div>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            Use either a known paid account ID or an invite email. This does not share jobs, create portal users, or create handoff requests.
+            Use either a known contractor account ID or an invite email. This only creates a connection invite. It does not share jobs, create portal users, or create ECC/HERS requests.
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label htmlFor="workshare-sender-account-id" className="text-sm font-medium text-slate-700">
-                Sender account ID
+                Contractor sender account ID
               </label>
               <input
                 id="workshare-sender-account-id"
@@ -926,6 +926,9 @@ export default async function AdminCompanyProfilePage({
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
                 placeholder="Known contractor account ID"
               />
+              <p className="text-xs leading-5 text-slate-500">
+                Enter the contractor account ID, not this rater account ID.
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -959,15 +962,16 @@ export default async function AdminCompanyProfilePage({
               type="submit"
               className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800"
             >
-              Create invite
+              Create connection invite
             </button>
           </div>
         </form>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           <WorkshareConnectionListSection
-            title="Can send work to us"
-            emptyMessage="No sender accounts invited yet."
+            title="Contractor accounts allowed to send here"
+            description="Contractor/sender accounts that are allowed to send ECC/HERS requests to this rater account after a connection is accepted."
+            emptyMessage="No contractor sending connections yet."
             rows={workshareAsReceiver}
             currentAccountOwnerUserId={internalUser.account_owner_user_id}
             actionSlot={(connection) => (
@@ -999,8 +1003,10 @@ export default async function AdminCompanyProfilePage({
           />
 
           <WorkshareConnectionListSection
-            title="Raters we can send to"
-            emptyMessage="No rater accounts linked to send work to."
+            title="Rater accounts this company can send to"
+            description="Rater accounts this company can send ECC/HERS requests to after a connection is accepted."
+            emptyMessage="No rater connections yet."
+            secondaryEmptyMessage="A rater must invite this account before ECC/HERS requests can be sent."
             rows={workshareAsSender}
             currentAccountOwnerUserId={internalUser.account_owner_user_id}
             actionSlot={(connection) => (
@@ -1240,7 +1246,9 @@ function workshareStatusBadgeClass(value: AccountWorkshareConnectionRow["status"
 
 function WorkshareConnectionListSection(props: {
   title: string;
+  description?: string;
   emptyMessage: string;
+  secondaryEmptyMessage?: string;
   rows: AccountWorkshareConnectionRow[];
   currentAccountOwnerUserId: string;
   actionSlot?: (connection: AccountWorkshareConnectionRow) => ReactNode;
@@ -1248,10 +1256,16 @@ function WorkshareConnectionListSection(props: {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
       <div className="text-sm font-semibold text-slate-900">{props.title}</div>
+      {props.description ? (
+        <div className="mt-1 text-xs leading-5 text-slate-600">{props.description}</div>
+      ) : null}
       <div className="mt-3 space-y-3">
         {props.rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">
-            {props.emptyMessage}
+            <div>{props.emptyMessage}</div>
+            {props.secondaryEmptyMessage ? (
+              <div className="mt-1 text-xs leading-5 text-slate-500">{props.secondaryEmptyMessage}</div>
+            ) : null}
           </div>
         ) : (
           props.rows.map((connection) => {

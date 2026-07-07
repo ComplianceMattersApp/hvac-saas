@@ -11,19 +11,19 @@ describe("authorized ECC raters company profile wiring", () => {
     expect(pageSource).toContain('requireInternalRole("admin"');
   });
 
-  it("renders connected ECC raters setup section with empty and preview states", () => {
+  it("renders default ECC/HERS rater details section with empty and preview states", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("Connected ECC Raters");
-    expect(pageSource).toContain("Choose who receives ECC/HERS handoffs when jobs need rater review.");
-    expect(pageSource).toContain("No ECC/HERS rater selected yet");
+    expect(pageSource).toContain("Default ECC/HERS Rater Details");
+    expect(pageSource).toContain("Optional rater contact details used for coordination. This does not create an account-to-account connection.");
+    expect(pageSource).toContain("No default ECC/HERS rater details yet");
     expect(pageSource).toContain("Advanced ECC/HERS rater details");
-    expect(pageSource).toContain("No connected ECC raters are set up yet.");
-    expect(pageSource).toContain("Add Compliance Matters or another authorized rater account to enable ECC handoffs.");
-    expect(pageSource).toContain("Add this only when jobs need ECC/HERS coordination.");
-    expect(pageSource).toContain("ECC/HERS handoff setup is available when needed.");
-    expect(pageSource).toContain("Workflow handoff will default to this rater.");
-    expect(pageSource).toContain("Workflow handoff will ask the user to choose a rater.");
+    expect(pageSource).toContain("No default ECC/HERS rater details yet.");
+    expect(pageSource).toContain("Add a connected account reference or manual rater contact details for coordination.");
+    expect(pageSource).toContain("Add these details only when your team needs a default rater reference.");
+    expect(pageSource).toContain("Default ECC/HERS rater details are optional and can be added when needed.");
+    expect(pageSource).toContain("Default rater coordination will use this detail record.");
+    expect(pageSource).toContain("Your team can choose a rater detail record during coordination.");
   });
 
   it("shows the current account rater link id as a read-only shareable field", () => {
