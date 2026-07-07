@@ -19,6 +19,12 @@ import {
   requestAccountHandoffConnectionFromForm,
   revokeAccountHandoffConnectionFromForm,
 } from "@/lib/workflows/account-handoff-connections-actions";
+import {
+  acceptAccountWorkshareInviteFromForm,
+  createAccountWorkshareInviteFromForm,
+  disableAccountWorkshareConnectionFromForm,
+  revokeAccountWorkshareConnectionFromForm,
+} from "@/lib/workflows/account-workshare-connections-actions";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import {
   DEFAULT_BILLING_MODE,
@@ -46,6 +52,10 @@ import {
   listAccountHandoffConnectionsForAccount,
   type AccountHandoffConnectionRow,
 } from "@/lib/workflows/account-handoff-connections-read";
+import {
+  listAccountWorkshareConnectionsForAccount,
+  type AccountWorkshareConnectionRow,
+} from "@/lib/workflows/account-workshare-connections-read";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -142,6 +152,26 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
     tone: "error",
     message: "Could not update connected handoff account settings. Please try again.",
   },
+  workshare_connection_invited: {
+    tone: "success",
+    message: "ECC/HERS work-sharing invite created.",
+  },
+  workshare_connection_accepted: {
+    tone: "success",
+    message: "ECC/HERS work-sharing invite accepted.",
+  },
+  workshare_connection_disabled: {
+    tone: "warn",
+    message: "ECC/HERS work-sharing connection disabled.",
+  },
+  workshare_connection_revoked: {
+    tone: "warn",
+    message: "ECC/HERS work-sharing connection revoked.",
+  },
+  workshare_connection_error: {
+    tone: "error",
+    message: "Could not update ECC/HERS work-sharing connection.",
+  },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -194,6 +224,7 @@ export default async function AdminCompanyProfilePage({
     authorizedEccSelection,
     accountHandoffConnections,
     activeConnectedRecipientConnections,
+    accountWorkshareConnections,
   ] = await Promise.all([
     getInternalBusinessProfileByAccountOwnerId({
       supabase,
@@ -221,6 +252,14 @@ export default async function AdminCompanyProfilePage({
       supabase,
       internalUser.account_owner_user_id,
       "ecc",
+    ),
+    listAccountWorkshareConnectionsForAccount(
+      supabase,
+      internalUser.account_owner_user_id,
+      {
+        serviceType: "ecc_hers",
+        limit: 200,
+      },
     ),
   ]);
 
@@ -254,6 +293,15 @@ export default async function AdminCompanyProfilePage({
   );
   const historicalConnections = accountHandoffConnections.filter((connection) =>
     connection.connection_status === "declined" || connection.connection_status === "revoked",
+  );
+  const workshareAsReceiver = accountWorkshareConnections.filter((connection) =>
+    connection.receiver_account_id === internalUser.account_owner_user_id,
+  );
+  const workshareAsSender = accountWorkshareConnections.filter((connection) =>
+    connection.sender_account_id === internalUser.account_owner_user_id,
+  );
+  const workshareActive = accountWorkshareConnections.filter((connection) =>
+    connection.status === "active",
   );
 
   return (
@@ -840,6 +888,151 @@ export default async function AdminCompanyProfilePage({
         </details>
       </div>
 
+      <div id="account-workshare-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">ECC/HERS Work-Sharing Network</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            Invite paid EveryStep accounts that can send ECC/HERS work to your rater account.
+          </p>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-700">
+          <div className="font-semibold text-slate-900">
+            {workshareActive.length === 0
+              ? "No active ECC/HERS work-sharing connections"
+              : workshareActive.length === 1
+                ? "1 active ECC/HERS work-sharing connection"
+                : `${workshareActive.length} active ECC/HERS work-sharing connections`}
+          </div>
+          <div className="mt-1 text-slate-600">
+            Connections here are directional. A contractor/sender account can send ECC/HERS work to a receiver/rater account only after the invite is accepted.
+          </div>
+        </div>
+
+        <form action={createAccountWorkshareInviteFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-semibold text-slate-900">Invite sender account</div>
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
+            Use either a known paid account ID or an invite email. This does not share jobs, create portal users, or create handoff requests.
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="workshare-sender-account-id" className="text-sm font-medium text-slate-700">
+                Sender account ID
+              </label>
+              <input
+                id="workshare-sender-account-id"
+                name="sender_account_id"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="Known contractor account ID"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="workshare-invite-email" className="text-sm font-medium text-slate-700">
+                Invite email
+              </label>
+              <input
+                id="workshare-invite-email"
+                name="invite_email"
+                type="email"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="contractor@example.com"
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="workshare-invite-company" className="text-sm font-medium text-slate-700">
+                Company name
+              </label>
+              <input
+                id="workshare-invite-company"
+                name="invite_company_name"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="Contractor company"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800"
+            >
+              Create invite
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <WorkshareConnectionListSection
+            title="Can send work to us"
+            emptyMessage="No sender accounts invited yet."
+            rows={workshareAsReceiver}
+            currentAccountOwnerUserId={internalUser.account_owner_user_id}
+            actionSlot={(connection) => (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {connection.status === "active" ? (
+                  <form action={disableAccountWorkshareConnectionFromForm}>
+                    <input type="hidden" name="connection_id" value={connection.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+                    >
+                      Disable
+                    </button>
+                  </form>
+                ) : null}
+                {(connection.status === "pending" || connection.status === "active") ? (
+                  <form action={revokeAccountWorkshareConnectionFromForm}>
+                    <input type="hidden" name="connection_id" value={connection.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+                    >
+                      Revoke
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            )}
+          />
+
+          <WorkshareConnectionListSection
+            title="Raters we can send to"
+            emptyMessage="No rater accounts linked to send work to."
+            rows={workshareAsSender}
+            currentAccountOwnerUserId={internalUser.account_owner_user_id}
+            actionSlot={(connection) => (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {connection.status === "pending" && connection.sender_account_id === internalUser.account_owner_user_id ? (
+                  <form action={acceptAccountWorkshareInviteFromForm}>
+                    <input type="hidden" name="connection_id" value={connection.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+                    >
+                      Accept
+                    </button>
+                  </form>
+                ) : null}
+                {(connection.status === "pending" || connection.status === "active") ? (
+                  <form action={revokeAccountWorkshareConnectionFromForm}>
+                    <input type="hidden" name="connection_id" value={connection.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+                    >
+                      Revoke
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            )}
+          />
+        </div>
+      </div>
+
       <div id="account-handoff-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected Handoff Accounts</h2>
@@ -1016,6 +1209,97 @@ function formatConnectionTimestamp(value: string | null) {
   }
 
   return date.toLocaleString();
+}
+
+function resolveWorkshareCounterpartyLabel(connection: AccountWorkshareConnectionRow, currentAccountOwnerUserId: string) {
+  if (connection.receiver_account_id === currentAccountOwnerUserId) {
+    return connection.sender_account_id || connection.invite_email || connection.invite_company_name || "Pending sender";
+  }
+
+  return connection.receiver_account_id;
+}
+
+function formatWorkshareStatus(value: AccountWorkshareConnectionRow["status"]) {
+  if (value === "pending") return "Pending";
+  if (value === "active") return "Active";
+  if (value === "disabled") return "Disabled";
+  return "Revoked";
+}
+
+function workshareStatusBadgeClass(value: AccountWorkshareConnectionRow["status"]) {
+  if (value === "active") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  if (value === "pending") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+
+  return "border-slate-300 bg-slate-100 text-slate-700";
+}
+
+function WorkshareConnectionListSection(props: {
+  title: string;
+  emptyMessage: string;
+  rows: AccountWorkshareConnectionRow[];
+  currentAccountOwnerUserId: string;
+  actionSlot?: (connection: AccountWorkshareConnectionRow) => ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+      <div className="text-sm font-semibold text-slate-900">{props.title}</div>
+      <div className="mt-3 space-y-3">
+        {props.rows.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">
+            {props.emptyMessage}
+          </div>
+        ) : (
+          props.rows.map((connection) => {
+            const createdAt = formatConnectionTimestamp(connection.created_at);
+            const acceptedAt = formatConnectionTimestamp(connection.accepted_at);
+            const disabledAt = formatConnectionTimestamp(connection.disabled_at);
+            const revokedAt = formatConnectionTimestamp(connection.revoked_at);
+
+            return (
+              <div key={connection.id} className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="break-all text-sm font-semibold text-slate-900">
+                      {resolveWorkshareCounterpartyLabel(connection, props.currentAccountOwnerUserId)}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      {connection.receiver_account_id === props.currentAccountOwnerUserId
+                        ? "Sender account"
+                        : "Receiver/rater account"}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${workshareStatusBadgeClass(connection.status)}`}>
+                      {formatWorkshareStatus(connection.status)}
+                    </span>
+                    <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                      ECC/HERS
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  {connection.invite_company_name ? <div>Company: {connection.invite_company_name}</div> : null}
+                  {connection.invite_email ? <div>Email: {connection.invite_email}</div> : null}
+                  {createdAt ? <div>Created: {createdAt}</div> : null}
+                  {acceptedAt ? <div>Accepted: {acceptedAt}</div> : null}
+                  {disabledAt ? <div>Disabled: {disabledAt}</div> : null}
+                  {revokedAt ? <div>Revoked: {revokedAt}</div> : null}
+                </div>
+
+                {props.actionSlot ? props.actionSlot(connection) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
 }
 
 function resolveOtherAccountOwnerUserId(connection: AccountHandoffConnectionRow, currentAccountOwnerUserId: string) {
