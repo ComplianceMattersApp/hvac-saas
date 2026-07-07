@@ -89,7 +89,6 @@ ALTER TABLE public.account_workshare_connections ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS account_workshare_connections_select_party_scope ON public.account_workshare_connections;
 DROP POLICY IF EXISTS account_workshare_connections_insert_receiver_admin_owner_scope ON public.account_workshare_connections;
 DROP POLICY IF EXISTS account_workshare_connections_update_receiver_admin_owner_scope ON public.account_workshare_connections;
-DROP POLICY IF EXISTS account_workshare_connections_update_sender_admin_owner_scope ON public.account_workshare_connections;
 
 CREATE POLICY account_workshare_connections_select_party_scope
 ON public.account_workshare_connections
@@ -155,41 +154,6 @@ WITH CHECK (
       AND (
         actor.role = 'admin'
         OR actor.user_id = account_workshare_connections.receiver_account_id
-      )
-  )
-);
-
-CREATE POLICY account_workshare_connections_update_sender_admin_owner_scope
-ON public.account_workshare_connections
-FOR UPDATE
-TO authenticated
-USING (
-  public.current_internal_account_owner_id() IS NOT NULL
-  AND sender_account_id = public.current_internal_account_owner_id()
-  AND EXISTS (
-    SELECT 1
-    FROM public.internal_users actor
-    WHERE actor.user_id = auth.uid()
-      AND actor.is_active = true
-      AND actor.account_owner_user_id = account_workshare_connections.sender_account_id
-      AND (
-        actor.role = 'admin'
-        OR actor.user_id = account_workshare_connections.sender_account_id
-      )
-  )
-)
-WITH CHECK (
-  public.current_internal_account_owner_id() IS NOT NULL
-  AND sender_account_id = public.current_internal_account_owner_id()
-  AND EXISTS (
-    SELECT 1
-    FROM public.internal_users actor
-    WHERE actor.user_id = auth.uid()
-      AND actor.is_active = true
-      AND actor.account_owner_user_id = account_workshare_connections.sender_account_id
-      AND (
-        actor.role = 'admin'
-        OR actor.user_id = account_workshare_connections.sender_account_id
       )
   )
 );

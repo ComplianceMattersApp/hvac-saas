@@ -51,6 +51,6 @@ describe('account workshare connections schema foundation', () => {
     expect(sql).toContain('receiver_account_id = public.current_internal_account_owner_id()')
     expect(sql).toContain('account_workshare_connections_insert_receiver_admin_owner_scope')
     expect(sql).toContain('account_workshare_connections_update_receiver_admin_owner_scope')
-    expect(sql).toContain('account_workshare_connections_update_sender_admin_owner_scope')
+    expect(sql).not.toContain('account_workshare_connections_update_sender_admin_owner_scope')
   })
 })
