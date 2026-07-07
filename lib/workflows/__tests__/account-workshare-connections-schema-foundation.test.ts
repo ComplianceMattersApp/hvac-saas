@@ -8,6 +8,12 @@ const migrationPath = path.join(
   'migrations',
   '20260706120000_account_workshare_connections_foundation.sql',
 )
+const senderUpdatePolicyDropMigrationPath = path.join(
+  process.cwd(),
+  'supabase',
+  'migrations',
+  '20260706121000_drop_account_workshare_sender_update_policy.sql',
+)
 
 describe('account workshare connections schema foundation', () => {
   it('defines a directional ECC/HERS connection table with directional uniqueness', () => {
@@ -52,5 +58,12 @@ describe('account workshare connections schema foundation', () => {
     expect(sql).toContain('account_workshare_connections_insert_receiver_admin_owner_scope')
     expect(sql).toContain('account_workshare_connections_update_receiver_admin_owner_scope')
     expect(sql).not.toContain('account_workshare_connections_update_sender_admin_owner_scope')
+  })
+
+  it('drops the stale sender update policy for databases that applied the first P1-B migration', () => {
+    const sql = fs.readFileSync(senderUpdatePolicyDropMigrationPath, 'utf8')
+
+    expect(sql).toContain('DROP POLICY IF EXISTS account_workshare_connections_update_sender_admin_owner_scope')
+    expect(sql).toContain('ON public.account_workshare_connections')
   })
 })
