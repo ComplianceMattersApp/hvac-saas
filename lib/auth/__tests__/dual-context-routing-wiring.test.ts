@@ -31,7 +31,7 @@ describe("dual-context routing wiring", () => {
     expect(layout).toContain("{isInternalUser ? <ShellCreateMenu items={createMenuItems} /> : null}");
     expect(layout).toContain("const hasExistingPortalAccess = access.hasExistingPortalAccess");
     expect(layout).toContain("Compliance Matters Portal");
-    expect(layout).toContain("hasPortalAccess={hasPortalAccess}");
+    expect(layout).toContain("hasPortalAccess={showPortalMenuItem}");
 
     expect(mobileMenu).toContain("{isInternalUser ? (");
     expect(mobileMenu).toContain('href="/jobs/new"');

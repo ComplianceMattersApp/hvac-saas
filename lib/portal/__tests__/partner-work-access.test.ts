@@ -8,9 +8,25 @@ import {
 import { shouldShowPartnerWorkMenuItem, shouldShowPortalMenuItem } from "../partner-work-access";
 
 describe("partner work access", () => {
-  it("shows the portal menu whenever the user has portal access", () => {
-    expect(shouldShowPortalMenuItem({ hasExistingPortalAccess: true })).toBe(true);
-    expect(shouldShowPortalMenuItem({ hasExistingPortalAccess: false })).toBe(false);
+  it("shows the portal menu only for active app users with portal access", () => {
+    expect(
+      shouldShowPortalMenuItem({
+        hasActiveAppAccess: true,
+        hasExistingPortalAccess: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowPortalMenuItem({
+        hasActiveAppAccess: false,
+        hasExistingPortalAccess: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowPortalMenuItem({
+        hasActiveAppAccess: true,
+        hasExistingPortalAccess: false,
+      }),
+    ).toBe(false);
     expect(
       shouldShowPartnerWorkMenuItem({ isInternalUser: true, hasPartnerWorkAccess: true }),
     ).toBe(true);
@@ -19,7 +35,7 @@ describe("partner work access", () => {
     ).toBe(false);
     expect(
       shouldShowPartnerWorkMenuItem({ isInternalUser: false, hasPartnerWorkAccess: true }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("labels attached work as created by rater and prefers sent to rater when formal handoff exists", () => {
@@ -64,8 +80,9 @@ describe("partner work access", () => {
 
     expect(layoutSource).toContain("shouldShowPortalMenuItem");
     expect(layoutSource).toContain("const hasExistingPortalAccess = access.hasExistingPortalAccess");
+    expect(layoutSource).toContain("hasActiveAppAccess: access.hasActiveAppAccess");
     expect(layoutSource).toContain("Compliance Matters Portal");
-    expect(layoutSource).toContain("hasPortalAccess={hasPortalAccess}");
+    expect(layoutSource).toContain("hasPortalAccess={showPortalMenuItem}");
     expect(mobileShellSource).toContain("hasPortalAccess: boolean;");
     expect(mobileShellSource).toContain("{hasPortalAccess ? (");
     expect(mobileShellSource).toContain('<Link href="/portal"');

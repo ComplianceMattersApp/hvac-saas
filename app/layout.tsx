@@ -100,7 +100,6 @@ export default async function RootLayout({
   let unreadNotificationCount = 0;
   let productMode: ProductMode = "hybrid";
   const hasExistingPortalAccess = access.hasExistingPortalAccess;
-  const hasPortalAccess = hasExistingPortalAccess;
   let permitWorkflowEnabled = false;
 
   if (access.preferredLandingContext === "portal") {
@@ -124,6 +123,7 @@ export default async function RootLayout({
   }
 
   const showPortalMenuItem = shouldShowPortalMenuItem({
+    hasActiveAppAccess: access.hasActiveAppAccess,
     hasExistingPortalAccess,
   });
 
@@ -337,7 +337,7 @@ export default async function RootLayout({
                       isEstimatesEnabled={estimatesEnabled}
                       showPermitRequestCreateItem={permitWorkflowEnabled}
                       showOperationalNotificationAwareness={showOperationalNotificationAwareness}
-                      hasPortalAccess={hasPortalAccess}
+                      hasPortalAccess={showPortalMenuItem}
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
                       primaryJobCtaLabel={primaryJobCtaLabel}
