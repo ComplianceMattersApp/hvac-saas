@@ -1516,6 +1516,8 @@ Current shipped ECC verification baseline note (May 2026):
 - Contractor intake **should be hidden or de-emphasized** in Service mode configuration when product-mode switching is implemented
 - Service companies operate in internal work-order/dispatch lane, not contractor-intake lane
 - Contractor portal remains available only for ECC/HERS mode or explicitly invited contractors (future)
+- Completed portal visibility rule: the sticky `Compliance Matters Portal` nav item is an app-context switcher for paid/internal users who also have ECC/contractor portal access. It is hidden for portal-only/non-paid users already operating inside `/portal`, where portal remains their home context.
+- Portal access truth remains independent from payment status: valid portal access is current `contractor_users` membership or the legacy active `contractors.owner_user_id = auth user id` owner mapping. Paid/internal access alone does not create portal access, and portal access alone does not create internal app authority.
 
 ### 3.5. Navigation and label matrix
 

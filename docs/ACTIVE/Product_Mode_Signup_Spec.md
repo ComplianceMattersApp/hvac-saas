@@ -662,6 +662,8 @@ Rules:
 - HVAC Service version should not show contractor portal/intake by default.
 - No customer portal is included in current scope.
 - Any future customer portal requires customer/location-scoped visibility and separate design.
+- Current sticky menu behavior: show the `Compliance Matters Portal` nav entry only when a user has active paid/internal app access and valid ECC/contractor portal access. Do not show that redundant nav entry to portal-only/non-paid users already in `/portal`.
+- Current portal access resolver accepts current `contractor_users` membership and legacy active `contractors.owner_user_id = auth user id` owner mapping. Payment/entitlement status must not hide valid portal access, and valid portal access must not grant internal app authority.
 
 ## 11. Relationship to Upcoming Estimates / Quoting
 

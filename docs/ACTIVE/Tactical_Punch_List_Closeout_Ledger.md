@@ -7,6 +7,23 @@ Authority: governed by [Documentation_Authority_Map.md](./Documentation_Authorit
 
 Control-plane rule: record minor UI polish, low-risk regressions, duplicate-submit/pending-state fixes, tactical performance fixes, and small punch-list completions here with concise commit evidence and guardrails. Do not use this ledger for durable model contracts, launch gates, roadmap sequencing, production runbook execution, or historical lane consolidation. If a tactical fix changes current product truth, add only a short Spine summary with a backlink here.
 
+## July 2026 Portal Visibility / Sticky Menu Closeout
+
+Status: CLOSED for the July 6, 2026 implementation slice.
+
+### Paid/Internal + ECC Portal Visibility
+
+- Evidence files: `lib/portal/current-portal-membership.ts`, `lib/auth/dual-context-access.ts`, `app/layout.tsx`, `lib/portal/partner-work-access.ts`, `lib/portal/__tests__/contractor-intake-proposal-scope-hardening.test.ts`, `lib/auth/__tests__/dual-context-access.test.ts`, `lib/portal/__tests__/partner-work-access.test.ts`, `lib/auth/__tests__/dual-context-routing-wiring.test.ts`.
+- Closed behavior: users with active internal app access and valid ECC/contractor portal access keep the normal internal default landing and also see a sticky `Compliance Matters Portal` nav entry in desktop navigation and mobile command menu.
+- Closed behavior: portal-only/non-paid users still land in `/portal` and keep portal route access, but no longer see a redundant sticky `Compliance Matters Portal` button while already inside the portal context.
+- Access truth: portal visibility is based on valid portal authority, not payment status alone. Current source is active `contractor_users` membership; legacy active `contractors.owner_user_id = auth user id` mapping is also accepted for existing ECC-owner accounts where production data predates explicit membership rows.
+- Guardrails preserved: paid/internal app access does not create portal access by itself; portal access does not create internal app authority; same-account internal users do not inherit contractor authority unless they are the explicit contractor owner or have membership; portal routes keep the existing contractor-safe guard; no customer portal, service customer portal, billing/Stripe/QBO/SMS, scheduling, ECC truth, schema, migration, or RLS weakening was introduced.
+- Validation commands:
+  - `npx.cmd vitest run lib/portal/__tests__/contractor-intake-proposal-scope-hardening.test.ts lib/auth/__tests__/dual-context-access.test.ts lib/auth/__tests__/post-login-destination.test.ts lib/portal/__tests__/partner-work-access.test.ts lib/auth/__tests__/portal-ops-redirect-loop.test.ts`
+  - `npx.cmd vitest run lib/portal/__tests__/partner-work-access.test.ts lib/auth/__tests__/dual-context-routing-wiring.test.ts lib/auth/__tests__/dual-context-access.test.ts lib/auth/__tests__/post-login-destination.test.ts lib/auth/__tests__/portal-ops-redirect-loop.test.ts`
+  - `npx.cmd tsc --noEmit`
+  - `npm.cmd run build`
+
 ## June 2026 Remote / Low-Risk Punch-List Closeout
 
 Status: CLOSED for the commits listed below. These items were verified from recent git history and are recorded here to avoid copying tactical details into the Spine, Roadmap, or Prelaunch checklist.
