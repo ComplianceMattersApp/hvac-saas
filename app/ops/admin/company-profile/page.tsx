@@ -890,6 +890,52 @@ export default async function AdminCompanyProfilePage({
 
       <div id="account-workshare-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">ECC/HERS Rater Connections</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            Rater accounts this company can send ECC/HERS requests to after a connection is accepted.
+          </p>
+        </div>
+
+        <div className="mt-5">
+          <WorkshareConnectionListSection
+            title="Rater accounts this company can send to"
+            description="Pending invites from rater accounts appear here for this contractor/sender account to accept."
+            emptyMessage="No rater connections yet."
+            secondaryEmptyMessage="No pending rater invites. A rater must invite this account before ECC/HERS requests can be sent."
+            rows={workshareAsSender}
+            currentAccountOwnerUserId={internalUser.account_owner_user_id}
+            perspective="sender"
+            actionSlot={(connection) => (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {connection.status === "pending" && connection.sender_account_id === internalUser.account_owner_user_id ? (
+                  <form action={acceptAccountWorkshareInviteFromForm}>
+                    <input type="hidden" name="connection_id" value={connection.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+                    >
+                      Accept connection
+                    </button>
+                  </form>
+                ) : null}
+                {(connection.status === "pending" || connection.status === "active") ? (
+                  <form action={revokeAccountWorkshareConnectionFromForm}>
+                    <input type="hidden" name="connection_id" value={connection.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+                    >
+                      Revoke
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            )}
+          />
+        </div>
+
+        <div className="mt-6 border-t border-slate-100 pt-6">
+        <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Contractor Sending Connections</h2>
           <p className="text-sm leading-6 text-slate-600">
             Invite contractor accounts that are allowed to send ECC/HERS requests to this rater account.
@@ -914,6 +960,11 @@ export default async function AdminCompanyProfilePage({
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
             Use either a known contractor account ID or an invite email. This only creates a connection invite. It does not share jobs, create portal users, or create ECC/HERS requests.
           </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs leading-5 text-slate-600">
+            <div className="font-semibold text-slate-800">This account ID</div>
+            <div className="mt-1 break-all font-mono text-slate-900">{internalUser.account_owner_user_id}</div>
+            <div className="mt-1">Do not paste this ID into the contractor sender account ID field below.</div>
+          </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -928,6 +979,7 @@ export default async function AdminCompanyProfilePage({
               />
               <p className="text-xs leading-5 text-slate-500">
                 Enter the contractor account ID, not this rater account ID.
+                Use the contractor account owner ID. Do not use an individual employee user ID unless that user owns the account.
               </p>
             </div>
 
@@ -974,6 +1026,7 @@ export default async function AdminCompanyProfilePage({
             emptyMessage="No contractor sending connections yet."
             rows={workshareAsReceiver}
             currentAccountOwnerUserId={internalUser.account_owner_user_id}
+            perspective="receiver"
             actionSlot={(connection) => (
               <div className="mt-3 flex flex-wrap gap-2">
                 {connection.status === "active" ? (
@@ -1002,40 +1055,13 @@ export default async function AdminCompanyProfilePage({
             )}
           />
 
-          <WorkshareConnectionListSection
-            title="Rater accounts this company can send to"
-            description="Rater accounts this company can send ECC/HERS requests to after a connection is accepted."
-            emptyMessage="No rater connections yet."
-            secondaryEmptyMessage="A rater must invite this account before ECC/HERS requests can be sent."
-            rows={workshareAsSender}
-            currentAccountOwnerUserId={internalUser.account_owner_user_id}
-            actionSlot={(connection) => (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {connection.status === "pending" && connection.sender_account_id === internalUser.account_owner_user_id ? (
-                  <form action={acceptAccountWorkshareInviteFromForm}>
-                    <input type="hidden" name="connection_id" value={connection.id} />
-                    <button
-                      type="submit"
-                      className="inline-flex min-h-9 items-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
-                    >
-                      Accept
-                    </button>
-                  </form>
-                ) : null}
-                {(connection.status === "pending" || connection.status === "active") ? (
-                  <form action={revokeAccountWorkshareConnectionFromForm}>
-                    <input type="hidden" name="connection_id" value={connection.id} />
-                    <button
-                      type="submit"
-                      className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
-                    >
-                      Revoke
-                    </button>
-                  </form>
-                ) : null}
-              </div>
-            )}
-          />
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+            <div className="text-sm font-semibold text-slate-900">Email invites</div>
+            <div className="mt-1 text-xs leading-5 text-slate-600">
+              Email-only invites require the invite email and token flow. Known contractor account ID invites can be accepted from the sender account section above.
+            </div>
+          </div>
+        </div>
         </div>
       </div>
 
@@ -1251,6 +1277,7 @@ function WorkshareConnectionListSection(props: {
   secondaryEmptyMessage?: string;
   rows: AccountWorkshareConnectionRow[];
   currentAccountOwnerUserId: string;
+  perspective?: "sender" | "receiver";
   actionSlot?: (connection: AccountWorkshareConnectionRow) => ReactNode;
 }) {
   return (
@@ -1273,6 +1300,8 @@ function WorkshareConnectionListSection(props: {
             const acceptedAt = formatConnectionTimestamp(connection.accepted_at);
             const disabledAt = formatConnectionTimestamp(connection.disabled_at);
             const revokedAt = formatConnectionTimestamp(connection.revoked_at);
+            const isSenderPerspective = props.perspective === "sender";
+            const isPendingSenderInvite = isSenderPerspective && connection.status === "pending";
 
             return (
               <div key={connection.id} className="rounded-xl border border-slate-200 bg-white px-3 py-3">
@@ -1282,9 +1311,11 @@ function WorkshareConnectionListSection(props: {
                       {resolveWorkshareCounterpartyLabel(connection, props.currentAccountOwnerUserId)}
                     </div>
                     <div className="mt-1 text-xs text-slate-600">
-                      {connection.receiver_account_id === props.currentAccountOwnerUserId
-                        ? "Sender account"
-                        : "Receiver/rater account"}
+                      {isPendingSenderInvite
+                        ? "Pending invite from rater account"
+                        : connection.receiver_account_id === props.currentAccountOwnerUserId
+                          ? "Contractor/sender account"
+                          : "Rater account"}
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -1298,6 +1329,11 @@ function WorkshareConnectionListSection(props: {
                 </div>
 
                 <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  {isPendingSenderInvite ? (
+                    <div className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-2 py-1.5 text-emerald-900">
+                      Accept this connection to allow this company to send ECC/HERS requests to that rater account.
+                    </div>
+                  ) : null}
                   {connection.invite_company_name ? <div>Company: {connection.invite_company_name}</div> : null}
                   {connection.invite_email ? <div>Email: {connection.invite_email}</div> : null}
                   {createdAt ? <div>Created: {createdAt}</div> : null}

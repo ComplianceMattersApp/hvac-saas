@@ -339,7 +339,7 @@ describe("account workshare connections actions", () => {
     expect(fixture.insertCalls).toHaveLength(0);
   });
 
-  it("intended sender account can accept a pending invite without creating jobs or portal membership", async () => {
+  it("intended sender account can accept a pending invite without creating unrelated records", async () => {
     const fixture = makeAdminFixture({
       connections: [
         makeConnection({
@@ -368,9 +368,55 @@ describe("account workshare connections actions", () => {
       status: "active",
       accepted_by_user_id: "00000000-0000-4000-8000-0000000000a2",
     });
+    expect(fixture.updateCalls[0]?.accepted_at).toEqual(expect.any(String));
+    expect(fixture.updateCalls[0]?.updated_at).toEqual(expect.any(String));
+    expect(result.success ? result.connection.accepted_at : null).toEqual(expect.any(String));
     expect(new Set(fixture.tableCalls)).toEqual(new Set(["account_workshare_connections"]));
-    expect(fixture.tableCalls.join(" ")).not.toContain("contractor_users");
-    expect(fixture.tableCalls.join(" ")).not.toContain("jobs");
+    const touchedTables = fixture.tableCalls.join(" ");
+    expect(touchedTables).not.toContain("contractor_users");
+    expect(touchedTables).not.toContain("contractor_invites");
+    expect(touchedTables).not.toContain("workflow_handoff_requests");
+    expect(touchedTables).not.toContain("jobs");
+  });
+
+  it("unrelated accounts and the receiver account cannot accept a known sender invite", async () => {
+    const fixture = makeAdminFixture({
+      connections: [
+        makeConnection({
+          id: "00000000-0000-4000-8000-000000000016",
+          sender_account_id: "00000000-0000-4000-8000-0000000000a1",
+          receiver_account_id: "00000000-0000-4000-8000-0000000000b1",
+          status: "pending",
+        }),
+      ],
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    setActor({
+      userId: "00000000-0000-4000-8000-0000000000c2",
+      accountOwnerUserId: "00000000-0000-4000-8000-0000000000c1",
+      role: "admin",
+    });
+    await expect(acceptAccountWorkshareInvite({
+      connectionId: "00000000-0000-4000-8000-000000000016",
+    })).resolves.toMatchObject({
+      success: false,
+      error: "Only the intended sender account can accept this invite.",
+    });
+
+    setActor({
+      userId: "00000000-0000-4000-8000-0000000000b2",
+      accountOwnerUserId: "00000000-0000-4000-8000-0000000000b1",
+      role: "admin",
+    });
+    await expect(acceptAccountWorkshareInvite({
+      connectionId: "00000000-0000-4000-8000-000000000016",
+    })).resolves.toMatchObject({
+      success: false,
+      error: "Only the intended sender account can accept this invite.",
+    });
+
+    expect(fixture.updateCalls).toHaveLength(0);
   });
 
   it("email invite requires matching email and valid token before activation", async () => {
@@ -529,10 +575,18 @@ describe("account workshare connections actions", () => {
     );
 
     expect(source).toContain("Contractor Sending Connections");
+    expect(source).toContain("ECC/HERS Rater Connections");
+    expect(source).toContain("Rater accounts this company can send ECC/HERS requests to after a connection is accepted.");
+    expect(source).toContain("No pending rater invites.");
+    expect(source).toContain("Pending invite from rater account");
+    expect(source).toContain("Accept this connection to allow this company to send ECC/HERS requests to that rater account.");
+    expect(source).toContain("Accept connection");
     expect(source).toContain("Invite contractor accounts that are allowed to send ECC/HERS requests to this rater account.");
     expect(source).toContain("No contractor sending connections yet.");
     expect(source).toContain("Invite contractor account");
     expect(source).toContain("This only creates a connection invite. It does not share jobs, create portal users, or create ECC/HERS requests.");
+    expect(source).toContain("This account ID");
+    expect(source).toContain("Use the contractor account owner ID. Do not use an individual employee user ID unless that user owns the account.");
     expect(source).toContain("Contractor sender account ID");
     expect(source).toContain("Known contractor account ID");
     expect(source).toContain("Enter the contractor account ID, not this rater account ID.");
