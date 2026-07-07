@@ -344,6 +344,7 @@ export function resolveContractorIssues(
   const pendingInfoReason = String(input.job.pending_info_reason ?? "").trim();
   const failureReasons = (input.failureReasons ?? []).map(String).map((s) => s.trim()).filter(Boolean);
   const hasOpenRetestChild = Boolean(input.chain?.hasOpenRetestChild);
+  const hasRetestReadyRequest = Boolean(input.chain?.hasRetestReadyRequest);
   const retestSchedule = hasOpenRetestChild ? formatRetestSchedule(input.chain) : "";
   const retestState: "none" | "pending_scheduling" | "scheduled" =
     hasOpenRetestChild
@@ -393,6 +394,14 @@ export function resolveContractorIssues(
         explanation: "Internal review confirmed this job is ready for retest scheduling.",
         detailLines: failureReasons.length > 0 ? failureReasons : undefined,
         stage: "retest_ready",
+      };
+    } else if (hasRetestReadyRequest) {
+      primaryIssue = {
+        group: "in_progress",
+        headline: "Retest Review Requested",
+        explanation: "Corrections marked complete. Our team will review and schedule the retest.",
+        detailLines: failureReasons.length > 0 ? failureReasons : undefined,
+        stage: "retest_review_requested",
       };
     } else {
       primaryIssue = {
@@ -493,6 +502,9 @@ export function resolveContractorIssues(
     } else if (opsStatus === "retest_needed") {
       statusLabel = "Retest Ready";
       nextStep = "Internal review confirmed this job is ready for retest scheduling.";
+    } else if (hasRetestReadyRequest) {
+      statusLabel = "Retest Review Requested";
+      nextStep = "Corrections marked complete. Our team will review and schedule the retest.";
     } else {
       statusLabel = "Failed";
       nextStep = "Retest decision needed.";

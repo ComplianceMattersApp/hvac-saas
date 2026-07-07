@@ -143,6 +143,9 @@ export default async function PortalPage({
       status,
       lifecycle_state,
       ops_status,
+      field_complete,
+      certs_complete,
+      invoice_complete,
       permit_number,
       pending_info_reason,
       on_hold_reason,
@@ -254,6 +257,7 @@ export default async function PortalPage({
       "contractor_correction_submission",
       "contractor_note",
       "retest_ready_requested",
+      "failure_resolved_by_correction_review",
       "status_changed",
       "ops_update",
     ])
@@ -336,6 +340,9 @@ export default async function PortalPage({
       job: {
         id: String(job.id ?? ""),
         ops_status: job.ops_status,
+        field_complete: Boolean(job.field_complete),
+        certs_complete: Boolean(job.certs_complete),
+        invoice_complete: Boolean(job.invoice_complete),
         pending_info_reason: job.pending_info_reason,
         follow_up_date: job.follow_up_date,
         next_action_note: job.next_action_note,

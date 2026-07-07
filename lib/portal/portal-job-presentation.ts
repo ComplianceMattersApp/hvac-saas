@@ -73,6 +73,7 @@ export function getPortalJobStatusMeta(row: PortalPresentationRow) {
   if (ops === "pending_office_review") return { label: "Under review", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
   if (resolvedLabel === "Retest Scheduled") return { label: "Retest scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" };
   if (resolvedLabel === "Retest Pending Scheduling") return { label: "Retest needs scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" };
+  if (resolvedLabel === "Retest Review Requested") return { label: "Retest review requested", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
   if (resolvedLabel === "Under Review") return { label: "Under review", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" };
   if (resolvedLabel === "Failed") return { label: "Needs correction", tone: "border-rose-200 bg-rose-50 text-rose-800" };
   if (ops === "paperwork_required") return { label: "Final paperwork", tone: "border-violet-200 bg-violet-50 text-violet-800" };
@@ -108,6 +109,7 @@ export function getPortalJobDetailLine(row: PortalPresentationRow) {
   if (ops === "paperwork_required") return "Final paperwork is in progress.";
   if (ops === "invoice_required") return "Final processing is underway.";
   if (row.resolved?.retestState === "scheduled") return "Your retest visit is scheduled.";
+  if (resolvedLabel === "Retest Review Requested") return "Corrections marked complete. Our team will review and schedule the retest.";
   if (lifecycle === "on_the_way") return "Your technician is on the way.";
   if (lifecycle === "in_progress" || lifecycle === "in_process" || ops === "in_process") return "Work is in progress.";
   if (ops === "scheduled") return "Your visit is scheduled.";
@@ -128,6 +130,7 @@ export function getPortalJobNextStep(row: PortalPresentationRow) {
   if (ops === "on_hold") return "Open this job to review the hold details.";
   if (ops === "pending_office_review") return "Open this job to review the latest update.";
   if (ops === "paperwork_required" || ops === "invoice_required") return "Open this job to review the latest processing details.";
+  if (resolvedLabel === "Retest Review Requested") return "Open this job to check retest review status.";
   if (row.resolved?.retestState === "pending_scheduling") return "Open this job to check retest scheduling status.";
   if (row.resolved?.retestState === "scheduled") return "Open this job to review the retest appointment.";
   if (row.resolved?.bucket === "action_required") return "Open this job to review the issue details and next step.";

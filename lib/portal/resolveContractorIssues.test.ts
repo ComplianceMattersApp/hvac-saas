@@ -149,6 +149,28 @@ describe("resolveContractorIssues", () => {
     expect(result.primaryIssue.group).toBe("failed");
     expect(result.statusLabel).toBe("Failed");
     expect(result.bucket).toBe("action_required");
+    expect(result.actionRequired).toBe(true);
+  });
+
+  it("projects failed jobs with contractor retest-ready request as internal review needed", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-failed-retest-requested",
+        ops_status: "failed",
+      },
+      failureReasons: ["Failed - duct leakage over threshold"],
+      chain: {
+        hasRetestReadyRequest: true,
+      },
+    });
+
+    expect(result.primaryIssue.group).toBe("in_progress");
+    expect(result.primaryIssue.headline).toBe("Retest Review Requested");
+    expect(result.primaryIssue.stage).toBe("retest_review_requested");
+    expect(result.statusLabel).toBe("Retest Review Requested");
+    expect(result.nextStep).toBe("Corrections marked complete. Our team will review and schedule the retest.");
+    expect(result.bucket).toBe("in_progress");
+    expect(result.actionRequired).toBe(false);
   });
 
   it("shows internally confirmed retest_needed as Retest Ready without contractor action required", () => {
@@ -166,6 +188,7 @@ describe("resolveContractorIssues", () => {
     expect(result.statusLabel).toBe("Retest Ready");
     expect(result.bucket).toBe("in_progress");
     expect(result.nextStep).toBe("Internal review confirmed this job is ready for retest scheduling.");
+    expect(result.actionRequired).toBe(false);
   });
 
   it("keeps normal closed jobs as passed when not evidence-accepted", () => {
@@ -186,7 +209,7 @@ describe("resolveContractorIssues", () => {
     expect(result.bucket).toBe("passed");
   });
 
-  it("uses retest scheduled override only for failed and retest_needed states", () => {
+  it("keeps retest scheduled child override above retest-ready request", () => {
     const result = resolveContractorIssues({
       job: {
         id: "job-4",
@@ -194,6 +217,7 @@ describe("resolveContractorIssues", () => {
       },
       chain: {
         hasOpenRetestChild: true,
+        hasRetestReadyRequest: true,
         retestScheduledDate: "2026-03-30",
         retestWindowStart: "08:00",
         retestWindowEnd: "10:00",
