@@ -17,6 +17,16 @@ const fieldActionButtonSource = readFileSync(
   "utf8",
 );
 
+const desktopV2Source = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/v2/page.tsx"),
+  "utf8",
+);
+
+const desktopV2FieldStatusAdvanceFormSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/v2/_components/FieldStatusAdvanceForm.tsx"),
+  "utf8",
+);
+
 const pendingRouteLinkSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/PendingRouteLink.tsx"),
   "utf8",
@@ -86,6 +96,21 @@ describe("job detail button response wiring", () => {
     expect(fieldActionButtonSource).toContain('<input type="hidden" name="auto_schedule_confirmed" value="0" />');
     expect(jobDetailSource).toContain("hasFullSchedule={hasFullSchedule}");
     expect(mobileStatusSource).toContain("hasFullSchedule={hasFullSchedule}");
+  });
+
+  it("keeps desktop V2 Mark On the Way on the auto-schedule confirmation path", () => {
+    expect(desktopV2Source).toContain('import FieldStatusAdvanceForm from "./_components/FieldStatusAdvanceForm";');
+    expect(desktopV2Source).toContain("const hasFullSchedule = Boolean(job.scheduled_date && job.window_start && job.window_end);");
+    expect(desktopV2Source).toContain("<FieldStatusAdvanceForm");
+    expect(desktopV2Source).toContain("hasFullSchedule={hasFullSchedule}");
+    expect(desktopV2Source).not.toContain("<form action={advanceStatusAction}>");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain("action={advanceJobStatusFromForm}");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain("const needsScheduleConfirm = currentStatus === \"open\" && !hasFullSchedule;");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain("window.confirm(");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain("schedule a 2-hour window starting now");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain('input[name="auto_schedule_confirmed"]');
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain('if (hidden) hidden.value = "1";');
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain('<input type="hidden" name="auto_schedule_confirmed" value="0" />');
   });
 
   it("adds pending feedback to Tests and Equipment route buttons without breaking link behavior", () => {

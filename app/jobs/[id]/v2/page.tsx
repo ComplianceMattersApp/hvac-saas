@@ -8,7 +8,6 @@ import {
   loadScopedInternalJobDetailReadBoundaryOutcome,
 } from "@/lib/actions/internal-job-detail-read-boundary";
 import {
-  advanceJobStatusFromForm,
   getContractors,
   archiveJobFromForm,
   createNextServiceVisitFromForm,
@@ -68,6 +67,7 @@ import SchedulePanel from "./_components/SchedulePanel";
 import NoteComposer from "./_components/NoteComposer";
 import PermitForm from "./_components/PermitForm";
 import InterruptionHub from "./_components/InterruptionHub";
+import FieldStatusAdvanceForm from "./_components/FieldStatusAdvanceForm";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -494,6 +494,7 @@ export default async function JobDetailV2Page({
   const visitStarted = isFieldActive || isEnRoute;
   const isTerminal = fieldComplete || status === "completed" || status === "cancelled";
   const hasScheduledAppointment = Boolean(job.scheduled_date || job.window_start || job.window_end);
+  const hasFullSchedule = Boolean(job.scheduled_date && job.window_start && job.window_end);
   const scheduledAppointmentDateText = formatBusinessDateUS(job.scheduled_date);
   const scheduledAppointmentWindowText = formatStandardWindowLA(job.window_start, job.window_end);
   const scheduledAppointmentText = [
@@ -679,7 +680,6 @@ export default async function JobDetailV2Page({
   const returnTo = `/jobs/${jobId}/v2`;
 
   // server actions (all read job_id / return_to from formData hidden inputs)
-  const advanceStatusAction = advanceJobStatusFromForm;
   const createReturnVisitAction = createNextServiceVisitFromForm;
   const createCallbackAction = createCallbackVisitFromForm;
 
@@ -3091,26 +3091,19 @@ export default async function JobDetailV2Page({
           <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
             {/* Primary button */}
             {!isTerminal ? (
-              <form action={advanceStatusAction}>
-                <input type="hidden" name="job_id" value={jobId} />
-                <input type="hidden" name="return_to" value={returnTo} />
-                <ImmediateSubmitButton
-                  pendingText="Updating…"
-                  className=""
-                  style={{
-                    ...(S.primaryBtn as React.CSSProperties),
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  {status === "in_process"
-                    ? "Finish Visit"
-                    : status === "on_the_way"
-                      ? "Mark On Site"
-                      : "Mark On the Way"}
-                </ImmediateSubmitButton>
-              </form>
+              <FieldStatusAdvanceForm
+                jobId={jobId}
+                returnTo={returnTo}
+                currentStatus={status}
+                hasFullSchedule={hasFullSchedule}
+                buttonStyle={S.primaryBtn as React.CSSProperties}
+              >
+                {status === "in_process"
+                  ? "Finish Visit"
+                  : status === "on_the_way"
+                    ? "Mark On Site"
+                    : "Mark On the Way"}
+              </FieldStatusAdvanceForm>
             ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton ? (
               <form action={markCertsCompleteFromForm}>
                 <input type="hidden" name="job_id" value={jobId} />
