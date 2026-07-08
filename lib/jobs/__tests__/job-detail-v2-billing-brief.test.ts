@@ -45,6 +45,25 @@ describe("desktop job detail V2 billing brief", () => {
     expect(selectSource).not.toContain("billing_email");
   });
 
+  it("uses a real attachment count for the desktop V2 Records attachments tab", () => {
+    expect(source).toContain("attachmentCountResult");
+    expect(source).toContain('.from("attachments")');
+    expect(source).toContain('.select("id", { count: "exact", head: true })');
+    expect(source).toContain('const attachmentCount = Number(attachmentCountResult.count ?? 0);');
+    expect(source).toContain('count: String(attachmentCount)');
+    expect(source).not.toContain('label: "Attachments",\n                  count: "0"');
+  });
+
+  it("uses a real timeline count for the desktop V2 Records timeline tab", () => {
+    expect(source).toContain("const timelineScopeJobIds = [jobId, job.parent_job_id].filter(Boolean) as string[];");
+    expect(source).toContain("timelineCountResult");
+    expect(source).toContain('.in("job_id", timelineScopeJobIds)');
+    expect(source).toContain("const timelineJobIds = timelineScopeJobIds;");
+    expect(source).toContain("const timelineCount = Number(timelineCountResult.count ?? 0);");
+    expect(source).toContain("count: String(timelineCount)");
+    expect(source).not.toContain('label: "Timeline",\n                  count: "—"');
+  });
+
   it("keeps static identity chips in the title band without duplicating the job reference", () => {
     const headerIndex = source.indexOf('{" "}/ Jobs / <span');
     const headerSlice = source.slice(headerIndex, headerIndex + 3200);

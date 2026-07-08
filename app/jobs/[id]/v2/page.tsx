@@ -395,6 +395,8 @@ export default async function JobDetailV2Page({
   if (!job) return notFound();
   if (job.deleted_at) redirect("/ops?saved=job_archived");
 
+  const timelineScopeJobIds = [jobId, job.parent_job_id].filter(Boolean) as string[];
+
   // ── supplemental queries ──────────────────────────────────────────────────
 
   const [
@@ -404,6 +406,8 @@ export default async function JobDetailV2Page({
     billingMode,
     { data: primaryInvoiceRaw },
     contactAttemptsResult,
+    attachmentCountResult,
+    timelineCountResult,
   ] = await Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
@@ -432,7 +436,19 @@ export default async function JobDetailV2Page({
       .eq("event_type", "customer_attempt")
       .order("created_at", { ascending: false })
       .limit(1),
+    supabase
+      .from("attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("entity_type", "job")
+      .eq("entity_id", jobId),
+    supabase
+      .from("job_events")
+      .select("id", { count: "exact", head: true })
+      .in("job_id", timelineScopeJobIds),
   ]);
+
+  if (attachmentCountResult.error) throw attachmentCountResult.error;
+  if (timelineCountResult.error) throw timelineCountResult.error;
 
   const customerLocations: Array<{ id: string; label: string }> = (customerLocationsRaw ?? []).map(
     (loc: any) => ({
@@ -445,6 +461,8 @@ export default async function JobDetailV2Page({
   );
 
   const assignedTeam = assignmentMap[jobId] ?? [];
+  const attachmentCount = Number(attachmentCountResult.count ?? 0);
+  const timelineCount = Number(timelineCountResult.count ?? 0);
   const contractor = job.contractor_id
     ? (contractorRows as Array<{ id: string; name?: string | null }>).find(
         (c) => c.id === job.contractor_id,
@@ -558,7 +576,7 @@ export default async function JobDetailV2Page({
   // service chain IDs for deferred components
   const serviceCaseId = job.service_case_id as string | null;
   const parentJobId = job.parent_job_id as string | null;
-  const timelineJobIds = [jobId, parentJobId].filter(Boolean) as string[];
+  const timelineJobIds = timelineScopeJobIds;
   const hasDirectNarrativeChain = Boolean(parentJobId);
 
   // brief fields
@@ -2686,7 +2704,7 @@ export default async function JobDetailV2Page({
                 {
                   id: "timeline",
                   label: "Timeline",
-                  count: "—",
+                  count: String(timelineCount),
                   content: (
                     <Suspense
                       fallback={
@@ -2716,7 +2734,7 @@ export default async function JobDetailV2Page({
                 {
                   id: "attachments",
                   label: "Attachments",
-                  count: "0",
+                  count: String(attachmentCount),
                   content: (
                     <Suspense
                       fallback={
