@@ -404,9 +404,9 @@ export default async function JobDetailV2Page({
   const [
     assignmentMap,
     contractorRows,
-    { data: customerLocationsRaw },
+    { data: customerLocationsRaw, error: customerLocationsError },
     billingMode,
-    { data: primaryInvoiceRaw },
+    { data: primaryInvoiceRaw, error: primaryInvoiceError },
     contactAttemptsResult,
     attachmentCountResult,
     timelineCountResult,
@@ -422,7 +422,7 @@ export default async function JobDetailV2Page({
           .eq("customer_id", job.customer_id)
           .eq("owner_user_id", accountOwnerUserId)
           .order("created_at", { ascending: true })
-      : Promise.resolve({ data: [] }),
+      : Promise.resolve({ data: [], error: null }),
     resolveBillingModeByAccountOwnerId({ supabase, accountOwnerUserId }),
     supabase
       .from("internal_invoices")
@@ -449,6 +449,9 @@ export default async function JobDetailV2Page({
       .in("job_id", timelineScopeJobIds),
   ]);
 
+  if (customerLocationsError) throw customerLocationsError;
+  if (primaryInvoiceError) throw primaryInvoiceError;
+  if (contactAttemptsResult.error) throw contactAttemptsResult.error;
   if (attachmentCountResult.error) throw attachmentCountResult.error;
   if (timelineCountResult.error) throw timelineCountResult.error;
 

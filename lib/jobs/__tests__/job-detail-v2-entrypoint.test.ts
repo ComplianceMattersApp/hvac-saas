@@ -59,6 +59,16 @@ describe("job detail V2 entrypoint", () => {
     );
   });
 
+  it("throws Desktop V2 supplemental Supabase read failures", () => {
+    expect(v2JobDetailSource).toContain("{ data: customerLocationsRaw, error: customerLocationsError }");
+    expect(v2JobDetailSource).toContain("{ data: primaryInvoiceRaw, error: primaryInvoiceError }");
+    expect(v2JobDetailSource).toContain("if (customerLocationsError) throw customerLocationsError;");
+    expect(v2JobDetailSource).toContain("if (primaryInvoiceError) throw primaryInvoiceError;");
+    expect(v2JobDetailSource).toContain("if (contactAttemptsResult.error) throw contactAttemptsResult.error;");
+    expect(v2JobDetailSource).toContain("if (attachmentCountResult.error) throw attachmentCountResult.error;");
+    expect(v2JobDetailSource).toContain("if (timelineCountResult.error) throw timelineCountResult.error;");
+  });
+
   it("uses full-width schedule action wording in the V2 right rail", () => {
     expect(v2SchedulePanelSource).toContain('width: "100%"');
     expect(v2SchedulePanelSource).toContain('height: "42px"');
