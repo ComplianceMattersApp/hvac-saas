@@ -51,6 +51,14 @@ describe("job detail V2 entrypoint", () => {
     expect(v2JobDetailSource).not.toContain("redirect(`/jobs/${jobId}`");
   });
 
+  it("throws Desktop V2 contractor shadow membership read failures", () => {
+    expect(v2JobDetailSource).toContain("const { data: shadowMembership, error: shadowMembershipError } = await supabase");
+    expect(v2JobDetailSource).toContain("if (shadowMembershipError) throw shadowMembershipError;");
+    expect(v2JobDetailSource.indexOf("if (shadowMembershipError) throw shadowMembershipError;")).toBeLessThan(
+      v2JobDetailSource.indexOf("const hasShadowMembership = Boolean(shadowMembership?.contractor_id);"),
+    );
+  });
+
   it("uses full-width schedule action wording in the V2 right rail", () => {
     expect(v2SchedulePanelSource).toContain('width: "100%"');
     expect(v2SchedulePanelSource).toContain('height: "42px"');

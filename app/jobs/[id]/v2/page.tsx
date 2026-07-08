@@ -367,11 +367,13 @@ export default async function JobDetailV2Page({
   const isAdmin = internalRole === "admin";
 
   // check for dual-role contractor shadow membership
-  const { data: shadowMembership } = await supabase
+  const { data: shadowMembership, error: shadowMembershipError } = await supabase
     .from("contractor_users")
     .select("contractor_id")
     .eq("user_id", user.id)
     .maybeSingle();
+  if (shadowMembershipError) throw shadowMembershipError;
+
   const hasShadowMembership = Boolean(shadowMembership?.contractor_id);
 
   // same-account boundary check
