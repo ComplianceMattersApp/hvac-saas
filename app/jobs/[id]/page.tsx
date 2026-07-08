@@ -103,6 +103,12 @@ import {
 } from "@/lib/jobs/job-invoice-action";
 import { shouldShowInternalInvoiceRequiredBanner } from "@/lib/jobs/job-detail-invoice-banner";
 import { listFieldChargeProposalsForJob } from "@/lib/business/field-charge-proposals";
+import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
+import { listAccountWorkshareRequestsForSourceJob } from "@/lib/workflows/account-workshare-requests-read";
+import {
+  cancelAccountWorkshareRequestFromForm,
+  createAccountWorkshareRequestFromJobForm,
+} from "@/lib/workflows/account-workshare-requests-actions";
 import {
   addInternalInvoiceLineItemFromForm,
   addInternalInvoiceLineItemFromPricebookForm,
@@ -3155,6 +3161,21 @@ const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visi
 });
 const primaryVisitScopeItems = visitScopeItems.filter((item) => item.kind === "primary");
 const companionVisitScopeItems = visitScopeItems.filter((item) => item.kind === "companion_service");
+const activeRaterWorkshareConnections = isInternalUser
+  ? await listAccountWorkshareConnectionsForAccount(supabase as any, internalUser.account_owner_user_id, {
+      serviceType: "ecc_hers",
+      statuses: ["active"],
+      limit: 100,
+    }).then((rows) => rows.filter((row) => row.sender_account_id === internalUser.account_owner_user_id))
+  : [];
+const sourceJobWorkshareRequests = isInternalUser
+  ? await listAccountWorkshareRequestsForSourceJob(
+      supabase as any,
+      internalUser.account_owner_user_id,
+      String(job.id),
+    )
+  : [];
+const hasActiveRaterWorkshareConnection = activeRaterWorkshareConnections.length > 0;
 const visitScopeReadyTotalCents = visitScopeItems.reduce((sum, item) => {
   const unitPrice = Number(item.expected_unit_price ?? 0);
   if (!Number.isFinite(unitPrice) || unitPrice <= 0) return sum;
@@ -4863,6 +4884,127 @@ const showCorrectionReviewResolution =
       </div>
 
     </div>
+
+    {hasActiveRaterWorkshareConnection ? (
+      <section
+        id="account-workshare-requests"
+        className="relative scroll-mt-24 overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.26)] xl:order-4 xl:col-span-3"
+      >
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <SectionEyebrow>ECC/HERS Work Request</SectionEyebrow>
+            <h2 className="mt-1 text-lg font-semibold text-navy">Send ECC/HERS Request</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              Send this job&apos;s ECC/HERS request to a connected rater account. This shares a safe request snapshot only. The rater will review it in a later step.
+            </p>
+          </div>
+          {sourceJobWorkshareRequests.length > 0 ? (
+            <div className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-800">
+              {sourceJobWorkshareRequests.length} sent
+            </div>
+          ) : null}
+        </div>
+
+        {notice === "workshare_request_sent" ? (
+          <div className="mt-3">
+            <FlashBanner type="success" message="ECC/HERS request sent to the connected rater." />
+          </div>
+        ) : notice === "workshare_request_cancelled" ? (
+          <div className="mt-3">
+            <FlashBanner type="success" message="ECC/HERS request cancelled." />
+          </div>
+        ) : notice === "workshare_request_error" ? (
+          <div className="mt-3">
+            <FlashBanner type="error" message="ECC/HERS request could not be updated." />
+          </div>
+        ) : null}
+
+        <form action={createAccountWorkshareRequestFromJobForm} className="mt-4 grid gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5">
+          <input type="hidden" name="source_job_id" value={job.id} />
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Rater account
+              <select name="connection_id" required className={workspaceInputClass} defaultValue={activeRaterWorkshareConnections[0]?.id ?? ""}>
+                {activeRaterWorkshareConnections.map((connection) => (
+                  <option key={connection.id} value={connection.id}>
+                    {connection.invite_company_name || `Connected rater ${connection.receiver_account_id.slice(0, 8)}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Preferred date/window
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">
+                <input type="date" name="preferred_date" className={workspaceInputClass} />
+                <input
+                  type="text"
+                  name="preferred_window"
+                  maxLength={240}
+                  placeholder="Morning, afternoon, or access window"
+                  className={workspaceInputClass}
+                />
+              </div>
+            </label>
+          </div>
+          <label>
+            <span className={workspaceFieldLabelClass}>Requested ECC/HERS scope</span>
+            <textarea
+              name="requested_scope"
+              required
+              maxLength={4000}
+              defaultValue={visitScopeSummary || primaryVisitScopeItems.map((item) => item.title).join("\n")}
+              className={workspaceTextareaClass}
+              rows={4}
+            />
+          </label>
+          <label>
+            <span className={workspaceFieldLabelClass}>Notes for rater</span>
+            <textarea
+              name="sender_notes"
+              maxLength={4000}
+              className={workspaceTextareaClass}
+              rows={3}
+            />
+          </label>
+          <div className="flex flex-col gap-2 border-t border-slate-200/80 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs leading-5 text-slate-500">
+              Snapshot includes customer, location, permit, source job reference, and requested scope fields only.
+            </div>
+            <SubmitButton loadingText="Sending..." className={`${darkButtonClass} w-full sm:w-auto`}>
+              Send request
+            </SubmitButton>
+          </div>
+        </form>
+
+        {sourceJobWorkshareRequests.length > 0 ? (
+          <div className="mt-4 space-y-2">
+            {sourceJobWorkshareRequests.map((request) => (
+              <div key={request.id} className="flex flex-col gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm text-slate-700 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="font-semibold text-slate-900">
+                    Request {request.status === "sent" ? "sent" : "cancelled"}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {request.sent_at ? formatDateTimeLAFromIso(request.sent_at) : "Sent date unavailable"}
+                    {request.receiver_account_id ? ` to rater ${request.receiver_account_id.slice(0, 8)}` : ""}
+                  </div>
+                </div>
+                {request.status === "sent" ? (
+                  <form action={cancelAccountWorkshareRequestFromForm} className="sm:ml-auto">
+                    <input type="hidden" name="source_job_id" value={job.id} />
+                    <input type="hidden" name="request_id" value={request.id} />
+                    <SubmitButton loadingText="Cancelling..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                      Cancel request
+                    </SubmitButton>
+                  </form>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </section>
+    ) : null}
 
     {/* Visit scope workspace */}
     {isInternalUser ? (
