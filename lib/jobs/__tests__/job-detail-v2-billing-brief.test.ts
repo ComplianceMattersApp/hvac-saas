@@ -33,6 +33,18 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("Permit Workflow");
   });
 
+  it("keeps the desktop V2 job select focused on fields rendered by the page", () => {
+    const selectStart = source.indexOf("const JOB_V2_SELECT = `");
+    const selectEnd = source.indexOf("`;", selectStart + 1);
+    const selectSource = source.slice(selectStart, selectEnd);
+
+    expect(selectStart).toBeGreaterThanOrEqual(0);
+    expect(selectSource).not.toContain("city, job_address");
+    expect(selectSource).not.toContain("service_visit_type");
+    expect(selectSource).not.toContain("on_the_way_at");
+    expect(selectSource).not.toContain("billing_email");
+  });
+
   it("keeps static identity chips in the title band without duplicating the job reference", () => {
     const headerIndex = source.indexOf('{" "}/ Jobs / <span');
     const headerSlice = source.slice(headerIndex, headerIndex + 3200);
@@ -131,10 +143,10 @@ describe("desktop job detail V2 billing brief", () => {
     const railSlice = source.slice(railIndex, railIndex + 3600);
 
     expect(railIndex).toBeGreaterThanOrEqual(0);
-    expect(railSlice).toContain("billingState.internalInvoicePanelEnabled");
+    expect(railSlice).toContain("billingState.internalInvoicePanelEnabled || canShowInvoiceButton");
     expect(railSlice).toContain("renderCloseoutBillingAction(S.primaryBtn");
     expect(railSlice).toContain("renderCloseoutBillingAction(S.outlineBtn");
-    expect(railSlice).toContain("External Billing Complete");
+    expect(railSlice).not.toContain("<form action={markInvoiceCompleteFromForm}");
     expect(railSlice).not.toContain("Send Certs");
     expect(railSlice).not.toContain("Send Invoice");
   });

@@ -299,19 +299,19 @@ function formatBillingRecipientMethod(input: {
 // ─── Supabase select ───────────────────────────────────────────────────────────
 
 const JOB_V2_SELECT = `
-  id, title, city, job_address, status, ops_status,
-  job_type, service_visit_type, service_visit_reason, service_visit_outcome,
+  id, title, status, ops_status,
+  job_type, service_visit_reason, service_visit_outcome,
   visit_scope_summary, visit_scope_items,
   customer_id, location_id, service_case_id, parent_job_id,
   contractor_id,
   job_display_number,
   customer_first_name, customer_last_name, customer_email, customer_phone,
-  scheduled_date, window_start, window_end, on_the_way_at,
+  scheduled_date, window_start, window_end,
   field_complete, certs_complete, invoice_complete,
   pending_info_reason, on_hold_reason,
   follow_up_date, next_action_note, action_required_by, ops_board_failure_note,
   permit_number, jurisdiction, permit_date,
-  billing_recipient, billing_name, billing_email,
+  billing_recipient, billing_name,
   billing_disposition,
   job_notes,
   created_at, deleted_at,
@@ -3144,25 +3144,8 @@ export default async function JobDetailV2Page({
                   Certs were sent
                 </ImmediateSubmitButton>
               </form>
-            ) : fieldComplete && closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
+            ) : fieldComplete && closeoutNeeds.needsInvoice && (billingState.internalInvoicePanelEnabled || canShowInvoiceButton) ? (
               renderCloseoutBillingAction(S.primaryBtn as React.CSSProperties)
-            ) : fieldComplete && closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
-              <form action={markInvoiceCompleteFromForm}>
-                <input type="hidden" name="job_id" value={jobId} />
-                <input type="hidden" name="return_to" value={returnTo} />
-                <ImmediateSubmitButton
-                  pendingText="Saving…"
-                  className=""
-                  style={{
-                    ...(S.primaryBtn as React.CSSProperties),
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  External Billing Complete
-                </ImmediateSubmitButton>
-              </form>
             ) : fieldComplete ? (
               <div
                 style={{
@@ -3199,26 +3182,8 @@ export default async function JobDetailV2Page({
                 windowEnd={String(job.window_end ?? "")}
                 action={updateJobScheduleFromForm}
               />
-            ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
+            ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && (billingState.internalInvoicePanelEnabled || canShowInvoiceButton) ? (
               renderCloseoutBillingAction(S.outlineBtn(false) as React.CSSProperties, { secondary: true })
-            ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
-              <form action={markInvoiceCompleteFromForm}>
-                <input type="hidden" name="job_id" value={jobId} />
-                <input type="hidden" name="return_to" value={returnTo} />
-                <ImmediateSubmitButton
-                  pendingText="Saving…"
-                  className=""
-                  style={{
-                    ...(S.outlineBtn(false) as React.CSSProperties),
-                    width: "100%",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  External Billing Complete
-                </ImmediateSubmitButton>
-              </form>
             ) : null}
           </div>
         </div>
