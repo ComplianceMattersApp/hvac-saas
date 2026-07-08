@@ -3587,6 +3587,8 @@ const showCorrectionReviewResolution =
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
   const showMobileContractorContext =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
+  const canShowContractorReportPanel =
+    isInternalUser && Boolean(contractorId) && ["failed", "pending_info"].includes(String(job.ops_status ?? ""));
   const MobileJobDetailMobileComponent = forceCurrentMobileLayout
     ? MobileJobDetailCurrent
     : MobileJobDetailV2Preview;
@@ -3609,6 +3611,7 @@ const showCorrectionReviewResolution =
           billingState={billingState}
           canShowCertsButton={canShowCertsButton}
           canShowEccFailedReasonBanner={canShowEccFailedReasonBanner}
+          canShowContractorReportPanel={canShowContractorReportPanel}
           canShowInvoiceButton={canShowInvoiceButton}
           canShowReleaseAndReevaluate={canShowReleaseAndReevaluate}
           ChatIcon={ChatIcon}
@@ -3782,6 +3785,15 @@ const showCorrectionReviewResolution =
           workspaceInputClass={workspaceInputClass}
           workspaceTextareaClass={workspaceTextareaClass}
         />
+        {canShowContractorReportPanel ? (
+          <div id="mobile-failed-report" className="mx-auto max-w-lg px-3 pb-4">
+            <ContractorReportPanel
+              jobId={job.id}
+              contractorResponseLabel={contractorResponseLabel}
+              contractorResponseSubLabel={contractorResponseSubLabel}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="hidden lg:block">
@@ -5149,7 +5161,10 @@ const showCorrectionReviewResolution =
         <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
         <div className="mb-2 flex items-start justify-between gap-3">
           <div>
-            <SectionEyebrow>{rightRailNotesTitle}</SectionEyebrow>
+            <div className="inline-flex items-center gap-1.5">
+              <ChatIcon className="h-3.5 w-3.5 text-blue-700" />
+              <SectionEyebrow>{rightRailNotesTitle}</SectionEyebrow>
+            </div>
             <div className="mt-1 text-[15px] leading-6 text-slate-600">{rightRailNotesSubtitle}</div>
           </div>
           <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-800">
@@ -7646,7 +7661,7 @@ const showCorrectionReviewResolution =
 </details>
 ) : null}
 
-{isInternalUser && contractorId && ["failed", "pending_info"].includes(String(job.ops_status ?? "")) ? (
+{canShowContractorReportPanel ? (
   <>
     <div className="order-4 xl:order-4">
       <ContractorReportPanel

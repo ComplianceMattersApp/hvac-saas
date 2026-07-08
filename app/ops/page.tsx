@@ -1070,6 +1070,20 @@ export default async function OpsPage({
       return sortOpsBoardRows(queueRes.data ?? [], boardSort);
     }
 
+    async function loadWaitingContractorFocusSourceRows() {
+      const queueRes = await supabase
+        .from("jobs")
+        .select(workspaceSelect)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .neq("ops_status", "closed")
+        .in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"])
+        .order("created_at", { ascending: true });
+
+      if (queueRes.error) throw queueRes.error;
+      return queueRes.data ?? [];
+    }
+
     const workspacePreviewEntries = await Promise.all(
       requestedWorkspaceKeys.map(async (workspaceKey) => [workspaceKey, await loadWorkspacePreviewRows(workspaceKey)] as const),
     );
@@ -1280,6 +1294,8 @@ export default async function OpsPage({
     const contractorFocusSourceRows =
       selectedWorkspaceKey === "permits"
         ? activePermitRequestRows
+        : selectedWorkspaceKey === "waiting"
+        ? await loadWaitingContractorFocusSourceRows()
         : reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? [];
     const contractorFocusCounts = new Map<string, number>();
     let contractorFocusInternalCount = 0;

@@ -116,10 +116,10 @@ describe("job tests page wiring", () => {
     const resultsEntryIndex = ductLeakageEntryFieldsSource.indexOf('Enter the measured duct leakage result');
     expect(resultsEntryIndex).toBeGreaterThan(-1);
     expect(ductLeakageEntryFieldsSource.indexOf('Exception')).toBeLessThan(resultsEntryIndex);
-    expect(ductLeakageEntryFieldsSource).toContain("const showMeasurementFields = !exceptionActive;");
-    expect(ductLeakageEntryFieldsSource).toContain("{showMeasurementFields ? (");
+    expect(ductLeakageEntryFieldsSource).not.toContain("const showMeasurementFields = !exceptionActive;");
     expect(ductLeakageEntryFieldsSource).toContain('name="measured_duct_leakage_cfm"');
-    expect(ductLeakageEntryFieldsSource).toContain(") : preview.statusText ? (");
+    expect(ductLeakageEntryFieldsSource).toContain("required={!exceptionActive}");
+    expect(ductLeakageEntryFieldsSource).toContain("Exception details remain recorded for this test.");
     expect(ductLeakageEntryFieldsSource).toContain('Total Leakage %');
     expect(ductBlock).toContain('DuctLeakageEntryFields');
     expect(ductBlock).not.toContain('data-duct-exception-select');
@@ -369,8 +369,7 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).not.toContain('<summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">\n              Systems');
     expect(jobTestsPageSource).toContain('Completion Report');
     expect(jobTestsPageSource).toContain('systems.length > 1 ? (');
-    expect(jobTestsPageSource).toContain('System Label');
-    expect(jobTestsPageSource).toContain('className="mt-2 flex gap-2 overflow-x-auto pb-1"');
+    expect(jobTestsPageSource).toContain('className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1"');
     expect(jobTestsPageSource).toContain('inline-flex min-h-10 shrink-0 items-center rounded-full');
     expect(jobTestsPageSource).toContain('href={withS(focusedType || undefined, String(sys.id))}');
     expect(jobTestsPageSource).toContain('<div className="mt-1 text-sm font-semibold text-slate-950">{selectedSystemName}</div>');
@@ -379,12 +378,11 @@ describe("job tests page wiring", () => {
   });
 
   it("starts a not-yet-created mobile next test through the create-run action", () => {
-    expect(jobTestsPageSource).toContain('const mobileNextTestRequiresRun =');
-    expect(jobTestsPageSource).toContain('mobileNextTestRow?.status?.state === "required"');
-    expect(jobTestsPageSource).toContain('mobileNextTestRequiresRun ? (');
-    expect(jobTestsPageSource).toContain('<form action={addEccTestRunFromForm}>');
-    expect(jobTestsPageSource).toContain('name="test_type" value={mobileNextTestType}');
-    expect(jobTestsPageSource).toContain("Continue {mobileNextTestLabel}");
+    expect(jobTestsPageSource).toContain('const mobileNextTestRow = selectedSystemStatusRows.find((row) => !row.complete && !row.carriedForward) ?? null;');
+    expect(jobTestsPageSource).toContain('status.state === "required" ? (');
+    expect(jobTestsPageSource).toContain("action={addEccTestRunFromForm}");
+    expect(jobTestsPageSource).toContain('name="test_type" value={testType}');
+    expect(jobTestsPageSource).toContain("Start Test");
   });
 
   it("does not fall back to completed tests for the mobile continue action", () => {
@@ -398,7 +396,7 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain("selectedRequiredRemainingCount === 0");
     expect(jobTestsPageSource).toContain("selectedDraftCount === 0");
     expect(jobTestsPageSource).toContain("selectedNotStartedCount === 0");
-    expect(jobTestsPageSource).toContain("Tests Complete");
+    expect(jobTestsPageSource).toContain("All tests complete");
   });
 
   it("keeps add-another-test unavailable after the ECC workspace is closed or completed", () => {
@@ -416,6 +414,30 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain("Your latest entries were saved. You can keep editing or return to the test matrix.");
     expect(jobTestsPageSource).toContain("{!isCompactTestWorkspace ? (");
     expect(jobTestsPageSource).toContain("Back to Tests");
+  });
+
+  it("formats completed test timestamps through the shared LA-local result helper", () => {
+    expect(jobTestsPageSource).toContain("function formatTestResultTimestamp");
+    expect(jobTestsPageSource).toContain('timeZone: "America/Los_Angeles"');
+    expect(jobTestsPageSource).toContain('month: "short"');
+    expect(jobTestsPageSource).not.toContain("new Date(runDL.updated_at).toLocaleString()");
+    expect(jobTestsPageSource).not.toContain("new Date(runAF.updated_at).toLocaleString()");
+    expect(jobTestsPageSource).not.toContain("new Date(runRC.updated_at).toLocaleString()");
+  });
+
+  it("exposes mobile failed-report sending through the existing contractor report panel", () => {
+    expect(jobPageSource).toContain("const canShowContractorReportPanel =");
+    expect(jobPageSource).toContain('id="mobile-failed-report"');
+    expect(jobPageSource).toContain("<ContractorReportPanel");
+    expect(mobileJobDetailCurrentSource).toContain("MobileJobStatusActionSurface");
+    expect(readFileSync(resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"), "utf8")).toContain(
+      "Send Failed Report",
+    );
+  });
+
+  it("removes the visible Standard view button from mobile V2", () => {
+    const mobileV2Source = readFileSync(resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx"), "utf8");
+    expect(mobileV2Source).not.toContain("Standard view");
   });
 });
 

@@ -603,12 +603,6 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </span>
                 <span className="min-w-0 break-words">Job Workbench</span>
               </div>
-              <Link
-                href={standardJobHref}
-                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
-              >
-                Standard view
-              </Link>
             </div>
 
             <h1 className="mt-4 break-words text-[1.8rem] font-semibold leading-[1.08] tracking-normal text-[#071225] min-[390px]:text-[2rem]">

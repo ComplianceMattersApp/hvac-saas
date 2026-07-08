@@ -225,6 +225,14 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsRowCardSource).toContain("Open Job");
   });
 
+  it("derives Waiting contractor options from the full active queue before contractor filtering", () => {
+    expect(opsPageSource).toContain("async function loadWaitingContractorFocusSourceRows()");
+    expect(opsPageSource).toContain('selectedWorkspaceKey === "waiting"');
+    expect(opsPageSource).toContain("? await loadWaitingContractorFocusSourceRows()");
+    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"])');
+    expect(opsPageSource).toContain("contractorFocusInternalCount += 1");
+  });
+
   it("keeps sorting combined with Contractor and selected queue", () => {
     expect(opsPageSource).toContain("const boardSort = normalizeOpsBoardSort(sp.sort);");
     expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');

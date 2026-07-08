@@ -20,6 +20,7 @@ type MobileJobDetailCurrentProps = {
   billingMode: any;
   billingState: any;
   canShowCertsButton: any;
+  canShowContractorReportPanel: any;
   canShowEccFailedReasonBanner: any;
   canShowInvoiceButton: any;
   canShowReleaseAndReevaluate: any;

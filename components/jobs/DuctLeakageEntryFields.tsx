@@ -182,7 +182,6 @@ export default function DuctLeakageEntryFields({
   }, [formId, projectType, selectedException?.label, measuredInput, previewVersion]);
 
   const exceptionActive = Boolean(selectedException);
-  const showMeasurementFields = !exceptionActive;
   const statusLabel =
     exceptionActive
       ? "Exception"
@@ -251,9 +250,7 @@ export default function DuctLeakageEntryFields({
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Results</div>
               <p className="mt-1 text-sm text-slate-600">
-                {showMeasurementFields
-                  ? "Enter the measured duct leakage result when no exception applies."
-                  : "Exception details are recorded for this test."}
+                Enter the measured duct leakage result when available. Exception details remain recorded for this test.
               </p>
             </div>
             {statusLabel ? (
@@ -263,49 +260,43 @@ export default function DuctLeakageEntryFields({
             ) : null}
           </div>
 
-          {showMeasurementFields ? (
-            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.7fr)] sm:items-start sm:gap-3">
-              <div className="grid gap-2">
-                <label className="flex items-center justify-between gap-2 text-sm font-medium" htmlFor={`dl-meas-${runId}`}>
-                  <span>Measured Duct Leakage</span>
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                    CFM
-                  </span>
-                </label>
-                <input
-                  id={`dl-meas-${runId}`}
-                  name="measured_duct_leakage_cfm"
-                  type="number"
-                  step="1"
-                  required
-                  className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-xl sm:font-semibold sm:tracking-tight"
-                  defaultValue={measuredInput}
-                  onInput={(event) => setMeasuredInput(event.currentTarget.value)}
-                  placeholder="Enter CFM"
-                />
-              </div>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.7fr)] sm:items-start sm:gap-3">
+            <div className="grid gap-2">
+              <label className="flex items-center justify-between gap-2 text-sm font-medium" htmlFor={`dl-meas-${runId}`}>
+                <span>Measured Duct Leakage</span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                  CFM
+                </span>
+              </label>
+              <input
+                id={`dl-meas-${runId}`}
+                name="measured_duct_leakage_cfm"
+                type="number"
+                step="1"
+                required={!exceptionActive}
+                className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-xl sm:font-semibold sm:tracking-tight"
+                defaultValue={measuredInput}
+                onInput={(event) => setMeasuredInput(event.currentTarget.value)}
+                placeholder="Enter CFM"
+              />
+            </div>
 
-              <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 sm:gap-2 sm:py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-slate-600">Total Leakage %</span>
-                  <span className="font-semibold text-slate-950">{formatNumber(preview.totalLeakagePercent, 1)}%</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium text-slate-600">Max Allowed</span>
-                  <span className="font-semibold text-slate-950">{formatNumber(preview.maxLeakageCfm, 1)} CFM</span>
-                </div>
-                {preview.statusText ? (
-                  <div className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${toneClasses(preview.tone)}`}>
-                    {preview.statusText}
-                  </div>
-                ) : null}
+            <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 sm:gap-2 sm:py-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-slate-600">Total Leakage %</span>
+                <span className="font-semibold text-slate-950">{formatNumber(preview.totalLeakagePercent, 1)}%</span>
               </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-medium text-slate-600">Max Allowed</span>
+                <span className="font-semibold text-slate-950">{formatNumber(preview.maxLeakageCfm, 1)} CFM</span>
+              </div>
+              {preview.statusText ? (
+                <div className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${toneClasses(preview.tone)}`}>
+                  {preview.statusText}
+                </div>
+              ) : null}
             </div>
-          ) : preview.statusText ? (
-            <div className={`rounded-xl border px-3 py-2 text-sm font-semibold ${toneClasses(preview.tone)}`}>
-              {preview.statusText}
-            </div>
-          ) : null}
+          </div>
 
           <div className="mt-3 grid gap-1">
             <label className="text-sm font-medium" htmlFor={`dl-notes-${runId}`}>

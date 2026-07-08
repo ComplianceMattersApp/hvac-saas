@@ -8,7 +8,7 @@ import {
 import { shouldShowPartnerWorkMenuItem, shouldShowPortalMenuItem } from "../partner-work-access";
 
 describe("partner work access", () => {
-  it("shows the portal menu only for active app users with portal access", () => {
+  it("shows the portal menu only for users with active contractor portal access", () => {
     expect(
       shouldShowPortalMenuItem({
         hasActiveAppAccess: true,
@@ -20,10 +20,16 @@ describe("partner work access", () => {
         hasActiveAppAccess: false,
         hasExistingPortalAccess: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldShowPortalMenuItem({
         hasActiveAppAccess: true,
+        hasExistingPortalAccess: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowPortalMenuItem({
+        hasActiveAppAccess: false,
         hasExistingPortalAccess: false,
       }),
     ).toBe(false);
@@ -35,7 +41,7 @@ describe("partner work access", () => {
     ).toBe(false);
     expect(
       shouldShowPartnerWorkMenuItem({ isInternalUser: false, hasPartnerWorkAccess: true }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("labels attached work as created by rater and prefers sent to rater when formal handoff exists", () => {

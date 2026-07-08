@@ -2,7 +2,7 @@ export function shouldShowPortalMenuItem(input: {
   hasActiveAppAccess: boolean;
   hasExistingPortalAccess: boolean;
 }) {
-  return input.hasActiveAppAccess && input.hasExistingPortalAccess;
+  return input.hasExistingPortalAccess;
 }
 
 export function shouldShowPartnerWorkMenuItem(input: {

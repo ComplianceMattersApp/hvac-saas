@@ -101,7 +101,10 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
       >
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <SectionEyebrow>Schedule</SectionEyebrow>
+            <div className="inline-flex items-center gap-1.5">
+              <ClockIcon className="h-4 w-4 text-blue-700" />
+              <SectionEyebrow>Schedule</SectionEyebrow>
+            </div>
             <div className="mt-1 break-words text-lg font-semibold leading-tight text-[#0f1f35]">{appointmentDateLabel}</div>
             {mobileAppointmentTimeLabel ? (
               <div className="mt-1 text-sm font-semibold text-blue-900">{mobileAppointmentTimeLabel}</div>
@@ -126,7 +129,10 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
         <summary className="cursor-pointer list-none">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <SectionEyebrow>Schedule</SectionEyebrow>
+              <div className="inline-flex items-center gap-1.5">
+                <ClockIcon className="h-4 w-4 text-blue-700" />
+                <SectionEyebrow>Schedule</SectionEyebrow>
+              </div>
               <div className="mt-2 break-words text-xl font-semibold leading-tight text-[#0f1f35]">{appointmentDateLabel}</div>
               {mobileAppointmentTimeLabel ? (
                 <div className="mt-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold text-blue-900">

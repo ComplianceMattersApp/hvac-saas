@@ -493,12 +493,16 @@ function formatBusinessDateTimeUS(value?: string | null) {
 
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
-    month: "numeric",
+    month: "short",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
   }).format(parsed);
+}
+
+function formatTestResultTimestamp(value?: string | null) {
+  return formatBusinessDateTimeUS(value);
 }
 
 function canonicalId(value: unknown) {
@@ -2892,7 +2896,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     <div className="font-medium text-slate-900">{getTestDisplayLabel(row.testType, packageSystem)}</div>
                     <div>Result on parent: {getEffectiveResultLabel(row.run)}</div>
                     <div>
-                      Updated: {row.run?.updated_at ? new Date(row.run.updated_at).toLocaleString() : "—"}
+                      Updated: {row.run?.updated_at ? formatTestResultTimestamp(row.run.updated_at) : "—"}
                     </div>
                     {row.run?.data?.notes ? (
                       <div className="break-words">Notes: {String(row.run.data.notes)}</div>
@@ -3056,7 +3060,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
               <div className="text-xs text-muted-foreground">
                 {focusedCustomRun?.updated_at
-                  ? new Date(focusedCustomRun.updated_at).toLocaleString()
+                  ? formatTestResultTimestamp(focusedCustomRun.updated_at)
                   : null}
               </div>
             </div>
@@ -3122,7 +3126,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
               {runDL?.updated_at ? (
                 <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                  {new Date(runDL.updated_at).toLocaleString()}
+                  {formatTestResultTimestamp(runDL.updated_at)}
                 </div>
               ) : null}
             </div>
@@ -3197,7 +3201,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runDL?.updated_at ? new Date(runDL.updated_at).toLocaleString() : null}
+                {runDL?.updated_at ? formatTestResultTimestamp(runDL.updated_at) : null}
               </div>
             </div>
 
@@ -3217,7 +3221,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div className="font-medium">Passed on parent visit; carried forward.</div>
                   <div className="mt-1 text-xs text-emerald-700">
                     Parent result: {getEffectiveResultLabel(parentRunDL)}
-                    {parentRunDL?.updated_at ? ` · Updated ${new Date(parentRunDL.updated_at).toLocaleString()}` : ""}
+                    {parentRunDL?.updated_at ? ` · Updated ${formatTestResultTimestamp(parentRunDL.updated_at)}` : ""}
                   </div>
                 </div>
               ) : (
@@ -3371,7 +3375,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runAF?.updated_at ? new Date(runAF.updated_at).toLocaleString() : null}
+                {runAF?.updated_at ? formatTestResultTimestamp(runAF.updated_at) : null}
               </div>
             </div>
 
@@ -3381,7 +3385,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div className="font-medium">Passed on parent visit; carried forward.</div>
                   <div className="mt-1 text-xs text-emerald-700">
                     Parent result: {getEffectiveResultLabel(parentRunAF)}
-                    {parentRunAF?.updated_at ? ` · Updated ${new Date(parentRunAF.updated_at).toLocaleString()}` : ""}
+                    {parentRunAF?.updated_at ? ` · Updated ${formatTestResultTimestamp(parentRunAF.updated_at)}` : ""}
                   </div>
                 </div>
               ) : (
@@ -3520,7 +3524,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runFan?.updated_at ? new Date(runFan.updated_at).toLocaleString() : null}
+                {runFan?.updated_at ? formatTestResultTimestamp(runFan.updated_at) : null}
               </div>
             </div>
 
@@ -3788,7 +3792,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runFilter?.updated_at ? new Date(runFilter.updated_at).toLocaleString() : null}
+                {runFilter?.updated_at ? formatTestResultTimestamp(runFilter.updated_at) : null}
               </div>
             </div>
 
@@ -4060,7 +4064,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runAhri?.updated_at ? new Date(runAhri.updated_at).toLocaleString() : null}
+                {runAhri?.updated_at ? formatTestResultTimestamp(runAhri.updated_at) : null}
               </div>
             </div>
 
@@ -4314,7 +4318,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runLocalExhaust?.updated_at ? new Date(runLocalExhaust.updated_at).toLocaleString() : null}
+                {runLocalExhaust?.updated_at ? formatTestResultTimestamp(runLocalExhaust.updated_at) : null}
               </div>
             </div>
 
@@ -4484,7 +4488,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runQiiInsulation?.updated_at ? new Date(runQiiInsulation.updated_at).toLocaleString() : null}
+                {runQiiInsulation?.updated_at ? formatTestResultTimestamp(runQiiInsulation.updated_at) : null}
               </div>
             </div>
 
@@ -4722,7 +4726,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
-                {runRC?.updated_at ? new Date(runRC.updated_at).toLocaleString() : null}
+                {runRC?.updated_at ? formatTestResultTimestamp(runRC.updated_at) : null}
               </div>
             </div>
 
@@ -4740,7 +4744,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div className="font-medium">Passed on parent visit; carried forward.</div>
                   <div className="mt-1 text-xs text-emerald-700">
                     Parent result: {getEffectiveResultLabel(parentRunRC)}
-                    {parentRunRC?.updated_at ? ` · Updated ${new Date(parentRunRC.updated_at).toLocaleString()}` : ""}
+                    {parentRunRC?.updated_at ? ` · Updated ${formatTestResultTimestamp(parentRunRC.updated_at)}` : ""}
                   </div>
                 </div>
               ) : (

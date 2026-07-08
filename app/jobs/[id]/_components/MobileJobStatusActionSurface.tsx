@@ -4,6 +4,7 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
   const {
     billingState,
     canShowCertsButton,
+    canShowContractorReportPanel,
     canShowEccFailedReasonBanner,
     canShowInvoiceButton,
     ChevronRightIcon,
@@ -124,6 +125,14 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
                 </SubmitButton>
               </form>
             </details>
+            {canShowContractorReportPanel ? (
+              <Link
+                href="#mobile-failed-report"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-900 shadow-sm transition-colors hover:bg-rose-100"
+              >
+                Send Failed Report
+              </Link>
+            ) : null}
           </div>
         ) : null}
 
