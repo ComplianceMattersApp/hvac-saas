@@ -27,6 +27,10 @@ const equipmentPhotoPanelSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/EquipmentLabelPhotoEvidencePanel.tsx"),
   "utf8",
 );
+const refrigerantEvidenceImageSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/RefrigerantEvidenceImage.tsx"),
+  "utf8",
+);
 const jobActionsSource = readFileSync(
   resolve(__dirname, "../../actions/job-actions.ts"),
   "utf8",
@@ -84,6 +88,9 @@ describe("equipment label photo evidence", () => {
     expect(completionReportSource).toContain("Equipment label photo");
     expect(completionReportSource).toContain('variant="equipmentLabel"');
     expect(completionReportSource).toContain("Label photo evidence");
+    expect(refrigerantEvidenceImageSource).toContain('href={src}');
+    expect(refrigerantEvidenceImageSource).toContain('title="Open full-size image"');
+    expect(refrigerantEvidenceImageSource).toContain("group-hover:scale-150");
     expect(completionReportSource).not.toContain("Manufacturer: ${present(eq?.manufacturer) || \"-\"}");
     expect(completionReportSource).not.toContain("Model: ${present(eq?.model) || \"-\"}");
     expect(completionReportSource).not.toContain("Serial: ${present(eq?.serial) || \"-\"}");

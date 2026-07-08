@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
+import { buildEquipmentIdentityLabel, buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
 
 describe("buildEquipmentSummaryLine", () => {
   it("includes heating fields for furnace equipment", () => {
@@ -82,5 +82,13 @@ describe("buildEquipmentSummaryLine", () => {
     expect(buildEquipmentSummaryLine({ equipment_role: "package_unit" })).toContain("Pack Unit");
     expect(buildEquipmentSummaryLine({ equipment_role: "gas_pack_unit" })).toContain("Gas Pack Unit");
     expect(buildEquipmentSummaryLine({ equipment_role: "heat_pump_pack_unit" })).toContain("Heat Pump Pack Unit");
+  });
+
+  it("labels photo-only equipment from role instead of unknown manual fields", () => {
+    expect(buildEquipmentIdentityLabel({ equipment_role: "air_handler" })).toBe("Air Handler");
+    expect(buildEquipmentIdentityLabel({ equipment_role: "outdoor_unit", has_label_photo_evidence: true })).toBe(
+      "Condenser - label photo on file",
+    );
+    expect(buildEquipmentIdentityLabel({})).toBe("Equipment details pending");
   });
 });

@@ -47,6 +47,7 @@ import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-busi
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
+import { buildEquipmentIdentityLabel } from "@/lib/utils/equipment-summary";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { displayTimeLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
@@ -1685,7 +1686,7 @@ export default async function JobDetailV2Page({
                 const roleLabel = String(eq.equipment_role ?? eq.component_type ?? "")
                   .replace(/_/g, " ")
                   .trim();
-                const makeModel = [eq.manufacturer, eq.model].filter(Boolean).join(" ") || "Unknown";
+                const makeModel = buildEquipmentIdentityLabel(eq);
                 return (
                   <div
                     key={eq.id}
@@ -2768,7 +2769,7 @@ export default async function JobDetailV2Page({
                               key={eq.id}
                               style={{ fontSize: "13px", color: "oklch(0.38 0.02 262)" }}
                             >
-                              {[eq.manufacturer, eq.model].filter(Boolean).join(" ") || "Unknown equipment"}
+                              {buildEquipmentIdentityLabel(eq)}
                               {eq.system_location ? ` — ${eq.system_location}` : ""}
                             </div>
                           ))}

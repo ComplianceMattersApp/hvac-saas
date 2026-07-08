@@ -39,3 +39,17 @@ export function buildEquipmentSummaryLine(eq: any) {
 
   return `${equipmentType} | ${details.join(" | ")}`;
 }
+
+export function buildEquipmentIdentityLabel(eq: any) {
+  const makeModel = [present(eq?.manufacturer), present(eq?.model)].filter(Boolean).join(" ");
+  if (makeModel) return makeModel;
+
+  const rawType = present(eq?.equipment_role || eq?.component_type);
+  const role = rawType ? equipmentRoleLabel(rawType) : "";
+  const hasPhotoEvidence = Boolean(eq?.has_label_photo_evidence);
+
+  if (role && hasPhotoEvidence) return `${role} - label photo on file`;
+  if (role) return role;
+  if (hasPhotoEvidence) return "Equipment label photo on file";
+  return "Equipment details pending";
+}
