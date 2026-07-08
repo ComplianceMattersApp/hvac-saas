@@ -64,6 +64,7 @@ import { isPackagedUnitEquipmentType } from "@/lib/utils/equipment-domain";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
+import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 import {
   listJobEquipmentLabelPhotoImages,
   listJobRefrigerantChargeEvidenceImages,
@@ -1349,7 +1350,8 @@ export default async function JobTestsPage({
   const isFailedOrRetestState = ["failed", "retest_needed", "pending_office_review"].includes(normalizedOpsStatus);
   const isCompletionReportCertCloseoutBlocked =
     isFailedOrRetestState ||
-    (hasCompletedFailedEccRun && !hasCorrectionReviewResolution);
+    (hasCompletedFailedEccRun && !hasCorrectionReviewResolution) ||
+    !isValidEccPermitNumber(job.permit_number);
   const canShowCompletionReportCertsSentAction =
     isCompletionReportFocused &&
     isInternalUser &&

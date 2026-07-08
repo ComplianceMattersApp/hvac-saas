@@ -311,12 +311,14 @@ describe("job tests page wiring", () => {
 
   it("adds completion-report cert closeout through the existing job ops action path", () => {
     expect(jobTestsPageSource).toContain('import { markCertsCompleteFromForm } from "@/lib/actions/job-ops-actions";');
+    expect(jobTestsPageSource).toContain('import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";');
     expect(jobTestsPageSource).toContain("const canShowCompletionReportCertsSentAction =");
     expect(jobTestsPageSource).toContain("isCompletionReportFocused");
     expect(jobTestsPageSource).toContain("isInternalUser");
     expect(jobTestsPageSource).toContain("isEccJobType(job.job_type)");
     expect(jobTestsPageSource).toContain("!Boolean(job.certs_complete)");
     expect(jobTestsPageSource).toContain("!isCompletionReportCertCloseoutBlocked");
+    expect(jobTestsPageSource).toContain("!isValidEccPermitNumber(job.permit_number)");
     expect(jobTestsPageSource).not.toContain("hasSelectedCompletionReportPass");
     expect(jobTestsPageSource).toContain("<form action={markCertsCompleteFromForm}>");
     expect(jobTestsPageSource).toContain('name="return_to" value={completionReportReturnTo}');

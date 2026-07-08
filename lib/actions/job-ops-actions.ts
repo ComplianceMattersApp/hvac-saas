@@ -54,6 +54,7 @@ import {
 import {
   ECC_PERMIT_NEEDED_REASON,
   isEccPermitNeededBlocker,
+  isValidEccPermitNumber,
   shouldApplyEccPermitNeededBlocker,
 } from "@/lib/ecc/permit-needed";
 import {
@@ -1459,6 +1460,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     billedTruthSatisfied && !Boolean(job.invoice_complete);
 
   if ((job.job_type ?? "").toLowerCase() === "ecc") {
+    const hasValidPermitNumber = isValidEccPermitNumber(job.permit_number);
     const permitBlocked = await persistEccPermitNeededBlocker({
       supabase,
       jobId,
@@ -1467,7 +1469,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
       userId: user.id,
     });
 
-    if (permitBlocked) {
+    if (permitBlocked || !hasValidPermitNumber) {
       revalidatePath(`/jobs/${jobId}`);
       revalidatePath(`/ops`);
       redirectToJob({ banner: "permit_needed" });
