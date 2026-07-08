@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { requireFinancialExportAccessOrResponse } from "@/lib/auth/financial-access";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import {
@@ -42,15 +43,11 @@ export async function GET(request: NextRequest) {
     ({ internalUser } = await requireInternalUser({ supabase, userId: user.id }));
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorError } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (contractorError) throw contractorError;
-
-      const redirectTarget = contractorUser?.contractor_id ? "/portal" : "/login";
+      const redirectTarget = await resolveInternalAccessErrorRedirectPath({
+        supabase,
+        user,
+        fallbackPath: "/login",
+      });
       return NextResponse.redirect(new URL(redirectTarget, request.url));
     }
 

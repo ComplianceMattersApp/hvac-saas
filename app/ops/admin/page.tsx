@@ -7,6 +7,7 @@ import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/bus
 import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncher";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { canViewFinancialRegister, isStructuralAccountOwner } from "@/lib/auth/financial-access";
 import {
   hasFieldPaymentCollectionAccess,
@@ -33,15 +34,13 @@ async function requireAdminOrRedirect() {
     return { supabase, internalUser: authz.internalUser, user };
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: cu, error: cuErr } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cuErr) throw cuErr;
-      if (cu?.contractor_id) redirect("/portal");
-      redirect("/ops");
+      redirect(
+        await resolveInternalAccessErrorRedirectPath({
+          supabase,
+          user,
+          fallbackPath: "/ops",
+        }),
+      );
     }
 
     throw error;

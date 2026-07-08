@@ -16,6 +16,7 @@ import {
   reportTableRowClass,
 } from "@/components/reports/ReportLedgerChrome";
 import { isInternalAccessError } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -51,15 +52,13 @@ export default async function TimeClockReportPage({
     ({ internalUser } = await requireAdminReportActor({ supabase, userId: user.id }));
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorError } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (contractorError) throw contractorError;
-      if (contractorUser?.contractor_id) redirect("/portal");
-      redirect("/ops");
+      redirect(
+        await resolveInternalAccessErrorRedirectPath({
+          supabase,
+          user,
+          fallbackPath: "/ops",
+        }),
+      );
     }
 
     throw error;

@@ -5,6 +5,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import {
   clockInFromForm,
   clockOutFromForm,
@@ -47,15 +48,13 @@ async function requireInternalUserOrRedirect() {
     return { supabase, userId: user.id, internalUser: authz.internalUser };
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: cu, error: cuErr } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cuErr) throw cuErr;
-      if (cu?.contractor_id) redirect("/portal");
-      redirect("/ops");
+      redirect(
+        await resolveInternalAccessErrorRedirectPath({
+          supabase,
+          user,
+          fallbackPath: "/ops",
+        }),
+      );
     }
 
     throw error;

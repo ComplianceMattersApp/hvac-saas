@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import {
   TIME_CLOCK_REPORT_EXPORT_LIMIT,
   buildTimeClockReportCsv,
@@ -24,14 +25,11 @@ export async function GET(request: NextRequest) {
     ({ internalUser } = await requireAdminReportActor({ supabase, userId: user.id }));
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorError } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (contractorError) throw contractorError;
-      const redirectTarget = contractorUser?.contractor_id ? "/portal" : "/ops";
+      const redirectTarget = await resolveInternalAccessErrorRedirectPath({
+        supabase,
+        user,
+        fallbackPath: "/ops",
+      });
       return NextResponse.redirect(new URL(redirectTarget, request.url));
     }
     throw error;

@@ -27,6 +27,17 @@ describe("dual-context routing wiring", () => {
     const layout = readRepoFile("app/layout.tsx");
     const mobileMenu = readRepoFile("components/layout/MobileShellMenu.tsx");
     const calendarPage = readRepoFile("app/calendar/page.tsx");
+    const internalAccessRedirect = readRepoFile("lib/auth/internal-access-redirect.ts");
+    const guardedAppFiles = [
+      "app/time-clock/page.tsx",
+      "app/ops/field/page.tsx",
+      "app/reports/time-clock/page.tsx",
+      "app/reports/time-clock/export/route.ts",
+      "app/reports/jobs/page.tsx",
+      "app/reports/invoices/export/route.ts",
+      "app/ops/admin/page.tsx",
+      "app/ops/admin/company-profile/page.tsx",
+    ];
 
     expect(layout).toContain("access.hasActiveAppAccess");
     expect(layout).toContain("{isInternalUser ? <ShellCreateMenu items={createMenuItems} /> : null}");
@@ -43,6 +54,15 @@ describe("dual-context routing wiring", () => {
     expect(calendarPage).toContain("resolveDualContextAccess");
     expect(calendarPage).toContain("landingPathForDualContextAccess");
     expect(calendarPage).not.toContain("contractor_users");
+
+    expect(internalAccessRedirect).toContain("resolveDualContextAccess");
+    expect(internalAccessRedirect).toContain("landingPathForDualContextAccess");
+
+    for (const path of guardedAppFiles) {
+      const source = readRepoFile(path);
+      expect(source).toContain("resolveInternalAccessErrorRedirectPath");
+      expect(source).not.toContain("contractor_users");
+    }
   });
 
   it("keeps portal request entry explicit and prevents membership-only job context switching", () => {

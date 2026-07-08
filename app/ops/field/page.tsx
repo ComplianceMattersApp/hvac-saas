@@ -5,6 +5,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { groupFieldJobs } from "@/lib/ops/field-queue";
 import type { FieldWorkJob } from "@/components/ops/FieldWorkCard";
@@ -46,15 +47,13 @@ export default async function OpsFieldPage() {
     internalBusinessDisplayName = internalBusinessIdentity.display_name;
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: cu, error: cuErr } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cuErr) throw cuErr;
-      if (cu?.contractor_id) redirect("/portal");
-      redirect("/login");
+      redirect(
+        await resolveInternalAccessErrorRedirectPath({
+          supabase,
+          user,
+          fallbackPath: "/login",
+        }),
+      );
     }
 
     throw error;
