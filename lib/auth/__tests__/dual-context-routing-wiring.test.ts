@@ -11,6 +11,7 @@ describe("dual-context routing wiring", () => {
     const rootPage = readRepoFile("app/page.tsx");
     const authCallback = readRepoFile("app/auth/callback/page.tsx");
     const loginPage = readRepoFile("app/login/page.tsx");
+    const jobDetailActor = readRepoFile("lib/actions/internal-job-detail-read-boundary.ts");
 
     expect(rootPage).toContain("resolveDualContextAccess");
     expect(rootPage).toContain("landingPathForDualContextAccess");
@@ -21,6 +22,9 @@ describe("dual-context routing wiring", () => {
 
     expect(loginPage).toContain("resolveDualContextAccess");
     expect(loginPage).toContain("resolvePostLoginDestination");
+
+    expect(jobDetailActor).toContain("resolveDualContextAccess");
+    expect(jobDetailActor).not.toContain('from("contractor_users")');
   });
 
   it("gates normal shell create and nav by active internal app context", () => {

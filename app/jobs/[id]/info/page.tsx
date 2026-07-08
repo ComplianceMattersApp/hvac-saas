@@ -2,10 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
-import {
-  isInternalAccessError,
-  requireInternalUser,
-} from "@/lib/auth/internal-user";
+import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
@@ -146,31 +143,17 @@ export default async function JobInfoPage({
 
     if (!user) redirect("/login");
 
-    let internalAccess: Awaited<ReturnType<typeof requireInternalUser>>;
+    const actorResolution = await resolveJobDetailActor({ supabase, userId: user.id });
+    if (actorResolution.kind === "contractor") redirect(`/portal/jobs/${id}`);
+    if (actorResolution.kind === "unauthorized") redirect("/login");
 
-    try {
-      internalAccess = await requireInternalUser({ supabase, userId: user.id });
-    } catch (error) {
-      if (isInternalAccessError(error)) {
-        const { data: contractorUser, error: contractorUserErr } = await supabase
-          .from("contractor_users")
-          .select("contractor_id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (contractorUserErr) throw contractorUserErr;
-
-        if (contractorUser?.contractor_id) {
-          redirect(`/portal/jobs/${id}`);
-        }
-
-        redirect("/login");
-      }
-
-      throw error;
-    }
-
-    return { user, internalAccess };
+    return {
+      user,
+      internalAccess: {
+        userId: actorResolution.internalUser.user_id,
+        internalUser: actorResolution.internalUser,
+      },
+    };
   });
 
 const { data: job, error } = await timedPhase("jobEquipmentRead", () => supabase

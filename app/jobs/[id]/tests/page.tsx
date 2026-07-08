@@ -19,10 +19,7 @@ import {
   resolveInternalBusinessIdentityByAccountOwnerId,
   resolveInternalBusinessProfileLogoUrl,
 } from "@/lib/business/internal-business-profile";
-import {
-  isInternalAccessError,
-  requireInternalUser,
-} from "@/lib/auth/internal-user";
+import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import JobSubpageContextHeader from "../_components/JobSubpageContextHeader";
 
 import {
@@ -817,32 +814,11 @@ export default async function JobTestsPage({
 
     if (!user) redirect("/login");
 
-    let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"] | null = null;
+    const actorResolution = await resolveJobDetailActor({ supabase, userId: user.id });
+    if (actorResolution.kind === "contractor") redirect(`/portal/jobs/${id}`);
+    if (actorResolution.kind === "unauthorized") redirect("/login");
 
-    try {
-      const internalAccess = await requireInternalUser({ supabase, userId: user.id });
-      internalUser = internalAccess.internalUser;
-    } catch (error) {
-      if (isInternalAccessError(error)) {
-        const { data: contractorUser, error: contractorUserErr } = await supabase
-          .from("contractor_users")
-          .select("contractor_id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (contractorUserErr) throw contractorUserErr;
-
-        if (contractorUser?.contractor_id) {
-          redirect(`/portal/jobs/${id}`);
-        }
-
-        redirect("/login");
-      }
-
-      throw error;
-    }
-
-    return { internalUser };
+    return { internalUser: actorResolution.internalUser };
   });
   const isInternalUser = Boolean(internalUser?.user_id);
 

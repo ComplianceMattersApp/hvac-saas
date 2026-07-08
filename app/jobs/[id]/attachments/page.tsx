@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import {
-  isInternalAccessError,
-  requireInternalUser,
-  getInternalUser,
-} from "@/lib/auth/internal-user";
+import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import { loadScopedInternalAttachmentJobForMutation } from "@/lib/auth/internal-attachment-scope";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
@@ -109,23 +105,11 @@ export default async function JobAttachmentsPage({
 
   if (!user) redirect("/login");
 
-  const internalUserData = await getInternalUser({ supabase, userId: user.id });
+  const actorResolution = await resolveJobDetailActor({ supabase, userId: user.id });
+  if (actorResolution.kind === "contractor") redirect(`/portal/jobs/${jobId}`);
+  if (actorResolution.kind === "unauthorized") redirect("/login");
 
-  if (!internalUserData) {
-    const { data: contractorUser, error: contractorError } = await supabase
-      .from("contractor_users")
-      .select("user_id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (contractorError) throw contractorError;
-
-    if (contractorUser) {
-      redirect(`/portal/jobs/${jobId}`);
-    }
-
-    redirect("/login");
-  }
+  const internalUserData = actorResolution.internalUser;
 
   // Explicit same-account internal scoped-job preflight: deny before any attachment read or signed URL generation
   const scopedJob = await loadScopedInternalAttachmentJobForMutation({

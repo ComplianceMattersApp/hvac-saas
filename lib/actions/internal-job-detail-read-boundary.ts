@@ -1,8 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/server";
-import {
-  isInternalAccessError,
-  requireInternalUser,
-} from "@/lib/auth/internal-user";
+import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import type { InternalUserRow } from "@/lib/auth/internal-user";
 import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 
 const UUID_PATTERN =
@@ -58,7 +56,7 @@ function normalizeQueryError(error: unknown): NormalizedQueryError {
 }
 
 type JobDetailActorResolution =
-  | { kind: "internal"; internalUser: { account_owner_user_id: string; role: string } }
+  | { kind: "internal"; internalUser: InternalUserRow }
   | { kind: "contractor" }
   | { kind: "unauthorized" };
 
@@ -66,30 +64,26 @@ export async function resolveJobDetailActor(params: {
   supabase: any;
   userId: string;
 }): Promise<JobDetailActorResolution> {
-  try {
-    const { internalUser } = await requireInternalUser({
-      supabase: params.supabase,
-      userId: params.userId,
-    });
+  const access = await resolveDualContextAccess({
+    supabase: params.supabase,
+    user: { id: params.userId },
+  });
+
+  if (access.hasActiveAppAccess && access.internalUser) {
     return {
       kind: "internal",
-      internalUser,
+      internalUser: {
+        user_id: access.internalUser.userId,
+        role: access.internalUser.role,
+        is_active: access.internalUser.isActive,
+        account_owner_user_id: access.internalUser.accountOwnerUserId,
+        created_by: access.internalUser.createdBy,
+      },
     };
-  } catch (error) {
-    if (!isInternalAccessError(error)) {
-      throw error;
-    }
-
-    const { data: contractorUser, error: contractorError } = await params.supabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", params.userId)
-      .maybeSingle();
-
-    if (contractorError) throw contractorError;
-    if (contractorUser?.contractor_id) return { kind: "contractor" };
-    return { kind: "unauthorized" };
   }
+
+  if (access.hasPortalAccess) return { kind: "contractor" };
+  return { kind: "unauthorized" };
 }
 
 export async function loadScopedInternalJobDetailReadBoundary(params: {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const isInternalAccessErrorMock = vi.fn();
+const resolveDualContextAccessMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -12,6 +13,10 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalUser: (...args: unknown[]) => requireInternalUserMock(...args),
   isInternalAccessError: (...args: unknown[]) => isInternalAccessErrorMock(...args),
+}));
+
+vi.mock("@/lib/auth/dual-context-access", () => ({
+  resolveDualContextAccess: (...args: unknown[]) => resolveDualContextAccessMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-job-scope", () => ({
@@ -227,20 +232,14 @@ describe("internal job-detail read boundary hardening", () => {
   });
 
   it("preserves non-internal contractor redirect classification", async () => {
-    requireInternalUserMock.mockRejectedValue(new Error("not-internal"));
-    isInternalAccessErrorMock.mockReturnValue(true);
+    resolveDualContextAccessMock.mockResolvedValue({
+      hasActiveAppAccess: false,
+      hasPortalAccess: true,
+      internalUser: null,
+    });
 
     const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn(async () => ({
-              data: { contractor_id: "contractor-1" },
-              error: null,
-            })),
-          })),
-        })),
-      })),
+      from: vi.fn(),
     };
 
     const { resolveJobDetailActor } = await import(
@@ -256,27 +255,21 @@ describe("internal job-detail read boundary hardening", () => {
   });
 
   it("prefers internal actor classification for dual-role users", async () => {
-    requireInternalUserMock.mockResolvedValue({
-      userId: "user-dual",
+    resolveDualContextAccessMock.mockResolvedValue({
+      hasActiveAppAccess: true,
+      hasPortalAccess: true,
       internalUser: {
-        user_id: "user-dual",
+        userId: "user-dual",
         role: "office",
         is_active: true,
-        account_owner_user_id: "owner-1",
+        isActive: true,
+        accountOwnerUserId: "owner-1",
+        createdBy: null,
       },
     });
 
     const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn(async () => ({
-              data: { contractor_id: "contractor-1" },
-              error: null,
-            })),
-          })),
-        })),
-      })),
+      from: vi.fn(),
     };
 
     const { resolveJobDetailActor } = await import(
@@ -295,26 +288,21 @@ describe("internal job-detail read boundary hardening", () => {
         role: "office",
         is_active: true,
         account_owner_user_id: "owner-1",
+        created_by: null,
       },
     });
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
   it("preserves non-internal login classification for non-contractor", async () => {
-    requireInternalUserMock.mockRejectedValue(new Error("not-internal"));
-    isInternalAccessErrorMock.mockReturnValue(true);
+    resolveDualContextAccessMock.mockResolvedValue({
+      hasActiveAppAccess: false,
+      hasPortalAccess: false,
+      internalUser: null,
+    });
 
     const supabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn(async () => ({
-              data: null,
-              error: null,
-            })),
-          })),
-        })),
-      })),
+      from: vi.fn(),
     };
 
     const { resolveJobDetailActor } = await import(
@@ -330,27 +318,21 @@ describe("internal job-detail read boundary hardening", () => {
   });
 
   it("keeps cross-account denial for dual-role internal users", async () => {
-    requireInternalUserMock.mockResolvedValue({
-      userId: "user-dual-cross",
+    resolveDualContextAccessMock.mockResolvedValue({
+      hasActiveAppAccess: true,
+      hasPortalAccess: true,
       internalUser: {
-        user_id: "user-dual-cross",
+        userId: "user-dual-cross",
         role: "office",
         is_active: true,
-        account_owner_user_id: "owner-2",
+        isActive: true,
+        accountOwnerUserId: "owner-2",
+        createdBy: null,
       },
     });
 
     const actorSupabase = {
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            maybeSingle: vi.fn(async () => ({
-              data: { contractor_id: "contractor-2" },
-              error: null,
-            })),
-          })),
-        })),
-      })),
+      from: vi.fn(),
     };
 
     const admin = {
