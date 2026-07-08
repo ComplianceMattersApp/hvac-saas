@@ -308,7 +308,7 @@ const JOB_V2_SELECT = `
   customer_first_name, customer_last_name, customer_email, customer_phone,
   scheduled_date, window_start, window_end, on_the_way_at,
   field_complete, certs_complete, invoice_complete,
-  ops_status, pending_info_reason, on_hold_reason,
+  pending_info_reason, on_hold_reason,
   follow_up_date, next_action_note, action_required_by, ops_board_failure_note,
   permit_number, jurisdiction, permit_date,
   billing_recipient, billing_name, billing_email,
@@ -461,10 +461,10 @@ export default async function JobDetailV2Page({
   const status = String(job.status ?? "").toLowerCase();
   const opsStatus = String(job.ops_status ?? "").toLowerCase();
   const jobType = String(job.job_type ?? "").toLowerCase();
+  const isServiceJob = jobType === "service";
   const isEccJob = jobType === "ecc";
   const fieldComplete = Boolean(job.field_complete);
   const certsComplete = Boolean(job.certs_complete);
-  const invoiceComplete = Boolean(job.invoice_complete);
 
   // ── billing state ─────────────────────────────────────────────────────────
   const billingDisposition = normalizeJobBillingDisposition((job as any).billing_disposition ?? null);
@@ -620,6 +620,8 @@ export default async function JobDetailV2Page({
     isMaintenanceAgreementsEnabled() && job.customer_id
       ? `/customers/${job.customer_id}?tab=service-plans`
       : null;
+  const canCreateReturnVisit = isServiceJob;
+  const canCreateCallbackVisit = isServiceJob && (fieldComplete || status === "completed" || opsStatus === "closed");
   const followUpDateValue = String(job.follow_up_date ?? "").trim();
   const followUpNoteValue = String(job.next_action_note ?? "").trim();
   const followUpOwnerValue = String(job.action_required_by ?? "").trim();
@@ -678,10 +680,6 @@ export default async function JobDetailV2Page({
 
   // return URL for actions
   const returnTo = `/jobs/${jobId}/v2`;
-
-  // server actions (all read job_id / return_to from formData hidden inputs)
-  const createReturnVisitAction = createNextServiceVisitFromForm;
-  const createCallbackAction = createCallbackVisitFromForm;
 
   const renderCloseoutBillingAction = (
     buttonStyle: React.CSSProperties,
@@ -2128,40 +2126,60 @@ export default async function JobDetailV2Page({
             {/* schedule a next visit */}
             <div>
               <div style={{ ...S.fieldLabel, marginBottom: "10px" }}>Schedule a next visit</div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <form action={createReturnVisitAction} style={{ flex: 1 }}>
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <input
-                    type="hidden"
-                    name="next_visit_reason"
-                    value={String(job.service_visit_reason ?? job.title ?? "").trim()}
-                  />
-                  <ImmediateSubmitButton
-                    pendingText="Creating…"
-                    className=""
-                    style={{ ...(S.outlineBtn(true) as React.CSSProperties), width: "100%", justifyContent: "center" } as React.CSSProperties}
-                  >
-                    Return Visit
-                  </ImmediateSubmitButton>
-                </form>
-                <form action={createCallbackAction} style={{ flex: 1 }}>
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <input
-                    type="hidden"
-                    name="callback_visit_reason"
-                    value={String(job.service_visit_reason ?? job.title ?? "").trim()}
-                  />
-                  <ImmediateSubmitButton
-                    pendingText="Creating…"
-                    className=""
-                    style={{ ...(S.outlineBtn(false) as React.CSSProperties), width: "100%", justifyContent: "center" } as React.CSSProperties}
-                  >
-                    Callback
-                  </ImmediateSubmitButton>
-                </form>
-              </div>
+              {canCreateReturnVisit || canCreateCallbackVisit ? (
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {canCreateReturnVisit ? (
+                    <form action={createNextServiceVisitFromForm} style={{ flex: 1 }}>
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <input
+                        type="hidden"
+                        name="next_visit_reason"
+                        value={String(job.service_visit_reason ?? job.title ?? "").trim()}
+                      />
+                      <ImmediateSubmitButton
+                        pendingText="Creating…"
+                        className=""
+                        style={{ ...(S.outlineBtn(true) as React.CSSProperties), width: "100%", justifyContent: "center" } as React.CSSProperties}
+                      >
+                        Return Visit
+                      </ImmediateSubmitButton>
+                    </form>
+                  ) : null}
+                  {canCreateCallbackVisit ? (
+                    <form action={createCallbackVisitFromForm} style={{ flex: 1 }}>
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <input
+                        type="hidden"
+                        name="callback_visit_reason"
+                        value={String(job.service_visit_reason ?? job.title ?? "").trim()}
+                      />
+                      <ImmediateSubmitButton
+                        pendingText="Creating…"
+                        className=""
+                        style={{ ...(S.outlineBtn(false) as React.CSSProperties), width: "100%", justifyContent: "center" } as React.CSSProperties}
+                      >
+                        Callback
+                      </ImmediateSubmitButton>
+                    </form>
+                  ) : null}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: "11px 13px",
+                    borderRadius: "9px",
+                    border: "1px solid oklch(0.92 0.006 250)",
+                    background: "oklch(0.98 0.003 250)",
+                    fontSize: "12.5px",
+                    lineHeight: 1.45,
+                    color: "oklch(0.55 0.015 262)",
+                  }}
+                >
+                  No service follow-up actions available for this job.
+                </div>
+              )}
               <div
                 style={{
                   fontSize: "12px",
@@ -2171,9 +2189,14 @@ export default async function JobDetailV2Page({
                 }}
               >
                 A <strong style={{ color: "oklch(0.4 0.02 262)" }}>return</strong> continues
-                unresolved work. A{" "}
-                <strong style={{ color: "oklch(0.4 0.02 262)" }}>callback</strong> opens a new
-                issue after completion.
+                unresolved service work.
+                {canCreateCallbackVisit ? (
+                  <>
+                    {" "}A{" "}
+                    <strong style={{ color: "oklch(0.4 0.02 262)" }}>callback</strong> opens a new
+                    issue after completion.
+                  </>
+                ) : null}
               </div>
             </div>
 

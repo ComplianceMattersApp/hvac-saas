@@ -183,4 +183,18 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain("{contractorDisplayName}");
     expect(source).not.toContain('{contractorName || "—"}');
   });
+
+  it("gates desktop V2 service follow-up actions to server-accepted job states", () => {
+    expect(source).toContain('const isServiceJob = jobType === "service";');
+    expect(source).toContain("const canCreateReturnVisit = isServiceJob;");
+    expect(source).toContain('const canCreateCallbackVisit = isServiceJob && (fieldComplete || status === "completed" || opsStatus === "closed");');
+    expect(source).toContain("{canCreateReturnVisit || canCreateCallbackVisit ? (");
+    expect(source).toContain("{canCreateReturnVisit ? (");
+    expect(source).toContain("<form action={createNextServiceVisitFromForm}");
+    expect(source).toContain("{canCreateCallbackVisit ? (");
+    expect(source).toContain("<form action={createCallbackVisitFromForm}");
+    expect(source).toContain("No service follow-up actions available for this job.");
+    expect(source).not.toContain("const createReturnVisitAction = createNextServiceVisitFromForm;");
+    expect(source).not.toContain("const createCallbackAction = createCallbackVisitFromForm;");
+  });
 });
