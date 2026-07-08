@@ -11,6 +11,10 @@ const jobInfoPageSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/info/page.tsx"),
   "utf8",
 );
+const jobV2PageSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/v2/page.tsx"),
+  "utf8",
+);
 const completionReportSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/tests/page.tsx"),
   "utf8",
@@ -78,6 +82,13 @@ describe("equipment label photo evidence", () => {
     expect(jobInfoPageSource).toContain("listJobEquipmentLabelPhotoImages");
     expect(jobInfoPageSource).toContain("labelPhotosByEquipmentId");
     expect(jobInfoPageSource).toContain("labelPhotoAttachments={labelPhotosByEquipmentId[String(eq.id)] ?? []}");
+  });
+
+  it("marks photo-captured equipment in the V2 job equipment summaries", () => {
+    expect(jobV2PageSource).toContain("listJobEquipmentLabelPhotoImages");
+    expect(jobV2PageSource).toContain("equipmentIdsWithLabelPhoto");
+    expect(jobV2PageSource).toContain("has_label_photo_evidence");
+    expect(jobV2PageSource).toContain("Photo captured");
   });
 
   it("renders completion report equipment photos under matching equipment blocks with blank fields hidden", () => {

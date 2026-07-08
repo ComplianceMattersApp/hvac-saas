@@ -45,6 +45,7 @@ import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
+import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { buildEquipmentIdentityLabel } from "@/lib/utils/equipment-summary";
@@ -689,7 +690,7 @@ export default async function JobDetailV2Page({
   })();
 
   // equipment rows
-  const equipmentRows = ((job as any).job_equipment ?? []) as Array<{
+  const baseEquipmentRows = ((job as any).job_equipment ?? []) as Array<{
     id: string;
     equipment_role: string | null;
     component_type: string | null;
@@ -701,6 +702,24 @@ export default async function JobDetailV2Page({
     refrigerant_type: string | null;
     notes: string | null;
   }>;
+  const equipmentLabelPhotoAttachments = baseEquipmentRows.length
+    ? await listJobEquipmentLabelPhotoImages({
+        supabase,
+        admin: createAdminClient(),
+        jobId,
+        equipmentIds: baseEquipmentRows.map((equipment) => String(equipment.id)),
+        limit: 100,
+      })
+    : [];
+  const equipmentIdsWithLabelPhoto = new Set(
+    equipmentLabelPhotoAttachments
+      .map((attachment) => String(attachment.equipmentId ?? "").trim())
+      .filter(Boolean),
+  );
+  const equipmentRows = baseEquipmentRows.map((equipment) => ({
+    ...equipment,
+    has_label_photo_evidence: equipmentIdsWithLabelPhoto.has(String(equipment.id)),
+  }));
 
   // return URL for actions
   const returnTo = `/jobs/${jobId}/v2`;
@@ -1712,7 +1731,32 @@ export default async function JobDetailV2Page({
                         </div>
                       ) : null}
                     </div>
-                    {roleLabel ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "flex-end",
+                        gap: "6px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {equipmentIdsWithLabelPhoto.has(String(eq.id)) ? (
+                        <span
+                          style={{
+                            fontFamily: S.mono,
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            padding: "3px 8px",
+                            borderRadius: "999px",
+                            background: "oklch(0.95 0.045 150)",
+                            color: "oklch(0.42 0.11 150)",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          Photo captured
+                        </span>
+                      ) : null}
+                      {roleLabel ? (
                       <span
                         style={{
                           fontFamily: S.mono,
@@ -1728,7 +1772,8 @@ export default async function JobDetailV2Page({
                       >
                         {roleLabel}
                       </span>
-                    ) : null}
+                      ) : null}
+                    </div>
                   </div>
                 );
               })}
@@ -2767,10 +2812,35 @@ export default async function JobDetailV2Page({
                           {equipmentRows.map((eq) => (
                             <div
                               key={eq.id}
-                              style={{ fontSize: "13px", color: "oklch(0.38 0.02 262)" }}
+                              style={{
+                                display: "flex",
+                                flexWrap: "wrap",
+                                alignItems: "center",
+                                gap: "6px",
+                                fontSize: "13px",
+                                color: "oklch(0.38 0.02 262)",
+                              }}
                             >
-                              {buildEquipmentIdentityLabel(eq)}
-                              {eq.system_location ? ` — ${eq.system_location}` : ""}
+                              <span>
+                                {buildEquipmentIdentityLabel(eq)}
+                                {eq.system_location ? ` — ${eq.system_location}` : ""}
+                              </span>
+                              {equipmentIdsWithLabelPhoto.has(String(eq.id)) ? (
+                                <span
+                                  style={{
+                                    fontFamily: S.mono,
+                                    fontSize: "10px",
+                                    fontWeight: 700,
+                                    padding: "2px 7px",
+                                    borderRadius: "999px",
+                                    background: "oklch(0.95 0.045 150)",
+                                    color: "oklch(0.42 0.11 150)",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  Photo captured
+                                </span>
+                              ) : null}
                             </div>
                           ))}
                         </div>
