@@ -3,6 +3,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { createClient } from "@/lib/supabase/server";
 import {
   listInternalNotifications,
@@ -58,15 +59,13 @@ export default async function NotificationsPage({
     internalUser = result.internalUser;
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: cu, error: cuErr } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (cuErr) throw cuErr;
-      if (cu?.contractor_id) redirect("/portal");
-      redirect("/login");
+      redirect(
+        await resolveInternalAccessErrorRedirectPath({
+          supabase,
+          user,
+          fallbackPath: "/login",
+        }),
+      );
     }
     throw error;
   }

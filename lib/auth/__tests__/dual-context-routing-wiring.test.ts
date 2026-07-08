@@ -31,12 +31,43 @@ describe("dual-context routing wiring", () => {
     const guardedAppFiles = [
       "app/time-clock/page.tsx",
       "app/ops/field/page.tsx",
+      "app/ops/notifications/page.tsx",
+      "app/ops/contractor-intake/export/route.ts",
       "app/reports/time-clock/page.tsx",
       "app/reports/time-clock/export/route.ts",
       "app/reports/jobs/page.tsx",
       "app/reports/invoices/export/route.ts",
+      "app/reports/service-cases/page.tsx",
+      "app/reports/service-cases/export/route.ts",
+      "app/reports/payments/page.tsx",
+      "app/reports/invoices/page.tsx",
+      "app/reports/deposits/page.tsx",
+      "app/reports/deposits/[payoutId]/page.tsx",
+      "app/reports/deposits/export/detail/route.ts",
+      "app/reports/deposits/export/summary/route.ts",
+      "app/reports/payment-reconciliation/page.tsx",
+      "app/reports/kpis/page.tsx",
+      "app/reports/failed-payments/page.tsx",
+      "app/reports/closeout/page.tsx",
+      "app/reports/closeout/export/route.ts",
+      "app/reports/dashboard/page.tsx",
+      "app/reports/dashboard/export/tech-workload/route.ts",
+      "app/reports/job-visit-ledger/export/route.ts",
       "app/ops/admin/page.tsx",
       "app/ops/admin/company-profile/page.tsx",
+      "app/ops/admin/communications/page.tsx",
+      "app/ops/admin/contractor-intake-submissions/page.tsx",
+      "app/ops/admin/contractor-intake-submissions/[id]/page.tsx",
+      "app/ops/admin/internal-users/page.tsx",
+      "app/ops/admin/internal-users/[userId]/page.tsx",
+      "app/ops/admin/pricebook/page.tsx",
+      "app/ops/admin/service-plan-templates/page.tsx",
+      "app/ops/admin/time-clock/page.tsx",
+      "app/ops/admin/users/support/page.tsx",
+    ];
+    const guardedAppFilesWithContractorUserDataReads = [
+      "app/ops/admin/users/page.tsx",
+      "app/ops/admin/contractors/page.tsx",
     ];
 
     expect(layout).toContain("access.hasActiveAppAccess");
@@ -62,6 +93,11 @@ describe("dual-context routing wiring", () => {
       const source = readRepoFile(path);
       expect(source).toContain("resolveInternalAccessErrorRedirectPath");
       expect(source).not.toContain("contractor_users");
+    }
+
+    for (const path of guardedAppFilesWithContractorUserDataReads) {
+      const source = readRepoFile(path);
+      expect(source).toContain("resolveInternalAccessErrorRedirectPath");
     }
   });
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
 import {
@@ -50,15 +51,13 @@ export default async function ServiceCaseContinuityPage({
     ({ internalUser } = await requireInternalUser({ supabase, userId: user.id }));
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorError } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (contractorError) throw contractorError;
-      if (contractorUser?.contractor_id) redirect("/portal");
-      redirect("/login");
+      redirect(
+        await resolveInternalAccessErrorRedirectPath({
+          supabase,
+          user,
+          fallbackPath: "/login",
+        }),
+      );
     }
     throw error;
   }

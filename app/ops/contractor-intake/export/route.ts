@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
+import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import {
   CONTRACTOR_INTAKE_QUEUE_EXPORT_LIMIT,
   buildContractorIntakeQueueCsv,
@@ -25,15 +26,12 @@ export async function GET(request: NextRequest) {
     }));
   } catch (error) {
     if (isInternalAccessError(error)) {
-      const { data: contractorUser, error: contractorError } = await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (contractorError) throw contractorError;
-
-      return NextResponse.redirect(new URL(contractorUser?.contractor_id ? "/portal" : "/ops", request.url));
+      const redirectTarget = await resolveInternalAccessErrorRedirectPath({
+        supabase,
+        user,
+        fallbackPath: "/ops",
+      });
+      return NextResponse.redirect(new URL(redirectTarget, request.url));
     }
 
     throw error;
