@@ -125,6 +125,12 @@ export default async function RootLayout({
   const showPortalMenuItem = shouldShowPortalMenuItem({
     hasActiveAppAccess: access.hasActiveAppAccess,
     hasExistingPortalAccess,
+    isPrimaryPortalAccount: Boolean(
+      access.portal &&
+        user?.id &&
+        (access.portal.accountOwnerUserId === user.id ||
+          access.portal.accountOwnerUserId === access.internalUser?.accountOwnerUserId),
+    ),
   });
 
   const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";

@@ -26,6 +26,7 @@ describe("dual-context routing wiring", () => {
   it("gates normal shell create and nav by active internal app context", () => {
     const layout = readRepoFile("app/layout.tsx");
     const mobileMenu = readRepoFile("components/layout/MobileShellMenu.tsx");
+    const calendarPage = readRepoFile("app/calendar/page.tsx");
 
     expect(layout).toContain("access.hasActiveAppAccess");
     expect(layout).toContain("{isInternalUser ? <ShellCreateMenu items={createMenuItems} /> : null}");
@@ -38,6 +39,10 @@ describe("dual-context routing wiring", () => {
     expect(mobileMenu).toContain('href="/customers/new"');
     expect(mobileMenu).toContain("hasPortalAccess: boolean;");
     expect(mobileMenu).toContain("Compliance Matters Portal");
+
+    expect(calendarPage).toContain("resolveDualContextAccess");
+    expect(calendarPage).toContain("landingPathForDualContextAccess");
+    expect(calendarPage).not.toContain("contractor_users");
   });
 
   it("keeps portal request entry explicit and prevents membership-only job context switching", () => {

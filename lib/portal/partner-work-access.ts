@@ -1,8 +1,9 @@
 export function shouldShowPortalMenuItem(input: {
   hasActiveAppAccess: boolean;
   hasExistingPortalAccess: boolean;
+  isPrimaryPortalAccount?: boolean;
 }) {
-  return input.hasExistingPortalAccess;
+  return input.hasExistingPortalAccess && !input.isPrimaryPortalAccount;
 }
 
 export function shouldShowPartnerWorkMenuItem(input: {

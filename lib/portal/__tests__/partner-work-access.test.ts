@@ -17,6 +17,20 @@ describe("partner work access", () => {
     ).toBe(true);
     expect(
       shouldShowPortalMenuItem({
+        hasActiveAppAccess: true,
+        hasExistingPortalAccess: true,
+        isPrimaryPortalAccount: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowPortalMenuItem({
+        hasActiveAppAccess: true,
+        hasExistingPortalAccess: true,
+        isPrimaryPortalAccount: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowPortalMenuItem({
         hasActiveAppAccess: false,
         hasExistingPortalAccess: true,
       }),
@@ -87,6 +101,7 @@ describe("partner work access", () => {
     expect(layoutSource).toContain("shouldShowPortalMenuItem");
     expect(layoutSource).toContain("const hasExistingPortalAccess = access.hasExistingPortalAccess");
     expect(layoutSource).toContain("hasActiveAppAccess: access.hasActiveAppAccess");
+    expect(layoutSource).toContain("isPrimaryPortalAccount: Boolean(");
     expect(layoutSource).toContain("Compliance Matters Portal");
     expect(layoutSource).toContain("hasPortalAccess={showPortalMenuItem}");
     expect(mobileShellSource).toContain("hasPortalAccess: boolean;");

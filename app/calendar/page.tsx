@@ -3,6 +3,10 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 
 import { createClient } from '@/lib/supabase/server';
+import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from '@/lib/auth/dual-context-access';
 import { isLikelyMobileUserAgent, resolveCalendarDefaultView } from '@/lib/utils/calendar-view-default';
 
 function todayYmdLA(now = new Date()) {
@@ -32,14 +36,14 @@ export default async function CalendarPage({
   const { data: userData } = await supabase.auth.getUser();
 
   if (userData?.user?.id) {
-    const { data: contractorUser, error: contractorErr } = await supabase
-      .from('contractor_users')
-      .select('contractor_id')
-      .eq('user_id', userData.user.id)
-      .maybeSingle();
+    const access = await resolveDualContextAccess({
+      supabase,
+      user: userData.user,
+    });
 
-    if (contractorErr) throw contractorErr;
-    if (contractorUser?.contractor_id) redirect('/portal');
+    if (!access.hasActiveAppAccess) {
+      redirect(landingPathForDualContextAccess(access));
+    }
   }
 
   const sp = (searchParams ? await searchParams : {}) ?? {};
