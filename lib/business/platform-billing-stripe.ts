@@ -48,6 +48,23 @@ function toCleanString(value: unknown) {
   return String(value ?? "").trim();
 }
 
+export function isStripeProductionDeployment(
+  env: { VERCEL_ENV?: unknown } = process.env as { VERCEL_ENV?: unknown },
+) {
+  return toCleanString(env.VERCEL_ENV).toLowerCase() === "production";
+}
+
+export function assertStripeSecretKeyAllowedForDeployment(
+  key: string,
+  env: { VERCEL_ENV?: unknown } = process.env as { VERCEL_ENV?: unknown },
+) {
+  if (isStripeProductionDeployment(env) && key.startsWith("sk_test")) {
+    const message = "Stripe configuration blocked: stripe_secret_key_mode=test_in_production";
+    console.error(message);
+    throw new Error(message);
+  }
+}
+
 function normalizePlanKey(value: unknown): PlatformPlanKey {
   const normalized = toCleanString(value).toLowerCase();
   if (normalized === "professional") return "professional";
@@ -167,6 +184,7 @@ export function getPlatformBillingAvailability(): PlatformBillingAvailability {
 function requireStripeSecretKey() {
   const key = toCleanString(process.env.STRIPE_SECRET_KEY);
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured.");
+  assertStripeSecretKeyAllowedForDeployment(key);
   return key;
 }
 

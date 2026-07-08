@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  assertStripeSecretKeyAllowedForDeployment,
   buildPlatformEntitlementStripePatch,
   createPlatformSubscriptionCheckoutSession,
   derivePlatformCheckoutSeatQuantity,
+  getStripeServerClient,
   mapStripeSubscriptionStatusToEntitlementStatus,
   reconcilePlatformSubscriptionSeatQuantity,
   syncPlatformEntitlementFromStripeForAccountOwner,
@@ -93,6 +95,66 @@ function entitlementRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe("platform-billing-stripe", () => {
+  describe("Stripe production environment guard", () => {
+    it("blocks a test secret key in Vercel production", () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        expect(() =>
+          assertStripeSecretKeyAllowedForDeployment("sk_test_example", {
+            VERCEL_ENV: "production",
+          }),
+        ).toThrow("stripe_secret_key_mode=test_in_production");
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          "Stripe configuration blocked: stripe_secret_key_mode=test_in_production",
+        );
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it("allows a live secret key in Vercel production", () => {
+      expect(() =>
+        assertStripeSecretKeyAllowedForDeployment("sk_live_example", {
+          VERCEL_ENV: "production",
+        }),
+      ).not.toThrow();
+    });
+
+    it.each(["preview", "development", "", undefined] as const)(
+      "allows a test secret key when VERCEL_ENV is %s",
+      (vercelEnv) => {
+        expect(() =>
+          assertStripeSecretKeyAllowedForDeployment("sk_test_example", {
+            VERCEL_ENV: vercelEnv,
+          }),
+        ).not.toThrow();
+      },
+    );
+
+    it("keeps the existing missing secret key error", () => {
+      const previousKey = process.env.STRIPE_SECRET_KEY;
+      const previousVercelEnv = process.env.VERCEL_ENV;
+      delete process.env.STRIPE_SECRET_KEY;
+      process.env.VERCEL_ENV = "production";
+
+      try {
+        expect(() => getStripeServerClient()).toThrow("STRIPE_SECRET_KEY is not configured.");
+      } finally {
+        if (previousKey === undefined) {
+          delete process.env.STRIPE_SECRET_KEY;
+        } else {
+          process.env.STRIPE_SECRET_KEY = previousKey;
+        }
+
+        if (previousVercelEnv === undefined) {
+          delete process.env.VERCEL_ENV;
+        } else {
+          process.env.VERCEL_ENV = previousVercelEnv;
+        }
+      }
+    });
+  });
+
   it.each([
     ["trialing", "trial"],
     ["active", "active"],
