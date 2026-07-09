@@ -515,6 +515,40 @@ async function loadScopedPricebookSnapshot(params: {
   return data ?? null;
 }
 
+// Resolves the effective starting unit price (in cents) for a Work Item imported
+// into a draft invoice charge. Manually priced Work Items keep their expected price.
+// A Work Item picked from the Pricebook but never manually priced (expected null)
+// falls back to the source Pricebook item's default_unit_price. Otherwise 0.
+// The Pricebook lookup is scoped to the account owner and is a prefill only.
+async function resolveEffectiveUnitPriceCents(
+  supabase: any,
+  expectedUnitPrice: number | null | undefined,
+  sourcePricebookItemId: string | null | undefined,
+  accountOwnerUserId: string,
+): Promise<number> {
+  if (expectedUnitPrice != null) {
+    return parseNonNegativeMoneyNumberToCents(expectedUnitPrice, 'Unit price');
+  }
+
+  const pricebookItemId = sanitizeVisitScopeItemId(sourcePricebookItemId);
+  if (pricebookItemId && accountOwnerUserId) {
+    const pricebookItem = await loadScopedPricebookSnapshot({
+      supabase,
+      accountOwnerUserId,
+      pricebookItemId,
+    });
+    if (pricebookItem?.default_unit_price != null) {
+      try {
+        return parseNonNegativeMoneyNumberToCents(pricebookItem.default_unit_price, 'Unit price');
+      } catch {
+        return 0;
+      }
+    }
+  }
+
+  return 0;
+}
+
 async function requireOperationalInternalInvoiceEntitlementAccessOrRedirect(params: {
   supabase: any;
   accountOwnerUserId: string | null | undefined;
@@ -1215,10 +1249,13 @@ async function importEligibleVisitScopeItemsToDraftInvoice(params: {
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
   const quantityHundredths = 100;
-  const payload = eligibleScopeItems.map(({ scopeItemId, scopeItem }, index) => {
-    const unitPriceCents = scopeItem.expected_unit_price == null
-      ? 0
-      : parseNonNegativeMoneyNumberToCents(scopeItem.expected_unit_price, 'Unit price');
+  const payload = await Promise.all(eligibleScopeItems.map(async ({ scopeItemId, scopeItem }, index) => {
+    const unitPriceCents = await resolveEffectiveUnitPriceCents(
+      context.supabase,
+      scopeItem.expected_unit_price,
+      scopeItem.source_pricebook_item_id,
+      context.internalUser.account_owner_user_id,
+    );
     const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
 
     return {
@@ -1239,7 +1276,7 @@ async function importEligibleVisitScopeItemsToDraftInvoice(params: {
       created_by_user_id: context.userId,
       updated_by_user_id: context.userId,
     };
-  });
+  }));
 
   const { error: insertErr } = await context.supabase
     .from('internal_invoice_line_items')
@@ -2356,11 +2393,14 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
 
-  const payload = idsToInsert.map((scopeItemId, index) => {
+  const payload = await Promise.all(idsToInsert.map(async (scopeItemId, index) => {
     const scopeItem = scopeItemsById.get(scopeItemId)!;
-    const unitPriceCents = scopeItem.expected_unit_price == null
-      ? 0
-      : parseNonNegativeMoneyNumberToCents(scopeItem.expected_unit_price, 'Unit price');
+    const unitPriceCents = await resolveEffectiveUnitPriceCents(
+      context.supabase,
+      scopeItem.expected_unit_price,
+      scopeItem.source_pricebook_item_id,
+      context.internalUser.account_owner_user_id,
+    );
     const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
     return {
       invoice_id: invoice.id,
@@ -2380,7 +2420,7 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
       created_by_user_id: context.userId,
       updated_by_user_id: context.userId,
     };
-  });
+  }));
 
   const { error: insertErr } = await context.supabase
     .from('internal_invoice_line_items')
