@@ -970,6 +970,174 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(invoiceUpdates[0].total_cents).toBe(0);
   });
 
+  it('auto-imports a pricebook-sourced unpriced work item at the pricebook default price', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const sourcePricebookItemId = '1f2e3d4c-5b6a-4788-99aa-bbccddeeff00';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      pricebookItem: {
+        id: sourcePricebookItemId,
+        account_owner_user_id: 'owner-1',
+        default_unit_price: 249.99,
+        is_active: true,
+      },
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Replace capacitor',
+          details: 'Install 45/5 capacitor and verify startup',
+          kind: 'primary',
+          source_pricebook_item_id: sourcePricebookItemId,
+          // No expected_unit_price: picked from pricebook, never manually priced.
+        },
+      ],
+      capabilityKeys: ['field_billing_enabled'],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(null);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'technician',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { createInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      createInternalInvoiceDraftFromForm(
+        createDraftFormData({ auto_import_visit_scope_items: '1' }),
+      ),
+    ).rejects.toThrow('REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_draft_created#invoice-workspace');
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        source_kind: 'visit_scope',
+        source_visit_scope_item_id: selectedScopeId,
+        quantity: '1.00',
+        unit_price: '249.99',
+        line_subtotal: '249.99',
+      }),
+    );
+    expect(invoiceUpdates[0].subtotal_cents).toBe(24999);
+    expect(invoiceUpdates[0].total_cents).toBe(24999);
+  });
+
+  it('imports a selected pricebook-sourced unpriced work item at the pricebook default price', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const sourcePricebookItemId = '1f2e3d4c-5b6a-4788-99aa-bbccddeeff00';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      pricebookItem: {
+        id: sourcePricebookItemId,
+        account_owner_user_id: 'owner-1',
+        default_unit_price: 249.99,
+        is_active: true,
+      },
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Replace capacitor',
+          details: 'Install 45/5 capacitor and verify startup',
+          kind: 'primary',
+          source_pricebook_item_id: sourcePricebookItemId,
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId])),
+    ).rejects.toThrow('banner=internal_invoice_visit_scope_line_item_added');
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        source_kind: 'visit_scope',
+        source_visit_scope_item_id: selectedScopeId,
+        quantity: '1.00',
+        unit_price: '249.99',
+        line_subtotal: '249.99',
+      }),
+    );
+    expect(invoiceUpdates[0].subtotal_cents).toBe(24999);
+  });
+
+  it('keeps a manually priced pricebook-sourced work item at its expected price, not the pricebook default', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const sourcePricebookItemId = '1f2e3d4c-5b6a-4788-99aa-bbccddeeff00';
+    const { supabase, insertedLineItems } = makeSupabaseFixture({
+      pricebookItem: {
+        id: sourcePricebookItemId,
+        account_owner_user_id: 'owner-1',
+        default_unit_price: 249.99,
+        is_active: true,
+      },
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Replace capacitor',
+          details: 'Install 45/5 capacitor and verify startup',
+          kind: 'primary',
+          source_pricebook_item_id: sourcePricebookItemId,
+          expected_unit_price: 175,
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId])),
+    ).rejects.toThrow('banner=internal_invoice_visit_scope_line_item_added');
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        unit_price: '175.00',
+        line_subtotal: '175.00',
+      }),
+    );
+  });
+
+  it('falls back to zero when a pricebook-sourced work item points at a missing pricebook item', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const sourcePricebookItemId = '1f2e3d4c-5b6a-4788-99aa-bbccddeeff00';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      pricebookItem: null,
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Replace capacitor',
+          details: 'Install 45/5 capacitor and verify startup',
+          kind: 'primary',
+          source_pricebook_item_id: sourcePricebookItemId,
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId])),
+    ).rejects.toThrow('banner=internal_invoice_visit_scope_line_item_added');
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        unit_price: '0.00',
+        line_subtotal: '0.00',
+      }),
+    );
+    expect(invoiceUpdates[0].subtotal_cents).toBe(0);
+  });
+
   it('denies issued invoice for visit scope-backed line insert', async () => {
     const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
     const { supabase, insertedLineItems } = makeSupabaseFixture({
