@@ -25,26 +25,10 @@ function isTestExcludedForDuctlessMiniSplit(testType: string | EccTestType) {
   );
 }
 
-function isAllNewProjectType(projectType: string | null | undefined) {
-  const normalized = String(projectType ?? "").trim().toLowerCase();
-  return (
-    normalized === "all_new" ||
-    normalized === "allnew" ||
-    normalized === "new" ||
-    normalized === "new_prescriptive"
-  );
-}
-
 export function isEccTestApplicableToSystem(
   testType: string | EccTestType,
   context: SystemApplicabilityContext,
 ) {
-  const normalized = normalizeTestType(testType);
-
-  if (normalized === "air_filter_device" && !isAllNewProjectType(context.projectType)) {
-    return false;
-  }
-
   if (context.heatOnlySystem) {
     return !isTestExcludedForHeatOnly(testType);
   }

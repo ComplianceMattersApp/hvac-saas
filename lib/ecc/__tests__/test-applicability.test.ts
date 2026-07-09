@@ -24,7 +24,7 @@ describe("isEccTestApplicableToSystem", () => {
     expect(manualAddForDuctless).toContain("qii_insulation");
   });
 
-  it("excludes air filter from alteration systems", () => {
+  it("allows air filter for alteration systems", () => {
     const manualAddForAlteration = getActiveManualAddTests()
       .map((test) => String(test.code))
       .filter((testType) =>
@@ -38,13 +38,13 @@ describe("isEccTestApplicableToSystem", () => {
     expect(manualAddForAlteration).toContain("duct_leakage");
     expect(manualAddForAlteration).toContain("airflow");
     expect(manualAddForAlteration).toContain("fan_watt_draw");
-    expect(manualAddForAlteration).not.toContain("air_filter_device");
+    expect(manualAddForAlteration).toContain("air_filter_device");
     expect(manualAddForAlteration).toContain("refrigerant_charge");
     expect(manualAddForAlteration).toContain("local_mechanical_exhaust");
     expect(manualAddForAlteration).toContain("qii_insulation");
   });
 
-  it("allows air filter only for all-new systems", () => {
+  it("allows air filter for all-new systems", () => {
     const manualAddForAllNew = getActiveManualAddTests()
       .map((test) => String(test.code))
       .filter((testType) =>
