@@ -9,6 +9,116 @@ Docs workflow is locked in [Documentation_Authority_Map.md](./Documentation_Auth
 **Control-plane rule:**
 Use this Spine for current operating posture, durable source-of-truth boundaries, and short links to canonical specs. Do not add full closeout blocks, smoke evidence, tactical polish logs, implementation commit lists, or roadmap backlog detail here. Put strategic sequencing in [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md), launch gates in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md), tactical evidence in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), and broader cleanup decisions in [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
 
+---
+## Post-Completion Maturation Roadmap — July 2026 Reframe
+
+**Status: ACTIVE ROADMAP POSTURE**
+
+EveryStep FieldWorks is core-complete and live-use proven. The roadmap phase is post-completion maturation: the foundation is no longer the problem. The priority is making the complete operational loop clearer, faster, and more commercially mature for real users on real devices.
+
+**Competitive posture note (July 2026):**
+A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan confirmed that the primary competitive gap is not missing features — it is field invoicing friction and commercial packaging clarity. HouseCall Pro dominates the 1–20 tech residential/HVAC market through mobile-first UX, two-way QBO sync, and automated customer communication. EveryStep's truth model and ECC differentiation are stronger; the gap is UX speed and commercial completeness perception.
+
+---
+
+### Active Lane: Field Invoice Flow V1
+
+**Owner sign-off date:** July 9, 2026
+**Mobile Field Mode layout changes:** explicitly approved for this lane.
+**Pricebook write authority for field_billing_enabled techs:** explicitly approved for this lane.
+
+**North star:** A non-technical user on a phone can go from job complete to invoice sent without friction, confusion, or re-entry of information already captured.
+
+**Slice A — Pricebook price carry-through (server action behavior change)**
+- When a Work Item has a `source_pricebook_item_id`, the import action looks up that Pricebook item's `default_unit_price` and uses it as the starting `unit_price` on the draft Invoice Charge instead of `0.00`.
+- Price remains a prefill default — fully editable before issue.
+- No schema change. Uses existing persisted `source_pricebook_item_id`. No change to invoice truth model, issue/send/payment behavior, or Stripe behavior.
+- Requires audit prompt first before implementation.
+
+**Slice B — Mobile field invoice flow compression (Field Mode layout)**
+- Billing / Closeout card on job detail shows contextual billing state with a single prominent action — no separate "Create Invoice" then "Open Invoice Charges" step.
+- Invoice screen opens with charges already imported and pre-priced. Each charge renders as a compact tap-to-edit card (name + price on one line). Running total always visible.
+- Charge edit form on mobile collapses to Name and Price as primary fields. Type, Quantity, and Description collapse behind "More details" toggle.
+- Issue Readiness moves inline as a compact status strip at the top of the invoice screen — not a separate scrollable section. "Send Invoice" becomes the dominant button when all checks are green.
+- $0.00 invoice decision options are shown only at issue time when total is still $0, not on invoice creation.
+- Builds on Slice A so prices are already populated when the compressed UI renders.
+- Requires audit prompt first before implementation.
+
+**Slice C — Quick-add new item with optional save to Pricebook**
+- When a user taps "+ Add Item" and types a name that does not match any Pricebook item, after entering a price they see: "Save '[item name]' at $X to your price list for next time?" — Yes / No.
+- If Yes: creates a new active Pricebook item with that name and price. Invoice charge is created either way.
+- Authority: `field_billing_enabled` users (including techs) can save new Pricebook items from the field. Explicitly approved by owner July 9, 2026.
+- No schema change to invoices. New Pricebook row creation uses existing Pricebook write path with appropriate role gate confirmation from audit.
+- Requires audit prompt first before implementation.
+
+**Slice A audit prompt:** generated and ready for VS Code agent. See conversation July 9, 2026.
+
+---
+
+### Post-Lane-1 Roadmap Sequence (locked order, July 2026)
+
+**Lane 2 — Landing Page Polish**
+- Pure front-end work. No backend, no migrations, no truth model risk.
+- Goal: product presents as polished as it performs. Buyer immediately understands the complete operating loop.
+- Targets the "users understand what they're signing up for" gap identified in owner review.
+- Sequenced after Field Invoice Flow V1 closes.
+
+**Lane 3 — Google Review Ask**
+- Single button after job closeout fires a review request (mailto or Google Business deep link).
+- No provider dependency. No SMS required.
+- Small build, high reputation ROI.
+- Can be bundled with Landing Page session if scope allows.
+
+**Lane 4 — SMS to Toggle-Ready**
+- Extensive spec docs already locked (SMS_Provider_Twilio_Readiness_Spec.md, SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md, and related slices).
+- Goal: complete implementation slices to reach a state where flipping the activation flag turns SMS on. No active provider cost until toggled.
+- Valid competitive selling point once toggle-ready.
+- Medium session. Well-scoped from prior spec work.
+
+**Lane 5 — QuickBooks Online Integration**
+- Two-way sync: customers, invoices, line items, payments flow into QBO automatically on job completion.
+- Locked boundary: QBO is downstream accounting only. EveryStep remains operational source of truth for all job, customer, invoice, payment, and closeout data.
+- Owner confirmed: QBO is a buyer expectation and a personal-use need (owner uses QBO and does not use own Stripe integration).
+- Requires its own audit-first session. Most complex remaining lane.
+- Sequenced after SMS toggle-ready.
+
+**Lane 6 — App Store Wrap (Capacitor)**
+- Final lane, deliberately last.
+- Web/PWA remains baseline. Everything above should be solid before entering App Store review cycles.
+- Apple: target Unlisted App Store app.
+- Android: direct install / sideload-style packaging or Play Store.
+- Web-layer changes continue deploying instantly without store involvement after wrap is live.
+
+---
+
+### Explicitly Deferred (unchanged, July 2026)
+
+The following remain parked unless an intentional owner decision reopens them:
+- Native app-store wrapper before Lane 6
+- Deeper offline mode
+- Customer portal / client hub
+- Full support-system buildout beyond current runbook-gated posture
+- Deeper Payments V2 (refunds, ACH, autopay expansion)
+- Service Plan billing/autopay/generated invoice expansion
+- Route Builder / Schedule Assist (nice-to-have, not operationally urgent)
+- GPS / location timers (after QBO and app wrap)
+- Reviews / marketing suite beyond Google review ask
+- AI receptionist / call tracking
+- Inventory, job costing, payroll, financing
+- Online booking
+- Broad customer-specific pricing complexity
+- Mileage / expense capture
+
+---
+
+### Checklist Phase 2 — Field Mode (parked)
+
+Explicitly parked behind separate audit and owner sign-off. Target surface: `MobileJobDetailV2Preview`. Not part of Field Invoice Flow V1 scope.
+
+### Customer Communication Polish V1 (repositioned)
+
+Previously named as next lane after Invoice Add-ons. Now folded into Lane 4 (SMS to Toggle-Ready) as the primary customer communication maturity work. Automated appointment reminders, On the Way notifications, and invoice-sent notifications are the high-value first events when SMS activates.
+
 **Owner-Scoped Permit Workflow V1:**
 Status: ACTIVE current-scope workflow. Permit Workflow V1 is a Compliance Matters owner/operator lane only, not a tenant-wide release feature. It is disabled by default and becomes available only when `ENABLE_PERMIT_WORKFLOW_ACCOUNT_OWNER_IDS` includes the current `account_owner_user_id`. Internal Ops `Permits` visibility, contractor `Request Permit` exposure, and permit mutations all fail closed outside the allowlist. Durable workflow boundaries and non-goals are locked in [Owner_Scoped_Permit_Workflow_V1_Model_Spec.md](./Owner_Scoped_Permit_Workflow_V1_Model_Spec.md). Future tenant-wide rollout remains deferred pending explicit review of permissions, contractor exposure, support burden, product-mode fit, onboarding/training, and whether permit tracking is broadly useful for customer accounts.
 
