@@ -50,24 +50,54 @@ function buildForm(values: Record<string, string> = {}) {
   return formData;
 }
 
-function makeAdminFixture(options?: { existingLocations?: Row[] }) {
+function makeAdminFixture(options?: { existingLocations?: Row[]; activeJobCount?: number }) {
   const locationInserts: Row[] = [];
+  const deletes: Array<{ table: string; filters: Array<[string, unknown]> }> = [];
   const customerFilters: Array<[string, unknown]> = [];
   const locationLookupFilters: Array<[string, unknown]> = [];
 
   function makeReadQuery(table: string) {
-    const filters: Array<[string, unknown]> = table === "customers" ? customerFilters : locationLookupFilters;
+    const filters: Array<[string, unknown]> = [];
+    let mode: "read" | "delete" = "read";
     const query: any = {
       select: vi.fn(() => query),
       eq: vi.fn((column: string, value: unknown) => {
         filters.push([column, value]);
+        if (table === "customers") customerFilters.push([column, value]);
+        if (table === "locations") locationLookupFilters.push([column, value]);
+        return query;
+      }),
+      is: vi.fn((column: string, value: unknown) => {
+        filters.push([column, value]);
+        if (table === "customers") customerFilters.push([column, value]);
+        if (table === "locations") locationLookupFilters.push([column, value]);
+        return query;
+      }),
+      delete: vi.fn(() => {
+        mode = "delete";
         return query;
       }),
       maybeSingle: vi.fn(async () => {
         if (table === "customers") return { data: { id: "cust-1" }, error: null };
+        if (table === "locations") {
+          const locationId = filters.find(([column]) => column === "id")?.[1] ?? "loc-1";
+          return {
+            data: { id: locationId, customer_id: "cust-1", owner_user_id: "owner-1" },
+            error: null,
+          };
+        }
         return { data: null, error: null };
       }),
       then: (resolve: (value: unknown) => void) => {
+        if (mode === "delete") {
+          deletes.push({ table, filters: [...filters] });
+          resolve({ error: null });
+          return;
+        }
+        if (table === "jobs") {
+          resolve({ count: options?.activeJobCount ?? 0, error: null });
+          return;
+        }
         if (table === "locations") {
           resolve({ data: options?.existingLocations ?? [], error: null });
           return;
@@ -80,7 +110,7 @@ function makeAdminFixture(options?: { existingLocations?: Row[] }) {
 
   const admin = {
     from: vi.fn((table: string) => {
-      if (table === "customers") return makeReadQuery(table);
+      if (table === "customers" || table === "jobs" || table === "contact_recipients") return makeReadQuery(table);
       if (table === "locations") {
         const readQuery = makeReadQuery(table);
         return {
@@ -100,7 +130,7 @@ function makeAdminFixture(options?: { existingLocations?: Row[] }) {
   };
 
   createAdminClientMock.mockReturnValue(admin);
-  return { admin, customerFilters, locationLookupFilters, locationInserts };
+  return { admin, customerFilters, locationLookupFilters, locationInserts, deletes };
 }
 
 describe("customer service location management", () => {
@@ -183,6 +213,51 @@ describe("customer service location management", () => {
 
     expect(fixture.locationInserts).toHaveLength(0);
   });
+
+  it("removes an unused saved service location for a scoped customer", async () => {
+    const fixture = makeAdminFixture();
+    const { deleteCustomerServiceLocationFromForm } = await import("@/lib/actions/customer-actions");
+    const formData = new FormData();
+    formData.set("customer_id", "cust-1");
+    formData.set("location_id", "loc-1");
+
+    await expect(deleteCustomerServiceLocationFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/customers/cust-1?tab=locations-contacts&locSaved=removed",
+    );
+
+    expect(fixture.deletes).toEqual([
+      {
+        table: "contact_recipients",
+        filters: [
+          ["account_owner_user_id", "owner-1"],
+          ["linked_entity_type", "location"],
+          ["linked_entity_id", "loc-1"],
+        ],
+      },
+      {
+        table: "locations",
+        filters: [
+          ["id", "loc-1"],
+          ["customer_id", "cust-1"],
+          ["owner_user_id", "owner-1"],
+        ],
+      },
+    ]);
+  });
+
+  it("blocks removing a saved service location while active jobs still reference it", async () => {
+    const fixture = makeAdminFixture({ activeJobCount: 1 });
+    const { deleteCustomerServiceLocationFromForm } = await import("@/lib/actions/customer-actions");
+    const formData = new FormData();
+    formData.set("customer_id", "cust-1");
+    formData.set("location_id", "loc-1");
+
+    await expect(deleteCustomerServiceLocationFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/customers/cust-1?tab=locations-contacts&locSaved=in_use#location-contacts-loc-1",
+    );
+
+    expect(fixture.deletes).toHaveLength(0);
+  });
 });
 
 describe("customer service location page wiring", () => {
@@ -205,6 +280,8 @@ describe("customer service location page wiring", () => {
     expect(customerPageSource).toContain("action={addCustomerServiceLocationFromForm}");
     expect(customerPageSource).toContain("Add Location");
     expect(customerPageSource).toContain("action={updateLocationServiceAddressFromForm}");
+    expect(customerPageSource).toContain("action={deleteCustomerServiceLocationFromForm}");
+    expect(customerPageSource).toContain("Remove Location");
     expect(customerPageSource).toContain("return_customer_id");
   });
 

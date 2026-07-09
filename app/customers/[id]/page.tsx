@@ -9,6 +9,7 @@ import {
   addCustomerServiceLocationFromForm,
   addCustomerLocationSystemFromForm,
   archiveCustomerFromForm,
+  deleteCustomerServiceLocationFromForm,
   updateCustomerNotesFromForm,
 } from "@/lib/actions/customer-actions";
 import { updateLocationServiceAddressFromForm } from "@/app/locations/[id]/notes-actions";
@@ -2579,6 +2580,16 @@ export default async function CustomerDetailPage(props: {
               Service location updated.
             </div>
           ) : null}
+          {serviceLocationSaved === "removed" ? (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+              Service location removed.
+            </div>
+          ) : null}
+          {serviceLocationSaved === "in_use" ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              This location is still linked to active jobs. Move or archive those jobs before removing the saved address.
+            </div>
+          ) : null}
 
           {locations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
@@ -2734,95 +2745,112 @@ export default async function CustomerDetailPage(props: {
                         ) : null}
 
                         {locId && isInternalViewer ? (
-                          <Disclosure title="Edit Service Address" className="w-full">
-                            <form action={updateLocationServiceAddressFromForm} className="grid gap-3 sm:grid-cols-2">
-                              <input type="hidden" name="location_id" value={locId} />
-                              <input type="hidden" name="return_customer_id" value={customerId} />
-                              <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                Nickname
-                                <input
-                                  name="nickname"
-                                  defaultValue={String(loc.nickname ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                Label
-                                <input
-                                  name="label"
-                                  defaultValue={String(loc.label ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
-                                Address Line 1
-                                <input
-                                  name="address_line1"
-                                  required
-                                  defaultValue={String(loc.address_line1 ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
-                                Address Line 2
-                                <input
-                                  name="address_line2"
-                                  defaultValue={String(loc.address_line2 ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                City
-                                <input
-                                  name="city"
-                                  required
-                                  defaultValue={String(loc.city ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                State
-                                <input
-                                  name="state"
-                                  required
-                                  defaultValue={String(loc.state ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                Zip
-                                <input
-                                  name="zip"
-                                  required
-                                  defaultValue={String(loc.zip ?? loc.postal_code ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
-                                Notes
-                                <textarea
-                                  name="notes"
-                                  rows={2}
-                                  defaultValue={String(loc.notes ?? "")}
-                                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                />
-                              </label>
-                              <div className="sm:col-span-2">
+                          <>
+                            <Disclosure title="Edit Service Address" className="w-full">
+                              <form action={updateLocationServiceAddressFromForm} className="grid gap-3 sm:grid-cols-2">
+                                <input type="hidden" name="location_id" value={locId} />
+                                <input type="hidden" name="return_customer_id" value={customerId} />
+                                <label className="grid gap-1 text-xs font-medium text-slate-600">
+                                  Nickname
+                                  <input
+                                    name="nickname"
+                                    defaultValue={String(loc.nickname ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-slate-600">
+                                  Label
+                                  <input
+                                    name="label"
+                                    defaultValue={String(loc.label ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
+                                  Address Line 1
+                                  <input
+                                    name="address_line1"
+                                    required
+                                    defaultValue={String(loc.address_line1 ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
+                                  Address Line 2
+                                  <input
+                                    name="address_line2"
+                                    defaultValue={String(loc.address_line2 ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-slate-600">
+                                  City
+                                  <input
+                                    name="city"
+                                    required
+                                    defaultValue={String(loc.city ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-slate-600">
+                                  State
+                                  <input
+                                    name="state"
+                                    required
+                                    defaultValue={String(loc.state ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-slate-600">
+                                  Zip
+                                  <input
+                                    name="zip"
+                                    required
+                                    defaultValue={String(loc.zip ?? loc.postal_code ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
+                                  Notes
+                                  <textarea
+                                    name="notes"
+                                    rows={2}
+                                    defaultValue={String(loc.notes ?? "")}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                                  />
+                                </label>
+                                <div className="sm:col-span-2">
+                                  <button
+                                    type="submit"
+                                    className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                                  >
+                                    Save Location
+                                  </button>
+                                  <Link
+                                    href={`/locations/${locId}`}
+                                    className="ml-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                                  >
+                                    Open Location Record
+                                  </Link>
+                                </div>
+                              </form>
+                            </Disclosure>
+                            <Disclosure title="Remove Location" className="w-full">
+                              <form action={deleteCustomerServiceLocationFromForm} className="grid gap-3">
+                                <input type="hidden" name="customer_id" value={customerId} />
+                                <input type="hidden" name="location_id" value={locId} />
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                  Removes this saved service address and any site/access contacts linked only to it. Locations with active jobs cannot be removed.
+                                </div>
                                 <button
                                   type="submit"
-                                  className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
+                                  className="inline-flex w-fit items-center rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
                                 >
-                                  Save Location
+                                  Remove Location
                                 </button>
-                                <Link
-                                  href={`/locations/${locId}`}
-                                  className="ml-2 inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50"
-                                >
-                                  Open Location Record
-                                </Link>
-                              </div>
-                            </form>
-                          </Disclosure>
+                              </form>
+                            </Disclosure>
+                          </>
                         ) : null}
                       </div>
                     </div>

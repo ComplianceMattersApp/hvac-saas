@@ -512,6 +512,67 @@ export async function addCustomerServiceLocationFromForm(formData: FormData) {
   );
 }
 
+export async function deleteCustomerServiceLocationFromForm(formData: FormData) {
+  "use server";
+
+  const customerId = readTrimmed(formData, "customer_id");
+  const locationId = readTrimmed(formData, "location_id");
+
+  if (!customerId) throw new Error("Customer is required");
+  if (!locationId) throw new Error("Location is required");
+
+  const supabase = await createClient();
+  let scoped;
+  try {
+    scoped = await requireInternalScopedCustomerLocationForMutation({
+      supabase,
+      customerId,
+      locationId,
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) redirect("/login");
+    throw error;
+  }
+
+  const { count: activeJobCount, error: jobsErr } = await scoped.admin
+    .from("jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("customer_id", scoped.customerId)
+    .eq("location_id", scoped.locationId)
+    .is("deleted_at", null);
+
+  if (jobsErr) throw jobsErr;
+  if ((activeJobCount ?? 0) > 0) {
+    redirect(
+      `/customers/${customerId}?tab=locations-contacts&locSaved=in_use#location-contacts-${locationId}`,
+    );
+  }
+
+  const { error: contactsErr } = await scoped.admin
+    .from("contact_recipients")
+    .delete()
+    .eq("account_owner_user_id", scoped.accountOwnerUserId)
+    .eq("linked_entity_type", "location")
+    .eq("linked_entity_id", scoped.locationId);
+
+  if (contactsErr) throw contactsErr;
+
+  const { error: deleteErr } = await scoped.admin
+    .from("locations")
+    .delete()
+    .eq("id", scoped.locationId)
+    .eq("customer_id", scoped.customerId)
+    .eq("owner_user_id", scoped.accountOwnerUserId);
+
+  if (deleteErr) throw deleteErr;
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  revalidatePath("/jobs/new");
+
+  redirect(`/customers/${customerId}?tab=locations-contacts&locSaved=removed`);
+}
+
 async function requireInternalScopedCustomerLocationForMutation(params: {
   supabase: any;
   customerId: string;
