@@ -2846,7 +2846,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 {showInlineAddAnotherTestCard ? (
                   <Link
                     href={focusedType === "custom" ? withS(undefined) : withS("custom")}
-                    className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border border-dashed px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:hidden ${
+                    className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border border-dashed px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 ${
                       focusedType === "custom"
                         ? "border-blue-600 bg-blue-600 text-white"
                         : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"

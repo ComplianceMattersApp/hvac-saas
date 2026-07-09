@@ -387,6 +387,21 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain("Start Test");
   });
 
+  it("keeps add-another-test visible after the first test exists", () => {
+    expect(jobTestsPageSource).toContain("const showInlineAddAnotherTestCard =");
+    expect(jobTestsPageSource).toContain("selectedSystemStatusRows.length > 0");
+
+    const addAnotherIndex = jobTestsPageSource.indexOf('<div className="text-sm font-semibold">Add another test</div>');
+    expect(addAnotherIndex).toBeGreaterThan(-1);
+
+    const addAnotherLinkStart = jobTestsPageSource.lastIndexOf("<Link", addAnotherIndex);
+    const addAnotherLinkEnd = jobTestsPageSource.indexOf("</Link>", addAnotherIndex);
+    const addAnotherLink = jobTestsPageSource.slice(addAnotherLinkStart, addAnotherLinkEnd);
+
+    expect(addAnotherLink).toContain('href={focusedType === "custom" ? withS(undefined) : withS("custom")}');
+    expect(addAnotherLink).not.toContain("sm:hidden");
+  });
+
   it("does not fall back to completed tests for the mobile continue action", () => {
     expect(jobTestsPageSource).toContain(
       "const mobileNextTestRow = selectedSystemStatusRows.find((row) => !row.complete && !row.carriedForward) ?? null;",
