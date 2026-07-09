@@ -8,7 +8,7 @@ import { Disclosure } from "@/components/ui/Disclosure";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import SubmitButton from "@/components/SubmitButton";
 import AirflowEntryFields from "@/components/jobs/AirflowEntryFields";
-import EccLivePreview from "@/components/jobs/EccLivePreview";
+import FanWattDrawInlinePreview from "@/components/jobs/FanWattDrawInlinePreview";
 import DuctLeakageEntryFields from "@/components/jobs/DuctLeakageEntryFields";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
 import RefrigerantChargeExceptionFields from "@/components/jobs/RefrigerantChargeExceptionFields";
@@ -3678,6 +3678,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         />
                         Photo evidence - attestation only
                       </label>
+
+                      <FanWattDrawInlinePreview formId={fanSaveFormId} />
                     </div>
                   </Disclosure>
 
@@ -3699,8 +3701,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </Disclosure>
                 </form>
-
-                <EccLivePreview mode="fan_watt_draw" formId={fanSaveFormId} projectType={job.project_type} />
 
                 <Disclosure title="Calculated / Result" className="text-sm text-slate-700">
                   <div className="space-y-1">

@@ -62,6 +62,11 @@ const refrigerantChargeInlinePreviewSource = readFileSync(
   "utf8",
 );
 
+const fanWattDrawInlinePreviewSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/FanWattDrawInlinePreview.tsx"),
+  "utf8",
+);
+
 const refrigerantChargePhotoEvidencePanelSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/RefrigerantChargePhotoEvidencePanel.tsx"),
   "utf8",
@@ -229,6 +234,23 @@ describe("job tests page wiring", () => {
     expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-2 gap-2 text-center"');
     expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"');
     expect(refrigerantBlock).not.toContain('id={`out-${runRC.id}`}');
+  });
+
+  it("keeps Fan Watt Draw live feedback inline with field entry", () => {
+    const fanIndex = jobTestsPageSource.indexOf('FAN EFFICACY / WATT VERIFICATION');
+    expect(fanIndex).toBeGreaterThan(-1);
+
+    const fanBlock = jobTestsPageSource.slice(
+      fanIndex,
+      jobTestsPageSource.indexOf('            AIR FILTER DEVICE VERIFICATION', fanIndex),
+    );
+
+    expect(fanBlock).toContain("FanWattDrawInlinePreview");
+    expect(fanBlock).not.toContain('EccLivePreview mode="fan_watt_draw"');
+    expect(fanWattDrawInlinePreviewSource).toContain("computeFanWattDrawResult");
+    expect(fanWattDrawInlinePreviewSource).toContain("Actual Fan Efficacy");
+    expect(fanWattDrawInlinePreviewSource).toContain("Fan efficacy PASS");
+    expect(fanWattDrawInlinePreviewSource).toContain("Fan efficacy FAIL");
   });
 
   it("strips refrigerant evidence tags from attachment display and edit labels", () => {
