@@ -41,6 +41,20 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 
 ---
 
+### Company Profile — Sectioned Settings Console (P0–P7) — MERGED, awaiting owner prod smoke (July 10, 2026)
+
+**Status: Merged to `main` and pushed (`7d1c3b0e`, merges the P0–P7 lane; range `bb9ab82f..7d1c3b0e`). Awaiting owner smoke in live prod.** Restructures `/ops/admin/company-profile` from one long scroll into a sectioned settings console on the internal navy app system — no settings removed, account scoping + admin authz intact.
+
+**Source-of-truth boundaries (durable):**
+- The page is a server component (`app/ops/admin/company-profile/page.tsx`) that hands rendered panels to a client shell (`_components/ProfileConsole.tsx`); reusable pieces live in `_components/` (`SettingsSection`, `SectionForm`, `fields`). Five sections — **Overview · Identity & Branding · Billing & Payments · ECC/HERS · Team & Roles** — desktop rail (one panel at a time), mobile accordion; the active section mirrors to the URL hash (unknown/empty hash → Overview). Panel content renders once across both layouts (no duplicate form ids).
+- **Save model unchanged:** per-section server actions (`saveInternalBusinessProfileFromForm`, `saveInvoiceModeFromForm`, the Stripe Connect actions) — the only new affordance is an on-change "Unsaved changes" bar. No global save, no billing/payment/connection behavior change.
+- **ECC/HERS stays a link-out:** the profile shows a **live** connect+connected summary (connected count + partner name(s), read from `account_workshare_connections` with service-role name lookups) and links to `/ops/admin/connections` — still the sole management UI, unchanged (account-ID invite, no email UI). **Team & Roles** is a seat summary that links out to `/ops/admin/users` (People & Access); it is not managed on the profile.
+- **Security (P0, first in the lane's history):** logo uploads are restricted server-side to png/jpeg/webp/svg by MIME **and** extension, and SVGs are script-scanned and rejected before storage; `confirmTeamSetupFromForm` now carries the same account-scoping guard as the other profile mutations. All reads/mutations remain admin-gated and account-scoped server-side.
+
+**Deferred / next:** sturdier SVG handling (restrictive CSP / `Content-Disposition` / rasterize on upload) is backlogged (flagged in a code comment); the shared readiness/profile DB-boundary `any` types were left as-is. Commit-level and smoke detail belong in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), not here.
+
+---
+
 ### Completed Lane: Field Invoice Flow V1 — CLOSED (July 9, 2026)
 
 **Status: CLOSED. All slices live on `main`, deployed, and field-smoked.** North star achieved: a non-technical user on a phone can go from job complete to invoice sent without friction or re-entry.
