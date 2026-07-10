@@ -31,8 +31,8 @@ type ActionResult =
 const SERVICE_TYPE_ECC_HERS: AccountWorkshareServiceType = "ecc_hers";
 const LIVE_STATUSES: AccountWorkshareConnectionStatus[] = ["pending", "active"];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
-const COMPANY_PROFILE_ANCHOR = "#account-workshare-connections";
+const CONNECTIONS_PATH = "/ops/admin/connections";
+const CONNECTIONS_ANCHOR = "#ecc-hers-connections";
 
 function cleanString(value: unknown) {
   return String(value ?? "").trim();
@@ -74,8 +74,8 @@ function tokenMatchesHash(token: string, expectedHash: string | null) {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-function withCompanyProfileNotice(notice: string) {
-  return `${COMPANY_PROFILE_PATH}?notice=${encodeURIComponent(notice)}${COMPANY_PROFILE_ANCHOR}`;
+function withConnectionsNotice(notice: string) {
+  return `${CONNECTIONS_PATH}?notice=${encodeURIComponent(notice)}${CONNECTIONS_ANCHOR}`;
 }
 
 function failure(error: string): ActionResult {
@@ -402,11 +402,11 @@ export async function createAccountWorkshareInviteFromForm(formData: FormData): 
   });
 
   if (!result.success) {
-    redirect(withCompanyProfileNotice("workshare_connection_error"));
+    redirect(withConnectionsNotice("workshare_connection_error"));
   }
 
-  revalidatePath(COMPANY_PROFILE_PATH);
-  redirect(withCompanyProfileNotice("workshare_connection_invited"));
+  revalidatePath(CONNECTIONS_PATH);
+  redirect(withConnectionsNotice("workshare_connection_invited"));
 }
 
 export async function acceptAccountWorkshareInviteFromForm(formData: FormData): Promise<void> {
@@ -416,11 +416,11 @@ export async function acceptAccountWorkshareInviteFromForm(formData: FormData): 
   });
 
   if (!result.success) {
-    redirect(withCompanyProfileNotice("workshare_connection_error"));
+    redirect(withConnectionsNotice("workshare_connection_error"));
   }
 
-  revalidatePath(COMPANY_PROFILE_PATH);
-  redirect(withCompanyProfileNotice("workshare_connection_accepted"));
+  revalidatePath(CONNECTIONS_PATH);
+  redirect(withConnectionsNotice("workshare_connection_accepted"));
 }
 
 export async function disableAccountWorkshareConnectionFromForm(formData: FormData): Promise<void> {
@@ -429,11 +429,11 @@ export async function disableAccountWorkshareConnectionFromForm(formData: FormDa
   });
 
   if (!result.success) {
-    redirect(withCompanyProfileNotice("workshare_connection_error"));
+    redirect(withConnectionsNotice("workshare_connection_error"));
   }
 
-  revalidatePath(COMPANY_PROFILE_PATH);
-  redirect(withCompanyProfileNotice("workshare_connection_disabled"));
+  revalidatePath(CONNECTIONS_PATH);
+  redirect(withConnectionsNotice("workshare_connection_disabled"));
 }
 
 export async function revokeAccountWorkshareConnectionFromForm(formData: FormData): Promise<void> {
@@ -442,9 +442,9 @@ export async function revokeAccountWorkshareConnectionFromForm(formData: FormDat
   });
 
   if (!result.success) {
-    redirect(withCompanyProfileNotice("workshare_connection_error"));
+    redirect(withConnectionsNotice("workshare_connection_error"));
   }
 
-  revalidatePath(COMPANY_PROFILE_PATH);
-  redirect(withCompanyProfileNotice("workshare_connection_revoked"));
+  revalidatePath(CONNECTIONS_PATH);
+  redirect(withConnectionsNotice("workshare_connection_revoked"));
 }
