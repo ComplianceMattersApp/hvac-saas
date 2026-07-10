@@ -57,7 +57,7 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 
 ### Post-Lane-1 Roadmap Sequence (locked order, July 2026)
 
-**Lane 1 (Field Invoice Flow V1) and Lane 2 (Landing Page Polish) are both CLOSED (July 9, 2026).** Next active lane: **Lane 3 — Google Review Ask.** (Roadmap Lane 3 is Google Review Ask — distinct from the merged `lane3-charge-form-progressive-disclosure` branch, which was a Field Invoice Flow follow-on, misnamed. See the follow-on note above.)
+**Lane 1 (Field Invoice Flow V1), Lane 2 (Landing Page Polish), and Lane 3 (Google Review Ask) are all CLOSED (July 9, 2026).** Next active lane: **Lane 4 — SMS to Toggle-Ready.** (Roadmap Lane 3 is Google Review Ask — distinct from the merged `lane3-charge-form-progressive-disclosure` branch, which was a Field Invoice Flow follow-on, misnamed. The Google Review Ask itself then shipped on a `lane4-google-review-ask` branch — also a label misnomer; roadmap-wise it is Lane 3. Both misnomers survive only in merged commit messages, not rewritten. See the closeout notes below.)
 
 **Lane 2 — Landing Page Polish — CLOSED (July 9, 2026)**
 
@@ -85,13 +85,23 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 
 - **Minor deviations from the written prompt (intentional):** desktop headline set to `text-3xl xl:text-4xl` (not a flat `text-4xl`) so it stays dominant without out-sizing the brand H1; column separator uses the sensible `lg:border-r` divider (prompt mentioned both a `border-b` and a `border-r` — the `border-b` was dropped).
 
-**Lane 3 — Google Review Ask  ◀ NEXT ACTIVE LANE**
-- Single button after job closeout fires a review request (mailto or Google Business deep link).
-- No provider dependency. No SMS required.
-- Small build, high reputation ROI.
-- Can be bundled with Landing Page session if scope allows.
+**Lane 3 — Google Review Ask — CLOSED (July 9, 2026)**
 
-**Lane 4 — SMS to Toggle-Ready**
+**Status: CLOSED. Live on `main` (merge `903a3b31`), deployed, schema pushed to the app's Supabase project.** A one-tap Google review ask appears on the job detail page when a job is `field_complete` and the account has a Google review URL configured. Two device-intent paths — pre-filled `mailto:` and pre-filled `sms:` — built from the job's customer contact. No SMS provider dependency (device-intent only); no billing/RLS/truth-model changes.
+
+**As-built notes (durable facts for later lanes):**
+
+- **Per-account config:** `internal_business_profiles.google_review_url` (nullable text; `null` disables the ask). Edited in Company Profile → Company details. Threaded through [lib/business/internal-business-profile.ts](../../lib/business/internal-business-profile.ts) (type / `.select()` / row-normalizer / identity resolver) and written by `saveInternalBusinessProfileFromForm` with an `https://` validation guard (`invalid_google_review_url` notice).
+
+- **Link builder:** `buildReviewAskLinks` in [lib/utils/review-ask-links.ts](../../lib/utils/review-ask-links.ts) — device-intent `mailto:`/`sms:` with `encodeURIComponent` bodies; returns `null` hrefs when email/phone is missing. This is the **first pre-filled-content device-intent surface** in the app — prior `sms:`/`mailto:` links were bare recipient-only (see also the SMS specs, which remain provider-powered messaging, a separate concern).
+
+- **Visibility gate:** `canShowReviewAsk = isInternalUser && field_complete && google_review_url set && !archived && !cancelled`. `field_complete` and `status` are independent columns, so the ask can appear before `status = completed`. Surfaces: **mobile** = dedicated amber row above More Details / Tools; **desktop v2** = command-rail Quick Links (v2 self-fetches its own business profile, since it loads data independently); **classic desktop** = `#field-status-actions` parity.
+
+- **Deploy gotcha (durable):** the running app queries Supabase project `kvpesjdukqwwlgpkzfjm`, which can differ from the project the CLI is linked to — the migration had to be pushed there specifically or the app throws Postgres `42703`. Confirm the link target (`supabase/.temp/project-ref` == `NEXT_PUBLIC_SUPABASE_URL`) before any remote migration.
+
+Tactical/smoke evidence and commit-level detail belong in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), not here.
+
+**Lane 4 — SMS to Toggle-Ready  ◀ NEXT ACTIVE LANE**
 - Extensive spec docs already locked (SMS_Provider_Twilio_Readiness_Spec.md, SMS_Sender_Identity_and_Provider_Configuration_Model_Spec.md, and related slices).
 - Goal: complete implementation slices to reach a state where flipping the activation flag turns SMS on. No active provider cost until toggled.
 - Valid competitive selling point once toggle-ready.
