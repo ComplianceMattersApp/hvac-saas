@@ -6,12 +6,6 @@ import {
   saveInternalBusinessProfileFromForm,
   startTenantStripeConnectOnboardingFromForm,
 } from "@/lib/actions/internal-business-profile-actions";
-import {
-  archiveAuthorizedEccRaterFromForm,
-  createConnectedAccountAuthorizedEccRaterFromForm,
-  createAuthorizedEccRaterFromForm,
-  setAuthorizedEccRaterDefaultFromForm,
-} from "@/lib/actions/authorized-handoff-recipient-actions";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import {
   DEFAULT_BILLING_MODE,
@@ -31,11 +25,6 @@ import {
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
-import {
-  resolveActiveAuthorizedHandoffRecipientSelection,
-  type AuthorizedHandoffRecipientRow,
-} from "@/lib/workflows/authorized-handoff-recipients-read";
-import { listActiveRecipientConnectionsForAccount } from "@/lib/workflows/account-handoff-connections-read";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -72,46 +61,6 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   stripe_connect_status_refresh_failed_unready: {
     tone: "warn",
     message: "We couldn't refresh the latest online payment setup status just now. The last saved setup state is shown below.",
-  },
-  authorized_ecc_rater_saved: {
-    tone: "success",
-    message: "Manual ECC rater tracking record saved.",
-  },
-  authorized_ecc_rater_display_name_required: {
-    tone: "error",
-    message: "Display name is required for a manual ECC rater tracking record.",
-  },
-  authorized_ecc_rater_save_failed: {
-    tone: "error",
-    message: "Could not save manual ECC rater tracking record. Please try again.",
-  },
-  authorized_ecc_rater_default_saved: {
-    tone: "success",
-    message: "Default connected ECC rater updated.",
-  },
-  authorized_ecc_rater_default_failed: {
-    tone: "error",
-    message: "Could not set default connected ECC rater.",
-  },
-  authorized_ecc_rater_archived: {
-    tone: "success",
-    message: "ECC rater archived.",
-  },
-  authorized_ecc_rater_archive_failed: {
-    tone: "error",
-    message: "Could not archive authorized ECC rater.",
-  },
-  connected_rater_added: {
-    tone: "success",
-    message: "Connected ECC rater added.",
-  },
-  connected_rater_exists: {
-    tone: "warn",
-    message: "Connected ECC rater is already configured.",
-  },
-  connected_rater_error: {
-    tone: "error",
-    message: "Could not add connected ECC rater.",
   },
 };
 
@@ -160,8 +109,6 @@ export default async function AdminCompanyProfilePage({
     profile,
     entitlement,
     seatAuditPreview,
-    authorizedEccSelection,
-    activeConnectedRecipientConnections,
   ] = await Promise.all([
     getInternalBusinessProfileByAccountOwnerId({
       supabase,
@@ -172,16 +119,6 @@ export default async function AdminCompanyProfilePage({
       accountOwnerUserId: internalUser.account_owner_user_id,
       supabase,
     }),
-    resolveActiveAuthorizedHandoffRecipientSelection({
-      supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      handoffKind: "ecc",
-    }),
-    listActiveRecipientConnectionsForAccount(
-      supabase,
-      internalUser.account_owner_user_id,
-      "ecc",
-    ),
   ]);
 
   const tenantStripeReadiness = await resolveTenantStripeConnectReadiness(
@@ -199,8 +136,6 @@ export default async function AdminCompanyProfilePage({
   const billingMode = profile?.billing_mode ?? DEFAULT_BILLING_MODE;
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
   const platformBillingAvailability = getPlatformBillingAvailability();
-  const authorizedEccRecipients = authorizedEccSelection.recipients;
-  const raterLinkId = internalUser.account_owner_user_id;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -497,324 +432,6 @@ export default async function AdminCompanyProfilePage({
 
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
 
-      <div id="authorized-ecc-raters" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Default ECC/HERS Rater Details</h2>
-          <p className="text-sm leading-6 text-slate-600">
-            Optional rater contact details used for coordination. This does not create an account-to-account connection.
-          </p>
-        </div>
-
-        <details className="group mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
-            <span className="inline-flex items-center gap-2">
-              <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
-              ECC/HERS Rater Details · advanced
-            </span>
-          </summary>
-          <div className="mt-4 space-y-5">
-
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-700">
-          <div className="font-semibold text-slate-900">
-            {authorizedEccRecipients.length === 0
-              ? "No default ECC/HERS rater details yet"
-              : authorizedEccRecipients.length === 1
-                ? "1 ECC/HERS rater detail record available"
-                : `${authorizedEccRecipients.length} ECC/HERS rater detail records available`}
-          </div>
-          <div className="mt-1 text-slate-600">
-            {authorizedEccSelection.mode === "none"
-              ? "Add these details only when your team needs a default rater reference."
-              : authorizedEccSelection.mode === "single"
-                ? "This rater detail record is selected as the default."
-                : "Your team can choose among these rater detail records."}
-          </div>
-        </div>
-
-        <details className="group mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
-            <span className="inline-flex items-center gap-2">
-              <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
-              Advanced ECC/HERS rater details
-            </span>
-          </summary>
-          <div className="mt-4 space-y-5">
-        <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-          <div className="text-sm font-semibold text-emerald-950">My ECC/HERS handoff ID</div>
-          <p className="mt-1 text-sm leading-6 text-emerald-900">
-            Share this ID with contractors who use Compliance Matters so they can connect to your rater account for ECC/HERS testing, corrections, retests, and cert closeout.
-          </p>
-          <div className="mt-3 space-y-1.5">
-            <label htmlFor="my-rater-link-id" className="text-sm font-medium text-emerald-950">
-              ECC/HERS handoff ID
-            </label>
-            <input
-              id="my-rater-link-id"
-              readOnly
-              value={raterLinkId}
-              aria-label="Copy ECC/HERS handoff ID"
-              className="w-full select-all rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 font-mono text-sm text-slate-950 shadow-sm"
-            />
-          </div>
-          <p className="mt-2 text-xs leading-5 text-emerald-900">
-            Contractors can paste this ECC/HERS handoff ID when adding Compliance Matters or another connected rater account.
-          </p>
-        </div>
-
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
-          {authorizedEccSelection.mode === "none" ? (
-            <span>Default ECC/HERS rater details are optional and can be added when needed.</span>
-          ) : authorizedEccSelection.mode === "single" ? (
-            <span>Default rater coordination will use this detail record.</span>
-          ) : (
-            <span>Your team can choose a rater detail record during coordination.</span>
-          )}
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {authorizedEccRecipients.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
-              No default ECC/HERS rater details yet. Add a connected account reference or manual rater contact details for coordination.
-            </div>
-          ) : (
-            authorizedEccRecipients.map((recipient) => {
-              const details = [
-                recipient.external_company_name,
-                recipient.external_contact_name,
-                recipient.external_email,
-                recipient.external_phone,
-              ].filter(Boolean);
-
-              return (
-                <div key={recipient.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900">{recipient.display_name}</div>
-                      <div className="mt-1 text-xs text-slate-600">{formatAuthorizedRecipientTypeLabel(recipient)}</div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {recipient.is_default ? (
-                        <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                          Default
-                        </span>
-                      ) : null}
-                      <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                        {recipient.handoff_kind.toUpperCase()}
-                      </span>
-                    </div>
-                  </div>
-
-                  {details.length > 0 ? (
-                    <div className="mt-2 text-sm text-slate-700">{details.join(" • ")}</div>
-                  ) : null}
-
-                  {recipient.notes ? (
-                    <div className="mt-2 text-sm text-slate-600">Notes: {recipient.notes}</div>
-                  ) : null}
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {!recipient.is_default ? (
-                      <form action={setAuthorizedEccRaterDefaultFromForm}>
-                        <input type="hidden" name="recipient_id" value={recipient.id} />
-                        <button
-                          type="submit"
-                          className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
-                        >
-                          Set as default
-                        </button>
-                      </form>
-                    ) : null}
-
-                    <form action={archiveAuthorizedEccRaterFromForm}>
-                      <input type="hidden" name="recipient_id" value={recipient.id} />
-                      <button
-                        type="submit"
-                        className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
-                      >
-                        Archive
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-semibold text-slate-900">Add connected ECC rater</div>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            For Compliance Matters, use the ECC/HERS handoff ID provided by Compliance Matters. This lets jobs be shared for ECC testing, corrections, retests, and cert closeout.
-          </p>
-
-          {activeConnectedRecipientConnections.length === 0 ? (
-            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-3 py-2 text-sm text-slate-600">
-              No active connected rater accounts yet. <a href="#account-handoff-connections" className="font-semibold text-slate-900 underline-offset-2 hover:underline">Add an ECC/HERS handoff ID</a> from Compliance Matters or another connected rating company first.
-            </div>
-          ) : activeConnectedRecipientConnections.length === 1 ? (
-            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
-              <input type="hidden" name="connection_id" value={activeConnectedRecipientConnections[0].id} />
-              <div className="text-sm text-slate-700">
-                Connect rater account {activeConnectedRecipientConnections[0].recipient_account_owner_user_id.slice(0, 8)} for ECC handoffs.
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
-                Set as default ECC rater
-              </label>
-              <button
-                type="submit"
-                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
-              >
-                Connect ECC rater
-              </button>
-            </form>
-          ) : (
-            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
-              <div className="space-y-1.5">
-                <label htmlFor="connected-rater-connection-id" className="text-sm font-medium text-slate-700">
-                  ECC/HERS handoff ID
-                </label>
-                <select
-                  id="connected-rater-connection-id"
-                  name="connection_id"
-                  required
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                >
-                  {activeConnectedRecipientConnections.map((connection) => (
-                    <option key={connection.id} value={connection.id}>
-                      {connection.recipient_account_owner_user_id}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs leading-5 text-slate-500">
-                  Choose an active ECC/HERS handoff ID that has already been connected below.
-                </p>
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
-                Set as default ECC rater
-              </label>
-              <button
-                type="submit"
-                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
-              >
-                Add connected rater
-              </button>
-            </form>
-          )}
-        </div>
-
-        <form action={createAuthorizedEccRaterFromForm} className="mt-5 space-y-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Track manual/external rater</div>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Use this only for tracking a rater that is not connected by ECC/HERS handoff ID yet. Manual tracking remains available, but connected rater accounts are preferred for ECC handoffs.
-            </p>
-          </div>
-          <input type="hidden" name="handoff_kind" value="ecc" />
-          <input type="hidden" name="recipient_type" value="external_manual" />
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <label htmlFor="authorized-rater-display-name" className="text-sm font-medium text-slate-700">
-                Display name
-              </label>
-              <input
-                id="authorized-rater-display-name"
-                name="display_name"
-                required
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="Compliance Matters ECC"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="authorized-rater-company" className="text-sm font-medium text-slate-700">
-                Company (optional)
-              </label>
-              <input
-                id="authorized-rater-company"
-                name="external_company_name"
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="Compliance Matters"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="authorized-rater-contact" className="text-sm font-medium text-slate-700">
-                Contact name (optional)
-              </label>
-              <input
-                id="authorized-rater-contact"
-                name="external_contact_name"
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="Rater contact"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="authorized-rater-email" className="text-sm font-medium text-slate-700">
-                Email (optional)
-              </label>
-              <input
-                id="authorized-rater-email"
-                name="external_email"
-                type="email"
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="rater@example.com"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label htmlFor="authorized-rater-phone" className="text-sm font-medium text-slate-700">
-                Phone (optional)
-              </label>
-              <input
-                id="authorized-rater-phone"
-                name="external_phone"
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="(209) 555-0202"
-              />
-            </div>
-
-            <div className="space-y-1.5 sm:col-span-2">
-              <label htmlFor="authorized-rater-notes" className="text-sm font-medium text-slate-700">
-                Notes (optional)
-              </label>
-              <textarea
-                id="authorized-rater-notes"
-                name="notes"
-                rows={2}
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="Use for workflow ECC handoff and completion coordination"
-              />
-            </div>
-          </div>
-
-          <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
-            Set as default ECC rater
-          </label>
-
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            Manual/external rater records are tracking only. Use connected account rater details when the rater provides an ECC/HERS handoff ID.
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800"
-            >
-              Add manual rater record
-            </button>
-          </div>
-        </form>
-          </div>
-        </details>
-          </div>
-        </details>
-      </div>
-
       <div id="account-workshare-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">ECC/HERS Partner Network</h2>
@@ -831,17 +448,6 @@ export default async function AdminCompanyProfilePage({
       </div>
     </div>
   );
-}
-
-function formatAuthorizedRecipientTypeLabel(recipient: AuthorizedHandoffRecipientRow) {
-  const normalizedType = String(recipient.recipient_type ?? "").trim().toLowerCase();
-  if (normalizedType === "internal_user") {
-    return "Internal user";
-  }
-  if (normalizedType === "connected_account_future") {
-    return "Connected handoff account";
-  }
-  return "External/manual rater";
 }
 
 // ---------------------------------------------------------------------------
