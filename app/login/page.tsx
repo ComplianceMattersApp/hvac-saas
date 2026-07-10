@@ -9,6 +9,51 @@ import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import { resolvePostLoginDestination } from "@/lib/auth/post-login-destination";
 import { AuthCommandCenterLayout } from "@/components/auth/AuthCommandCenterLayout";
 
+const ACCENT_CLASSES = {
+  blue: {
+    kicker: "text-blue-300",
+    hoverBorder: "hover:border-blue-400/30",
+    focusRing: "focus-visible:ring-blue-400/50",
+  },
+  cyan: {
+    kicker: "text-cyan-300",
+    hoverBorder: "hover:border-cyan-400/30",
+    focusRing: "focus-visible:ring-cyan-400/50",
+  },
+  emerald: {
+    kicker: "text-emerald-300",
+    hoverBorder: "hover:border-emerald-400/30",
+    focusRing: "focus-visible:ring-emerald-400/50",
+  },
+} as const;
+
+const TRIAL_PATHS = [
+  {
+    slug: "service",
+    label: "Service",
+    accent: "blue",
+    cta: "Start Service Trial",
+    description: "For HVAC service calls, dispatch, field invoicing, and job closeout.",
+    href: "/signup/service",
+  },
+  {
+    slug: "ecc",
+    label: "ECC / Compliance",
+    accent: "cyan",
+    cta: "Start ECC / Compliance Trial",
+    description: "For ECC testing, corrections, contractor handoff, and cert closeout.",
+    href: "/signup/ecc",
+  },
+  {
+    slug: "cleaning",
+    label: "Cleaning / Janitorial",
+    accent: "emerald",
+    cta: "Start Cleaning Trial",
+    description: "For cleaning jobs, crews, checklists, and recurring service.",
+    href: "/signup/cleaning",
+  },
+] as const;
+
 function resolvePasswordResetRedirect() {
   const configuredAppUrl = String(process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
 
@@ -170,19 +215,24 @@ export default function LoginPage() {
 
   return (
     <AuthCommandCenterLayout
-      eyebrow="Field service workbench"
+      eyebrow="Field service management"
       brandName="EveryStep FieldWorks"
       backingLine="by Compliance Matters"
       headline="Every job. Every step. Fully closed."
-      subhead="Bring scheduling, field notes, invoices, payments, job history, and closeout into one organized view."
+      subhead="The field service platform built for small HVAC and trades teams. Schedule, dispatch, invoice, and close out jobs — from the office or the driveway."
       highlights={[
-        "Schedule field work from one queue",
-        "Track jobs from first call to closeout",
-        "Keep field notes and job details connected",
-        "See invoices and payments at a glance",
+        "Send professional invoices from the field in seconds",
+        "Know exactly where every job stands, every day",
+        "Close out jobs completely — nothing falls through",
+        "Built for ECC, HVAC service, and cleaning operations",
       ]}
     >
       <div className="space-y-5">
+        <div className="text-center lg:hidden">
+          <h2 className="text-2xl font-bold text-white">Every job. Every step. Fully closed.</h2>
+          <p className="mt-2 text-sm text-slate-400">Field service management for HVAC and trades.</p>
+        </div>
+
         <div className="rounded-[28px] border border-white/10 bg-white p-7 shadow-[0_50px_100px_-30px_rgba(2,6,23,0.7)] sm:p-8">
           <div className="flex items-center gap-3">
             <img src="/cm-logo.png" alt="EveryStep FieldWorks" width={44} height={44} className="rounded-xl border border-slate-200 shadow-sm" />
@@ -192,7 +242,7 @@ export default function LoginPage() {
             </div>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            Log in to run field work, scheduling, closeout, and follow-up from one organized place.
+            Welcome back. Your jobs, schedule, and field team are ready.
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -274,32 +324,20 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <Link
-              href="/signup/service"
-              className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-blue-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
-            >
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-300">Service</span>
-              <span className="mt-2 text-sm font-semibold text-white">Start Service Trial</span>
-              <span className="mt-1 text-xs leading-5 text-slate-400">For service calls, dispatch, work orders, and follow-up.</span>
-            </Link>
-
-            <Link
-              href="/signup/ecc"
-              className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-cyan-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-            >
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">ECC / Compliance</span>
-              <span className="mt-2 text-sm font-semibold text-white">Start ECC / Compliance Trial</span>
-              <span className="mt-1 text-xs leading-5 text-slate-400">For ECC jobs, tests, corrections, and closeout.</span>
-            </Link>
-
-            <Link
-              href="/signup/cleaning"
-              className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-emerald-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
-            >
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">Cleaning / Janitorial</span>
-              <span className="mt-2 text-sm font-semibold text-white">Start Cleaning Trial</span>
-              <span className="mt-1 text-xs leading-5 text-slate-400">For cleaning jobs, crews, checklists, recurring service, and follow-up.</span>
-            </Link>
+            {TRIAL_PATHS.map((path) => {
+              const accent = ACCENT_CLASSES[path.accent];
+              return (
+                <Link
+                  key={path.slug}
+                  href={path.href}
+                  className={`group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 ${accent.hoverBorder} ${accent.focusRing}`}
+                >
+                  <span className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${accent.kicker}`}>{path.label}</span>
+                  <span className="mt-2 text-sm font-semibold text-white">{path.cta}</span>
+                  <span className="mt-1 text-xs leading-5 text-slate-400">{path.description}</span>
+                </Link>
+              );
+            })}
           </div>
 
           <p className="mt-3 text-[11px] leading-5 text-slate-500">

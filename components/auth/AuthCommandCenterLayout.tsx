@@ -1,17 +1,39 @@
 import type { ReactNode } from "react";
+import { Check } from "lucide-react";
+
+type PreviewSegment = {
+  text: string;
+  live?: "green" | "blue";
+};
 
 type PreviewCard = {
   label: string;
-  detail: string;
+  labelLive?: boolean;
+  segments: PreviewSegment[];
 };
 
 const PREVIEW_CARDS: PreviewCard[] = [
-  { label: "Today's Jobs", detail: "8 scheduled · 2 in progress" },
-  { label: "Schedule", detail: "Week view · 3 open slots" },
-  { label: "Field Status", detail: "5 techs active · 1 en route" },
-  { label: "Closeout", detail: "3 ready to close" },
-  { label: "Invoices", detail: "2 sent today · 1 overdue" },
+  { label: "Today's Jobs", segments: [{ text: "6 scheduled" }, { text: "3 in progress", live: "blue" }] },
+  { label: "Schedule", segments: [{ text: "2 open slots this week" }] },
+  {
+    label: "Field Status",
+    labelLive: true,
+    segments: [{ text: "4 techs active", live: "green" }, { text: "1 on the way", live: "blue" }],
+  },
+  { label: "Closeout", segments: [{ text: "2 jobs ready to close" }] },
+  { label: "Invoices", segments: [{ text: "$1,840 invoiced today" }, { text: "1 needs attention" }] },
 ];
+
+function LiveDot({ tone }: { tone: "green" | "blue" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full animate-pulse ${
+        tone === "green" ? "bg-green-400" : "bg-blue-400"
+      }`}
+    />
+  );
+}
 
 function OperationsPreview() {
   return (
@@ -26,8 +48,19 @@ function OperationsPreview() {
             }`}
           >
             <span className="block h-0.5 w-8 rounded-full bg-gradient-to-r from-blue-400 to-blue-400/20" />
-            <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">{card.label}</p>
-            <p className="mt-1.5 text-sm leading-5 text-slate-400">{card.detail}</p>
+            <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-300">
+              {card.labelLive ? <LiveDot tone="green" /> : null}
+              {card.label}
+            </p>
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-1 text-sm leading-5 text-slate-400">
+              {card.segments.map((segment, segmentIndex) => (
+                <span key={segment.text} className="inline-flex items-center gap-1">
+                  {segmentIndex > 0 ? <span className="text-slate-600">·</span> : null}
+                  {segment.live ? <LiveDot tone={segment.live} /> : null}
+                  {segment.text}
+                </span>
+              ))}
+            </p>
           </div>
         ))}
       </div>
@@ -47,7 +80,7 @@ export type AuthCommandCenterLayoutProps = {
 
 export function AuthCommandCenterLayout({ eyebrow, brandName, backingLine, headline, subhead, highlights, children }: AuthCommandCenterLayoutProps) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#101b2d] to-[#0b1422] text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-shell-dark to-shell-darker text-slate-100">
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{
@@ -71,7 +104,7 @@ export function AuthCommandCenterLayout({ eyebrow, brandName, backingLine, headl
               {backingLine ? (
                 <p className="mt-2 text-sm font-medium text-blue-200/85">{backingLine}</p>
               ) : null}
-              <h2 className="mt-6 max-w-xl text-2xl font-semibold leading-tight tracking-tight text-white xl:text-[2rem]">
+              <h2 className="mt-6 max-w-xl text-3xl font-semibold leading-tight tracking-tight text-white xl:text-4xl">
                 {headline}
               </h2>
             </>
@@ -90,10 +123,10 @@ export function AuthCommandCenterLayout({ eyebrow, brandName, backingLine, headl
           <p className="mt-4 max-w-lg text-sm leading-relaxed text-slate-300 sm:text-base">{subhead}</p>
 
           {highlights?.length ? (
-            <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
+            <ul className="mt-6 grid grid-cols-2 gap-3">
               {highlights.map((item) => (
-                <li key={item} className="flex items-start gap-2.5 text-sm leading-6 text-slate-300">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400/70" />
+                <li key={item} className="flex items-start gap-2 text-sm leading-6 text-slate-300">
+                  <Check className="mt-1 h-4 w-4 shrink-0 text-blue-400" aria-hidden="true" />
                   {item}
                 </li>
               ))}
