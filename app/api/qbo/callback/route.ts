@@ -19,16 +19,47 @@ function redirectClearingState(request: NextRequest, path: string): NextResponse
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
+    console.error("[qbo/callback] incoming url:", request.url);
+
     const url = new URL(request.url);
     const stateParam = url.searchParams.get("state");
     const code = url.searchParams.get("code");
     const cookieState = request.cookies.get(STATE_COOKIE)?.value;
 
+    // Intuit sends error/error_description on the callback when auth fails/denies.
+    const intuitError = url.searchParams.get("error");
+    const intuitErrorDescription = url.searchParams.get("error_description");
+    if (intuitError || intuitErrorDescription) {
+      console.error(
+        "[qbo/callback] intuit returned error:",
+        intuitError,
+        "| description:",
+        intuitErrorDescription,
+      );
+    }
+
+    console.error(
+      "[qbo/callback] state cookie:",
+      cookieState,
+      "| state param:",
+      stateParam,
+    );
+
     // CSRF: the state echoed back by Intuit must match our signed one-time cookie.
     if (!stateParam || !cookieState || stateParam !== cookieState) {
+      console.error(
+        "[qbo/callback] FAILURE: state mismatch (hasParam:",
+        Boolean(stateParam),
+        "hasCookie:",
+        Boolean(cookieState),
+        "equal:",
+        stateParam === cookieState,
+        ")",
+      );
       return redirectClearingState(request, FAILURE_PATH);
     }
     if (!code) {
+      console.error("[qbo/callback] FAILURE: missing ?code= param");
       return redirectClearingState(request, FAILURE_PATH);
     }
 
@@ -52,9 +83,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       environment: getQboEnvironment(),
     });
 
+    console.error("[qbo/callback] SUCCESS: connection stored for", internalUser.account_owner_user_id);
     return redirectClearingState(request, SUCCESS_PATH);
-  } catch {
+  } catch (error) {
     // Any failure degrades to the failure notice — never a 500 that leaks details.
+    console.error(
+      "[qbo/callback] FAILURE: caught error:",
+      error instanceof Error ? error.message : String(error),
+    );
+    if (error instanceof Error && error.stack) {
+      console.error("[qbo/callback] stack:", error.stack);
+    }
     return redirectClearingState(request, FAILURE_PATH);
   }
 }
