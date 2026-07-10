@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import SubmitButton from '@/components/SubmitButton';
 import type { InternalInvoiceItemType, InternalInvoiceLineItemRecord } from '@/lib/business/internal-invoice';
 import type { FieldBillingCapabilities } from '@/lib/auth/field-billing-access';
 import type { PricebookEntryItem } from '@/components/pricebook/PricebookLineEntryFields';
+import type {
+  FieldPricebookNameCheckResult,
+  FieldPricebookSaveResult,
+} from '@/lib/actions/field-pricebook-actions';
 
 type InternalInvoiceActionResult = {
   ok: boolean;
@@ -56,6 +60,10 @@ type InternalInvoiceLineItemsTableProps = {
   secondaryButtonClass: string;
   // Slice B: compressed mobile field workspace. Off by default so desktop is unchanged.
   isMobileWorkspace?: boolean;
+  // Slice C: optional field "save custom charge to Pricebook" actions. Only used on
+  // the mobile workspace; desktop never calls them.
+  saveFieldItemToPricebookAction?: (formData: FormData) => Promise<FieldPricebookSaveResult>;
+  checkFieldPricebookItemNameExistsAction?: (formData: FormData) => Promise<FieldPricebookNameCheckResult>;
 };
 
 function formatCurrencyFromCents(cents?: number | null) {
@@ -206,6 +214,8 @@ export default function InternalInvoiceLineItemsTable({
   primaryButtonClass,
   secondaryButtonClass,
   isMobileWorkspace = false,
+  saveFieldItemToPricebookAction,
+  checkFieldPricebookItemNameExistsAction,
 }: InternalInvoiceLineItemsTableProps) {
   const router = useRouter();
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
@@ -214,6 +224,74 @@ export default function InternalInvoiceLineItemsTable({
   const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>('');
   const [pricebookSearchQuery, setPricebookSearchQuery] = useState('');
   const [selectedVisitScopeItemIds, setSelectedVisitScopeItemIds] = useState<string[]>([]);
+  // Slice C: ephemeral "save this custom item to your price list?" suggestion.
+  const [pendingSaveSuggestion, setPendingSaveSuggestion] = useState<{
+    itemName: string;
+    unitPrice: string;
+    itemType: string;
+  } | null>(null);
+  const [savingSuggestion, setSavingSuggestion] = useState(false);
+  const suggestionCardRef = useRef<HTMLDivElement | null>(null);
+
+  // Dismiss the suggestion when the user taps anywhere outside it.
+  useEffect(() => {
+    if (!pendingSaveSuggestion) return;
+    function onDocumentClick(event: MouseEvent) {
+      if (suggestionCardRef.current && !suggestionCardRef.current.contains(event.target as Node)) {
+        setPendingSaveSuggestion(null);
+      }
+    }
+    document.addEventListener('click', onDocumentClick);
+    return () => document.removeEventListener('click', onDocumentClick);
+  }, [pendingSaveSuggestion]);
+
+  function openAddForm() {
+    // Opening another add form clears any pending suggestion (one prompt at a time).
+    setPendingSaveSuggestion(null);
+    setIsAddFormOpen(true);
+  }
+
+  // Slice C: after a manual charge is added on mobile, offer to save it to the
+  // Pricebook when no active item with that name already exists. Best-effort — a
+  // failure here never disrupts the charge that was already created.
+  async function maybeOfferPricebookSave(candidate: { itemName: string; unitPrice: string; itemType: string }) {
+    if (!isMobileWorkspace || !checkFieldPricebookItemNameExistsAction || !saveFieldItemToPricebookAction) return;
+    const name = candidate.itemName.trim();
+    const price = Number(String(candidate.unitPrice).replace(/[$,\s]/g, ''));
+    if (!name || !Number.isFinite(price) || price <= 0) return;
+    try {
+      const checkForm = new FormData();
+      checkForm.set('item_name', name);
+      const result = await checkFieldPricebookItemNameExistsAction(checkForm);
+      if (!result?.exists) {
+        setPendingSaveSuggestion({ itemName: name, unitPrice: price.toFixed(2), itemType: candidate.itemType });
+      }
+    } catch {
+      // Suggestion is optional; ignore failures.
+    }
+  }
+
+  async function handleSaveSuggestionToPricebook() {
+    if (!pendingSaveSuggestion || !saveFieldItemToPricebookAction) return;
+    setSavingSuggestion(true);
+    try {
+      const form = new FormData();
+      form.set('item_name', pendingSaveSuggestion.itemName);
+      form.set('unit_price', pendingSaveSuggestion.unitPrice);
+      form.set('item_type', pendingSaveSuggestion.itemType);
+      const result = await saveFieldItemToPricebookAction(form);
+      setFeedback(
+        result?.ok
+          ? { type: 'success', message: result.status === 'already_exists' ? 'Already in your price list.' : 'Added to your price list.' }
+          : { type: 'error', message: 'Could not save to your price list.' },
+      );
+    } catch {
+      setFeedback({ type: 'error', message: 'Could not save to your price list.' });
+    } finally {
+      setSavingSuggestion(false);
+      setPendingSaveSuggestion(null);
+    }
+  }
   const canAddPricebookLine = capabilities.can_select_pricebook_invoice_lines;
   const canAddManualLine = capabilities.can_add_manual_invoice_line;
   const canAddInvoiceLine = canAddPricebookLine || canAddManualLine;
@@ -303,6 +381,13 @@ export default function InternalInvoiceLineItemsTable({
   }
 
   async function handleAddManual(formData: FormData) {
+    // Capture the typed values before the mutation so we can offer a Pricebook save.
+    const candidate = {
+      itemName: String(formData.get('item_name_snapshot') ?? '').trim(),
+      unitPrice: String(formData.get('unit_price') ?? '').trim(),
+      itemType: String(formData.get('item_type_snapshot') ?? '').trim() || 'service',
+    };
+    setPendingSaveSuggestion(null);
     await runInlineMutation({
       formData,
       action: addLineItemAction,
@@ -311,6 +396,7 @@ export default function InternalInvoiceLineItemsTable({
       onSuccess: () => {
         setPricebookSearchQuery('');
         setIsAddFormOpen(false);
+        void maybeOfferPricebookSave(candidate);
       },
     });
   }
@@ -396,7 +482,7 @@ export default function InternalInvoiceLineItemsTable({
             <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
               <button
                 type="button"
-                onClick={() => setIsAddFormOpen(true)}
+                onClick={openAddForm}
                 disabled={!canAddInvoiceLine}
                 className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-950 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
               >
@@ -920,6 +1006,36 @@ export default function InternalInvoiceLineItemsTable({
           );
         })}
 
+        {/* Slice C: optional "save to price list" suggestion, mobile only. */}
+        {isMobileWorkspace && pendingSaveSuggestion ? (
+          <div ref={suggestionCardRef} className="bg-sky-50/70 px-4 py-3">
+            <div className="rounded-xl border border-sky-200 bg-white/80 px-3.5 py-3">
+              <div className="text-sm text-slate-700">
+                Save <span className="font-semibold text-slate-950">&ldquo;{pendingSaveSuggestion.itemName}&rdquo;</span> at{' '}
+                <span className="font-semibold text-slate-950">${pendingSaveSuggestion.unitPrice}</span> to your price list for next time?
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveSuggestionToPricebook}
+                  disabled={savingSuggestion}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-sky-600 bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {savingSuggestion ? 'Saving...' : 'Save to Price List'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingSaveSuggestion(null)}
+                  disabled={savingSuggestion}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                >
+                  No thanks
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {canAddInvoiceLine && isAddFormOpen ? (
           <div className="bg-slate-50/94 px-5 py-5">
 
@@ -1128,7 +1244,7 @@ export default function InternalInvoiceLineItemsTable({
               </div>
               <button
                 type="button"
-                onClick={() => setIsAddFormOpen(true)}
+                onClick={openAddForm}
                 className={`${primaryButtonClass}${isMobileWorkspace ? ' w-full' : ''}`}
               >
                 {isMobileWorkspace ? '+ Add Item' : 'Add Charge'}
