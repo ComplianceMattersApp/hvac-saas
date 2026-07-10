@@ -67,26 +67,57 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
 
       {visitScopeItems.length > 0 ? (
         <div className="space-y-2">
-          {visitScopeItems.map((item: any, index: number) => (
-            <div key={`mobile-primary-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.24)]">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 text-base font-semibold leading-6 text-slate-950">{item.title}</div>
-                {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? (
-                  <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                    ${Number(item.expected_unit_price).toFixed(2)}
-                  </span>
+          {visitScopeItems.map((item: any, index: number) => {
+            const hasPrice = item.expected_unit_price !== null && item.expected_unit_price !== undefined;
+            const unitPrice = hasPrice ? Number(item.expected_unit_price) : null;
+            // Slice B cleanup (Fix 5): Work Items have no quantity field today, so this
+            // stays a flat price. Reading defensively lights up the math line automatically
+            // if a per-item quantity is ever added, matching the invoice charge card.
+            const quantity = Number(item.quantity ?? item.expected_quantity ?? 1);
+            const showQuantityMath = hasPrice && Number.isFinite(quantity) && quantity > 1;
+            // Slice B cleanup (Fix 4): removal re-saves visit_scope_items without this row
+            // through the same updateJobVisitScopeFromForm action the Adjust Work builder uses.
+            const remainingItemsJson = JSON.stringify(
+              visitScopeItems.filter((_: any, idx: number) => idx !== index),
+            );
+            return (
+              <div key={`mobile-primary-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.24)]">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0 text-base font-semibold leading-6 text-slate-950">{item.title}</div>
+                  {hasPrice && !showQuantityMath ? (
+                    <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                      ${unitPrice!.toFixed(2)}
+                    </span>
+                  ) : null}
+                </div>
+                {showQuantityMath ? (
+                  <div className="mt-1 text-sm font-semibold text-slate-700">
+                    {quantity.toFixed(2)} × ${unitPrice!.toFixed(2)} = ${(quantity * unitPrice!).toFixed(2)}
+                  </div>
+                ) : null}
+                {item.kind === "companion_service" ? (
+                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {formatVisitScopeItemKindLabel(item.kind)}
+                  </div>
+                ) : null}
+                {item.details ? (
+                  <div className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-700">{item.details}</div>
+                ) : null}
+                {isInternalUser ? (
+                  <form action={updateJobVisitScopeFromForm} className="mt-2 flex justify-end">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} />
+                    <input type="hidden" name="visit_scope_summary" value={visitScopeSummary ?? ""} />
+                    <input type="hidden" name="visit_scope_items_json" value={remainingItemsJson} />
+                    <button type="submit" className="text-xs font-semibold text-rose-600 hover:text-rose-700">
+                      Remove
+                    </button>
+                  </form>
                 ) : null}
               </div>
-              {item.kind === "companion_service" ? (
-                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  {formatVisitScopeItemKindLabel(item.kind)}
-                </div>
-              ) : null}
-              {item.details ? (
-                <div className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-700">{item.details}</div>
-              ) : null}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 

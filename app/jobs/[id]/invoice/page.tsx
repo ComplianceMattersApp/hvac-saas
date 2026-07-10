@@ -860,13 +860,17 @@ export default async function InternalInvoiceWorkspacePage({
                 {supplementalReasonLabel ? ` Reason: ${supplementalReasonLabel}.` : ""}
               </div>
             ) : null}
-            <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
-              <p className="mt-1">
-                <span className="font-semibold text-slate-900">Stage:</span> {invoiceRevenueWorkflowRail.stage}.
-                <span className="ml-2 font-semibold text-slate-900">Next:</span> {invoiceRevenueWorkflowRail.next}
-              </p>
-            </div>
+            {/* Slice B cleanup: internal workflow language is desktop-only; the
+                status chips are enough context for the compressed mobile flow. */}
+            {isMobileWorkspace ? null : (
+              <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
+                <p className="mt-1">
+                  <span className="font-semibold text-slate-900">Stage:</span> {invoiceRevenueWorkflowRail.stage}.
+                  <span className="ml-2 font-semibold text-slate-900">Next:</span> {invoiceRevenueWorkflowRail.next}
+                </p>
+              </div>
+            )}
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className={chipClass}>{invoice ? formatInternalInvoiceStatus(invoice.status) : "No draft"}</span>
               <span className={chipClass}>{lineItemCount} charge{lineItemCount === 1 ? "" : "s"}</span>
@@ -893,7 +897,8 @@ export default async function InternalInvoiceWorkspacePage({
                 Print / Save PDF
               </Link>
             ) : null}
-            {invoice ? (
+            {/* Slice B cleanup: redundant on mobile where charges scroll inline. */}
+            {invoice && !isMobileWorkspace ? (
               <Link href="#invoice-charges" className={darkButtonClass}>
                 Open Invoice Charges
               </Link>
