@@ -160,6 +160,30 @@ export default async function AdminCompanyProfilePage({
     ? { kind: "attention" }
     : { kind: "complete" };
 
+  // Overview surfaces optional readiness items muted alongside the required
+  // ones (the old page dropped optionals). Sourced from readiness.items, not
+  // re-derived. Needs-attention "Open" links jump to the owning console
+  // section via hash; items that live on another route keep their own href.
+  const optionalItems = readiness.items.filter((item) => item.status === "optional");
+  const overviewSectionHash: Record<string, string> = {
+    company_name: "#identity",
+    support_email: "#identity",
+    support_phone: "#identity",
+    company_logo: "#identity",
+    billing_mode: "#billing",
+    app_subscription: "#billing",
+    accept_online_invoice_payments: "#billing",
+    online_invoice_payments: "#billing",
+    active_internal_users: "#team",
+  };
+  const overviewPlanLabel = entitlement.isInternalComped
+    ? "Internal / Comped"
+    : PLAN_LABELS[entitlement.planKey] ?? entitlement.planKey;
+  const overviewAccountActive =
+    entitlement.isInternalComped ||
+    ["active", "grace", "trial"].includes(entitlement.entitlementStatus);
+  const onlinePaymentsReady = tenantStripeReadiness.isReady;
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
       <div className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98)_55%,rgba(236,253,245,0.56))] p-6 shadow-[0_28px_60px_-36px_rgba(15,23,42,0.28)]">
@@ -198,43 +222,134 @@ export default async function AdminCompanyProfilePage({
             id: "overview",
             label: "Overview",
             content: (
-              <div className="space-y-4">
-                {incompleteRequiredItems.length > 0 ? (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+              <div className="space-y-5">
+                {/* Summary */}
+                <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      {currentLogoUrl ? (
+                        <img src={currentLogoUrl} alt={`${companyName} logo`} className="max-h-full max-w-full object-contain" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-100 text-xl font-semibold text-slate-500">
+                          {companyInitial}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="break-words text-lg font-semibold tracking-[-0.02em] text-[#0f1f35]">{companyName}</div>
+                      <div className="mt-0.5 text-sm text-slate-600">
+                        {supportEmail || "No business email yet"}
+                        {supportPhone ? ` · ${supportPhone}` : ""}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${overviewAccountActive ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                          {overviewAccountActive ? "Account active" : "Account needs attention"}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
+                          {overviewPlanLabel}
+                        </span>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${onlinePaymentsReady ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                          {onlinePaymentsReady ? "Online payments ready" : "Online payments off"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Needs attention — required (amber) + optional (muted) */}
+                {incompleteRequiredItems.length > 0 || optionalItems.length > 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="font-semibold">Setup attention</div>
-                      <div className="text-xs font-semibold uppercase tracking-wide">
+                      <div className="text-sm font-semibold text-[#0f1f35]">Needs attention</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                         {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
                       </div>
                     </div>
-                    <div className="mt-1 text-sm leading-6 text-amber-900">
-                      Finish only the items that need attention.
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <ul className="mt-3 space-y-2">
                       {incompleteRequiredItems.map((item) => (
-                        <div key={item.key} className="rounded-lg border border-amber-200 bg-white/80 px-3 py-2 text-sm text-amber-950">
-                          <div className="font-medium">
-                            {item.key === "billing_mode" ? "Choose how invoices are handled" : `Finish: ${item.label}`}
+                        <li key={item.key} className="flex items-start justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-amber-950">
+                              {item.key === "billing_mode" ? "Choose how invoices are handled" : item.label}
+                            </div>
+                            <div className="text-xs leading-5 text-amber-800">{item.description}</div>
                           </div>
                           {item.href ? (
-                            <Link href={item.href} className="mt-1 inline-flex text-xs font-semibold text-amber-950 underline-offset-2 hover:underline">
-                              Open
-                            </Link>
+                            overviewSectionHash[item.key] ? (
+                              <a href={overviewSectionHash[item.key]} className="mt-0.5 shrink-0 text-xs font-semibold text-amber-900 underline-offset-2 hover:underline">
+                                Open
+                              </a>
+                            ) : (
+                              <Link href={item.href} className="mt-0.5 shrink-0 text-xs font-semibold text-amber-900 underline-offset-2 hover:underline">
+                                Open
+                              </Link>
+                            )
                           ) : null}
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                      {optionalItems.map((item) => (
+                        <li key={item.key} className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-slate-600">
+                              {item.label}
+                              <span className="ml-1.5 text-xs font-normal text-slate-400">Optional</span>
+                            </div>
+                            <div className="text-xs leading-5 text-slate-500">{item.description}</div>
+                          </div>
+                          {item.href ? (
+                            overviewSectionHash[item.key] ? (
+                              <a href={overviewSectionHash[item.key]} className="mt-0.5 shrink-0 text-xs font-semibold text-slate-600 underline-offset-2 hover:underline">
+                                Open
+                              </a>
+                            ) : (
+                              <Link href={item.href} className="mt-0.5 shrink-0 text-xs font-semibold text-slate-600 underline-offset-2 hover:underline">
+                                Open
+                              </Link>
+                            )
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-900">
+                    Everything&apos;s set up. Nothing needs your attention right now.
+                  </div>
+                )}
 
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-                  <div className="font-semibold text-slate-900">First job training</div>
-                  <p className="mt-1 text-sm leading-5 text-slate-600">
-                    Open Training Room for the step-by-step first job path.
-                  </p>
-                  <Link href="/training" className="mt-3 inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100">
+                {/* First job training — slim banner */}
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-[#0f1f35]">First job training</div>
+                    <div className="text-xs text-slate-600">Step-by-step first job path in Training Room.</div>
+                  </div>
+                  <Link href="/training" className="inline-flex min-h-11 shrink-0 items-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-100">
                     Open Training Room
                   </Link>
+                </div>
+
+                {/* Jump cards */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    { hash: "#identity", title: "Identity & Branding", sub: "Logo, name, contact, review link" },
+                    { hash: "#billing", title: "Billing & Payments", sub: "Subscription, invoices, online payments" },
+                    { hash: "#ecc-hers", title: "ECC/HERS", sub: "Partner Network connections" },
+                    { hash: "#team", title: "Team & Roles", sub: "Members, roles, and seats" },
+                  ].map((card) => (
+                    <a
+                      key={card.hash}
+                      href={card.hash}
+                      className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[#0f1f35]">{card.title}</div>
+                        <div className="text-xs text-slate-500">{card.sub}</div>
+                      </div>
+                      <span className="shrink-0 text-sm font-semibold text-blue-600 transition-transform group-hover:translate-x-0.5">
+                        Edit &rarr;
+                      </span>
+                    </a>
+                  ))}
                 </div>
               </div>
             ),
