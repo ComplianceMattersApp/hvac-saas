@@ -25,6 +25,7 @@ import {
   markInternalNewWorkNotificationsResolved,
 } from "@/lib/actions/notification-actions";
 import { createOnTheWayIntentFromEvent } from "@/lib/communications/sms-on-the-way-intent-create";
+import { formatAppointmentContext } from "@/lib/communications/sms-on-the-way-token-renderer";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import {
   loadScopedInternalJobForMutation,
@@ -49,6 +50,7 @@ import {
 } from "@/lib/auth/internal-ecc-scope";
 import { requireInternalRole, requireInternalUser } from "@/lib/auth/internal-user";
 import {
+  getInternalBusinessProfileByAccountOwnerId,
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
@@ -10143,7 +10145,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   // ✅ Read true current status from DB (source of truth)
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("status, on_the_way_at, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, window_start, window_end, parent_job_id")
+    .select("status, on_the_way_at, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, window_start, window_end, customer_first_name, parent_job_id")
     .eq("id", id)
     .single();
 
@@ -10330,6 +10332,51 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       // and event insert. Failures do not rollback job status or event.
       if (onMyWayEventId) {
         try {
+          // Resolve real token values for the SMS message body. Each resolution is
+          // best-effort with its own fallback — a failure here must never affect the
+          // job lifecycle (the outer try/catch also swallows).
+          let operatorOrTechName = "your technician";
+          try {
+            const userDisplayMap = await resolveUserDisplayMap({
+              supabase,
+              userIds: [actingUserId],
+            });
+            const resolvedName = String(userDisplayMap[actingUserId] ?? "").trim();
+            // resolveUserDisplayMap falls back to the literal "User" when a name
+            // cannot be resolved — treat that as no name and keep the SMS fallback.
+            if (resolvedName && resolvedName !== "User") {
+              operatorOrTechName = resolvedName;
+            }
+          } catch {
+            // best-effort — keep the fallback name
+          }
+
+          // Read the raw profile (null when the account has no real business profile
+          // row) rather than the resolver, which injects the platform default name.
+          // Only a genuine tenant name should reach a customer SMS; otherwise "our team".
+          let companyName = "our team";
+          try {
+            const businessProfile = await getInternalBusinessProfileByAccountOwnerId({
+              supabase,
+              accountOwnerUserId: internalUser.account_owner_user_id,
+            });
+            const resolvedCompany = String(businessProfile?.display_name ?? "").trim();
+            if (resolvedCompany) {
+              companyName = resolvedCompany;
+            }
+          } catch {
+            // best-effort — keep the fallback company name
+          }
+
+          // Prefer the schedule actually applied in this update (auto-scheduled jobs
+          // carry the real window on updatePayload; jobs with an existing schedule
+          // fall back to the job row).
+          const appointmentOrJobContext = formatAppointmentContext({
+            scheduledDate: updatePayload.scheduled_date ?? job?.scheduled_date ?? null,
+            windowStart: updatePayload.window_start ?? job?.window_start ?? null,
+            windowEnd: updatePayload.window_end ?? job?.window_end ?? null,
+          });
+
           await _ftTimeSubphase("eventBreadcrumb.smsOnTheWayIntentCreate", async () =>
             createOnTheWayIntentFromEvent({
               supabase,
@@ -10337,6 +10384,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
               actingUserId,
               jobId: id,
               jobEventId: onMyWayEventId,
+              tokenValues: {
+                recipientFirstName: job?.customer_first_name ?? null,
+                operatorOrTechName,
+                companyName,
+                appointmentOrJobContext,
+              },
             }),
           );
           console.log("[SMS_INTENT_CREATE_SUCCESS]", { jobId: id, onMyWayEventId });

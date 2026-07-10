@@ -81,6 +81,8 @@ function makeEligibility(overrides?: Record<string, unknown>) {
     messageClass: "on_the_way",
     templateKey: "on_the_way",
     templateVersion: 7,
+    bodyTemplate:
+      "Hi {{recipient_first_name}}, this is {{operator_or_tech_name}} with {{company_name}}. I am on the way to {{appointment_or_job_context}}. Reply STOP to opt out.",
     messageBodySnapshot: "Hi Taylor, this is Alex with Your company.",
     recipientRef: "recipient-1",
     jobEventId: "event-1",
@@ -274,6 +276,88 @@ describe("sms on-the-way intent creation helper", () => {
     expect(row.blocked_reason_codes).toEqual([]);
     expect(row.idempotency_key).toBe("owner-1:event-1:on_the_way:recipient-1");
     expect(row.decision_outcome).toBe("ready_for_provider");
+  });
+
+  it("renders real token values into message_body_snapshot when tokenValues provided", async () => {
+    const evaluateMock = vi.mocked(evaluateOnTheWayIntentEligibility);
+    evaluateMock.mockResolvedValue(makeEligibility() as any);
+
+    const { supabase, intentRows } = makeSupabase({
+      recipients: [makeRecipient({ id: "recipient-1" })],
+      consents: [makeConsent({ contact_recipient_id: "recipient-1", consent_status: "opted_in" })],
+      suppressions: [],
+    });
+
+    await createOnTheWayIntentFromEvent({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      actingUserId: "actor-1",
+      jobId: "job-1",
+      jobEventId: "event-1",
+      tokenValues: {
+        recipientFirstName: "Maria",
+        operatorOrTechName: "Jordan",
+        companyName: "Cool Air HVAC",
+        appointmentOrJobContext: "Tuesday, July 9 between 10 AM – 12 PM",
+      },
+    });
+
+    const body = (intentRows[0] as any).message_body_snapshot as string;
+    // Real values present, sample placeholders absent, no unrendered tokens.
+    expect(body).toContain("Maria");
+    expect(body).toContain("Jordan");
+    expect(body).toContain("Cool Air HVAC");
+    expect(body).toContain("Tuesday, July 9 between 10 AM – 12 PM");
+    expect(body).not.toContain("Taylor");
+    expect(body).not.toContain("Alex");
+    expect(body).not.toContain("Your company");
+    expect(body).not.toContain("{{");
+  });
+
+  it("stamps the v2 real-tokens decision_policy_version", async () => {
+    const evaluateMock = vi.mocked(evaluateOnTheWayIntentEligibility);
+    evaluateMock.mockResolvedValue(makeEligibility() as any);
+
+    const { supabase, intentRows } = makeSupabase({
+      recipients: [makeRecipient({ id: "recipient-1" })],
+      consents: [makeConsent({ contact_recipient_id: "recipient-1", consent_status: "opted_in" })],
+      suppressions: [],
+    });
+
+    await createOnTheWayIntentFromEvent({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      actingUserId: "actor-1",
+      jobId: "job-1",
+      jobEventId: "event-1",
+    });
+
+    expect((intentRows[0] as any).decision_policy_version).toBe(
+      "f5c-b-on-the-way-intent-create-v2-real-tokens",
+    );
+  });
+
+  it("keeps the sample preview when tokenValues are absent (backward compatible)", async () => {
+    const evaluateMock = vi.mocked(evaluateOnTheWayIntentEligibility);
+    evaluateMock.mockResolvedValue(makeEligibility() as any);
+
+    const { supabase, intentRows } = makeSupabase({
+      recipients: [makeRecipient({ id: "recipient-1" })],
+      consents: [makeConsent({ contact_recipient_id: "recipient-1", consent_status: "opted_in" })],
+      suppressions: [],
+    });
+
+    await createOnTheWayIntentFromEvent({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      actingUserId: "actor-1",
+      jobId: "job-1",
+      jobEventId: "event-1",
+    });
+
+    expect((intentRows[0] as any).message_body_snapshot).toBe(
+      "Hi Taylor, this is Alex with Your company.",
+    );
   });
 
   it("inserts blocked intent when eligibility is blocked and required truth exists", async () => {
