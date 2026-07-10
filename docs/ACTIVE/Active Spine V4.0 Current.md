@@ -21,43 +21,42 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 
 ---
 
-### Active Lane: Field Invoice Flow V1
+### Completed Lane: Field Invoice Flow V1 — CLOSED (July 9, 2026)
 
-**Owner sign-off date:** July 9, 2026
-**Mobile Field Mode layout changes:** explicitly approved for this lane.
-**Pricebook write authority for field_billing_enabled techs:** explicitly approved for this lane.
+**Status: CLOSED. All slices live on `main`, deployed, and field-smoked.** North star achieved: a non-technical user on a phone can go from job complete to invoice sent without friction or re-entry.
 
-**North star:** A non-technical user on a phone can go from job complete to invoice sent without friction, confusion, or re-entry of information already captured.
+**Owner sign-offs (July 9, 2026):** Mobile Field Mode layout changes approved; Pricebook write authority for `field_billing_enabled` techs approved.
 
-**Slice A — Pricebook price carry-through (server action behavior change)**
-- When a Work Item has a `source_pricebook_item_id`, the import action looks up that Pricebook item's `default_unit_price` and uses it as the starting `unit_price` on the draft Invoice Charge instead of `0.00`.
-- Price remains a prefill default — fully editable before issue.
-- No schema change. Uses existing persisted `source_pricebook_item_id`. No change to invoice truth model, issue/send/payment behavior, or Stripe behavior.
-- Requires audit prompt first before implementation.
+**Lane summary:**
+- ✅ **Slice A — Pricebook price carry-through** — live, smoked.
+- ✅ **Slice B — Mobile invoice flow compression** — live, smoked.
+- ✅ **Slice B Cleanup — 5 mobile polish fixes** — live, smoked.
+- ✅ **Slice C — Quick-add with optional Pricebook save** — live, smoked on real phone.
 
-**Slice B — Mobile field invoice flow compression (Field Mode layout)**
-- Billing / Closeout card on job detail shows contextual billing state with a single prominent action — no separate "Create Invoice" then "Open Invoice Charges" step.
-- Invoice screen opens with charges already imported and pre-priced. Each charge renders as a compact tap-to-edit card (name + price on one line). Running total always visible.
-- Charge edit form on mobile collapses to Name and Price as primary fields. Type, Quantity, and Description collapse behind "More details" toggle.
-- Issue Readiness moves inline as a compact status strip at the top of the invoice screen — not a separate scrollable section. "Send Invoice" becomes the dominant button when all checks are green.
-- $0.00 invoice decision options are shown only at issue time when total is still $0, not on invoice creation.
-- Builds on Slice A so prices are already populated when the compressed UI renders.
-- Requires audit prompt first before implementation.
+**Final `main` HEAD after the lane:** `25897e02` (Slice C merge). Per-slice: Slice A `86744207` (merge `48225159`), Slice B `30fd2ebc` (merge `d40ae0d0`), Slice B Cleanup `3c694931` (merge `bec0b287`), Slice C `ebd8b46c` (merge `25897e02`).
 
-**Slice C — Quick-add new item with optional save to Pricebook**
-- When a user taps "+ Add Item" and types a name that does not match any Pricebook item, after entering a price they see: "Save '[item name]' at $X to your price list for next time?" — Yes / No.
-- If Yes: creates a new active Pricebook item with that name and price. Invoice charge is created either way.
-- Authority: `field_billing_enabled` users (including techs) can save new Pricebook items from the field. Explicitly approved by owner July 9, 2026.
-- No schema change to invoices. New Pricebook row creation uses existing Pricebook write path with appropriate role gate confirmation from audit.
-- Requires audit prompt first before implementation.
+**As-built notes (durable facts for later lanes — the code differs from the original slice sketches above in a few places):**
 
-**Slice A audit prompt:** generated and ready for VS Code agent. See conversation July 9, 2026.
+- **Slice A** shipped in [lib/actions/internal-invoice-actions.ts](../../lib/actions/internal-invoice-actions.ts) via a `resolveEffectiveUnitPriceCents` helper at both import sites (auto-import on draft create + selected visit-scope import). Premise correction on record: the carry-through of a *manually set* `expected_unit_price` already existed (B8-C1); the real gap Slice A closed was the **Pricebook `default_unit_price` fallback** when a Pricebook-sourced Work Item was never manually priced. Gated by the existing `can_convert_visit_scope_to_invoice_lines` import gate; no new gate. Price stays an editable prefill.
+
+- **Slice B** is gated on **`?mobileLayout=v2`** (`isMobileWorkspace`). The invoice workspace ([app/jobs/[id]/invoice/page.tsx](../../app/jobs/%5Bid%5D/invoice/page.tsx)) is a **single shared desktop/mobile page** — there is no separate mobile route — so mobile changes are all conditioned on that flag and desktop is untouched.
+  - **Classic mobile job-detail surface RETIRED:** `page.tsx` selects `MobileJobDetailV2Preview` unconditionally. `?mobileLayout=current|classic` is now inert. `MobileJobDetailCurrent.tsx` is **retained in the tree but unreachable/dead** pending later deletion — do not assume it renders.
+  - **New compound server action `issueAndSendInternalInvoiceFromForm`** issues + emails in one round trip when all readiness checks are green and a recipient email is present; it will not issue if the send would fail (missing/invalid email). The standalone `issueInternalInvoiceFromForm` and `sendInternalInvoiceEmailFromForm` are unchanged; the compound action reuses extracted non-redirecting cores (`applyInternalInvoiceIssueMutation`, `deliverInternalInvoiceEmailForContext`).
+  - Mobile charge list: two-line tap-to-expand rows, Type/Qty/Description behind a `More details` disclosure, sticky running total. Mobile "Back to Job" → `?tab=ops`.
+
+- **Slice B Cleanup — 5 mobile-only presentation fixes** (all `isMobileWorkspace`-gated): (1) Revenue Workflow Rail hidden on mobile; (2) "Open Invoice Charges" button hidden on mobile; (3) "External billing option" collapsed behind a `<details>`; (4) each saved Work Item row gets a **Remove** action (re-saves `visit_scope_items` via the same `updateJobVisitScopeFromForm` the builder uses — there is no dedicated per-item remove action); (5) quantity math (`qty × price = subtotal`) — **dormant today because Work Items have no `quantity` field** (implicitly 1.00); implemented defensively so it lights up if a quantity field is ever added.
+
+- **Slice C** added [lib/actions/field-pricebook-actions.ts](../../lib/actions/field-pricebook-actions.ts) with two **value-returning** (never-redirecting) server actions: `checkFieldPricebookItemNameExistsFromForm` (case-insensitive, active-only match) and `saveFieldItemToPricebookFromForm` (creates an active `pricebook_items` row, duplicate-guarded case-insensitively + on `23505`). Gated by **`field_billing_enabled`** (true for flagged techs and financial-authority roles). Mobile-only prompt after a manual add; desktop never calls it. The existing admin `createPricebookItemFromForm` (redirect-based, admin-gated) was left untouched — the field path is deliberately separate.
+
+**Future polish candidate (not scheduled):** merge the job-detail Work Scope card and Billing/Closeout card into one connected "Work & Billing" flow. Good fit for the Landing Page Polish lane or its own small lane.
 
 ---
 
 ### Post-Lane-1 Roadmap Sequence (locked order, July 2026)
 
-**Lane 2 — Landing Page Polish**
+**Lane 1 (Field Invoice Flow V1) is CLOSED (July 9, 2026).** Next active lane: **Lane 2 — Landing Page Polish.**
+
+**Lane 2 — Landing Page Polish  ◀ NEXT ACTIVE LANE**
 - Pure front-end work. No backend, no migrations, no truth model risk.
 - Goal: product presents as polished as it performs. Buyer immediately understands the complete operating loop.
 - Targets the "users understand what they're signing up for" gap identified in owner review.
