@@ -530,7 +530,7 @@ describe("account workshare connections actions", () => {
     expect(result.success ? result.connection.status : null).toBe("disabled");
   });
 
-  it("form wrapper redirects to company profile section and touches no unrelated domains", async () => {
+  it("form wrapper redirects to the connections page and touches no unrelated domains", async () => {
     const fixture = makeAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
     setActor({
@@ -543,9 +543,9 @@ describe("account workshare connections actions", () => {
     formData.set("sender_account_id", "00000000-0000-4000-8000-0000000000a1");
 
     await expect(createAccountWorkshareInviteFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/ops/admin/company-profile?notice=workshare_connection_invited#account-workshare-connections",
+      "REDIRECT:/ops/admin/connections?notice=workshare_connection_invited#ecc-hers-connections",
     );
-    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/admin/company-profile");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/admin/connections");
     expect(new Set(fixture.tableCalls)).toEqual(new Set(["account_workshare_connections"]));
   });
 
@@ -566,23 +566,16 @@ describe("account workshare connections actions", () => {
     expect(source).not.toContain("ecc_test_runs");
   });
 
-  it("source guard: company profile copy describes directional connection invites only", async () => {
+  it("source guard: connections page copy describes directional account-id invites only", async () => {
     const fs = await import("node:fs");
     const path = await import("node:path");
     const source = fs.readFileSync(
-      path.join(process.cwd(), "app", "ops", "admin", "company-profile", "page.tsx"),
+      path.join(process.cwd(), "app", "ops", "admin", "connections", "page.tsx"),
       "utf8",
     );
 
-    expect(source).toContain("Contractor Sending Connections");
-    expect(source).toContain("ECC/HERS Rater Connections");
-    expect(source).toContain("Rater accounts this company can send ECC/HERS requests to after a connection is accepted.");
-    expect(source).toContain("No pending rater invites.");
-    expect(source).toContain("Pending invite from rater account");
-    expect(source).toContain("Accept this connection to allow this company to send ECC/HERS requests to that rater account.");
-    expect(source).toContain("Accept connection");
-    expect(source).toContain("Invite contractor accounts that are allowed to send ECC/HERS requests to this rater account.");
-    expect(source).toContain("No contractor sending connections yet.");
+    // Advanced account-id invite disclosure — directional, safety-scoped copy.
+    expect(source).toContain("Connect using Account ID · advanced");
     expect(source).toContain("Invite contractor account");
     expect(source).toContain("This only creates a connection invite. It does not share jobs, create portal users, or create ECC/HERS requests.");
     expect(source).toContain("This account ID");
@@ -591,10 +584,25 @@ describe("account workshare connections actions", () => {
     expect(source).toContain("Known contractor account ID");
     expect(source).toContain("Enter the contractor account ID, not this rater account ID.");
     expect(source).toContain("Create connection invite");
-    expect(source).toContain("Rater accounts this company can send to");
-    expect(source).toContain("A rater must invite this account before ECC/HERS requests can be sent.");
-    expect(source).not.toContain("ECC/HERS Work-Sharing Network");
-    expect(source).not.toContain("Sender account ID");
-    expect(source).not.toContain("Create invite");
+    expect(source).toContain("Connecting only creates the link");
+    // No portal-authority leakage or email-invite surface on this page.
+    expect(source).not.toContain("/portal");
+    expect(source).not.toContain('name="invite_email"');
+  });
+
+  it("source guard: company profile links out to the connections page instead of embedding the workshare invite", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const source = fs.readFileSync(
+      path.join(process.cwd(), "app", "ops", "admin", "company-profile", "page.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("/ops/admin/connections");
+    expect(source).toContain("Manage connections");
+    // The workshare invite form and its actions no longer live on Company Profile.
+    expect(source).not.toContain("createAccountWorkshareInviteFromForm");
+    expect(source).not.toContain("Contractor Sending Connections");
+    expect(source).not.toContain("WorkshareConnectionListSection");
   });
 });

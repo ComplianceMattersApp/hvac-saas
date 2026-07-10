@@ -16,6 +16,7 @@ import {
   sendPasswordResetFromForm,
 } from "@/lib/actions/admin-user-actions";
 import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
+import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -79,6 +80,17 @@ export default async function AdminContractorsPage({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+
+  // Presentation-only workshare indicator. There is no clean join between the
+  // `contractors` table (external company records) and account_workshare_connections
+  // (auth-user account-to-account links), so we surface a single account-level
+  // summary line rather than per-card badges.
+  const activeWorkshareConnections = await listAccountWorkshareConnectionsForAccount(
+    supabase,
+    internalUser.account_owner_user_id,
+    { serviceType: "ecc_hers", statuses: ["active"] },
+  );
+  const activeWorkshareConnectionCount = activeWorkshareConnections.length;
 
   const { data: contractors, error } = await supabase
     .from("contractors")
@@ -545,6 +557,20 @@ export default async function AdminContractorsPage({
       {productMode === "hvac_service" ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-sm">
           Optional collaboration tool for Service accounts. Core service dispatch can run without ECC contractor relationships.
+        </div>
+      ) : null}
+
+      {activeWorkshareConnectionCount > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900 shadow-sm">
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden="true">&#10003;</span>
+            {activeWorkshareConnectionCount === 1
+              ? "1 active ECC/HERS partner connection on this account."
+              : `${activeWorkshareConnectionCount} active ECC/HERS partner connections on this account.`}
+          </span>
+          <Link href="/ops/admin/connections" className="font-semibold text-teal-800 underline-offset-2 hover:underline">
+            Manage connections &rarr;
+          </Link>
         </div>
       ) : null}
 

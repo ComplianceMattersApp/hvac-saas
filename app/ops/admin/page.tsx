@@ -294,6 +294,14 @@ export default async function OpsAdminPage() {
         { label: "Intake proposals", href: "/ops/admin/contractor-intake-submissions" },
       ],
     });
+    workspaceCards.push({
+      title: "Partner Network",
+      description:
+        "Manage ECC/HERS company-to-company connections for work sharing.",
+      href: "/ops/admin/connections",
+      ctaLabel: "Manage connections",
+      enabled: true,
+    });
   }
 
   if (isMaintenanceAgreementsEnabled()) {
