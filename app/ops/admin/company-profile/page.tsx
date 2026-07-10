@@ -26,6 +26,9 @@ import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-acce
 import { createClient } from "@/lib/supabase/server";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
+import { SettingsSection } from "./_components/SettingsSection";
+import { SectionForm } from "./_components/SectionForm";
+import { TextField } from "./_components/fields";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -359,160 +362,101 @@ export default async function AdminCompanyProfilePage({
             label: "Identity & Branding",
             state: identityState,
             content: (
-      <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
-          <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-            <div className="text-sm font-semibold text-slate-950">Customer-facing identity</div>
-            <div className="mt-1 text-sm text-slate-600">Preview the name, logo, and contact info customers see.</div>
-          </div>
-          <div className="space-y-4 p-5">
-            <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/80 bg-white shadow-[0_12px_24px_-18px_rgba(15,23,42,0.25)]">
-                  {currentLogoUrl ? (
-                    <img src={currentLogoUrl} alt={`${companyName} logo`} className="max-h-full max-w-full object-contain" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,rgba(15,23,42,0.06),rgba(15,23,42,0.12))] text-2xl font-semibold text-slate-600">
-                      {companyInitial}
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Company</div>
-                  <div className="break-words text-xl font-semibold tracking-[-0.02em] text-slate-950">{companyName}</div>
-                </div>
-              </div>
-
-                {supportEmail || supportPhone ? (
-                  <div className="space-y-0.5 border-t border-slate-200/80 pt-3 text-sm leading-6 text-slate-600">
-                    {supportEmail ? <div>{supportEmail}</div> : null}
-                    {supportPhone ? <div>{supportPhone}</div> : null}
-                  </div>
-                ) : (
-                  <div className="border-t border-slate-200/80 pt-3 text-sm leading-6 text-slate-600">
-                    Add business contact info so customers and your team see the right details.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-600">
-              {currentLogoUrl
-                ? "Upload a new logo anytime to refresh how your company appears in the app."
-                : "Upload a logo to give your workspace a more polished, familiar look."}
-            </div>
-          </div>
-        </div>
-
-        <div id="company-details" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Company details</h2>
-            <p className="text-sm leading-6 text-slate-600">
-              Edit the name, contact info, and logo shown across the app.
-            </p>
-          </div>
-
-          <form action={saveInternalBusinessProfileFromForm} className="mt-6 space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="space-y-1">
-                  <div className="text-sm font-semibold text-slate-950">Logo</div>
-                  <div className="text-sm leading-6 text-slate-600">Shown on invoices, messages, and team screens.</div>
-                </div>
-
-                {currentLogoUrl ? (
-                  <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" name="remove_logo" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
-                    Remove logo
-                  </label>
-                ) : null}
-              </div>
-
-              <div className="mt-4">
-                <input
-                  id="logo_file"
-                  name="logo_file"
-                  type="file"
-                  accept="image/*"
-                  className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3.5 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-800"
-                />
-                <p className="mt-2 text-xs text-slate-500">PNG, JPG, SVG, or WebP. Up to 5 MB.</p>
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5 sm:col-span-2">
-                <label htmlFor="display_name" className="text-sm font-medium text-slate-700">
-                  Company name
-                </label>
-                <input
-                  id="display_name"
-                  name="display_name"
-                  defaultValue={profile?.display_name ?? ""}
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                  placeholder="Compliance Matters"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="support_email" className="text-sm font-medium text-slate-700">
-                  Business email
-                </label>
-                <input
-                  id="support_email"
-                  name="support_email"
-                  type="email"
-                  defaultValue={profile?.support_email ?? ""}
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                  placeholder="support@company.com"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="support_phone" className="text-sm font-medium text-slate-700">
-                  Business phone
-                </label>
-                <input
-                  id="support_phone"
-                  name="support_phone"
-                  defaultValue={profile?.support_phone ?? ""}
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                  placeholder="(209) 555-1234"
-                />
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
-                <label htmlFor="google_review_url" className="text-sm font-medium text-slate-700">
-                  Google Review Link
-                </label>
-                <input
-                  id="google_review_url"
-                  name="google_review_url"
-                  type="url"
-                  defaultValue={profile?.google_review_url ?? ""}
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                  placeholder="https://g.page/r/your-place-id/review"
-                />
-                <p className="text-xs text-slate-500">
-                  Paste your Google Business review link here. When set, a review ask button
-                  appears on completed jobs so you can request reviews from satisfied customers.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end">
-              <button
-                type="submit"
-                className="inline-flex min-h-11 items-center rounded-xl bg-slate-900 px-4.5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_30px_-22px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_22px_34px_-22px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
+              <SettingsSection
+                eyebrow="Identity & Branding"
+                title="Identity & Branding"
+                description="The logo, name, and contact info shown across the app, on invoices, and on customer documents."
               >
-                Save company profile
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+                <SectionForm action={saveInternalBusinessProfileFromForm} saveLabel="Save changes">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          {currentLogoUrl ? (
+                            <img src={currentLogoUrl} alt={`${companyName} logo`} className="max-h-full max-w-full object-contain" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-slate-100 text-lg font-semibold text-slate-500">
+                              {companyInitial}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-sm font-semibold text-[#0f1f35]">Logo</div>
+                          <div className="text-sm leading-6 text-slate-600">Shown on invoices, messages, and team screens.</div>
+                        </div>
+                      </div>
+
+                      {currentLogoUrl ? (
+                        <label className="inline-flex min-h-11 items-center gap-2 text-sm text-slate-700">
+                          <input type="checkbox" name="remove_logo" value="1" className="h-4 w-4 rounded border-slate-300 text-blue-600" />
+                          Remove logo
+                        </label>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4">
+                      <label htmlFor="logo_file" className="sr-only">
+                        Upload company logo
+                      </label>
+                      <input
+                        id="logo_file"
+                        name="logo_file"
+                        type="file"
+                        accept=".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml"
+                        className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3.5 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">PNG, JPG, SVG, or WebP. Up to 5 MB.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <TextField
+                      id="display_name"
+                      name="display_name"
+                      label="Company name"
+                      requirement="required"
+                      defaultValue={profile?.display_name ?? ""}
+                      placeholder="Compliance Matters"
+                      autoComplete="organization"
+                      className="sm:col-span-2"
+                    />
+                    <TextField
+                      id="support_email"
+                      name="support_email"
+                      type="email"
+                      inputMode="email"
+                      label="Business email"
+                      requirement="recommended"
+                      defaultValue={profile?.support_email ?? ""}
+                      placeholder="support@company.com"
+                      autoComplete="email"
+                    />
+                    <TextField
+                      id="support_phone"
+                      name="support_phone"
+                      type="tel"
+                      inputMode="tel"
+                      label="Business phone"
+                      requirement="recommended"
+                      defaultValue={profile?.support_phone ?? ""}
+                      placeholder="(209) 555-1234"
+                      autoComplete="tel"
+                    />
+                    <TextField
+                      id="google_review_url"
+                      name="google_review_url"
+                      type="url"
+                      inputMode="url"
+                      label="Google review link"
+                      requirement="optional"
+                      defaultValue={profile?.google_review_url ?? ""}
+                      placeholder="https://g.page/r/your-place-id/review"
+                      helper="Paste your Google Business review link. When set, a review-ask button appears on completed jobs so you can request reviews from satisfied customers."
+                      className="sm:col-span-2"
+                    />
+                  </div>
+                </SectionForm>
+              </SettingsSection>
             ),
           },
           {
