@@ -78,7 +78,7 @@ describe("internal invoice line items table capability wiring", () => {
   it("renders the single add-charge flow below existing invoice lines", () => {
     const linesIndex = source.indexOf("{lineItems.map((lineItem, index) => {");
     const addPricebookFormIndex = source.indexOf("action={handleAddPricebook}");
-    const addChargeEntryIndex = source.lastIndexOf("onClick={() => setIsAddFormOpen(true)}");
+    const addChargeEntryIndex = source.lastIndexOf("onClick={openAddForm}");
     const runningTotalIndex = source.indexOf("Running Total");
 
     expect(linesIndex).toBeGreaterThan(-1);

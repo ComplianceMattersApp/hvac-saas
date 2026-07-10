@@ -71,6 +71,10 @@ import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "../_components/InternalInvoiceLineItemsTable";
 import {
+  saveFieldItemToPricebookFromForm,
+  checkFieldPricebookItemNameExistsFromForm,
+} from "@/lib/actions/field-pricebook-actions";
+import {
   sanitizeVisitScopeItemId,
   sanitizeVisitScopeItems,
 } from "@/lib/jobs/visit-scope";
@@ -1039,6 +1043,8 @@ export default async function InternalInvoiceWorkspacePage({
                   primaryButtonClass={primaryButtonClass}
                   secondaryButtonClass={secondaryButtonClass}
                   isMobileWorkspace={isMobileWorkspace}
+                  saveFieldItemToPricebookAction={saveFieldItemToPricebookFromForm}
+                  checkFieldPricebookItemNameExistsAction={checkFieldPricebookItemNameExistsFromForm}
                 />
               ) : (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/75">
