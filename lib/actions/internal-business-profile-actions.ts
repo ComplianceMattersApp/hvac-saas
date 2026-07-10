@@ -40,6 +40,10 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isValidHttpsUrl(value: string) {
+  return /^https:\/\/\S+$/i.test(value);
+}
+
 function isUploadFile(value: unknown): value is File {
   return typeof File !== "undefined" && value instanceof File;
 }
@@ -113,6 +117,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   const displayName = normalizeText(formData.get("display_name"));
   const supportEmail = normalizeNullableText(formData.get("support_email"));
   const supportPhone = normalizeNullableText(formData.get("support_phone"));
+  const googleReviewUrl = normalizeNullableText(formData.get("google_review_url"));
   const hasBillingModeInput = formData.has("billing_mode");
   const logoFileEntry = formData.get("logo_file");
   const removeLogo = String(formData.get("remove_logo") ?? "").trim() === "1";
@@ -123,6 +128,10 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
 
   if (supportEmail && !isValidEmail(supportEmail)) {
     redirect(withNotice("invalid_support_email"));
+  }
+
+  if (googleReviewUrl && !isValidHttpsUrl(googleReviewUrl)) {
+    redirect(withNotice("invalid_google_review_url"));
   }
 
   const logoFile = isUploadFile(logoFileEntry) && logoFileEntry.size > 0 ? logoFileEntry : null;
@@ -193,6 +202,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
         display_name: displayName,
         support_email: supportEmail,
         support_phone: supportPhone,
+        google_review_url: googleReviewUrl,
         logo_url: nextLogoUrl,
         billing_mode: billingMode,
         profile_reviewed_at: new Date().toISOString(),

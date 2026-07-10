@@ -353,10 +353,14 @@ export default function MobileJobDetailV2Preview(props: any) {
     LockIcon,
     logCustomerContactAttemptFromForm,
     MapPinIcon,
+    MailIcon,
     MarkVisitCountedActionButton,
     markVisitCountedAgreementName,
     markVisitCountedLinkId,
     MessageIcon,
+    canShowReviewAsk,
+    reviewAskMailtoHref,
+    reviewAskSmsHref,
     mobileAppointmentTimeLabel,
     mobileCallHref,
     mobileCustomerHref,
@@ -1196,6 +1200,42 @@ export default function MobileJobDetailV2Preview(props: any) {
             </a>
           ) : null}
         </section>
+
+        {canShowReviewAsk ? (
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700">
+              Request a Review
+            </p>
+            <p className="mb-3 text-sm text-stone-600">
+              Job complete — ask your customer for a Google review while the experience is fresh.
+            </p>
+            <div className="flex flex-col gap-2">
+              {reviewAskMailtoHref ? (
+                <a
+                  href={reviewAskMailtoHref}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                >
+                  <MailIcon className="h-4 w-4" />
+                  Send Review Request by Email
+                </a>
+              ) : null}
+              {reviewAskSmsHref ? (
+                <a
+                  href={reviewAskSmsHref}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-white px-4 py-2.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                >
+                  <MessageIcon className="h-4 w-4" />
+                  Send Review Request by Text
+                </a>
+              ) : null}
+              {!reviewAskMailtoHref && !reviewAskSmsHref ? (
+                <p className="text-xs text-stone-400">
+                  No email or phone on file — add contact info to enable review requests.
+                </p>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
 
         <details className={`${previewSectionClass} group`}>
           <summary className="cursor-pointer list-none">

@@ -43,7 +43,8 @@ import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
-import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { getInternalBusinessProfileByAccountOwnerId, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
@@ -412,6 +413,7 @@ export default async function JobDetailV2Page({
     contactAttemptsResult,
     attachmentCountResult,
     timelineCountResult,
+    businessProfile,
   ] = await Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
@@ -449,6 +451,7 @@ export default async function JobDetailV2Page({
       .from("job_events")
       .select("id", { count: "exact", head: true })
       .in("job_id", timelineScopeJobIds),
+    getInternalBusinessProfileByAccountOwnerId({ supabase, accountOwnerUserId }),
   ]);
 
   if (customerLocationsError) throw customerLocationsError;
@@ -556,6 +559,22 @@ export default async function JobDetailV2Page({
     contractorName,
     customerName: customerFullName,
   });
+
+  // Lane 4 — Google review ask (field-complete trigger + per-account review URL)
+  const googleReviewUrl = businessProfile?.google_review_url ?? null;
+  const canShowReviewAsk =
+    fieldComplete && Boolean(googleReviewUrl) && status !== "cancelled";
+  const reviewAskLinks = canShowReviewAsk && googleReviewUrl
+    ? buildReviewAskLinks({
+        customerFirstName: job.customer_first_name ?? null,
+        customerEmail: job.customer_email ?? null,
+        customerPhone: job.customer_phone ?? null,
+        googleReviewUrl,
+        businessName: String(businessProfile?.display_name ?? "").trim() || "our team",
+      })
+    : null;
+  const reviewAskMailtoHref = reviewAskLinks?.mailtoHref ?? null;
+  const reviewAskSmsHref = reviewAskLinks?.smsHref ?? null;
 
   const jobDisplayRef = formatJobDisplayReference({ jobDisplayNumber: job.job_display_number, jobId: job.id });
 
@@ -3401,6 +3420,44 @@ export default async function JobDetailV2Page({
                   <span style={{ fontSize: "11px", color: "oklch(0.65 0.015 262)", flexShrink: 0 }}>↗</span>
                 </Link>
               ))}
+            {canShowReviewAsk && reviewAskMailtoHref ? (
+              <a
+                href={reviewAskMailtoHref}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "6px 0",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "oklch(0.55 0.13 70)",
+                  textDecoration: "none",
+                  borderBottom: "1px solid oklch(0.95 0.004 250)",
+                }}
+              >
+                Email Review Request
+                <span style={{ fontSize: "11px", color: "oklch(0.7 0.1 70)", flexShrink: 0 }}>✉</span>
+              </a>
+            ) : null}
+            {canShowReviewAsk && reviewAskSmsHref ? (
+              <a
+                href={reviewAskSmsHref}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "6px 0",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "oklch(0.55 0.13 70)",
+                  textDecoration: "none",
+                  borderBottom: "1px solid oklch(0.95 0.004 250)",
+                }}
+              >
+                Text Review Request
+                <span style={{ fontSize: "11px", color: "oklch(0.7 0.1 70)", flexShrink: 0 }}>↗</span>
+              </a>
+            ) : null}
           </div>
         </div>
 

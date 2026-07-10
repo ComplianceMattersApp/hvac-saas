@@ -103,6 +103,7 @@ import {
 } from "@/lib/jobs/job-invoice-action";
 import { shouldShowInternalInvoiceRequiredBanner } from "@/lib/jobs/job-detail-invoice-banner";
 import { listFieldChargeProposalsForJob } from "@/lib/business/field-charge-proposals";
+import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
 import { listAccountWorkshareRequestsForSourceJob } from "@/lib/workflows/account-workshare-requests-read";
 import {
@@ -920,6 +921,15 @@ function MessageIcon(props: { className?: string }) {
   return (
     <MobileLineIcon className={props.className}>
       <path d="M21 12a8.5 8.5 0 0 1-8.5 8.5H7l-4 2 1.4-4.2A8.5 8.5 0 1 1 21 12Z" />
+    </MobileLineIcon>
+  );
+}
+
+function MailIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="m22 7-10 6L2 7" />
     </MobileLineIcon>
   );
 }
@@ -2961,6 +2971,27 @@ const normalizedOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
 const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === "archived";
 const isJobClosed = normalizedOpsStatus === "closed";
 const isJobCancelled = normalizedJobStatus === "cancelled";
+
+// Lane 4 — Google review ask (field-complete trigger + per-account review URL)
+const googleReviewUrl = internalBusinessIdentity.google_review_url ?? null;
+const canShowReviewAsk =
+  isInternalUser &&
+  isFieldComplete &&
+  Boolean(googleReviewUrl) &&
+  !isJobArchived &&
+  !isJobCancelled;
+const reviewAskLinks = canShowReviewAsk && googleReviewUrl
+  ? buildReviewAskLinks({
+      customerFirstName: job.customer_first_name ?? null,
+      customerEmail: job.customer_email ?? null,
+      customerPhone: job.customer_phone ?? null,
+      googleReviewUrl,
+      businessName: internalBusinessDisplayName || "our team",
+    })
+  : null;
+const reviewAskMailtoHref = reviewAskLinks?.mailtoHref ?? null;
+const reviewAskSmsHref = reviewAskLinks?.smsHref ?? null;
+
 const showFieldOutcomePanel =
   job.job_type !== "ecc" &&
   !isJobClosed &&
@@ -3682,6 +3713,10 @@ const showCorrectionReviewResolution =
           isFieldComplete={isFieldComplete}
           isHistoricalServiceFollowUpContinued={isHistoricalServiceFollowUpContinued}
           isInternalUser={isInternalUser}
+          canShowReviewAsk={canShowReviewAsk}
+          reviewAskMailtoHref={reviewAskMailtoHref}
+          reviewAskSmsHref={reviewAskSmsHref}
+          MailIcon={MailIcon}
           isServiceFieldFollowUpPendingInfo={isServiceFieldFollowUpPendingInfo}
           job={job}
           JobFieldActionButton={JobFieldActionButton}
@@ -3872,6 +3907,29 @@ const showCorrectionReviewResolution =
           >
             <div className="font-semibold">{completionActionAttentionBanner.title}</div>
             <div className="mt-1">{completionActionAttentionBanner.message}</div>
+          </div>
+        ) : null}
+        {canShowReviewAsk ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+            <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Request a Review</div>
+            <div className="mt-1 text-sm leading-5 text-amber-900">
+              Job complete — ask your customer for a Google review while the experience is fresh.
+            </div>
+            <div className="mt-2 flex flex-wrap gap-3">
+              {reviewAskMailtoHref ? (
+                <a href={reviewAskMailtoHref} className="text-sm font-semibold text-amber-800 underline-offset-2 hover:underline">
+                  Email Review Request
+                </a>
+              ) : null}
+              {reviewAskSmsHref ? (
+                <a href={reviewAskSmsHref} className="text-sm font-semibold text-amber-800 underline-offset-2 hover:underline">
+                  Text Review Request
+                </a>
+              ) : null}
+              {!reviewAskMailtoHref && !reviewAskSmsHref ? (
+                <span className="text-xs text-amber-700">No email or phone on file to send a review request.</span>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {!isFieldComplete && job.status !== "completed" ? (
