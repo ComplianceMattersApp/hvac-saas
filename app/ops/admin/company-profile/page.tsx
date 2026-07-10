@@ -25,6 +25,7 @@ import {
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -138,6 +139,27 @@ export default async function AdminCompanyProfilePage({
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
   const platformBillingAvailability = getPlatformBillingAvailability();
 
+  // Rail state at a glance (design turn 14a): green dot = complete,
+  // amber + count = needs attention. Derived from readiness so the source of
+  // truth stays account-readiness, not a second re-derivation.
+  const incompleteKeys = new Set(
+    readiness.items.filter((item) => item.status === "incomplete").map((item) => item.key),
+  );
+  const countIncompleteKeys = (keys: string[]) => keys.filter((key) => incompleteKeys.has(key)).length;
+  const identityIncomplete = countIncompleteKeys(["company_name", "support_email", "support_phone"]);
+  const billingIncomplete = countIncompleteKeys([
+    "billing_mode",
+    "app_subscription",
+    "accept_online_invoice_payments",
+  ]);
+  const identityState: ConsoleSectionState =
+    identityIncomplete > 0 ? { kind: "attention", count: identityIncomplete } : { kind: "complete" };
+  const billingState: ConsoleSectionState =
+    billingIncomplete > 0 ? { kind: "attention", count: billingIncomplete } : { kind: "complete" };
+  const teamState: ConsoleSectionState = incompleteKeys.has("active_internal_users")
+    ? { kind: "attention" }
+    : { kind: "complete" };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
       <div className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98)_55%,rgba(236,253,245,0.56))] p-6 shadow-[0_28px_60px_-36px_rgba(15,23,42,0.28)]">
@@ -169,6 +191,59 @@ export default async function AdminCompanyProfilePage({
         </div>
       ) : null}
 
+      <ProfileConsole
+        defaultSectionId="overview"
+        sections={[
+          {
+            id: "overview",
+            label: "Overview",
+            content: (
+              <div className="space-y-4">
+                {incompleteRequiredItems.length > 0 ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="font-semibold">Setup attention</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide">
+                        {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
+                      </div>
+                    </div>
+                    <div className="mt-1 text-sm leading-6 text-amber-900">
+                      Finish only the items that need attention.
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {incompleteRequiredItems.map((item) => (
+                        <div key={item.key} className="rounded-lg border border-amber-200 bg-white/80 px-3 py-2 text-sm text-amber-950">
+                          <div className="font-medium">
+                            {item.key === "billing_mode" ? "Choose how invoices are handled" : `Finish: ${item.label}`}
+                          </div>
+                          {item.href ? (
+                            <Link href={item.href} className="mt-1 inline-flex text-xs font-semibold text-amber-950 underline-offset-2 hover:underline">
+                              Open
+                            </Link>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                  <div className="font-semibold text-slate-900">First job training</div>
+                  <p className="mt-1 text-sm leading-5 text-slate-600">
+                    Open Training Room for the step-by-step first job path.
+                  </p>
+                  <Link href="/training" className="mt-3 inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100">
+                    Open Training Room
+                  </Link>
+                </div>
+              </div>
+            ),
+          },
+          {
+            id: "identity",
+            label: "Identity & Branding",
+            state: identityState,
+            content: (
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
           <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
@@ -323,47 +398,14 @@ export default async function AdminCompanyProfilePage({
           </form>
         </div>
       </div>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {incompleteRequiredItems.length > 0 ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-semibold">Setup attention</div>
-              <div className="text-xs font-semibold uppercase tracking-wide">
-                {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
-              </div>
-            </div>
-            <div className="mt-1 text-sm leading-6 text-amber-900">
-              Finish only the items that need attention.
-            </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {incompleteRequiredItems.map((item) => (
-                <div key={item.key} className="rounded-lg border border-amber-200 bg-white/80 px-3 py-2 text-sm text-amber-950">
-                  <div className="font-medium">
-                    {item.key === "billing_mode" ? "Choose how invoices are handled" : `Finish: ${item.label}`}
-                  </div>
-                  {item.href ? (
-                    <Link href={item.href} className="mt-1 inline-flex text-xs font-semibold text-amber-950 underline-offset-2 hover:underline">
-                      Open
-                    </Link>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          <div className="font-semibold text-slate-900">First job training</div>
-          <p className="mt-1 text-sm leading-5 text-slate-600">
-            Open Training Room for the step-by-step first job path.
-          </p>
-          <Link href="/training" className="mt-3 inline-flex rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100">
-            Open Training Room
-          </Link>
-        </div>
-      </div>
-
+            ),
+          },
+          {
+            id: "billing",
+            label: "Billing & Payments",
+            state: billingState,
+            content: (
+              <div className="space-y-6">
       <PlatformAccountSection
         entitlement={entitlement}
         availability={platformBillingAvailability}
@@ -432,7 +474,13 @@ export default async function AdminCompanyProfilePage({
       </div>
 
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
-
+              </div>
+            ),
+          },
+          {
+            id: "ecc-hers",
+            label: "ECC/HERS",
+            content: (
       <div id="account-workshare-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">ECC/HERS Partner Network</h2>
@@ -447,6 +495,45 @@ export default async function AdminCompanyProfilePage({
           Manage connections &rarr;
         </Link>
       </div>
+            ),
+          },
+          {
+            id: "team",
+            label: "Team & Roles",
+            state: teamState,
+            content: (
+              <div className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold tracking-[-0.02em] text-[#0f1f35]">Team &amp; Roles</h2>
+                  <p className="text-sm leading-6 text-slate-600">
+                    People &amp; Access — invite teammates, set roles, and manage seats.
+                  </p>
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active users</dt>
+                    <dd className="mt-1 text-sm font-semibold text-[#0f1f35]">{entitlement.activeSeatCount}</dd>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Seat limit</dt>
+                    <dd className="mt-1 text-sm font-semibold text-[#0f1f35]">{formatSeatAuditSeatLimitLabel(entitlement)}</dd>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor records</dt>
+                    <dd className="mt-1 text-sm font-semibold text-[#0f1f35]">{seatAuditPreview.contractorDirectoryCount ?? "—"}</dd>
+                  </div>
+                </dl>
+                <Link
+                  href="/ops/admin/users"
+                  className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+                >
+                  Manage team &rarr;
+                </Link>
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
