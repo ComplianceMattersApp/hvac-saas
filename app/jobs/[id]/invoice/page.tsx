@@ -45,6 +45,7 @@ import {
   createSupplementalInternalInvoiceFromForm,
   createInternalInvoiceDraftFromForm,
   issueInternalInvoiceFromForm,
+  issueAndSendInternalInvoiceFromForm,
   markInternalInvoiceExternallyBilledFromForm,
   markInternalInvoiceNoChargeFromForm,
   removeInternalInvoiceLineItemFromForm,
@@ -215,6 +216,8 @@ function bannerMessage(value?: string | null) {
     internal_invoice_email_sent: "Invoice email sent.",
     internal_invoice_email_resent: "Invoice email resent.",
     internal_invoice_email_failed: "Invoice email failed to send.",
+    internal_invoice_issued_and_sent: "Invoice issued and sent to the billing recipient.",
+    internal_invoice_issued_email_failed: "Invoice issued, but the email could not be sent. Try Send again.",
     internal_invoice_send_recipient_required: "Billing recipient email is required before sending.",
     internal_invoice_send_recipient_invalid: "Enter a valid billing recipient email before sending.",
     internal_invoice_send_requires_issued: "Issue the invoice before sending it.",
@@ -372,6 +375,8 @@ export default async function InternalInvoiceWorkspacePage({
   const requestedInvoiceId = firstSearchValue(sp.invoice_id) ?? firstSearchValue(sp.supplemental_invoice_id);
   const checkoutSessionId = firstSearchValue(sp.checkout_session_id);
   const checkoutSessionUrl = firstSearchValue(sp.checkout_session_url);
+  // Slice B: compressed mobile workspace gate. Desktop is untouched when false.
+  const isMobileWorkspace = firstSearchValue(sp.mobileLayout) === "v2";
   const supabase = await createClient();
 
   const {
@@ -698,6 +703,22 @@ export default async function InternalInvoiceWorkspacePage({
   const returnTo = invoice
     ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}#invoice-workspace`
     : `/jobs/${jobId}/invoice#invoice-workspace`;
+  // Slice B: keep the mobile workspace gate through action redirects.
+  const mobileReturnTo = invoice
+    ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}&mobileLayout=v2#invoice-workspace`
+    : `/jobs/${jobId}/invoice?mobileLayout=v2#invoice-workspace`;
+  const recipientEmailReady = Boolean(String(invoice?.billing_email ?? "").trim());
+  // Slice B: compact mobile Issue & Send readiness — only unmet checks are shown.
+  const mobileReadinessBlockers = [
+    { label: "Billing recipient", ready: recipientReady, needed: "Add a billing name." },
+    { label: "Charges", ready: chargesReady, needed: "Add at least 1 charge." },
+    { label: "Total", ready: totalReady, needed: "Total must be above $0.00." },
+    { label: "Job closeout", ready: jobReady, needed: "Complete the job and field work." },
+  ].filter((check) => !check.ready);
+  const canMobileCompoundIssueSend =
+    canIssue && canIssueInvoiceLifecycle && canSendInvoiceLifecycle && recipientEmailReady;
+  const canMobileIssueOnly = canIssue && canIssueInvoiceLifecycle;
+  const showMobileIssueSendCard = isMobileWorkspace && isDraft && !billingDispositionResolved;
   const effectiveBanner = !banner && invalidRequestedInvoiceSelection
     ? "internal_invoice_selection_invalid"
     : banner;
@@ -856,7 +877,10 @@ export default async function InternalInvoiceWorkspacePage({
             </div>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Link href={`/jobs/${jobId}?tab=info#internal-invoice-panel`} className={secondaryButtonClass}>
+            <Link
+              href={isMobileWorkspace ? `/jobs/${jobId}?tab=ops` : `/jobs/${jobId}?tab=info#internal-invoice-panel`}
+              className={secondaryButtonClass}
+            >
               Back to Job
             </Link>
             {invoice ? (
@@ -965,7 +989,13 @@ export default async function InternalInvoiceWorkspacePage({
           </div>
         </section>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.32fr)_minmax(22rem,0.68fr)]">
+        <div
+          className={
+            isMobileWorkspace
+              ? "flex flex-col gap-5"
+              : "grid gap-5 xl:grid-cols-[minmax(0,1.32fr)_minmax(22rem,0.68fr)]"
+          }
+        >
           <main className="flex flex-col gap-5">
             <section id="invoice-charges" className={`${panelClass} order-40 p-4 sm:p-5`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1003,6 +1033,7 @@ export default async function InternalInvoiceWorkspacePage({
                   workspaceInputClass={inputClass}
                   primaryButtonClass={primaryButtonClass}
                   secondaryButtonClass={secondaryButtonClass}
+                  isMobileWorkspace={isMobileWorkspace}
                 />
               ) : (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/75">
@@ -1456,6 +1487,61 @@ export default async function InternalInvoiceWorkspacePage({
           </main>
 
           <aside className="space-y-5">
+            {showMobileIssueSendCard ? (
+              <section className={`${panelClass} p-4`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Issue &amp; Send</div>
+                {mobileReadinessBlockers.length > 0 ? (
+                  <div className="mt-3 space-y-1.5">
+                    {mobileReadinessBlockers.map((check) => (
+                      <div
+                        key={check.label}
+                        className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-900"
+                      >
+                        <span aria-hidden className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                        <span>
+                          <span className="font-semibold">{check.label}:</span> {check.needed}
+                        </span>
+                      </div>
+                    ))}
+                    <p className="pt-1 text-xs text-slate-500">Resolve the above to issue and send.</p>
+                  </div>
+                ) : canMobileCompoundIssueSend ? (
+                  <form action={issueAndSendInternalInvoiceFromForm} className="mt-3">
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={mobileReturnTo} />
+                    <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
+                      Sending to <span className="font-semibold text-slate-900">{invoice.billing_name}</span>
+                      <span className="block text-xs text-slate-500">{invoice.billing_email}</span>
+                    </div>
+                    <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`}>
+                      Issue &amp; Send Invoice
+                    </SubmitButton>
+                  </form>
+                ) : canMobileIssueOnly ? (
+                  <form action={issueInternalInvoiceFromForm} className="mt-3">
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={mobileReturnTo} />
+                    <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`}>
+                      Issue Invoice
+                    </SubmitButton>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {!recipientEmailReady
+                        ? "No email on file — invoice will be issued but not sent."
+                        : "Invoice send authority is not available for your role."}
+                    </p>
+                  </form>
+                ) : (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-600">
+                    Invoice issue authority is not available for your current role.
+                  </div>
+                )}
+              </section>
+            ) : null}
+            {!showMobileIssueSendCard ? (
             <section className={`${panelClass} p-4 sm:p-5`}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Issue Readiness</div>
               <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
@@ -1491,6 +1577,7 @@ export default async function InternalInvoiceWorkspacePage({
                 </div>
               )}
             </section>
+            ) : null}
 
             <section className={`${panelClass} p-4 sm:p-5`}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Billing Recipient</div>

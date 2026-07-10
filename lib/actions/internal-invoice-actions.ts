@@ -1725,6 +1725,66 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
   });
 }
 
+type LoadedInternalInvoiceContext = Awaited<ReturnType<typeof loadInternalInvoiceContext>>;
+
+// Slice B: issue mutation core, shared by issueInternalInvoiceFromForm and the
+// compound issueAndSendInternalInvoiceFromForm. Callers must run readiness checks
+// (recipient, charges, total, job closeout) and access gates BEFORE invoking.
+// This performs the mutation only — no revalidate, no redirect.
+async function applyInternalInvoiceIssueMutation(context: LoadedInternalInvoiceContext) {
+  const invoice = context.invoice;
+  if (!invoice) throw new Error('Invoice is required to issue.');
+
+  const issuedAt = new Date().toISOString();
+  const previousOpsStatus = String(context.job.ops_status ?? '').trim() || null;
+
+  const { error: invoiceErr } = await context.supabase
+    .from('internal_invoices')
+    .update({
+      status: 'issued',
+      issued_at: issuedAt,
+      issued_by_user_id: context.userId,
+      updated_by_user_id: context.userId,
+      updated_at: issuedAt,
+    })
+    .eq('id', invoice.id)
+    .eq('status', 'draft');
+
+  if (invoiceErr) throw invoiceErr;
+
+  const { error: jobErr } = await context.supabase
+    .from('jobs')
+    .update({
+      invoice_complete: true,
+      invoice_number: invoice.invoice_number,
+    })
+    .eq('id', context.jobId);
+
+  if (jobErr) throw jobErr;
+
+  await logInvoiceEvent({
+    supabase: context.supabase,
+    userId: context.userId,
+    jobId: context.jobId,
+    eventType: 'internal_invoice_issued',
+    invoice: {
+      ...invoice,
+      status: 'issued',
+    },
+  });
+
+  await recomputeOpsAfterInvoiceMutation({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    userId: context.userId,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    jobType: context.job.job_type ?? null,
+    serviceCaseId: context.job.service_case_id ?? null,
+    previousOpsStatus,
+    source: 'internal_invoice_issue_recompute',
+  });
+}
+
 export async function issueInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
@@ -1757,54 +1817,7 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issue_incomplete', context.returnTo));
   }
 
-  const issuedAt = new Date().toISOString();
-  const previousOpsStatus = String(context.job.ops_status ?? '').trim() || null;
-
-  const { error: invoiceErr } = await context.supabase
-    .from('internal_invoices')
-    .update({
-      status: 'issued',
-      issued_at: issuedAt,
-      issued_by_user_id: context.userId,
-      updated_by_user_id: context.userId,
-      updated_at: issuedAt,
-    })
-    .eq('id', context.invoice.id)
-    .eq('status', 'draft');
-
-  if (invoiceErr) throw invoiceErr;
-
-  const { error: jobErr } = await context.supabase
-    .from('jobs')
-    .update({
-      invoice_complete: true,
-      invoice_number: context.invoice.invoice_number,
-    })
-    .eq('id', context.jobId);
-
-  if (jobErr) throw jobErr;
-
-  await logInvoiceEvent({
-    supabase: context.supabase,
-    userId: context.userId,
-    jobId: context.jobId,
-    eventType: 'internal_invoice_issued',
-    invoice: {
-      ...context.invoice,
-      status: 'issued',
-    },
-  });
-
-  await recomputeOpsAfterInvoiceMutation({
-    supabase: context.supabase,
-    jobId: context.jobId,
-    userId: context.userId,
-    accountOwnerUserId: context.internalUser.account_owner_user_id,
-    jobType: context.job.job_type ?? null,
-    serviceCaseId: context.job.service_case_id ?? null,
-    previousOpsStatus,
-    source: 'internal_invoice_issue_recompute',
-  });
+  await applyInternalInvoiceIssueMutation(context);
 
   revalidatePath(`/jobs/${context.jobId}`);
   revalidatePath(`/jobs/${context.jobId}/invoice`);
@@ -2652,39 +2665,22 @@ export async function removeInternalInvoiceLineItemFromForm(formData: FormData):
   });
 }
 
-export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
-  const context = await loadInternalInvoiceContext(formData);
-
-  requireFieldInvoiceSendAccessOrRedirect({
-    actorUserId: context.userId,
-    internalUser: context.internalUser,
-    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
-    explicitCapabilities: context.fieldBillingExplicitCapabilities,
-    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
-  });
-
-  if (!context.invoice) {
-    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
-  }
-
-  if (context.invoice.status !== 'issued') {
-    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_requires_issued', context.returnTo));
-  }
-
-  const recipientEmail = getTrimmedString(formData.get('recipient_email')).toLowerCase() || getTrimmedString(context.invoice.billing_email).toLowerCase();
-
-  if (!recipientEmail) {
-    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_required', context.returnTo));
-  }
-
-  if (!isValidEmail(recipientEmail)) {
-    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_invalid', context.returnTo));
-  }
+// Slice B: email delivery core, shared by sendInternalInvoiceEmailFromForm and the
+// compound issueAndSendInternalInvoiceFromForm. Callers validate access, invoice
+// status, and recipient email BEFORE invoking, and own revalidate/redirect after.
+// Records the queued/sent/failed notification and logs the invoice event; never
+// throws on a send failure — returns { status: 'failed' } instead.
+async function deliverInternalInvoiceEmailForContext(
+  context: LoadedInternalInvoiceContext,
+  recipientEmail: string,
+): Promise<{ attemptKind: InternalInvoiceEmailAttemptKind; status: 'sent' | 'failed' }> {
+  const invoice = context.invoice;
+  if (!invoice) throw new Error('Invoice is required to send.');
 
   const sendHistory = await listInternalInvoiceEmailNotifications({
     supabase: context.supabase,
     jobId: context.jobId,
-    invoiceId: context.invoice.id,
+    invoiceId: invoice.id,
   });
   const successfulSendExists = sendHistory.some((row: any) => String(row?.status ?? '').trim().toLowerCase() === 'sent');
   const attemptKind: InternalInvoiceEmailAttemptKind = successfulSendExists ? 'resent' : 'sent';
@@ -2706,7 +2702,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     .join(' ')
     .trim() || null;
   const shouldLookupContractorGreetingName =
-    !getTrimmedString(context.invoice.billing_name)
+    !getTrimmedString(invoice.billing_name)
     && String(context.job.billing_recipient ?? '').trim().toLowerCase() === 'contractor'
     && !String(context.job.billing_name ?? '').trim();
   const contractorDisplayName = shouldLookupContractorGreetingName
@@ -2717,7 +2713,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
       })
     : null;
   const greetingName = resolveInternalInvoiceGreetingName({
-    invoice: context.invoice,
+    invoice,
     job: context.job,
     contractorDisplayName,
   });
@@ -2725,13 +2721,13 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     supabase: context.supabase,
     accountOwnerUserId: context.internalUser.account_owner_user_id,
     jobId: context.jobId,
-    invoice: context.invoice,
+    invoice,
   });
 
   const invoiceReference = formatInvoiceDisplayReference({
-    invoiceDisplayNumber: context.invoice.invoice_display_number,
-    invoiceNumber: context.invoice.invoice_number,
-    invoiceId: context.invoice.id,
+    invoiceDisplayNumber: invoice.invoice_display_number,
+    invoiceNumber: invoice.invoice_number,
+    invoiceId: invoice.id,
   });
   const subject = `${invoiceReference} from ${tenantIdentity.displayName}`;
   const body = buildInternalInvoiceEmailBody({
@@ -2740,7 +2736,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     supportEmail: tenantIdentity.supportEmail,
     supportPhone: tenantIdentity.supportPhone,
     paymentUrl,
-    invoice: context.invoice,
+    invoice,
     greetingName,
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
@@ -2751,7 +2747,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     supportEmail: tenantIdentity.supportEmail,
     supportPhone: tenantIdentity.supportPhone,
     paymentUrl,
-    invoice: context.invoice,
+    invoice,
     greetingName,
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
@@ -2761,8 +2757,8 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   const queuedDelivery = await insertInternalInvoiceEmailNotification({
     supabase: context.supabase,
     jobId: context.jobId,
-    invoiceId: context.invoice.id,
-    invoiceNumber: context.invoice.invoice_number,
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoice_number,
     recipientEmail,
     subject,
     body: attemptKind === 'resent' ? 'Internal invoice resend queued.' : 'Internal invoice email queued.',
@@ -2793,7 +2789,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
       userId: context.userId,
       jobId: context.jobId,
       eventType: 'internal_invoice_email_failed',
-      invoice: context.invoice,
+      invoice,
       extraMeta: {
         recipient_email: recipientEmail,
         attempt_kind: attemptKind,
@@ -2802,12 +2798,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
       },
     });
 
-    revalidatePath(`/jobs/${context.jobId}`);
-    revalidatePath(`/jobs/${context.jobId}/invoice`);
-    revalidatePath('/jobs');
-    revalidatePath('/ops');
-    revalidatePath('/reports/invoices');
-    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_email_failed', context.returnTo));
+    return { attemptKind, status: 'failed' };
   }
 
   await markInternalInvoiceEmailNotification({
@@ -2821,7 +2812,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     userId: context.userId,
     jobId: context.jobId,
     eventType: attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent',
-    invoice: context.invoice,
+    invoice,
     extraMeta: {
       recipient_email: recipientEmail,
       attempt_kind: attemptKind,
@@ -2829,10 +2820,132 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     },
   });
 
+  return { attemptKind, status: 'sent' };
+}
+
+export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
+  const context = await loadInternalInvoiceContext(formData);
+
+  requireFieldInvoiceSendAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
+  if (!context.invoice) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
+  }
+
+  if (context.invoice.status !== 'issued') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_requires_issued', context.returnTo));
+  }
+
+  const recipientEmail = getTrimmedString(formData.get('recipient_email')).toLowerCase() || getTrimmedString(context.invoice.billing_email).toLowerCase();
+
+  if (!recipientEmail) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_required', context.returnTo));
+  }
+
+  if (!isValidEmail(recipientEmail)) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_invalid', context.returnTo));
+  }
+
+  const deliveryResult = await deliverInternalInvoiceEmailForContext(context, recipientEmail);
+
   revalidatePath(`/jobs/${context.jobId}`);
   revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
   revalidatePath('/reports/invoices');
-  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent', context.returnTo));
+
+  if (deliveryResult.status === 'failed') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_email_failed', context.returnTo));
+  }
+
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, deliveryResult.attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent', context.returnTo));
+}
+
+// Slice B: compound "Issue & Send" for the compressed mobile field flow. Issues the
+// draft invoice and immediately emails it to the billing recipient in one round trip.
+// Additive — the standalone issue and send actions are unchanged. Requires BOTH issue
+// and send authority, and validates all readiness (recipient name + email, charges,
+// total, job closeout) BEFORE mutating, so it never issues when the send would fail
+// for a missing/invalid recipient email.
+export async function issueAndSendInternalInvoiceFromForm(formData: FormData) {
+  const context = await loadInternalInvoiceContext(formData);
+
+  requireFieldInvoiceIssueAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
+  requireFieldInvoiceSendAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
+  if (!context.invoice) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
+  }
+
+  if (context.invoice.status === 'issued') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_already_issued', context.returnTo));
+  }
+
+  if (context.invoice.status === 'void') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_locked', context.returnTo));
+  }
+
+  if (!context.job.field_complete || String(context.job.status ?? '').trim().toLowerCase() !== 'completed') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issue_blocked', context.returnTo));
+  }
+
+  const billingName = getTrimmedString(context.invoice.billing_name);
+  if (!billingName || context.invoice.total_cents <= 0 || (context.invoice.line_items?.length ?? 0) === 0) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issue_incomplete', context.returnTo));
+  }
+
+  // Recipient email is mandatory for the compound action: the send must be able to
+  // succeed before we issue. If it is missing/invalid we redirect WITHOUT mutating.
+  const recipientEmail =
+    getTrimmedString(formData.get('recipient_email')).toLowerCase()
+    || getTrimmedString(context.invoice.billing_email).toLowerCase();
+
+  if (!recipientEmail) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_required', context.returnTo));
+  }
+
+  if (!isValidEmail(recipientEmail)) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_invalid', context.returnTo));
+  }
+
+  // All readiness green — issue, then send.
+  await applyInternalInvoiceIssueMutation(context);
+  // Reflect the issued state on the in-memory invoice so the delivery event meta and
+  // downstream references see 'issued' rather than the stale draft snapshot.
+  context.invoice = { ...context.invoice, status: 'issued' };
+
+  const deliveryResult = await deliverInternalInvoiceEmailForContext(context, recipientEmail);
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+  revalidatePath('/reports/invoices');
+
+  if (deliveryResult.status === 'failed') {
+    // Invoice is issued but the email failed — surface a distinct banner so the user
+    // can Send again from the issued invoice.
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issued_email_failed', context.returnTo));
+  }
+
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issued_and_sent', context.returnTo));
 }

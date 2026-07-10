@@ -73,23 +73,15 @@ const refrigerantChargePhotoEvidencePanelSource = readFileSync(
 );
 
 describe("job tests page wiring", () => {
-  it("keeps Mobile V2 as the canonical mobile default while preserving current fallback", () => {
-    const mobileSelectionStart = jobPageSource.indexOf("const MobileJobDetailMobileComponent = forceCurrentMobileLayout");
-    const mobileSelection = jobPageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
-
-    expect(jobPageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
+  it("keeps Mobile V2 as the only mobile default with the classic surface retired", () => {
+    // Slice B: unconditional V2 selection; classic surface retired but file retained.
+    expect(jobPageSource).toContain("const MobileJobDetailMobileComponent = MobileJobDetailV2Preview;");
     expect(jobPageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
     expect(jobPageSource).not.toContain("buildV2JobDetailRedirectPath");
-    expect(jobPageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
-    expect(jobPageSource).toContain('const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";');
-    expect(jobPageSource).not.toContain("const explicitlyRequestedMobileV2Preview =");
-    expect(jobPageSource).not.toContain("const mobileV2EligibleInternalUser =");
-    expect(jobPageSource).not.toContain("const mobileV2ExplicitPreviewAllowed =");
-    expect(jobPageSource).not.toContain("const mobileV2UniversalDefaultAllowed =");
-    expect(jobPageSource).not.toContain("const mobileV2OwnerDefaultAllowed =");
-    expect(mobileSelectionStart).toBeGreaterThan(-1);
-    expect(mobileSelection).toContain("? MobileJobDetailCurrent");
-    expect(mobileSelection).toContain(": MobileJobDetailV2Preview");
+    expect(jobPageSource).not.toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
+    expect(jobPageSource).not.toContain("const forceCurrentMobileLayout");
+    expect(jobPageSource).not.toContain("const mobileLayoutRaw = sp.mobileLayout;");
+    expect(jobPageSource).not.toContain("? MobileJobDetailCurrent");
     expect(mobileJobDetailCurrentSource).toContain("export default function MobileJobDetailCurrent");
   });
 
