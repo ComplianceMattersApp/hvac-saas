@@ -64,6 +64,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   saved: { tone: "success", message: "Your company details have been saved." },
   display_name_required: { tone: "error", message: "Enter your company name before saving." },
   invalid_support_email: { tone: "error", message: "Enter a valid support email, or leave it blank." },
+  invalid_google_review_url: { tone: "error", message: "Enter a Google review link starting with https://, or leave it blank." },
   invalid_logo_file: { tone: "error", message: "Upload an image file for your logo." },
   logo_too_large: { tone: "error", message: "Logo files must be 5 MB or smaller." },
   save_failed: { tone: "error", message: "We couldn't save your company details. Please try again." },
@@ -456,6 +457,24 @@ export default async function AdminCompanyProfilePage({
                   className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                   placeholder="(209) 555-1234"
                 />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label htmlFor="google_review_url" className="text-sm font-medium text-slate-700">
+                  Google Review Link
+                </label>
+                <input
+                  id="google_review_url"
+                  name="google_review_url"
+                  type="url"
+                  defaultValue={profile?.google_review_url ?? ""}
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  placeholder="https://g.page/r/your-place-id/review"
+                />
+                <p className="text-xs text-slate-500">
+                  Paste your Google Business review link here. When set, a review ask button
+                  appears on completed jobs so you can request reviews from satisfied customers.
+                </p>
               </div>
             </div>
 

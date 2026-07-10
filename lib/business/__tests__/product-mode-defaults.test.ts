@@ -74,6 +74,7 @@ describe("product mode defaults", () => {
       support_email: null,
       support_phone: null,
       logo_url: null,
+      google_review_url: null,
     });
   });
 
@@ -166,6 +167,7 @@ describe("product mode defaults", () => {
       support_email: null,
       support_phone: null,
       logo_url: null,
+      google_review_url: null,
     });
 
     await expect(
@@ -189,6 +191,7 @@ describe("product mode defaults", () => {
       support_email: null,
       support_phone: null,
       logo_url: null,
+      google_review_url: null,
     });
 
     await expect(
@@ -214,6 +217,7 @@ describe("product mode defaults", () => {
         support_email: null,
         support_phone: null,
         logo_url: null,
+        google_review_url: null,
       });
 
       await expect(
@@ -239,6 +243,7 @@ describe("product mode defaults", () => {
       support_email: null,
       support_phone: null,
       logo_url: null,
+      google_review_url: null,
     });
 
     await expect(

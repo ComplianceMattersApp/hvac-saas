@@ -13,6 +13,7 @@ export type InternalBusinessProfile = {
   support_email: string | null;
   support_phone: string | null;
   logo_url: string | null;
+  google_review_url: string | null;
   billing_mode: BillingMode;
   created_at: string;
   updated_at: string;
@@ -23,6 +24,7 @@ export type ResolvedInternalBusinessIdentity = {
   support_email: string | null;
   support_phone: string | null;
   logo_url: string | null;
+  google_review_url: string | null;
 };
 
 const DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME = "Compliance Matters";
@@ -90,6 +92,7 @@ function normalizeInternalBusinessProfileRow(row: any): InternalBusinessProfile 
     support_email: String(row?.support_email ?? "").trim() || null,
     support_phone: String(row?.support_phone ?? "").trim() || null,
     logo_url: String(row?.logo_url ?? "").trim() || null,
+    google_review_url: row?.google_review_url ?? null,
     billing_mode: normalizeBillingMode(String(row?.billing_mode ?? "")),
     created_at: String(row?.created_at ?? "").trim(),
     updated_at: String(row?.updated_at ?? "").trim(),
@@ -108,7 +111,7 @@ export async function getInternalBusinessProfileByAccountOwnerId(params: {
   const { data, error } = await supabase
     .from("internal_business_profiles")
     .select(
-      "account_owner_user_id, display_name, support_email, support_phone, logo_url, billing_mode, created_at, updated_at",
+      "account_owner_user_id, display_name, support_email, support_phone, logo_url, google_review_url, billing_mode, created_at, updated_at",
     )
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
@@ -142,6 +145,7 @@ export async function resolveInternalBusinessIdentityByAccountOwnerId(params: {
       support_email: null,
       support_phone: null,
       logo_url: null,
+      google_review_url: null,
     };
   }
 
@@ -155,6 +159,7 @@ export async function resolveInternalBusinessIdentityByAccountOwnerId(params: {
     support_email: profile?.support_email ?? null,
     support_phone: profile?.support_phone ?? null,
     logo_url: profile?.logo_url ?? null,
+    google_review_url: profile?.google_review_url ?? null,
   };
 }
 
