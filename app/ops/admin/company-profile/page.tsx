@@ -27,6 +27,9 @@ import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-acce
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
+import { getQboAvailability } from "@/lib/qbo/qbo-env";
+import { getQboConnectionForAccount } from "@/lib/qbo/qbo-connection";
+import { QboIntegrationSection } from "./_components/QboIntegrationSection";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 import { SettingsSection } from "./_components/SettingsSection";
 import { SectionForm } from "./_components/SectionForm";
@@ -74,6 +77,11 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
     tone: "warn",
     message: "We couldn't refresh the latest online payment setup status just now. The last saved setup state is shown below.",
   },
+  qbo_connected: { tone: "success", message: "QuickBooks Online connected successfully." },
+  qbo_connect_failed: { tone: "error", message: "Could not connect to QuickBooks Online. Please try again." },
+  qbo_disconnected: { tone: "success", message: "QuickBooks Online disconnected." },
+  qbo_sync_complete: { tone: "success", message: "QuickBooks sync complete." },
+  qbo_not_configured: { tone: "warn", message: "QuickBooks Online is not configured for this environment." },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -202,6 +210,16 @@ export default async function AdminCompanyProfilePage({
         ? { kind: "count", count: eccConnectedCount }
         : undefined;
   const platformBillingAvailability = getPlatformBillingAvailability();
+
+  // QBO Integrations section. The read is defensive (returns null if the table
+  // is missing or unreadable) so QBO never blocks the Company Profile page.
+  const qboAvailable = getQboAvailability().available;
+  let qboConnection: Awaited<ReturnType<typeof getQboConnectionForAccount>> = null;
+  try {
+    qboConnection = await getQboConnectionForAccount({ supabase, accountOwnerUserId: ownerId });
+  } catch {
+    qboConnection = null;
+  }
 
   // Rail state at a glance (design turn 14a): green dot = complete,
   // amber + count = needs attention. Derived from readiness so the source of
@@ -583,6 +601,13 @@ export default async function AdminCompanyProfilePage({
 
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
               </div>
+            ),
+          },
+          {
+            id: "integrations",
+            label: "Integrations",
+            content: (
+              <QboIntegrationSection qboConnection={qboConnection} qboAvailable={qboAvailable} />
             ),
           },
           {
