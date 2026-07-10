@@ -34,6 +34,7 @@ function buildFixture(options: FixtureOptions = {}) {
   const existingLogoUrl = options.existingLogoUrl ?? "storage://attachments/company-profile/owner-1/existing-logo.png";
 
   const profileWrites: Array<Record<string, unknown>> = [];
+  const profileUpdates: Array<Record<string, unknown>> = [];
   const storageUploads: Array<{ path: string }> = [];
   const storageRemoves: Array<{ paths: string[] }> = [];
 
@@ -71,6 +72,12 @@ function buildFixture(options: FixtureOptions = {}) {
             profileWrites.push(payload);
             return { error: null };
           }),
+          update: vi.fn((payload: Record<string, unknown>) => ({
+            eq: vi.fn(async () => {
+              profileUpdates.push(payload);
+              return { error: null };
+            }),
+          })),
         };
         return query;
       }
@@ -94,9 +101,17 @@ function buildFixture(options: FixtureOptions = {}) {
   return {
     admin,
     profileWrites,
+    profileUpdates,
     storageUploads,
     storageRemoves,
   };
+}
+
+function buildLogoFormData(file: File) {
+  const formData = new FormData();
+  formData.set("display_name", "Compliance Matters");
+  formData.set("logo_file", file);
+  return formData;
 }
 
 function buildFormData(includeLogo = false) {
@@ -222,5 +237,110 @@ describe("internal business profile scope hardening", () => {
     expect(fixture.profileWrites).toHaveLength(0);
     expect(fixture.storageUploads).toHaveLength(0);
     expect(fixture.storageRemoves).toHaveLength(0);
+  });
+
+  it("rejects a disallowed logo type (gif) before any profile or storage mutation", async () => {
+    const fixture = buildFixture({ preflightAllowed: true });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { saveInternalBusinessProfileFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    const gif = new File(["gif-bytes"], "logo.gif", { type: "image/gif" });
+    await expect(saveInternalBusinessProfileFromForm(buildLogoFormData(gif))).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=invalid_logo_file",
+    );
+
+    expect(fixture.profileWrites).toHaveLength(0);
+    expect(fixture.storageUploads).toHaveLength(0);
+  });
+
+  it("rejects an image/* MIME spoof with a non-image extension", async () => {
+    const fixture = buildFixture({ preflightAllowed: true });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { saveInternalBusinessProfileFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    const spoof = new File(["<html>"], "payload.html", { type: "image/png" });
+    await expect(saveInternalBusinessProfileFromForm(buildLogoFormData(spoof))).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=invalid_logo_file",
+    );
+
+    expect(fixture.profileWrites).toHaveLength(0);
+    expect(fixture.storageUploads).toHaveLength(0);
+  });
+
+  it("rejects a script-bearing SVG logo before any profile or storage mutation", async () => {
+    const fixture = buildFixture({ preflightAllowed: true });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { saveInternalBusinessProfileFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    const unsafeSvg = new File(
+      ['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
+      "logo.svg",
+      { type: "image/svg+xml" },
+    );
+    await expect(saveInternalBusinessProfileFromForm(buildLogoFormData(unsafeSvg))).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=unsafe_logo_file",
+    );
+
+    expect(fixture.profileWrites).toHaveLength(0);
+    expect(fixture.storageUploads).toHaveLength(0);
+  });
+
+  it("accepts a clean SVG logo and reaches the storage upload path", async () => {
+    const fixture = buildFixture({ preflightAllowed: true });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { saveInternalBusinessProfileFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    const cleanSvg = new File(
+      ['<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" /></svg>'],
+      "logo.svg",
+      { type: "image/svg+xml" },
+    );
+    await expect(saveInternalBusinessProfileFromForm(buildLogoFormData(cleanSvg))).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=saved",
+    );
+
+    expect(fixture.profileWrites).toHaveLength(1);
+    expect(fixture.storageUploads).toHaveLength(1);
+  });
+
+  it("allows same-account admin confirmTeamSetupFromForm to stamp team_reviewed_at", async () => {
+    const fixture = buildFixture({ preflightAllowed: true });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { confirmTeamSetupFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(confirmTeamSetupFromForm()).rejects.toThrow(
+      "REDIRECT:/ops/admin/internal-users?team_confirm=confirmed",
+    );
+
+    expect(fixture.profileUpdates).toHaveLength(1);
+    expect(fixture.profileUpdates[0]).toHaveProperty("team_reviewed_at");
+  });
+
+  it("denies cross-account confirmTeamSetupFromForm before the profile update", async () => {
+    const fixture = buildFixture({ preflightAllowed: false });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { confirmTeamSetupFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(confirmTeamSetupFromForm()).rejects.toThrow("REDIRECT:/forbidden");
+
+    expect(fixture.profileUpdates).toHaveLength(0);
   });
 });

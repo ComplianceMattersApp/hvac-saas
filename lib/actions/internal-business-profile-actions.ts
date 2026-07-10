@@ -20,6 +20,27 @@ import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-strip
 
 const MAX_LOGO_FILE_SIZE = 5 * 1024 * 1024;
 
+// Explicit allowlist of the four advertised logo formats (page copy: "PNG, JPG,
+// SVG, or WebP"). Enforced by BOTH MIME type and filename extension so a spoofed
+// image/* MIME (gif/bmp/avif, or an HTML file mislabeled as an image) is rejected.
+const ALLOWED_LOGO_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/svg+xml",
+]);
+const ALLOWED_LOGO_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "svg"]);
+
+// Pragmatic guard against the obvious SVG stored-XSS vectors. Not exhaustive
+// (misses entity-encoded handlers etc.) — the sturdier long-term fix is to serve
+// logos with a restrictive CSP / Content-Disposition or rasterize on upload.
+const SVG_UNSAFE_PATTERN = /<script[\s>/]|<foreignobject[\s>]|on\w+\s*=|javascript:/i;
+
+function logoFileExtension(name: string) {
+  const match = /\.([a-z0-9]+)$/i.exec(String(name ?? "").trim().toLowerCase());
+  return match ? match[1] : "";
+}
+
 function safeFileName(name: string) {
   return String(name ?? "")
     .trim()
@@ -136,12 +157,26 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
 
   const logoFile = isUploadFile(logoFileEntry) && logoFileEntry.size > 0 ? logoFileEntry : null;
 
-  if (logoFile && !String(logoFile.type ?? "").toLowerCase().startsWith("image/")) {
-    redirect(withNotice("invalid_logo_file"));
-  }
+  if (logoFile) {
+    const mimeType = String(logoFile.type ?? "").toLowerCase().trim();
+    const extension = logoFileExtension(logoFile.name);
 
-  if (logoFile && logoFile.size > MAX_LOGO_FILE_SIZE) {
-    redirect(withNotice("logo_too_large"));
+    if (!ALLOWED_LOGO_MIME_TYPES.has(mimeType) || !ALLOWED_LOGO_EXTENSIONS.has(extension)) {
+      redirect(withNotice("invalid_logo_file"));
+    }
+
+    if (logoFile.size > MAX_LOGO_FILE_SIZE) {
+      redirect(withNotice("logo_too_large"));
+    }
+
+    // SVGs are rendered from storage and can carry embedded scripts — scan and
+    // reject the obvious active-content vectors before we ever store the file.
+    if (mimeType === "image/svg+xml" || extension === "svg") {
+      const svgText = await logoFile.text();
+      if (SVG_UNSAFE_PATTERN.test(svgText)) {
+        redirect(withNotice("unsafe_logo_file"));
+      }
+    }
   }
 
   const admin = createAdminClient();
@@ -343,9 +378,18 @@ export async function saveTimeClockAccountSettingFromForm(formData: FormData): P
 
 export async function confirmTeamSetupFromForm(): Promise<void> {
   const supabase = await createClient();
-  const { internalUser } = await requireInternalRole("admin", { supabase });
+  const { userId, internalUser } = await requireInternalRole("admin", { supabase });
 
   const admin = createAdminClient();
+  try {
+    await requireScopedInternalBusinessProfileMutationContext({
+      admin,
+      actorUserId: userId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect("/forbidden");
+  }
 
   const { error } = await admin
     .from("internal_business_profiles")
