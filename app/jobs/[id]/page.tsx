@@ -183,7 +183,8 @@ import {
 } from "@/lib/communications/contact-recipients-read";
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
-import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";
+// Slice B: MobileJobDetailCurrent is retired (no longer rendered). The file is
+// intentionally left in place but unreferenced pending later removal.
 import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";
 import DesktopJobDetailV2Page from "./v2/page";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
@@ -1301,15 +1302,9 @@ export default async function JobDetailPage({
   }
 
   const sp: SearchParams = (searchParams ? await searchParams : {}) ?? {};
-  const mobileLayoutRaw = sp.mobileLayout;
-  const mobileLayout =
-    Array.isArray(mobileLayoutRaw)
-      ? mobileLayoutRaw[0]
-      : typeof mobileLayoutRaw === "string"
-      ? mobileLayoutRaw
-      : "";
-  const mobileLayoutMode = mobileLayout.trim().toLowerCase();
-  const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";
+  // Slice B: the classic mobile surface (MobileJobDetailCurrent) is retired.
+  // V2Preview is the only mobile surface; ?mobileLayout=current|classic no longer
+  // switches components (the param is now inert for mobile selection).
 
   const desktopLayoutRaw = sp.desktopLayout;
   const desktopLayout =
@@ -3610,9 +3605,9 @@ const showCorrectionReviewResolution =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
   const canShowContractorReportPanel =
     isInternalUser && Boolean(contractorId) && ["failed", "pending_info"].includes(String(job.ops_status ?? ""));
-  const MobileJobDetailMobileComponent = forceCurrentMobileLayout
-    ? MobileJobDetailCurrent
-    : MobileJobDetailV2Preview;
+  // Slice B: unconditional V2 mobile surface. MobileJobDetailCurrent remains in
+  // the tree as dead code (intentionally unreachable) pending later removal.
+  const MobileJobDetailMobileComponent = MobileJobDetailV2Preview;
   const desktopV2Params = Promise.resolve({ id: jobId });
   const desktopV2SearchParams = Promise.resolve(sp);
 

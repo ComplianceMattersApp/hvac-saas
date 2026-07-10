@@ -54,6 +54,8 @@ type InternalInvoiceLineItemsTableProps = {
   workspaceInputClass: string;
   primaryButtonClass: string;
   secondaryButtonClass: string;
+  // Slice B: compressed mobile field workspace. Off by default so desktop is unchanged.
+  isMobileWorkspace?: boolean;
 };
 
 function formatCurrencyFromCents(cents?: number | null) {
@@ -203,6 +205,7 @@ export default function InternalInvoiceLineItemsTable({
   workspaceInputClass,
   primaryButtonClass,
   secondaryButtonClass,
+  isMobileWorkspace = false,
 }: InternalInvoiceLineItemsTableProps) {
   const router = useRouter();
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
@@ -546,8 +549,44 @@ export default function InternalInvoiceLineItemsTable({
         ) : null}
 
         {lineItems.map((lineItem, index) => {
-          const isPrimaryRow = index === 0;
+          // Slice B: on mobile no row is auto-expanded; all rows are tap-to-expand.
+          const isPrimaryRow = !isMobileWorkspace && index === 0;
           const isExpanded = isPrimaryRow || expandedAdditionalRowId === lineItem.id;
+          const rowCanInteract = canEditAnyLine || canRemoveLine;
+
+          if (!isExpanded && isMobileWorkspace) {
+            const summaryLine = (
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-slate-950">{lineItem.item_name_snapshot}</div>
+                <div className="mt-0.5 text-xs text-slate-500">
+                  {formatDecimalInput(lineItem.quantity)} × {formatCurrencyFromAmount(lineItem.unit_price)}
+                  {' = '}
+                  <span className="font-semibold text-slate-700">{formatCurrencyFromAmount(lineItem.line_subtotal)}</span>
+                </div>
+              </div>
+            );
+            const trailing = (
+              <span className="shrink-0 text-sm font-semibold text-slate-950">
+                {formatCurrencyFromAmount(lineItem.line_subtotal)}
+              </span>
+            );
+            return rowCanInteract ? (
+              <button
+                key={lineItem.id}
+                type="button"
+                onClick={() => setExpandedAdditionalRowId(lineItem.id)}
+                className="flex w-full items-center justify-between gap-3 bg-white/78 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+              >
+                {summaryLine}
+                {trailing}
+              </button>
+            ) : (
+              <div key={lineItem.id} className="flex items-center justify-between gap-3 bg-white/78 px-4 py-3.5">
+                {summaryLine}
+                {trailing}
+              </div>
+            );
+          }
 
           if (!isExpanded) {
             return (
@@ -593,6 +632,134 @@ export default function InternalInvoiceLineItemsTable({
                       </span>
                     )}
                   </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (isMobileWorkspace) {
+            return (
+              <div key={lineItem.id} className="bg-white/72">
+                <form action={handleUpdateLineItem} className="px-4 py-4">
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+                  <input type="hidden" name="tab" value={tab} />
+                  <input type="hidden" name="line_item_id" value={lineItem.id} />
+
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Line {index + 1}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedAdditionalRowId(null)}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+                    >
+                      Done
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className={workspaceFieldLabelClass}>Item Name</label>
+                      <input
+                        name="item_name_snapshot"
+                        defaultValue={lineItem.item_name_snapshot}
+                        className={workspaceInputClass}
+                        disabled={!canEditDescription}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className={workspaceFieldLabelClass}>Unit Price</label>
+                      <input
+                        name="unit_price"
+                        inputMode="decimal"
+                        defaultValue={formatDecimalInput(lineItem.unit_price)}
+                        className={workspaceInputClass}
+                        disabled={!canEditPrice}
+                        required
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Subtotal</span>
+                      <span className="text-sm font-semibold text-slate-900">{formatCurrencyFromAmount(lineItem.line_subtotal)}</span>
+                    </div>
+
+                    <details className="rounded-lg border border-slate-200 bg-white/70 px-3.5 py-2.5">
+                      <summary className="cursor-pointer list-none text-sm font-semibold text-slate-700">
+                        More details
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Type</label>
+                          <select
+                            name="item_type_snapshot"
+                            defaultValue={lineItem.item_type_snapshot}
+                            className={workspaceInputClass}
+                            disabled={!canEditDescription}
+                          >
+                            <option value="service">Service</option>
+                            <option value="material">Material</option>
+                            <option value="diagnostic">Diagnostic</option>
+                            <option value="adjustment">Adjustment</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Quantity</label>
+                          <input
+                            name="quantity"
+                            inputMode="decimal"
+                            defaultValue={formatDecimalInput(lineItem.quantity)}
+                            className={workspaceInputClass}
+                            disabled={!canEditQuantity}
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className={workspaceFieldLabelClass}>Description / Work Instruction</label>
+                          <textarea
+                            name="description_snapshot"
+                            defaultValue={String(lineItem.description_snapshot ?? '')}
+                            className={`${workspaceInputClass} min-h-[5.5rem]`}
+                            disabled={!canEditDescription}
+                            placeholder="Scope detail, work instruction, or install note"
+                          />
+                        </div>
+                      </div>
+                    </details>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-2">
+                    {canEditAnyLine ? (
+                      <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} flex-1`}>
+                        Save Charge
+                      </SubmitButton>
+                    ) : null}
+                    {canRemoveLine ? (
+                      <button
+                        type="submit"
+                        form={`remove-line-item-${lineItem.id}`}
+                        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+
+                <div className="sr-only">
+                  <form id={`remove-line-item-${lineItem.id}`} action={handleRemoveLineItem}>
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="line_item_id" value={lineItem.id} />
+                  </form>
                 </div>
               </div>
             );
@@ -944,9 +1111,9 @@ export default function InternalInvoiceLineItemsTable({
               <button
                 type="button"
                 onClick={() => setIsAddFormOpen(true)}
-                className={primaryButtonClass}
+                className={`${primaryButtonClass}${isMobileWorkspace ? ' w-full' : ''}`}
               >
-                Add Charge
+                {isMobileWorkspace ? '+ Add Item' : 'Add Charge'}
               </button>
             </div>
           </div>
@@ -959,7 +1126,13 @@ export default function InternalInvoiceLineItemsTable({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-white/88 px-5 py-3.5">
+      <div
+        className={
+          isMobileWorkspace
+            ? "sticky bottom-0 z-10 flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-8px_20px_-16px_rgba(15,23,42,0.4)]"
+            : "flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-white/88 px-5 py-3.5"
+        }
+      >
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Running Total</div>
         <div className="text-sm font-semibold text-slate-950">{formatCurrencyFromCents(totalCents)}</div>
       </div>

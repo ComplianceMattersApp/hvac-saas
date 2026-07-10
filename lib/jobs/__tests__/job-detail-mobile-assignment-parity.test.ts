@@ -90,29 +90,24 @@ const realPreviewWorkspacePatterns = [
 ];
 
 describe("mobile job detail assignment parity", () => {
-  it("defaults canonical mobile job detail to V2 while preserving current mobile fallback", () => {
-    const mobileSelectionStart = pageSource.indexOf("const MobileJobDetailMobileComponent = forceCurrentMobileLayout");
-    const mobileSelection = pageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
-
-    expect(mobileSelectionStart).toBeGreaterThan(-1);
-    expect(pageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
+  it("makes V2 the only mobile job detail surface with the classic mobile surface retired", () => {
+    // Slice B: unconditional V2 selection; the classic surface is retired.
+    expect(pageSource).toContain("const MobileJobDetailMobileComponent = MobileJobDetailV2Preview;");
     expect(pageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
     expect(pageSource).not.toContain("buildV2JobDetailRedirectPath");
-    expect(pageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
-    expect(pageSource).toContain('const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";');
+    expect(pageSource).not.toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
+    expect(pageSource).not.toContain("const forceCurrentMobileLayout");
+    expect(pageSource).not.toContain("const mobileLayoutRaw = sp.mobileLayout;");
+    expect(pageSource).not.toContain("? MobileJobDetailCurrent");
     expect(pageSource).not.toContain("const explicitlyRequestedMobileV2Preview =");
     expect(pageSource).not.toContain("const mobileV2EligibleInternalUser =");
-    expect(pageSource).not.toContain("const mobileV2ExplicitPreviewAllowed =");
-    expect(pageSource).not.toContain("const mobileV2UniversalDefaultAllowed =");
-    expect(pageSource).not.toContain("const mobileV2OwnerDefaultAllowed =");
-    expect(mobileSelection).toContain("? MobileJobDetailCurrent");
-    expect(mobileSelection).toContain(": MobileJobDetailV2Preview");
     expect(pageSource).toContain("<MobileJobDetailMobileComponent");
+    // The classic mobile component file is retained in the tree but unreachable.
+    expect(mobileJobDetailCurrentSource).toContain("export default function MobileJobDetailCurrent");
     expect(mobileJobDetailV2PreviewSource).toContain("export default function MobileJobDetailV2Preview");
     expect(mobileJobDetailV2PreviewSource).toContain("Billing / Closeout");
     expect(mobileJobDetailV2PreviewSource).toContain("No billing action needed yet.");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Preview only");
-    expect(mobileJobDetailCurrentSource).toContain("<MobileJobStatusActionSurface {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobStatusActionSurface {...props} />");
   });
 
@@ -143,7 +138,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";');
     expect(mobileJobDetailV2PreviewSource).not.toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
-    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-invoice-summary-card"');
+    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-work-scope-card"');
     expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobStatusActionSurface {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain("`/jobs/${job.id}/tests`");
     for (const anchor of standardViewAnchors) {
@@ -413,14 +408,14 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('isReadOnlyState');
     expect(mobileJobDetailV2PreviewSource).toContain('"Review billing, closeout, and history from job records."');
     expect(mobileJobDetailV2PreviewSource).toContain("const v2BillingReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-invoice-summary-card`;");
-    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-invoice-summary-card"');
+    expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-work-scope-card"');
     expect(mobileJobDetailV2PreviewSource).toContain("billingPreview.hrefAnchor === \"mobile-invoice-summary-card\"");
     expect(mobileJobDetailV2PreviewSource).toContain("billingPreview.hrefAnchor === \"mobile-next-service-action\"");
     expect(mobileJobDetailV2PreviewSource).toContain("form action={completeDataEntryFromForm}");
     expect(mobileJobDetailV2PreviewSource).toContain('name="return_to" value={v2BillingReturnTo}');
     expect(mobileJobDetailV2PreviewSource).toContain("form action={createInternalInvoiceDraftFromForm}");
     expect(mobileJobDetailV2PreviewSource).toContain('name="auto_import_visit_scope_items" value="1"');
-    expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/invoice#invoice-workspace`}');
+    expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/invoice?mobileLayout=v2#invoice-workspace`}');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-next-service-action"');
     expect(mobileJobDetailV2PreviewSource).not.toContain("props.isEccPermitNeededActive ||\n      Boolean(props.closeoutNeeds?.needsCerts)");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markEccPermitAvailableFromForm}");
