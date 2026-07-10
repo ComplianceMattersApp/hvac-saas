@@ -4,6 +4,7 @@ import {
   type OnTheWayIntentEligibilityResult,
 } from "@/lib/communications/sms-on-the-way-intent-eligibility";
 import { getSmsEligibilityInputsForRecipient } from "@/lib/communications/sms-eligibility-inputs-read";
+import { renderOnTheWayMessageBody } from "@/lib/communications/sms-on-the-way-token-renderer";
 
 type SupabaseLike = {
   from(table: string): any;
@@ -11,7 +12,9 @@ type SupabaseLike = {
 
 const ON_THE_WAY_MESSAGE_CLASS = "on_the_way" as const;
 const ON_THE_WAY_TEMPLATE_KEY = "on_the_way" as const;
-const DECISION_POLICY_VERSION = "f5c-b-on-the-way-intent-create-v1";
+// v2: rows written after real-token rendering carry actual customer/tech/company/appointment
+// values in message_body_snapshot (v1 stored the sample-preview placeholder text).
+const DECISION_POLICY_VERSION = "f5c-b-on-the-way-intent-create-v2-real-tokens";
 
 export type CreateOnTheWayIntentFromEventParams = {
   supabase: SupabaseLike;
@@ -20,6 +23,14 @@ export type CreateOnTheWayIntentFromEventParams = {
   jobId: string | null | undefined;
   jobEventId: string | null | undefined;
   now?: Date;
+  // Real token values for message-body rendering. Optional — when absent, the helper
+  // falls back to the eligibility sample preview (backward compatible with other callers).
+  tokenValues?: {
+    recipientFirstName?: string | null;
+    operatorOrTechName?: string | null;
+    companyName?: string | null;
+    appointmentOrJobContext?: string | null;
+  };
 };
 
 export type CreateOnTheWayIntentFromEventResult = {
@@ -199,7 +210,30 @@ export async function createOnTheWayIntentFromEvent(
     });
   }
 
-  const messageBodySnapshot = asTrimmed(eligibility.messageBodySnapshot);
+  // Default to the eligibility sample preview (placeholder text). When real token values
+  // and the raw template body are available on a ready decision, render the real body.
+  let messageBodySnapshot = asTrimmed(eligibility.messageBodySnapshot);
+
+  if (
+    params.tokenValues &&
+    asTrimmed(eligibility.bodyTemplate) &&
+    eligibility.decisionStatus === "ready"
+  ) {
+    const rendered = asTrimmed(
+      renderOnTheWayMessageBody(String(eligibility.bodyTemplate), {
+        recipientFirstName: asTrimmed(params.tokenValues.recipientFirstName) || "there",
+        operatorOrTechName: asTrimmed(params.tokenValues.operatorOrTechName) || "your technician",
+        companyName: asTrimmed(params.tokenValues.companyName) || "our team",
+        appointmentOrJobContext:
+          asTrimmed(params.tokenValues.appointmentOrJobContext) || "your service appointment",
+      }),
+    );
+
+    if (rendered) {
+      messageBodySnapshot = rendered;
+    }
+  }
+
   if (!messageBodySnapshot) {
     return writeSkippedResult({
       eligibility,

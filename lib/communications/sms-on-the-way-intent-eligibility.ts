@@ -46,6 +46,7 @@ export type OnTheWayIntentEligibilityResult = {
   messageClass: "on_the_way";
   templateKey: "on_the_way";
   templateVersion?: number;
+  bodyTemplate: string | null; // Raw template body with {{token}} placeholders (for real rendering)
   messageBodySnapshot?: string;
   recipientRef?: string;
   jobEventId: string;
@@ -105,6 +106,7 @@ function emptyResult(input: {
     warnings: [],
     messageClass: ON_THE_WAY_MESSAGE_CLASS,
     templateKey: ON_THE_WAY_TEMPLATE_KEY,
+    bodyTemplate: null,
     jobEventId: input.jobEventId,
     jobId: input.jobId,
     providerReady: false,
@@ -379,6 +381,7 @@ export async function evaluateOnTheWayIntentEligibility(
   } else {
     result.templateReady = true;
     result.templateVersion = selectedTemplateVersion.versionNumber ?? undefined;
+    result.bodyTemplate = selectedTemplateVersion.bodyTemplate ?? null;
     result.messageBodySnapshot = selectedTemplateVersion.samplePreview;
   }
 
