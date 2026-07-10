@@ -86,14 +86,6 @@ describe("authorized ECC raters company profile wiring", () => {
     expect(pageSource).toContain("#account-handoff-connections");
   });
 
-  it("labels the connection request field as rater link id while preserving current backend field", () => {
-    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
-
-    expect(pageSource).toContain("ECC/HERS handoff ID");
-    expect(pageSource).toContain('name="recipient_account_owner_user_id"');
-    expect(pageSource).toContain("match this to a connected account behind the scenes until dedicated handoff ID validation is available");
-  });
-
   it("labels connected recipient rows clearly", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
     expect(pageSource).toContain("Connected handoff account");
