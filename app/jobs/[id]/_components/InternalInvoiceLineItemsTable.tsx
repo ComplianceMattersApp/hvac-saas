@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { ChevronRight } from 'lucide-react';
 import SubmitButton from '@/components/SubmitButton';
 import type { InternalInvoiceItemType, InternalInvoiceLineItemRecord } from '@/lib/business/internal-invoice';
 import type { FieldBillingCapabilities } from '@/lib/auth/field-billing-access';
@@ -10,6 +11,7 @@ import type {
   FieldPricebookNameCheckResult,
   FieldPricebookSaveResult,
 } from '@/lib/actions/field-pricebook-actions';
+import { computeLiveSubtotal } from '@/lib/business/internal-invoice-live-subtotal';
 
 type InternalInvoiceActionResult = {
   ok: boolean;
@@ -188,6 +190,378 @@ export function InternalInvoiceDraftSaveForm(props: {
         </div>
       ) : null}
       {children}
+    </form>
+  );
+}
+
+// Shared "More details" disclosure trigger for the desktop edit + manual-add
+// forms. The mobile edit form keeps its own inline <details> and is
+// intentionally not routed through this helper (per Lane 3 boundaries).
+function MoreDetailsSummary() {
+  return (
+    <summary className="mt-2 flex list-none cursor-pointer select-none items-center gap-1 text-xs text-slate-500 transition-colors hover:text-slate-700 [&::-webkit-details-marker]:hidden">
+      <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+      More details — type, quantity, notes
+    </summary>
+  );
+}
+
+const INTERNAL_INVOICE_TYPE_OPTIONS = (
+  <>
+    <option value="service">Service</option>
+    <option value="material">Material</option>
+    <option value="diagnostic">Diagnostic</option>
+    <option value="adjustment">Adjustment</option>
+    <option value="other">Other</option>
+  </>
+);
+
+type DesktopLineItemEditFormProps = {
+  lineItem: InternalInvoiceLineItemRecord;
+  index: number;
+  isPrimaryRow: boolean;
+  jobId: string;
+  selectedInvoiceId: string;
+  tab: string;
+  handleUpdateLineItem: (formData: FormData) => void | Promise<void>;
+  handleRemoveLineItem: (formData: FormData) => void | Promise<void>;
+  onHideDetails: () => void;
+  canEditDescription: boolean;
+  canEditQuantity: boolean;
+  canEditPrice: boolean;
+  canEditAnyLine: boolean;
+  canRemoveLine: boolean;
+  workspaceFieldLabelClass: string;
+  workspaceInputClass: string;
+  secondaryButtonClass: string;
+};
+
+// Lane 3: desktop charge edit form with progressive disclosure. Item Name +
+// Unit Price + live Subtotal stay in Tier 1; Type / Quantity / Description
+// collapse behind "More details". Extracted from the row map so each row owns
+// its own live-subtotal state (hooks cannot live inside .map()).
+function DesktopLineItemEditForm({
+  lineItem,
+  index,
+  isPrimaryRow,
+  jobId,
+  selectedInvoiceId,
+  tab,
+  handleUpdateLineItem,
+  handleRemoveLineItem,
+  onHideDetails,
+  canEditDescription,
+  canEditQuantity,
+  canEditPrice,
+  canEditAnyLine,
+  canRemoveLine,
+  workspaceFieldLabelClass,
+  workspaceInputClass,
+  secondaryButtonClass,
+}: DesktopLineItemEditFormProps) {
+  const priceRef = useRef<HTMLInputElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
+  const [liveSubtotal, setLiveSubtotal] = useState<number | null>(
+    () => Number(lineItem.unit_price) * Number(lineItem.quantity),
+  );
+
+  // Open the disclosure automatically when it would otherwise hide real data:
+  // a non-Service type, a quantity other than 1, or an existing description.
+  const hasNonDefaultDetails =
+    lineItem.item_type_snapshot !== 'service'
+    || Number(lineItem.quantity) !== 1
+    || Boolean(lineItem.description_snapshot?.trim());
+
+  function recomputeLiveSubtotal() {
+    const price = priceRef.current?.value ?? '';
+    // Quantity lives behind the disclosure; when untouched/blank use the server
+    // default of 1 so the preview matches what will actually be saved.
+    const qty = quantityRef.current?.value.trim() || '1';
+    setLiveSubtotal(computeLiveSubtotal(price, qty));
+  }
+
+  async function saveWithLivePreviewReset(formData: FormData) {
+    await handleUpdateLineItem(formData);
+    // Authoritative subtotal returns via router.refresh(); drop the preview.
+    setLiveSubtotal(null);
+  }
+
+  const subtotalDisplay =
+    liveSubtotal !== null
+      ? formatCurrencyFromCents(Math.round(liveSubtotal * 100))
+      : formatCurrencyFromAmount(lineItem.line_subtotal);
+
+  return (
+    <div className="bg-white/72">
+      <form action={saveWithLivePreviewReset} className="px-5 py-5">
+        <input type="hidden" name="job_id" value={jobId} />
+        <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+        <input type="hidden" name="tab" value={tab} />
+        <input type="hidden" name="line_item_id" value={lineItem.id} />
+
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line {index + 1}</div>
+            <div className="mt-1 text-xs text-slate-500">{isPrimaryRow ? 'Main invoice charge' : 'Editing details'}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!isPrimaryRow ? (
+              <button
+                type="button"
+                onClick={onHideDetails}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition-[background-color,border-color,transform] hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
+              >
+                Hide Details
+              </button>
+            ) : null}
+            <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:hidden">
+              {subtotalDisplay}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className={workspaceFieldLabelClass}>Item Name</label>
+            <input
+              name="item_name_snapshot"
+              defaultValue={lineItem.item_name_snapshot}
+              className={workspaceInputClass}
+              disabled={!canEditDescription}
+              required
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
+            <div>
+              <label className={workspaceFieldLabelClass}>Unit Price</label>
+              <input
+                ref={priceRef}
+                name="unit_price"
+                inputMode="decimal"
+                defaultValue={formatDecimalInput(lineItem.unit_price)}
+                onChange={recomputeLiveSubtotal}
+                className={workspaceInputClass}
+                disabled={!canEditPrice}
+                required
+              />
+            </div>
+
+            <div>
+              <label className={workspaceFieldLabelClass}>Subtotal</label>
+              <div className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold text-slate-900">
+                {subtotalDisplay}
+              </div>
+            </div>
+          </div>
+
+          <details className="group" open={hasNonDefaultDetails}>
+            <MoreDetailsSummary />
+            <div className="mt-3 grid gap-4 sm:grid-cols-2 sm:items-start">
+              <div>
+                <label className={workspaceFieldLabelClass}>Type</label>
+                <select
+                  name="item_type_snapshot"
+                  defaultValue={lineItem.item_type_snapshot}
+                  className={workspaceInputClass}
+                  disabled={!canEditDescription}
+                >
+                  {INTERNAL_INVOICE_TYPE_OPTIONS}
+                </select>
+              </div>
+
+              <div>
+                <label className={workspaceFieldLabelClass}>Quantity</label>
+                <input
+                  ref={quantityRef}
+                  name="quantity"
+                  inputMode="decimal"
+                  defaultValue={formatDecimalInput(lineItem.quantity)}
+                  onChange={recomputeLiveSubtotal}
+                  className={workspaceInputClass}
+                  disabled={!canEditQuantity}
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className={workspaceFieldLabelClass}>Description / Work Instruction</label>
+                <textarea
+                  name="description_snapshot"
+                  defaultValue={String(lineItem.description_snapshot ?? '')}
+                  className={`${workspaceInputClass} min-h-[5.5rem]`}
+                  disabled={!canEditDescription}
+                  placeholder="Scope detail, work instruction, or install note"
+                />
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
+          <div className="text-xs text-slate-500">
+            {canEditAnyLine
+              ? 'Save after editing this row to keep totals and issued charges in sync.'
+              : 'This row is read-only for edits under your current direct invoice permissions.'}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {canEditAnyLine ? (
+              <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
+                Save Charge
+              </SubmitButton>
+            ) : null}
+            {canRemoveLine ? (
+              <button
+                type="submit"
+                form={`remove-line-item-${lineItem.id}`}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
+              >
+                Remove Charge
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </form>
+
+      <div className="sr-only">
+        <form id={`remove-line-item-${lineItem.id}`} action={handleRemoveLineItem}>
+          <input type="hidden" name="job_id" value={jobId} />
+          <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+          <input type="hidden" name="tab" value={tab} />
+          <input type="hidden" name="line_item_id" value={lineItem.id} />
+        </form>
+      </div>
+    </div>
+  );
+}
+
+type ManualAddChargeFormProps = {
+  handleAddManual: (formData: FormData) => void | Promise<void>;
+  jobId: string;
+  selectedInvoiceId: string;
+  tab: string;
+  workspaceFieldLabelClass: string;
+  workspaceInputClass: string;
+  secondaryButtonClass: string;
+};
+
+// Lane 3: manual-add charge form with progressive disclosure. Charge name +
+// Unit Price + live Subtotal in Tier 1; Type / Quantity / Description behind
+// "More details". Slice C snapshot field names (item_name_snapshot, unit_price,
+// item_type_snapshot) are preserved for the save-to-pricebook suggestion.
+function ManualAddChargeForm({
+  handleAddManual,
+  jobId,
+  selectedInvoiceId,
+  tab,
+  workspaceFieldLabelClass,
+  workspaceInputClass,
+  secondaryButtonClass,
+}: ManualAddChargeFormProps) {
+  const priceRef = useRef<HTMLInputElement>(null);
+  const quantityRef = useRef<HTMLInputElement>(null);
+  const [liveSubtotal, setLiveSubtotal] = useState<number | null>(null);
+
+  function recomputeLiveSubtotal() {
+    const price = priceRef.current?.value ?? '';
+    const qty = quantityRef.current?.value.trim() || '1';
+    setLiveSubtotal(computeLiveSubtotal(price, qty));
+  }
+
+  // The manual-add form unmounts on a successful add (isAddFormOpen flips to
+  // false), so the live-subtotal preview resets to null on next open without an
+  // explicit wrapper — keeping the action wired straight to handleAddManual.
+  return (
+    <form action={handleAddManual} className="rounded-xl border border-slate-200 bg-white/90 px-4 py-4">
+      <input type="hidden" name="job_id" value={jobId} />
+      <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+      <input type="hidden" name="tab" value={tab} />
+      <div className="text-sm font-semibold text-slate-950">Manual Charge</div>
+      <div className="mt-1 text-xs leading-5 text-slate-500">
+        Type a one-off invoice charge when the Pricebook does not have the item you need.
+      </div>
+      <div className="mt-4 space-y-3">
+        <div>
+          <label htmlFor="manual_invoice_item_name" className={workspaceFieldLabelClass}>
+            Charge name
+          </label>
+          <input
+            id="manual_invoice_item_name"
+            name="item_name_snapshot"
+            placeholder="Type invoice charge..."
+            className={workspaceInputClass}
+            required
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 sm:items-start">
+          <div>
+            <label htmlFor="manual_invoice_unit_price" className={workspaceFieldLabelClass}>
+              Unit Price
+            </label>
+            <input
+              id="manual_invoice_unit_price"
+              ref={priceRef}
+              name="unit_price"
+              inputMode="decimal"
+              placeholder="0.00"
+              onChange={recomputeLiveSubtotal}
+              className={workspaceInputClass}
+              required
+            />
+          </div>
+
+          <div>
+            <label className={workspaceFieldLabelClass}>Subtotal</label>
+            <div className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold text-slate-900">
+              {liveSubtotal !== null ? formatCurrencyFromCents(Math.round(liveSubtotal * 100)) : '—'}
+            </div>
+          </div>
+        </div>
+
+        <details className="group">
+          <MoreDetailsSummary />
+          <div className="mt-3 space-y-3">
+            <div>
+              <label htmlFor="manual_invoice_item_type" className={workspaceFieldLabelClass}>
+                Type
+              </label>
+              <select id="manual_invoice_item_type" name="item_type_snapshot" className={workspaceInputClass} defaultValue="service">
+                {INTERNAL_INVOICE_TYPE_OPTIONS}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="manual_invoice_quantity" className={workspaceFieldLabelClass}>
+                Quantity
+              </label>
+              <input
+                id="manual_invoice_quantity"
+                ref={quantityRef}
+                name="quantity"
+                inputMode="decimal"
+                defaultValue="1.00"
+                onChange={recomputeLiveSubtotal}
+                className={workspaceInputClass}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="manual_invoice_description" className={workspaceFieldLabelClass}>
+                Description
+              </label>
+              <textarea
+                id="manual_invoice_description"
+                name="description_snapshot"
+                className={`${workspaceInputClass} min-h-[5rem]`}
+                placeholder="Optional charge detail"
+              />
+            </div>
+          </div>
+        </details>
+      </div>
+      <SubmitButton loadingText="Adding..." className={`${secondaryButtonClass} mt-4 w-full`}>
+        Add Manual Charge
+      </SubmitButton>
     </form>
   );
 }
@@ -870,139 +1244,26 @@ export default function InternalInvoiceLineItemsTable({
           }
 
           return (
-            <div key={lineItem.id} className="bg-white/72">
-              <form action={handleUpdateLineItem} className="px-5 py-5">
-                <input type="hidden" name="job_id" value={jobId} />
-                <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
-                <input type="hidden" name="tab" value={tab} />
-                <input type="hidden" name="line_item_id" value={lineItem.id} />
-
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Line {index + 1}</div>
-                    <div className="mt-1 text-xs text-slate-500">{isPrimaryRow ? 'Main invoice charge' : 'Editing details'}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!isPrimaryRow ? (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedAdditionalRowId(null)}
-                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 transition-[background-color,border-color,transform] hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
-                      >
-                        Hide Details
-                      </button>
-                    ) : null}
-                    <div className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 md:hidden">
-                      {formatCurrencyFromAmount(lineItem.line_subtotal)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)] md:items-start">
-                  <div>
-                    <label className={workspaceFieldLabelClass}>Item Name</label>
-                    <input
-                      name="item_name_snapshot"
-                      defaultValue={lineItem.item_name_snapshot}
-                      className={workspaceInputClass}
-                      disabled={!canEditDescription}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className={workspaceFieldLabelClass}>Type</label>
-                    <select
-                      name="item_type_snapshot"
-                      defaultValue={lineItem.item_type_snapshot}
-                      className={workspaceInputClass}
-                      disabled={!canEditDescription}
-                    >
-                      <option value="service">Service</option>
-                      <option value="material">Material</option>
-                      <option value="diagnostic">Diagnostic</option>
-                      <option value="adjustment">Adjustment</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className={workspaceFieldLabelClass}>Quantity</label>
-                    <input
-                      name="quantity"
-                      inputMode="decimal"
-                      defaultValue={formatDecimalInput(lineItem.quantity)}
-                      className={workspaceInputClass}
-                      disabled={!canEditQuantity}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className={workspaceFieldLabelClass}>Unit Price</label>
-                    <input
-                      name="unit_price"
-                      inputMode="decimal"
-                      defaultValue={formatDecimalInput(lineItem.unit_price)}
-                      className={workspaceInputClass}
-                      disabled={!canEditPrice}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className={workspaceFieldLabelClass}>Subtotal</label>
-                    <div className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm font-semibold text-slate-900">
-                      {formatCurrencyFromAmount(lineItem.line_subtotal)}
-                    </div>
-                  </div>
-
-                  <div className="md:col-span-5">
-                    <label className={workspaceFieldLabelClass}>Description / Work Instruction</label>
-                    <textarea
-                      name="description_snapshot"
-                      defaultValue={String(lineItem.description_snapshot ?? '')}
-                      className={`${workspaceInputClass} min-h-[5.5rem]`}
-                      disabled={!canEditDescription}
-                      placeholder="Scope detail, work instruction, or install note"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
-                  <div className="text-xs text-slate-500">
-                    {canEditAnyLine
-                      ? 'Save after editing this row to keep totals and issued charges in sync.'
-                      : 'This row is read-only for edits under your current direct invoice permissions.'}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {canEditAnyLine ? (
-                      <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
-                        Save Charge
-                      </SubmitButton>
-                    ) : null}
-                    {canRemoveLine ? (
-                      <button
-                        type="submit"
-                        form={`remove-line-item-${lineItem.id}`}
-                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
-                      >
-                        Remove Charge
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </form>
-
-              <div className="sr-only">
-                <form id={`remove-line-item-${lineItem.id}`} action={handleRemoveLineItem}>
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
-                  <input type="hidden" name="tab" value={tab} />
-                  <input type="hidden" name="line_item_id" value={lineItem.id} />
-                </form>
-              </div>
-            </div>
+            <DesktopLineItemEditForm
+              key={lineItem.id}
+              lineItem={lineItem}
+              index={index}
+              isPrimaryRow={isPrimaryRow}
+              jobId={jobId}
+              selectedInvoiceId={selectedInvoiceId}
+              tab={tab}
+              handleUpdateLineItem={handleUpdateLineItem}
+              handleRemoveLineItem={handleRemoveLineItem}
+              onHideDetails={() => setExpandedAdditionalRowId(null)}
+              canEditDescription={canEditDescription}
+              canEditQuantity={canEditQuantity}
+              canEditPrice={canEditPrice}
+              canEditAnyLine={canEditAnyLine}
+              canRemoveLine={canRemoveLine}
+              workspaceFieldLabelClass={workspaceFieldLabelClass}
+              workspaceInputClass={workspaceInputClass}
+              secondaryButtonClass={secondaryButtonClass}
+            />
           );
         })}
 
@@ -1155,83 +1416,15 @@ export default function InternalInvoiceLineItemsTable({
               ) : null}
 
               {canAddManualLine ? (
-                <form action={handleAddManual} className="rounded-xl border border-slate-200 bg-white/90 px-4 py-4">
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
-                  <input type="hidden" name="tab" value={tab} />
-                  <div className="text-sm font-semibold text-slate-950">Manual Charge</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-500">
-                    Type a one-off invoice charge when the Pricebook does not have the item you need.
-                  </div>
-                  <div className="mt-4 grid gap-3">
-                    <div>
-                      <label htmlFor="manual_invoice_item_name" className={workspaceFieldLabelClass}>
-                        Charge name
-                      </label>
-                      <input
-                        id="manual_invoice_item_name"
-                        name="item_name_snapshot"
-                        placeholder="Type invoice charge..."
-                        className={workspaceInputClass}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="manual_invoice_item_type" className={workspaceFieldLabelClass}>
-                        Type
-                      </label>
-                      <select id="manual_invoice_item_type" name="item_type_snapshot" className={workspaceInputClass} defaultValue="service">
-                        <option value="service">Service</option>
-                        <option value="material">Material</option>
-                        <option value="diagnostic">Diagnostic</option>
-                        <option value="adjustment">Adjustment</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label htmlFor="manual_invoice_quantity" className={workspaceFieldLabelClass}>
-                          Quantity
-                        </label>
-                        <input
-                          id="manual_invoice_quantity"
-                          name="quantity"
-                          inputMode="decimal"
-                          defaultValue="1.00"
-                          className={workspaceInputClass}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="manual_invoice_unit_price" className={workspaceFieldLabelClass}>
-                          Unit Price
-                        </label>
-                        <input
-                          id="manual_invoice_unit_price"
-                          name="unit_price"
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          className={workspaceInputClass}
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="manual_invoice_description" className={workspaceFieldLabelClass}>
-                        Description
-                      </label>
-                      <textarea
-                        id="manual_invoice_description"
-                        name="description_snapshot"
-                        className={`${workspaceInputClass} min-h-[5rem]`}
-                        placeholder="Optional charge detail"
-                      />
-                    </div>
-                  </div>
-                  <SubmitButton loadingText="Adding..." className={`${secondaryButtonClass} mt-4 w-full`}>
-                    Add Manual Charge
-                  </SubmitButton>
-                </form>
+                <ManualAddChargeForm
+                  handleAddManual={handleAddManual}
+                  jobId={jobId}
+                  selectedInvoiceId={selectedInvoiceId}
+                  tab={tab}
+                  workspaceFieldLabelClass={workspaceFieldLabelClass}
+                  workspaceInputClass={workspaceInputClass}
+                  secondaryButtonClass={secondaryButtonClass}
+                />
               ) : null}
             </div>
           </div>

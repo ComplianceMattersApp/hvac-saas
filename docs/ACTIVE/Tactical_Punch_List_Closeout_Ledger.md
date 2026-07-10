@@ -7,6 +7,24 @@ Authority: governed by [Documentation_Authority_Map.md](./Documentation_Authorit
 
 Control-plane rule: record minor UI polish, low-risk regressions, duplicate-submit/pending-state fixes, tactical performance fixes, and small punch-list completions here with concise commit evidence and guardrails. Do not use this ledger for durable model contracts, launch gates, roadmap sequencing, production runbook execution, or historical lane consolidation. If a tactical fix changes current product truth, add only a short Spine summary with a backlink here.
 
+## July 2026 Invoice Charge Form Progressive Disclosure Closeout
+
+Status: CLOSED for the July 9, 2026 implementation slice. Merged to `main` via `--no-ff` from `lane3-charge-form-progressive-disclosure`.
+
+Scope: desktop + manual-add port of the mobile "More details" progressive-disclosure pattern on the invoice charge forms, plus a client-only live subtotal preview. UI-only; no server action, schema, migration, Supabase, Stripe, payment, or invoice truth-model change.
+
+- Implementation commit: `8dfdd3b7` (`feat(invoice): Lane 3 — progressive disclosure on charge entry`).
+- Evidence files: `app/jobs/[id]/_components/InternalInvoiceLineItemsTable.tsx`, `lib/business/internal-invoice-live-subtotal.ts` (new pure helper), `lib/jobs/__tests__/internal-invoice-live-subtotal.test.ts` (new).
+- Closed behavior — the desktop charge edit form and the manual-add form (both surfaces) now show Item Name + Unit Price + a live Subtotal in Tier 1 and collapse Type / Quantity / Description behind a `More details` `<details>` disclosure. The desktop edit disclosure auto-opens when it would otherwise hide real data (type != service, qty != 1, or an existing description). `required` was removed from Quantity when it moves behind the disclosure (server already defaults blank qty to 1); Item Name and Unit Price stay required and visible, so no required control is ever hidden behind a closed `<details>`.
+- Closed behavior — the per-line live subtotal is a client-only preview via the pure `computeLiveSubtotal` helper; it never affects submitted data and resets to the authoritative server value after save via `router.refresh()`.
+- Extraction: the two forms were pulled into `DesktopLineItemEditForm` and `ManualAddChargeForm` child components so each row owns its own preview state (React hooks cannot live inside the row `.map()`).
+- Guardrails preserved: server actions (`updateInternalInvoiceLineItemFromForm`, `addInternalInvoiceLineItemFromForm`, Pricebook and Visit-scope add paths) untouched; the mobile edit form untouched; the compound `issueAndSendInternalInvoiceFromForm` untouched; the footer running total stays server-authoritative; `router.refresh()` preserved on every save; Slice C snapshot field names (`item_name_snapshot`, `unit_price`, `item_type_snapshot`) preserved so the save-to-Pricebook suggestion still fires.
+- Validation:
+  - `npx tsc --noEmit` — clean.
+  - `npx vitest run lib/jobs/__tests__/internal-invoice-live-subtotal.test.ts lib/jobs/__tests__/internal-invoice-line-items-table-capability-wiring.test.ts` — 18 passed (8 new + 10 existing).
+  - Two failures elsewhere (`job-detail-v2-entrypoint`, `job-detail-deferred-narrative-fail-open`) confirmed pre-existing on the base tree and independent of this change.
+- Pending: owner visual + functional browser smoke on the `?mobileLayout=v2` mobile and desktop invoice workspaces.
+
 ## July 2026 Portal Visibility / Sticky Menu Closeout
 
 Status: CLOSED for the July 6, 2026 implementation slice.
