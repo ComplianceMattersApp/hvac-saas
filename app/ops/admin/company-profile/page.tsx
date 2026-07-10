@@ -10,6 +10,7 @@ import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import {
   DEFAULT_BILLING_MODE,
   getInternalBusinessProfileByAccountOwnerId,
+  resolveInternalBusinessIdentityByAccountOwnerId,
   resolveInternalBusinessProfileLogoUrl,
 } from "@/lib/business/internal-business-profile";
 import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
@@ -23,8 +24,9 @@ import {
   requireInternalRole,
 } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 import { SettingsSection } from "./_components/SettingsSection";
 import { SectionForm } from "./_components/SectionForm";
@@ -145,6 +147,57 @@ export default async function AdminCompanyProfilePage({
   const supportPhone = String(profile?.support_phone ?? "").trim();
   const billingMode = profile?.billing_mode ?? DEFAULT_BILLING_MODE;
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
+
+  // ECC/HERS Partner Network live summary. The read helper returns [] if the
+  // table is missing, so this is safe. Partner display names live in each
+  // partner's own RLS-scoped profile, resolved with the service-role client —
+  // same pattern as the connections page. We do NOT rebuild the connect UI.
+  const ownerId = internalUser.account_owner_user_id;
+  const eccConnections = await listAccountWorkshareConnectionsForAccount(supabase, ownerId, {
+    serviceType: "ecc_hers",
+    limit: 200,
+  });
+  const eccActive = eccConnections.filter((connection) => connection.status === "active");
+  const eccPendingIncoming = eccConnections.filter(
+    (connection) => connection.status === "pending" && connection.sender_account_id === ownerId,
+  );
+  const partnerIdFor = (connection: (typeof eccConnections)[number]) =>
+    String(
+      (connection.receiver_account_id === ownerId
+        ? connection.sender_account_id
+        : connection.receiver_account_id) ?? "",
+    ).trim();
+  const eccPartnerNameById = new Map<string, string>();
+  const eccPartnerIds = Array.from(new Set(eccActive.map(partnerIdFor).filter(Boolean)));
+  if (eccPartnerIds.length > 0) {
+    const admin = createAdminClient();
+    const resolved = await Promise.all(
+      eccPartnerIds.map(async (partnerId) => {
+        const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
+          accountOwnerUserId: partnerId,
+          supabase: admin,
+        });
+        return [partnerId, String(identity?.display_name ?? "").trim()] as const;
+      }),
+    );
+    for (const [partnerId, name] of resolved) {
+      if (name) eccPartnerNameById.set(partnerId, name);
+    }
+  }
+  const eccPartnerNames = eccActive.map(
+    (connection) =>
+      eccPartnerNameById.get(partnerIdFor(connection)) ||
+      String(connection.invite_company_name ?? "").trim() ||
+      String(connection.invite_email ?? "").trim() ||
+      "Connected company",
+  );
+  const eccConnectedCount = eccActive.length;
+  const eccState: ConsoleSectionState | undefined =
+    eccPendingIncoming.length > 0
+      ? { kind: "attention", count: eccPendingIncoming.length }
+      : eccConnectedCount > 0
+        ? { kind: "count", count: eccConnectedCount }
+        : undefined;
   const platformBillingAvailability = getPlatformBillingAvailability();
 
   // Rail state at a glance (design turn 14a): green dot = complete,
@@ -532,21 +585,43 @@ export default async function AdminCompanyProfilePage({
           {
             id: "ecc-hers",
             label: "ECC/HERS",
+            state: eccState,
             content: (
-      <div id="account-workshare-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">ECC/HERS Partner Network</h2>
-          <p className="text-sm leading-6 text-slate-600">
-            Manage trusted company-to-company connections for ECC/HERS work sharing.
-          </p>
-        </div>
-        <Link
-          href="/ops/admin/connections"
-          className="mt-4 inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
-        >
-          Manage connections &rarr;
-        </Link>
-      </div>
+              <SettingsSection
+                eyebrow="ECC/HERS Partner Network"
+                title="ECC/HERS Partner Network"
+                description="Trusted company-to-company connections for ECC/HERS work sharing."
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+                    {eccConnectedCount} connected
+                  </span>
+                  {eccPendingIncoming.length > 0 ? (
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">
+                      {eccPendingIncoming.length} invite{eccPendingIncoming.length === 1 ? "" : "s"} to accept
+                    </span>
+                  ) : null}
+                </div>
+
+                {eccConnectedCount > 0 ? (
+                  <p className="text-sm leading-6 text-slate-600">
+                    Connected with{" "}
+                    <span className="font-medium text-[#0f1f35]">{eccPartnerNames.slice(0, 3).join(", ")}</span>
+                    {eccPartnerNames.length > 3 ? ` +${eccPartnerNames.length - 3} more` : ""}.
+                  </p>
+                ) : (
+                  <p className="text-sm leading-6 text-slate-600">
+                    No connected companies yet. Connect a company to start sharing ECC/HERS work.
+                  </p>
+                )}
+
+                <Link
+                  href="/ops/admin/connections"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+                >
+                  Manage connections &rarr;
+                </Link>
+              </SettingsSection>
             ),
           },
           {
@@ -554,14 +629,12 @@ export default async function AdminCompanyProfilePage({
             label: "Team & Roles",
             state: teamState,
             content: (
-              <div className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-semibold tracking-[-0.02em] text-[#0f1f35]">Team &amp; Roles</h2>
-                  <p className="text-sm leading-6 text-slate-600">
-                    People &amp; Access — invite teammates, set roles, and manage seats.
-                  </p>
-                </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <SettingsSection
+                eyebrow="Team & Roles"
+                title="Team & Roles"
+                description="People & Access — invite teammates, set roles, and manage seats. Managed on the dedicated Team & Access page."
+              >
+                <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
                     <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active users</dt>
                     <dd className="mt-1 text-sm font-semibold text-[#0f1f35]">{entitlement.activeSeatCount}</dd>
@@ -577,11 +650,11 @@ export default async function AdminCompanyProfilePage({
                 </dl>
                 <Link
                   href="/ops/admin/users"
-                  className="mt-4 inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+                  className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
                 >
                   Manage team &rarr;
                 </Link>
-              </div>
+              </SettingsSection>
             ),
           },
         ]}
