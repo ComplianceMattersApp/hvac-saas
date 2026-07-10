@@ -23,6 +23,7 @@ import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { listOpenWorkflowHandoffRequestsForInstallerAccount } from "@/lib/workflows/workflow-handoff-requests-read";
 import { listActiveConnectedRecipientHandoffProjectionsForAccount } from "@/lib/workflows/connected-recipient-handoff-projection-read";
+import { listSenderWorkshareConnectionsForReceiver } from "@/lib/workflows/account-workshare-connections-read";
 
 import {
   formatBusinessDateUS,
@@ -280,14 +281,21 @@ export default async function OpsPage({
     })
     : null;
 
-  const [handoffRequestsPendingRows, connectedHandoffPartnerRows] = await Promise.all([
+  const [handoffRequestsPendingRows, connectedHandoffPartnerRows, incomingWorkshareConnectionRows] = await Promise.all([
     listOpenWorkflowHandoffRequestsForInstallerAccount(supabase, {
       installerAccountOwnerUserId: internalUser.account_owner_user_id,
     }),
     listActiveConnectedRecipientHandoffProjectionsForAccount(supabase, internalUser.account_owner_user_id),
+    listSenderWorkshareConnectionsForReceiver(supabase, internalUser.account_owner_user_id),
   ]);
   const handoffRequestsPendingCount = handoffRequestsPendingRows.filter((row) => row.handoff_status === "sent").length;
   const connectedHandoffPartnerCount = connectedHandoffPartnerRows.length;
+  // Show the incoming ECC/HERS request queue only to accounts that have an active
+  // workshare connection where they are the receiver — no point surfacing an empty
+  // queue to accounts that have not set up connections yet.
+  const hasActiveIncomingWorkshareConnection = incomingWorkshareConnectionRows.some(
+    (row) => row.status === "active",
+  );
 
   const showTeamClockStatusCardForRole =
     internalUser.role === "admin" || internalUser.role === "office";
@@ -2582,6 +2590,12 @@ export default async function OpsPage({
                 <span className="font-medium text-slate-700">{connectedHandoffPartnerCount} connected</span>
                 <span className="font-semibold text-blue-700">View &rarr;</span>
               </Link>
+              {hasActiveIncomingWorkshareConnection ? (
+                <Link href="/ops/workshare/incoming" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
+                  <span className="font-medium text-slate-700">Incoming ECC/HERS requests</span>
+                  <span className="font-semibold text-blue-700">View &rarr;</span>
+                </Link>
+              ) : null}
             </div>
           </section>
 
