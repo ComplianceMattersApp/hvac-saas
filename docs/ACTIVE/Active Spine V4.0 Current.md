@@ -56,15 +56,35 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 
 ### Post-Lane-1 Roadmap Sequence (locked order, July 2026)
 
-**Lane 1 (Field Invoice Flow V1) is CLOSED (July 9, 2026).** Next active lane: **Lane 2 — Landing Page Polish.**
+**Lane 1 (Field Invoice Flow V1) and Lane 2 (Landing Page Polish) are both CLOSED (July 9, 2026).** Next active lane: **Lane 3 — Google Review Ask.**
 
-**Lane 2 — Landing Page Polish  ◀ NEXT ACTIVE LANE**
-- Pure front-end work. No backend, no migrations, no truth model risk.
-- Goal: product presents as polished as it performs. Buyer immediately understands the complete operating loop.
-- Targets the "users understand what they're signing up for" gap identified in owner review.
-- Sequenced after Field Invoice Flow V1 closes.
+**Lane 2 — Landing Page Polish — CLOSED (July 9, 2026)**
 
-**Lane 3 — Google Review Ask**
+**Status: CLOSED. Live on `main`, deployed.** Goal achieved: the landing/login + signup funnel now presents as polished as the product performs, with copy that names exactly what was built (ECC, HVAC service, cleaning) rather than vague "any-trade" language. Pure front-end — no auth logic, routing, schema, migrations, or server-action changes.
+
+**Design brief (owner-locked):** moved off the generic dark-navy glass "SaaS/AI template" look toward a warm, considered, crafted feel — **warm off-white surface `#faf7f2`, navy typography `#0f1f35`, terracotta accent `#c2622a`** (replacing the blue→cyan gradient). Preview widget kept as an *illustrative* dashboard (hardcoded sample data, terracotta pulse dots) — not real data.
+
+**`main` HEAD after the lane:** `073853b2` (merge). Per-commit: V1 mobile-first + config `4a9c7515`, V2 warm redesign `9120c612`, signup funnel warm pass `b9a3c083`.
+
+**As-built notes (durable facts for later lanes):**
+
+- **The landing page IS the login page** — [app/login/page.tsx](../../app/login/page.tsx). There is no separate marketing route. `/` just redirects (authed → landing, else → `/login`). The authenticated app shell header does not render here (gated on `user` in [app/layout.tsx](../../app/layout.tsx)), so the page is genuinely standalone.
+
+- **[components/auth/AuthCommandCenterLayout.tsx](../../components/auth/AuthCommandCenterLayout.tsx) is the shared shell for BOTH login and all three signup pages.** Restyling it warmed signup automatically; [app/signup/signup-content.tsx](../../app/signup/signup-content.tsx) was then aligned in the same pass so the login→signup transition is one continuous warm surface (owner call: consistent funnel over keeping signup untouched). Any future change to this layout affects login + `/signup/service` + `/signup/ecc` + `/signup/cleaning` together, including the `generic` signup variant.
+
+- **New design tokens in [app/globals.css](../../app/globals.css):** `--color-shell-warm: #faf7f2`, `--color-terracotta: #c2622a`, `--color-terracotta-light: #f5e6de` (these replaced short-lived V1 dark-shell tokens). Terracotta button gradient is `from-[#c2622a] to-[#d97740]` with `hover:brightness-105`.
+
+- **Trial paths are now a single config** — `TRIAL_PATHS` in [app/login/page.tsx](../../app/login/page.tsx) (routes/labels/accents/copy), rendered by map, killing the prior login↔signup copy drift. Routes unchanged: `/signup/service`, `/signup/ecc`, `/signup/cleaning`. Accents: Service = terracotta, ECC = stone pill, Cleaning = emerald.
+
+- **New `brandLine` prop** on the layout (login-only, signup does not pass it): *"We missed the details too, so we built something that doesn't."* — the emotional hook. Headline unchanged: *"Every job. Every step. Fully closed."*
+
+- **Mobile:** tagline + brand line + subline render above the login card (`lg:hidden`); the full left marketing panel remains desktop-only (`lg:block`), which is by design.
+
+- **Verification caveat:** no headless browser (Playwright/Puppeteer) exists in the repo, so all smoke was rendered-HTML markers + route-200 checks (warm-shell class present, zero blue/dark-glass remnants across all three signup routes), not pixel screenshots. `npx tsc --noEmit` clean. Owner did visual review before push.
+
+- **Minor deviations from the written prompt (intentional):** desktop headline set to `text-3xl xl:text-4xl` (not a flat `text-4xl`) so it stays dominant without out-sizing the brand H1; column separator uses the sensible `lg:border-r` divider (prompt mentioned both a `border-b` and a `border-r` — the `border-b` was dropped).
+
+**Lane 3 — Google Review Ask  ◀ NEXT ACTIVE LANE**
 - Single button after job closeout fires a review request (mailto or Google Business deep link).
 - No provider dependency. No SMS required.
 - Small build, high reputation ROI.
