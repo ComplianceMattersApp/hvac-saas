@@ -49,6 +49,7 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 - **Slice C** added [lib/actions/field-pricebook-actions.ts](../../lib/actions/field-pricebook-actions.ts) with two **value-returning** (never-redirecting) server actions: `checkFieldPricebookItemNameExistsFromForm` (case-insensitive, active-only match) and `saveFieldItemToPricebookFromForm` (creates an active `pricebook_items` row, duplicate-guarded case-insensitively + on `23505`). Gated by **`field_billing_enabled`** (true for flagged techs and financial-authority roles). Mobile-only prompt after a manual add; desktop never calls it. The existing admin `createPricebookItemFromForm` (redirect-based, admin-gated) was left untouched — the field path is deliberately separate.
 
 - **Progressive-disclosure follow-on (July 9, 2026):** the Type/Qty/Description `More details` disclosure is **no longer mobile-only**. The **desktop** charge edit form and the **manual-add** form (both surfaces) now use the same two-tier pattern (Item Name + Unit Price + live Subtotal visible; Type/Qty/Description collapsed), plus a client-only live subtotal preview (`computeLiveSubtotal`, pure module [lib/business/internal-invoice-live-subtotal.ts](../../lib/business/internal-invoice-live-subtotal.ts)). Server actions, invoice truth model, running total, and the Pricebook/Visit-scope add paths are unchanged; the mobile edit form was not touched. Tactical evidence: [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
+  - **Naming note:** this follow-on shipped on a branch/commits labeled `lane3-charge-form-progressive-disclosure` (commits `8dfdd3b7`, `860fc697`, merge `e7c9a3d7`). That "lane3" label is a **misnomer** — this work is a Field Invoice Flow V1 continuation, **not** the roadmap's Lane 3 (Google Review Ask). The label survives only in merged commit messages (not rewritten, to avoid rewriting shared `main` history).
 
 **Future polish candidate (not scheduled):** merge the job-detail Work Scope card and Billing/Closeout card into one connected "Work & Billing" flow. Good fit for the Landing Page Polish lane or its own small lane.
 
@@ -56,7 +57,7 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 
 ### Post-Lane-1 Roadmap Sequence (locked order, July 2026)
 
-**Lane 1 (Field Invoice Flow V1) and Lane 2 (Landing Page Polish) are both CLOSED (July 9, 2026).** Next active lane: **Lane 3 — Google Review Ask.**
+**Lane 1 (Field Invoice Flow V1) and Lane 2 (Landing Page Polish) are both CLOSED (July 9, 2026).** Next active lane: **Lane 3 — Google Review Ask.** (Roadmap Lane 3 is Google Review Ask — distinct from the merged `lane3-charge-form-progressive-disclosure` branch, which was a Field Invoice Flow follow-on, misnamed. See the follow-on note above.)
 
 **Lane 2 — Landing Page Polish — CLOSED (July 9, 2026)**
 
