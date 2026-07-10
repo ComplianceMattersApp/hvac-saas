@@ -29,6 +29,11 @@ import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileC
 import { SettingsSection } from "./_components/SettingsSection";
 import { SectionForm } from "./_components/SectionForm";
 import { TextField } from "./_components/fields";
+import { Disclosure } from "@/components/ui/Disclosure";
+import {
+  formatTimestampDateDisplayLA,
+  formatTimestampDateTimeDisplayLA,
+} from "@/lib/utils/schedule-la";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -471,15 +476,12 @@ export default async function AdminCompanyProfilePage({
         seatAuditPreview={seatAuditPreview}
       />
 
-      <div id="invoice-settings" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invoice Settings</h2>
-          <p className="text-sm leading-6 text-slate-600">
-            Choose where your company creates and manages invoices.
-          </p>
-        </div>
-
-        <form action={saveInvoiceModeFromForm} className="mt-6 space-y-4">
+      <SettingsSection
+        eyebrow="Invoice Settings"
+        title="Invoice Settings"
+        description="Choose where your company creates and manages invoices."
+      >
+        <SectionForm action={saveInvoiceModeFromForm} saveLabel="Save invoice settings">
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <div className="space-y-1.5">
               <label htmlFor="billing_mode" className="text-sm font-medium text-slate-700">
@@ -489,7 +491,7 @@ export default async function AdminCompanyProfilePage({
                 id="billing_mode"
                 name="billing_mode"
                 defaultValue={billingMode}
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-slate-200"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-[#0f1f35] shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               >
                 <option value="external_billing">Track billing outside EveryStep FieldWorks</option>
                 <option value="internal_invoicing">Use EveryStep FieldWorks invoices</option>
@@ -520,17 +522,8 @@ export default async function AdminCompanyProfilePage({
               </div>
             )}
           </div>
-
-          <div className="flex items-center justify-end">
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center rounded-xl bg-slate-900 px-4.5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_30px_-22px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_22px_34px_-22px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
-            >
-              Save invoice settings
-            </button>
-          </div>
-        </form>
-      </div>
+        </SectionForm>
+      </SettingsSection>
 
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
               </div>
@@ -643,11 +636,7 @@ function PlatformAccountSection({
 
   const trialEndsLabel =
     entitlement.entitlementStatus === "trial" && entitlement.trialEndsAt
-      ? entitlement.trialEndsAt.toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })
+      ? formatTimestampDateDisplayLA(entitlement.trialEndsAt.toISOString())
       : null;
 
   const billingStatusLabel = entitlement.billingSubscriptionStatus
@@ -671,17 +660,13 @@ function PlatformAccountSection({
       : "Not connected";
 
   const billingPeriodEndLabel = entitlement.billingCurrentPeriodEnd
-    ? entitlement.billingCurrentPeriodEnd.toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
+    ? formatTimestampDateDisplayLA(entitlement.billingCurrentPeriodEnd.toISOString())
     : null;
 
   return (
     <div id="account-billing" className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)] scroll-mt-24">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-        <div className="text-sm font-semibold text-slate-950">Compliance Matters Subscription</div>
+        <div className="text-sm font-semibold text-[#0f1f35]">Compliance Matters Subscription</div>
         <div className="mt-1 text-sm text-slate-600">
           Review app access and subscription billing.
         </div>
@@ -725,7 +710,7 @@ function PlatformAccountSection({
             <form action="/api/stripe/checkout" method="post">
               <button
                 type="submit"
-                className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+                className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
               >
                 Open billing setup
               </button>
@@ -733,7 +718,7 @@ function PlatformAccountSection({
             <form action="/api/stripe/portal" method="post">
               <button
                 type="submit"
-                className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+                className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
               >
                 Manage subscription
               </button>
@@ -745,49 +730,23 @@ function PlatformAccountSection({
           </div>
         )}
       </div>
-      <details className="group border-t border-slate-100 bg-white px-5 py-3">
-        <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
-          <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
-            Advanced subscription details
-          </span>
-        </summary>
-        <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
-          <div className="text-xs text-slate-500">
-            These details are for support review only and do not change billing automatically.
+      <div className="border-t border-slate-100 px-5 py-3">
+        <Disclosure variant="flush" title="Advanced subscription details">
+          <div className="space-y-3 text-sm leading-6 text-slate-600">
+            <div className="text-xs text-slate-500">
+              These details are for support review only and do not change billing automatically.
+            </div>
+            <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2">
+              <PlatformAccountField label="Active users" value={String(entitlement.activeSeatCount)} />
+              <PlatformAccountField label="Seat limit" value={seatLimitLabel} />
+              <PlatformAccountField label="Payment method for subscription" value={billingCustomerLabel} />
+              <PlatformAccountField label="Inactive users excluded" value={inactiveUserCountLabel} />
+              <PlatformAccountField label="External/contractor records excluded" value={externalRecordCountLabel} />
+              <PlatformAccountField label="Pending invites" value="Not counted yet" />
+            </dl>
           </div>
-          <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2">
-            <PlatformAccountField
-              label="Active users"
-              value={String(entitlement.activeSeatCount)}
-            />
-            <PlatformAccountField
-              label="Seat limit"
-              value={seatLimitLabel}
-            />
-            <PlatformAccountField
-              label="Payment method for subscription"
-              value={billingCustomerLabel}
-            />
-            <PlatformAccountField
-              label="Active users counted"
-              value={String(entitlement.activeSeatCount)}
-            />
-            <PlatformAccountField
-              label="Inactive users excluded"
-              value={inactiveUserCountLabel}
-            />
-            <PlatformAccountField
-              label="External/contractor records excluded"
-              value={externalRecordCountLabel}
-            />
-            <PlatformAccountField
-              label="Pending invites"
-              value="Not counted yet"
-            />
-          </dl>
-        </div>
-      </details>
+        </Disclosure>
+      </div>
     </div>
   );
 }
@@ -844,10 +803,18 @@ function TenantStripePaymentsSection({
         ? "border-amber-200 bg-amber-50/70 text-amber-900"
         : "border-slate-200 bg-slate-50/80 text-slate-700";
 
+  const lastCheckedLabel = (() => {
+    if (!readiness.lastSyncedAt) return "Never";
+    const parsed = new Date(readiness.lastSyncedAt as string | number | Date);
+    return Number.isFinite(parsed.getTime())
+      ? formatTimestampDateTimeDisplayLA(parsed.toISOString())
+      : "Never";
+  })();
+
   return (
     <div id="accept-payments" className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)] scroll-mt-24">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-        <div className="text-sm font-semibold text-slate-950">Online Payments</div>
+        <div className="text-sm font-semibold text-[#0f1f35]">Online Payments</div>
         <div className="mt-1 text-sm text-slate-600">
           Let customers pay EveryStep FieldWorks invoices online.
         </div>
@@ -863,7 +830,7 @@ function TenantStripePaymentsSection({
           <form action={startTenantStripeConnectOnboardingFromForm}>
             <button
               type="submit"
-              className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 active:translate-y-[0.5px]"
+              className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 active:translate-y-[0.5px]"
             >
               {setupActionLabel}
             </button>
@@ -872,7 +839,7 @@ function TenantStripePaymentsSection({
           <form action={refreshTenantStripeConnectReadinessFromForm}>
             <button
               type="submit"
-              className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,box-shadow,transform] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 active:translate-y-[0.5px]"
+              className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,box-shadow,transform] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 active:translate-y-[0.5px]"
             >
               Refresh payment status
             </button>
@@ -880,7 +847,7 @@ function TenantStripePaymentsSection({
         </div>
 
         <div className="text-xs text-slate-500">
-          Last checked: {readiness.lastSyncedAt ? new Date(readiness.lastSyncedAt).toLocaleString() : "Never"}
+          Last checked: {lastCheckedLabel}
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-600">
@@ -889,14 +856,8 @@ function TenantStripePaymentsSection({
             : "Online payments are optional here because invoices are managed outside EveryStep FieldWorks."}
         </div>
 
-        <details className="group rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
-            <span className="inline-flex items-center gap-2">
-              <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
-              Advanced payment details
-            </span>
-          </summary>
-          <div className="mt-3 space-y-3">
+        <Disclosure title="Advanced payment details">
+          <div className="space-y-3">
             <div className="text-xs leading-5 text-slate-500">
               These details are for owner/admin support review and do not change payment setup automatically.
             </div>
@@ -909,7 +870,7 @@ function TenantStripePaymentsSection({
               <PlatformAccountField label="Disabled reason" value={readiness.disabledReason ?? "-"} />
             </dl>
           </div>
-        </details>
+        </Disclosure>
       </div>
     </div>
   );
@@ -921,7 +882,7 @@ function PlatformAccountField({ label, value }: { label: string; value: string }
       <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
         {label}
       </dt>
-      <dd className="mt-1 text-sm font-medium text-slate-900">{value}</dd>
+      <dd className="mt-1 text-sm font-medium text-[#0f1f35]">{value}</dd>
     </div>
   );
 }
