@@ -55,12 +55,21 @@ function makeSupabase(rows: AccountWorkshareRequestRow[]) {
 
       const state = {
         eq: [] as Array<[string, unknown]>,
+        order: [] as Array<[string, boolean]>,
         limit: null as number | null,
       };
 
       const applyFilters = () => {
         let filtered = rows.filter((row) =>
           state.eq.every(([column, value]) => (row as any)[column] === value));
+        for (const [column, ascending] of [...state.order].reverse()) {
+          filtered = [...filtered].sort((a, b) => {
+            const av = String((a as any)[column] ?? "");
+            const bv = String((b as any)[column] ?? "");
+            if (av === bv) return 0;
+            return (av < bv ? -1 : 1) * (ascending ? 1 : -1);
+          });
+        }
         if (state.limit !== null) filtered = filtered.slice(0, state.limit);
         return filtered;
       };
@@ -71,7 +80,10 @@ function makeSupabase(rows: AccountWorkshareRequestRow[]) {
           state.eq.push([column, value]);
           return builder;
         },
-        order: () => builder,
+        order: (column: string, opts?: { ascending?: boolean }) => {
+          state.order.push([column, opts?.ascending !== false]);
+          return builder;
+        },
         limit: (value: number) => {
           state.limit = value;
           return builder;
@@ -121,6 +133,55 @@ describe("account workshare requests read helpers", () => {
     const rows = await listIncomingAccountWorkshareRequestsForReceiver(supabase as any, "receiver-1");
 
     expect(rows.map((row) => row.id)).toEqual(["request-1"]);
+  });
+
+  it("receiver incoming excludes cancelled requests", async () => {
+    const supabase = makeSupabase([
+      makeRequest({ id: "request-sent", receiver_account_id: "receiver-1", status: "sent" }),
+      makeRequest({
+        id: "request-cancelled",
+        receiver_account_id: "receiver-1",
+        status: "cancelled",
+        cancelled_at: "2026-07-08T12:00:00.000Z",
+      }),
+    ]);
+
+    const rows = await listIncomingAccountWorkshareRequestsForReceiver(supabase as any, "receiver-1");
+
+    expect(rows.map((row) => row.id)).toEqual(["request-sent"]);
+  });
+
+  it("receiver incoming returns newest created_at first", async () => {
+    const supabase = makeSupabase([
+      makeRequest({ id: "request-old", receiver_account_id: "receiver-1", created_at: "2026-07-01T10:00:00.000Z" }),
+      makeRequest({ id: "request-new", receiver_account_id: "receiver-1", created_at: "2026-07-09T10:00:00.000Z" }),
+      makeRequest({ id: "request-mid", receiver_account_id: "receiver-1", created_at: "2026-07-05T10:00:00.000Z" }),
+    ]);
+
+    const rows = await listIncomingAccountWorkshareRequestsForReceiver(supabase as any, "receiver-1");
+
+    expect(rows.map((row) => row.id)).toEqual(["request-new", "request-mid", "request-old"]);
+  });
+
+  it("receiver incoming is account-isolated across accounts", async () => {
+    const supabase = makeSupabase([
+      makeRequest({ id: "for-a", receiver_account_id: "account-a" }),
+      makeRequest({ id: "for-b", receiver_account_id: "account-b" }),
+    ]);
+
+    await expect(listIncomingAccountWorkshareRequestsForReceiver(supabase as any, "account-a"))
+      .resolves.toEqual([expect.objectContaining({ id: "for-a" })]);
+    await expect(listIncomingAccountWorkshareRequestsForReceiver(supabase as any, "account-b"))
+      .resolves.toEqual([expect.objectContaining({ id: "for-b" })]);
+  });
+
+  it("receiver incoming returns empty when nothing is addressed to the account", async () => {
+    const supabase = makeSupabase([
+      makeRequest({ id: "request-1", receiver_account_id: "receiver-1" }),
+    ]);
+
+    await expect(listIncomingAccountWorkshareRequestsForReceiver(supabase as any, "receiver-empty"))
+      .resolves.toEqual([]);
   });
 
   it("unrelated or blank account scope sees none", async () => {

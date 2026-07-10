@@ -219,12 +219,17 @@ export async function listIncomingAccountWorkshareRequestsForReceiver(
 
   const safeLimit = Math.max(1, Math.min(500, Number(options?.limit ?? 100)));
 
+  // Receiver-side read model (P1-D1): read-only incoming queue.
+  // Only requests still in `sent` status are surfaced — cancelled requests are
+  // excluded so the rater never sees a request the sender has withdrawn.
+  // Ordered by created_at DESC (newest first).
   return fetchAccountWorkshareRequestRows(supabase, async (client) => {
     const { data, error } = await client
       .from("account_workshare_requests")
       .select("*")
       .eq("receiver_account_id", normalizedReceiverAccountId)
-      .order("sent_at", { ascending: false })
+      .eq("status", "sent")
+      .order("created_at", { ascending: false })
       .limit(safeLimit);
 
     return { data: (data ?? []) as AccountWorkshareRequestRow[], error };
