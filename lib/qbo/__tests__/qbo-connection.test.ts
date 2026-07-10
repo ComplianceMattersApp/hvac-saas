@@ -1,0 +1,107 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { refreshQboTokens } = vi.hoisted(() => ({ refreshQboTokens: vi.fn() }));
+vi.mock("@/lib/qbo/qbo-oauth-client", () => ({ refreshQboTokens }));
+
+import { decryptToken, encryptToken } from "@/lib/qbo/qbo-encryption";
+import {
+  getValidQboAccessToken,
+  upsertQboConnection,
+} from "@/lib/qbo/qbo-connection";
+
+const KEY = "c".repeat(64);
+
+function makeSupabase(row: any | null) {
+  const captured: { upsert: any; update: any } = { upsert: null, update: null };
+  const builder: any = {
+    from: vi.fn(() => builder),
+    select: vi.fn(() => builder),
+    eq: vi.fn(() => builder),
+    order: vi.fn(() => builder),
+    maybeSingle: vi.fn(async () => ({ data: row, error: null })),
+    upsert: vi.fn((payload: any) => {
+      captured.upsert = payload;
+      return Promise.resolve({ error: null });
+    }),
+    update: vi.fn((payload: any) => {
+      captured.update = payload;
+      return builder;
+    }),
+    then: (resolve: (v: any) => void) => resolve({ data: row, error: null }),
+  };
+  return { builder, captured };
+}
+
+function activeRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "1",
+    account_owner_user_id: "acc",
+    realm_id: "r1",
+    access_token_encrypted: encryptToken("fresh-at"),
+    refresh_token_encrypted: encryptToken("old-rt"),
+    token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    environment: "sandbox",
+    status: "active",
+    connected_at: new Date().toISOString(),
+    last_synced_at: null,
+    last_sync_error: null,
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  process.env.QBO_ENCRYPTION_KEY = KEY;
+  refreshQboTokens.mockResolvedValue({
+    accessToken: "new-at",
+    refreshToken: "new-rt",
+    expiresAt: new Date(Date.now() + 3600_000),
+  });
+});
+
+describe("qbo-connection", () => {
+  it("upsertQboConnection encrypts tokens before storage", async () => {
+    const { builder, captured } = makeSupabase(null);
+    await upsertQboConnection({
+      supabase: builder,
+      accountOwnerUserId: "acc",
+      realmId: "r1",
+      accessToken: "AT",
+      refreshToken: "RT",
+      expiresAt: new Date(),
+      environment: "sandbox",
+    });
+    expect(captured.upsert.access_token_encrypted).not.toContain("AT");
+    expect(captured.upsert.refresh_token_encrypted).not.toContain("RT");
+    expect(decryptToken(captured.upsert.access_token_encrypted)).toBe("AT");
+    expect(decryptToken(captured.upsert.refresh_token_encrypted)).toBe("RT");
+    expect(captured.upsert.status).toBe("active");
+  });
+
+  it("getValidQboAccessToken returns the stored token when not near expiry", async () => {
+    const { builder } = makeSupabase(activeRow());
+    const result = await getValidQboAccessToken({ supabase: builder, accountOwnerUserId: "acc" });
+    expect(refreshQboTokens).not.toHaveBeenCalled();
+    expect(result).toEqual({ accessToken: "fresh-at", realmId: "r1" });
+  });
+
+  it("getValidQboAccessToken refreshes and persists when within 5 minutes of expiry", async () => {
+    const row = activeRow({
+      access_token_encrypted: encryptToken("old-at"),
+      token_expires_at: new Date(Date.now() + 120_000).toISOString(), // 2 min out
+    });
+    const { builder, captured } = makeSupabase(row);
+    const result = await getValidQboAccessToken({ supabase: builder, accountOwnerUserId: "acc" });
+    expect(refreshQboTokens).toHaveBeenCalledWith("old-rt");
+    expect(result).toEqual({ accessToken: "new-at", realmId: "r1" });
+    expect(captured.update.access_token_encrypted).toBeDefined();
+    expect(decryptToken(captured.update.access_token_encrypted)).toBe("new-at");
+    expect(decryptToken(captured.update.refresh_token_encrypted)).toBe("new-rt");
+  });
+
+  it("getValidQboAccessToken returns null when there is no active connection", async () => {
+    const { builder } = makeSupabase(null);
+    const result = await getValidQboAccessToken({ supabase: builder, accountOwnerUserId: "acc" });
+    expect(result).toBeNull();
+  });
+});
