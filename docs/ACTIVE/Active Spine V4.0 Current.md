@@ -21,6 +21,26 @@ A structured review of HouseCall Pro, FieldProMax, Jobber, and ServiceTitan conf
 
 ---
 
+### ECC/HERS Account Work-Sharing (P1) + Partner Network Cleanup — MERGED, awaiting owner prod smoke (July 10, 2026)
+
+**Status: Merged to `main` and pushed (`bb9ab82f`; merges `15221b60` partner-network + `bb9ab82f` P1-D1). Awaiting owner smoke in live prod.** Adds company-to-company ECC/HERS work sharing — a contractor/sender account sends an ECC/HERS testing request to a connected rater/receiver account — and consolidates the Company Profile ECC/HERS surface onto one dedicated page.
+
+**Source-of-truth boundaries (durable):**
+- Two account-scoped tables. `account_workshare_connections` (P1-B): directional sender→receiver link, `service_type = ecc_hers`, statuses pending/active/disabled/revoked. `account_workshare_requests` (P1-C): `ecc_hers_testing`, statuses sent/cancelled, **snapshot-based** — customer/location/scope/source-job values are frozen at send time; the receiver never reads the sender's live jobs or customers. Both RLS-scoped by `current_internal_account_owner_id()`; the requests SELECT policy allows either party (sender OR receiver).
+- A request can only be sent on an **`active`** connection. Partner display names live in `internal_business_profiles`, which is RLS-scoped per account, so cross-account name lookups use the **service-role client** (established pattern).
+
+**What shipped:**
+- **`/ops/admin/connections` — "ECC/HERS Partner Network"** (admin-only): the sole management UI for workshare connections — active list, pending accept/decline, and an account-ID invite behind an Advanced disclosure (no email-invite UI). Company Profile no longer embeds this; it links out ("Manage connections →"). Admin Center has a gated "Partner Network" card. The Contractors page shows an account-level active-connection count only (no clean join exists between `contractors` and workshare connections).
+- **P1-D1 — `/ops/workshare/incoming`** (internal-only, **read-only**): the receiver's incoming queue. Lists `status = sent` requests newest-first with sender company name + snapshot detail. **No accept/decline (P1-D2 pending) and no receiver job creation (P1-E pending)** — a "coming soon" placeholder marks this.
+
+**Company Profile consolidation (same lane):** removed the **"Default ECC/HERS Rater Details"** (`authorized_handoff_recipients`) and **"Connected Handoff Accounts"** (`account_handoff_connections`) sections. ⚠️ **Those two tables/modules are NOT dead** — the job-detail ECC handoff panel and the workflow handoff-send/grant path still read them at runtime; only the Company Profile management UI was removed. `/ops/connected-handoffs` also stays (it reads handoff *grants*, not the connection table). Prod (`kvpesjdukqwwlgpkzfjm`): `account_handoff_connections` = 0 rows; `authorized_handoff_recipients` = 1 leftover smoke artifact (kept, FK-referenced by completed smoke handoff requests).
+
+**Prod-smoke note:** the incoming queue shows the empty state until a `sent` workshare request exists — prod currently has **0** `account_workshare_requests`. To smoke a populated queue, first send a request from a sender account that holds an active connection.
+
+**Next in this track:** P1-D2 (accept/decline on incoming requests), then P1-E (receiver job creation). Commit-level and smoke detail belong in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), not here.
+
+---
+
 ### Completed Lane: Field Invoice Flow V1 — CLOSED (July 9, 2026)
 
 **Status: CLOSED. All slices live on `main`, deployed, and field-smoked.** North star achieved: a non-technical user on a phone can go from job complete to invoice sent without friction or re-entry.
