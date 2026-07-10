@@ -73,6 +73,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Persist via the admin client (service role) — token writes never depend on RLS timing.
     const admin = createAdminClient();
+    console.log("[qbo/callback] realmId before upsert:", tokens.realmId);
     await upsertQboConnection({
       supabase: admin,
       accountOwnerUserId: internalUser.account_owner_user_id,

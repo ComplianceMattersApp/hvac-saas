@@ -39,10 +39,15 @@ export async function exchangeQboAuthCode(url: string): Promise<QboTokenSet> {
   const client = createQboOAuthClient();
   const response = await client.createToken(url);
   const token = response.getJson();
+  // realmId is NOT in the token-endpoint response body — intuit-oauth overwrites
+  // the token object with that body, dropping the realmId it parsed from the URL.
+  // Read it from the callback URL (its only real source), with fallbacks.
+  const realmId =
+    new URL(url).searchParams.get("realmId") ?? client.getToken().realmId ?? token.realmId ?? "";
   return {
     accessToken: token.access_token,
     refreshToken: token.refresh_token,
-    realmId: token.realmId,
+    realmId,
     expiresAt: new Date(Date.now() + token.expires_in * 1000),
   };
 }
