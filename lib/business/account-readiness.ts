@@ -40,6 +40,13 @@ function normalizeCount(value: unknown) {
 export async function resolveAccountReadiness(
   accountOwnerUserId: string,
   supabase: SupabaseClient | any,
+  options?: {
+    // Callers that already resolved these (e.g. the Company Profile page)
+    // can pass them in to avoid re-fetching entitlement + Stripe readiness
+    // (and the internal_users active-count query entitlement runs).
+    entitlement?: Awaited<ReturnType<typeof resolveAccountEntitlement>>;
+    tenantStripeReadiness?: Awaited<ReturnType<typeof resolveTenantStripeConnectReadiness>>;
+  },
 ): Promise<AccountReadinessSummary> {
   const ownerId = toCleanString(accountOwnerUserId);
 
@@ -131,8 +138,8 @@ export async function resolveAccountReadiness(
       .from("contractors")
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", ownerId),
-    resolveAccountEntitlement(ownerId, supabase),
-    resolveTenantStripeConnectReadiness(ownerId, supabase),
+    options?.entitlement ?? resolveAccountEntitlement(ownerId, supabase),
+    options?.tenantStripeReadiness ?? resolveTenantStripeConnectReadiness(ownerId, supabase),
   ]);
 
   if (profileResult.error) {

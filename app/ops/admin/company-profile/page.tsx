@@ -137,7 +137,10 @@ export default async function AdminCompanyProfilePage({
     internalUser.account_owner_user_id,
     supabase,
   );
-  const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
+  const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase, {
+    entitlement,
+    tenantStripeReadiness,
+  });
   const incompleteRequiredItems = readiness.items.filter((item) => item.status === "incomplete");
   const currentLogoUrl = await resolveInternalBusinessProfileLogoUrl({
     logoUrl: profile?.logo_url ?? null,
