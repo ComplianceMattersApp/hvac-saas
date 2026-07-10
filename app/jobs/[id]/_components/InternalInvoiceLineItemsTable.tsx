@@ -437,28 +437,46 @@ export default function InternalInvoiceLineItemsTable({
           </div>
         </div>
       ) : !billingDispositionLabel ? (
-        <div className="border-b border-sky-200/80 bg-sky-50/75 px-5 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-sky-950">External billing option</div>
-              <div className="mt-1 text-xs leading-5 text-sky-900">
-                Mark this job as billed outside EveryStep FieldWorks. Existing draft line items will stay here for reference, but this draft will not be treated as the invoice sent through the app.
+        (() => {
+          // Single source for the external-billing block (one form, label before the
+          // return_to). Rendered directly on desktop (unchanged); wrapped in a
+          // disclosure on mobile so it stays collapsed by default.
+          const externalBillingBlock = (
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-sky-950">External billing option</div>
+                <div className="mt-1 text-xs leading-5 text-sky-900">
+                  Mark this job as billed outside EveryStep FieldWorks. Existing draft line items will stay here for reference, but this draft will not be treated as the invoice sent through the app.
+                </div>
               </div>
+              <form className="shrink-0" action={handleExternalBillingDisposition}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+                <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`} />
+                <SubmitButton
+                  loadingText="Saving..."
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
+                >
+                  External Billing Complete
+                </SubmitButton>
+              </form>
             </div>
-            <form className="shrink-0" action={handleExternalBillingDisposition}>
-              <input type="hidden" name="job_id" value={jobId} />
-              <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
-              <input type="hidden" name="tab" value={tab} />
-              <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`} />
-              <SubmitButton
-                loadingText="Saving..."
-                className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
-              >
-                External Billing Complete
-              </SubmitButton>
-            </form>
-          </div>
-        </div>
+          );
+          return (
+            <div className="border-b border-sky-200/80 bg-sky-50/75 px-5 py-3">
+              {/* Slice B cleanup (Fix 3): collapse behind a disclosure on mobile. */}
+              {isMobileWorkspace ? (
+                <details>
+                  <summary className="cursor-pointer list-none text-sm font-semibold text-sky-950">External billing option</summary>
+                  <div className="mt-2">{externalBillingBlock}</div>
+                </details>
+              ) : (
+                externalBillingBlock
+              )}
+            </div>
+          );
+        })()
       ) : null}
 
       <div className="hidden grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3 md:grid">

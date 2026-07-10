@@ -642,7 +642,7 @@ describe("job detail field operations board layout", () => {
     const mobileAssignedTeamIndex = mobileJobDetailCurrentSource.indexOf("<AssignedTeamControls");
     const mobileWorkScopeMountIndex = mobileJobDetailCurrentSource.indexOf("<MobileJobWorkScopePanel");
     const mobileWorkItemsIndex = mobileJobWorkScopePanelSource.indexOf(
-      "{visitScopeItems.map((item: any, index: number) => (",
+      "{visitScopeItems.map((item: any, index: number) => {",
       visitReasonIndex,
     );
     const visitScopeIndex = jobPageSource.indexOf('id="visit-scope-section"');
@@ -664,11 +664,16 @@ describe("job detail field operations board layout", () => {
   });
 
   it("shows every saved Work Scope item on mobile without a hidden more-items summary", () => {
-    expect(mobileJobWorkScopePanelSource).toContain("{visitScopeItems.map((item: any, index: number) => (");
+    expect(mobileJobWorkScopePanelSource).toContain("{visitScopeItems.map((item: any, index: number) => {");
     expect(mobileJobWorkScopePanelSource).not.toContain("primaryVisitScopeItems.slice(0, 2)");
     expect(mobileJobWorkScopePanelSource).not.toContain("more work item");
     expect(mobileJobWorkScopePanelSource).toContain("formatVisitScopeItemKindLabel(item.kind)");
-    expect(mobileJobWorkScopePanelSource).toContain("Number(item.expected_unit_price).toFixed(2)");
+    expect(mobileJobWorkScopePanelSource).toContain("Number(item.expected_unit_price)");
+    // Slice B cleanup: each saved work item exposes a Remove action wired to the
+    // same visit-scope save action, and quantity math when quantity > 1.
+    expect(mobileJobWorkScopePanelSource).toContain("action={updateJobVisitScopeFromForm}");
+    expect(mobileJobWorkScopePanelSource).toContain("Remove");
+    expect(mobileJobWorkScopePanelSource).toContain("showQuantityMath");
   });
 
   it("keeps post-build invoice state visible in the mobile Work & Invoice section", () => {
@@ -690,7 +695,7 @@ describe("job detail field operations board layout", () => {
 
   it("keeps mobile Visit Reason editing aligned inside the Visit Reason card", () => {
     const mobileVisitReasonStart = mobileJobWorkScopePanelSource.indexOf('id="mobile-visit-reason-card"');
-    const mobileVisitReasonEnd = mobileJobWorkScopePanelSource.indexOf("{visitScopeItems.map((item: any, index: number) => (", mobileVisitReasonStart);
+    const mobileVisitReasonEnd = mobileJobWorkScopePanelSource.indexOf("{visitScopeItems.map((item: any, index: number) => {", mobileVisitReasonStart);
     const mobileVisitReasonSlice =
       mobileVisitReasonStart > -1 && mobileVisitReasonEnd > mobileVisitReasonStart
         ? mobileJobWorkScopePanelSource.slice(mobileVisitReasonStart, mobileVisitReasonEnd)
