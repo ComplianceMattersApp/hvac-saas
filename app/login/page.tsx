@@ -9,6 +9,39 @@ import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import { resolvePostLoginDestination } from "@/lib/auth/post-login-destination";
 import { AuthCommandCenterLayout } from "@/components/auth/AuthCommandCenterLayout";
 
+const TRIAL_LABEL_CLASSES = {
+  terracotta: "text-[#c2622a]",
+  stonePill: "rounded-full bg-stone-100 px-2 py-0.5 text-stone-700",
+  emerald: "text-emerald-700",
+} as const;
+
+const TRIAL_PATHS = [
+  {
+    slug: "service",
+    label: "Service",
+    accent: "terracotta",
+    cta: "Start Service Trial",
+    description: "For HVAC service calls, dispatch, field invoicing, and job closeout.",
+    href: "/signup/service",
+  },
+  {
+    slug: "ecc",
+    label: "ECC / Compliance",
+    accent: "stonePill",
+    cta: "Start ECC / Compliance Trial",
+    description: "For ECC testing, corrections, contractor handoff, and cert closeout.",
+    href: "/signup/ecc",
+  },
+  {
+    slug: "cleaning",
+    label: "Cleaning / Janitorial",
+    accent: "emerald",
+    cta: "Start Cleaning Trial",
+    description: "For cleaning jobs, crews, checklists, and recurring service.",
+    href: "/signup/cleaning",
+  },
+] as const;
+
 function resolvePasswordResetRedirect() {
   const configuredAppUrl = String(process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
 
@@ -170,36 +203,45 @@ export default function LoginPage() {
 
   return (
     <AuthCommandCenterLayout
-      eyebrow="Field service workbench"
+      eyebrow="Field service management"
       brandName="EveryStep FieldWorks"
       backingLine="by Compliance Matters"
       headline="Every job. Every step. Fully closed."
-      subhead="Bring scheduling, field notes, invoices, payments, job history, and closeout into one organized view."
+      brandLine="We missed the details too, so we built something that doesn't."
+      subhead="The field service platform built for small HVAC and trades teams. Schedule, dispatch, invoice, and close out jobs — from the office or the driveway."
       highlights={[
-        "Schedule field work from one queue",
-        "Track jobs from first call to closeout",
-        "Keep field notes and job details connected",
-        "See invoices and payments at a glance",
+        "Send professional invoices from the field in seconds",
+        "Know exactly where every job stands, every day",
+        "Close out jobs completely — nothing falls through",
+        "Built for ECC, HVAC service, and cleaning operations",
       ]}
     >
       <div className="space-y-5">
-        <div className="rounded-[28px] border border-white/10 bg-white p-7 shadow-[0_50px_100px_-30px_rgba(2,6,23,0.7)] sm:p-8">
+        <div className="mb-6 px-4 text-center lg:hidden">
+          <h1 className="mb-1 text-2xl font-bold text-[#0f1f35]">Every job. Every step. Fully closed.</h1>
+          <p className="mb-2 text-sm italic text-stone-500">
+            We missed the details too, so we built something that doesn&apos;t.
+          </p>
+          <p className="text-xs text-stone-400">Field service management for HVAC and trades.</p>
+        </div>
+
+        <div className="rounded-2xl border border-stone-200 bg-white p-7 shadow-md sm:p-8">
           <div className="flex items-center gap-3">
-            <img src="/cm-logo.png" alt="EveryStep FieldWorks" width={44} height={44} className="rounded-xl border border-slate-200 shadow-sm" />
+            <img src="/cm-logo.png" alt="EveryStep FieldWorks" width={44} height={44} className="rounded-xl border border-stone-200 shadow-sm" />
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">EveryStep FieldWorks</h1>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">by Compliance Matters</p>
+              <h1 className="text-xl font-semibold tracking-tight text-[#0f1f35]">EveryStep FieldWorks</h1>
+              <p className="mt-0.5 text-xs font-medium text-stone-500">by Compliance Matters</p>
             </div>
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            Log in to run field work, scheduling, closeout, and follow-up from one organized place.
+          <p className="mt-3 text-sm leading-relaxed text-stone-500">
+            Welcome back. Your jobs, schedule, and field team are ready.
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Email</label>
+              <label className="text-sm font-medium text-stone-700">Email</label>
               <input
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-[#0f1f35] shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#c2622a]/40"
                 type="email"
                 name="email"
                 value={email}
@@ -211,18 +253,18 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-3">
-                <label className="text-sm font-medium text-slate-700">Password</label>
+                <label className="text-sm font-medium text-stone-700">Password</label>
                 <button
                   type="button"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                   onClick={() => setShowPassword((current) => !current)}
-                  className="text-xs font-medium text-slate-500 underline-offset-4 hover:text-slate-700 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500/40 rounded"
+                  className="text-xs font-medium text-stone-500 underline-offset-4 hover:text-stone-700 hover:underline focus:outline-none focus:ring-2 focus:ring-[#c2622a]/40 rounded"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
               <input
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
+                className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-[#0f1f35] shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#c2622a]/40"
                 type={showPassword ? "text" : "password"}
                 name="password"
                 value={password}
@@ -235,7 +277,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={onForgotPassword}
                   disabled={loading || resetLoading}
-                  className="text-sm text-slate-500 underline-offset-4 hover:text-slate-700 hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="text-sm text-[#c2622a] underline-offset-4 hover:underline disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {resetLoading ? "Sending reset link..." : "Forgot password?"}
                 </button>
@@ -255,59 +297,46 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || resetLoading}
-              className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_18px_40px_-16px_rgba(37,99,235,0.65)] transition-all hover:from-blue-500 hover:to-cyan-400 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full rounded-xl bg-gradient-to-br from-[#c2622a] to-[#d97740] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_18px_40px_-20px_rgba(194,98,42,0.7)] transition-all hover:brightness-105 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? "Signing in…" : "Sign in"}
             </button>
           </form>
         </div>
 
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-white">New to EveryStep FieldWorks?</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Start a 30-day guided setup. No payment details needed.</p>
+              <p className="text-sm font-medium text-[#0f1f35]">New to EveryStep FieldWorks?</p>
+              <p className="mt-1 text-xs leading-5 text-stone-500">Start a 30-day guided setup. No payment details needed.</p>
             </div>
-            <span className="inline-flex h-fit items-center rounded-full border border-blue-400/25 bg-blue-400/10 px-2.5 py-1 text-[11px] font-semibold text-blue-200">
+            <span className="inline-flex h-fit items-center rounded-full bg-[#c2622a] px-3 py-1 text-xs font-medium text-white">
               Guided trial
             </span>
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <Link
-              href="/signup/service"
-              className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-blue-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
-            >
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-300">Service</span>
-              <span className="mt-2 text-sm font-semibold text-white">Start Service Trial</span>
-              <span className="mt-1 text-xs leading-5 text-slate-400">For service calls, dispatch, work orders, and follow-up.</span>
-            </Link>
-
-            <Link
-              href="/signup/ecc"
-              className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-cyan-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-            >
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-300">ECC / Compliance</span>
-              <span className="mt-2 text-sm font-semibold text-white">Start ECC / Compliance Trial</span>
-              <span className="mt-1 text-xs leading-5 text-slate-400">For ECC jobs, tests, corrections, and closeout.</span>
-            </Link>
-
-            <Link
-              href="/signup/cleaning"
-              className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-emerald-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
-            >
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">Cleaning / Janitorial</span>
-              <span className="mt-2 text-sm font-semibold text-white">Start Cleaning Trial</span>
-              <span className="mt-1 text-xs leading-5 text-slate-400">For cleaning jobs, crews, checklists, recurring service, and follow-up.</span>
-            </Link>
+            {TRIAL_PATHS.map((path) => (
+              <Link
+                key={path.slug}
+                href={path.href}
+                className="group flex min-h-24 flex-col justify-between rounded-xl border border-stone-200 bg-white p-4 text-left transition-all duration-150 hover:border-[#c2622a]/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c2622a]/40"
+              >
+                <span className={`self-start text-[11px] font-semibold uppercase tracking-[0.14em] ${TRIAL_LABEL_CLASSES[path.accent]}`}>
+                  {path.label}
+                </span>
+                <span className="mt-2 text-sm font-bold text-[#0f1f35]">{path.cta}</span>
+                <span className="mt-1 text-sm leading-5 text-stone-500">{path.description}</span>
+              </Link>
+            ))}
           </div>
 
-          <p className="mt-3 text-[11px] leading-5 text-slate-500">
+          <p className="mt-3 text-[11px] leading-5 text-stone-400">
             Trial paths start with a 30-day guided setup and no payment details.
           </p>
         </div>
 
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-stone-400">
           Already invited by your company? Contact your administrator if you need access.
         </p>
       </div>

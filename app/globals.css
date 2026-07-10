@@ -23,6 +23,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 
   /* Visual alignment pass — navy is the heading standard app-wide. */
   --color-navy: #0f1f35;
+
+  /* Auth/landing warm shell palette. */
+  --color-shell-warm: #faf7f2;
+  --color-terracotta: #c2622a;
+  --color-terracotta-light: #f5e6de;
 }
 
 @media (prefers-color-scheme: dark) {

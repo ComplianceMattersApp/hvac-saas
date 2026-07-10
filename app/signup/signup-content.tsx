@@ -156,7 +156,7 @@ const SIGNUP_COPY: Record<
 };
 
 const SIGNUP_FIELD_CLASS =
-  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:ring-offset-2 focus:ring-offset-white [&:-webkit-autofill]:[box-shadow:inset_0_0_0_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#0f172a] [&:-webkit-autofill]:[caret-color:#0f172a]";
+  "w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-[#0f1f35] shadow-sm transition-all placeholder:text-stone-400 focus:border-[#c2622a] focus:outline-none focus:ring-2 focus:ring-[#c2622a]/40 focus:ring-offset-2 focus:ring-offset-white [&:-webkit-autofill]:[box-shadow:inset_0_0_0_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#0f1f35] [&:-webkit-autofill]:[caret-color:#0f1f35]";
 
 export function SignupContent({ productIntent = "generic" }: SignupContentProps) {
   const copy = SIGNUP_COPY[productIntent] ?? SIGNUP_COPY.generic;
@@ -184,39 +184,39 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
       highlights={copy.cards.map((card) => card.title)}
     >
       <div className="space-y-5">
-        <div className="rounded-[28px] border border-white/10 bg-white p-7 shadow-[0_50px_100px_-30px_rgba(2,6,23,0.7)] sm:p-8">
+        <div className="rounded-2xl border border-stone-200 bg-white p-7 shadow-md sm:p-8">
           <div className="flex items-center gap-3">
             <img
               src="/cm-logo.png"
               alt="EveryStep FieldWorks logo"
               width={44}
               height={44}
-              className="rounded-xl border border-slate-200 shadow-sm"
+              className="rounded-xl border border-stone-200 shadow-sm"
             />
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-slate-900">EveryStep FieldWorks</h2>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">by Compliance Matters</p>
+              <h2 className="text-xl font-semibold tracking-tight text-[#0f1f35]">EveryStep FieldWorks</h2>
+              <p className="mt-0.5 text-xs font-medium text-stone-500">by Compliance Matters</p>
             </div>
           </div>
-          <div className="mt-4 text-sm font-semibold text-slate-900">Create your account</div>
-          <p className="mt-3 text-sm leading-relaxed text-slate-500">{copy.formIntro}</p>
+          <div className="mt-4 text-sm font-semibold text-[#0f1f35]">Create your account</div>
+          <p className="mt-3 text-sm leading-relaxed text-stone-500">{copy.formIntro}</p>
 
-          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm">
-            <div className="font-semibold text-slate-900">What happens next</div>
+          <div className="mt-5 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700 shadow-sm">
+            <div className="font-semibold text-[#0f1f35]">What happens next</div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {[
                 "Enter your email",
                 "Get your setup link",
                 "Try real jobs for 30 days",
               ].map((step, index) => (
-                <div key={step} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-[11px] text-white">
+                <div key={step} className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 shadow-sm">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-stone-500">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-[#c2622a] to-[#d97740] text-[11px] text-white">
                       {index + 1}
                     </span>
                     Step {index + 1}
                   </div>
-                  <div className="mt-1.5 text-sm font-medium text-slate-900">{step}</div>
+                  <div className="mt-1.5 text-sm font-medium text-[#0f1f35]">{step}</div>
                 </div>
               ))}
             </div>
@@ -228,7 +228,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             ) : null}
 
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-sm font-medium text-slate-700">
+              <label htmlFor="email" className="text-sm font-medium text-stone-700">
                 Owner email
               </label>
               <input
@@ -245,7 +245,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="owner_display_name" className="text-sm font-medium text-slate-700">
+              <label htmlFor="owner_display_name" className="text-sm font-medium text-stone-700">
                 Owner display name
               </label>
               <input
@@ -260,7 +260,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="business_display_name" className="text-sm font-medium text-slate-700">
+              <label htmlFor="business_display_name" className="text-sm font-medium text-stone-700">
                 Business display name
               </label>
               <input
@@ -291,34 +291,34 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             <button
               type="submit"
               disabled={isPending}
-              className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_18px_40px_-16px_rgba(37,99,235,0.65)] transition-all hover:from-blue-500 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-xl bg-gradient-to-br from-[#c2622a] to-[#d97740] px-4 py-2.5 text-sm font-semibold text-white shadow-[0_18px_40px_-20px_rgba(194,98,42,0.7)] transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPending ? "Submitting..." : "Send setup link"}
             </button>
           </form>
 
-          <p className="mt-4 text-xs leading-relaxed text-slate-500">
+          <p className="mt-4 text-xs leading-relaxed text-stone-500">
             You will not need payment details for this step. After setup, you can review account options in your account.
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-200">{previewHeading}</p>
-            {productIntent !== "generic" ? <span className="text-[11px] text-slate-400">Success Guide</span> : null}
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#c2622a]">{previewHeading}</p>
+            {productIntent !== "generic" ? <span className="text-[11px] text-stone-400">Success Guide</span> : null}
           </div>
-          <div className="mt-3 grid grid-cols-1 gap-2 text-sm leading-5 text-slate-200 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm leading-5 text-[#0f1f35] sm:grid-cols-2">
             {previewItems.map((item) => (
-              <div key={item} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+              <div key={item} className="rounded-lg border border-stone-200 bg-white px-3 py-2">
                 {item}
               </div>
             ))}
           </div>
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs leading-5 text-slate-300">
+            <p className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs leading-5 text-stone-600">
               {copy.trialGoal}
             </p>
-            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs leading-5 text-slate-300">
+            <p className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs leading-5 text-stone-600">
               No payment details are needed to get started. You can review billing options after setup.
             </p>
           </div>
