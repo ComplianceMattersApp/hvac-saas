@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import {
   resolveJobDetailActor,
   loadScopedInternalJobDetailReadBoundaryOutcome,
@@ -374,9 +375,9 @@ export default async function JobDetailV2Page({
   // ── auth ──────────────────────────────────────────────────────────────────
 
   let supabase = await createClient();
-  const {
-    data: { user },
-  } = await timedPhase("authGetUser", () => supabase.auth.getUser());
+  // Shared, request-scoped user resolution — a cache hit against the getUser the
+  // root layout already resolved for this request (dedupes the round-trip).
+  const user = await timedPhase("authGetUser", () => getRequestUser());
   if (!user) redirect("/login");
 
   const actorResolution = await timedPhase("actorRoleResolution", () =>
