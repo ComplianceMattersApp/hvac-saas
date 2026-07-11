@@ -5,6 +5,7 @@ import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-acce
 import { requireFinancialRegisterAccessOrRedirect } from "@/lib/auth/financial-access";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import {
   ReportPageHeader,
   ReportStatCard,
@@ -65,9 +66,7 @@ export default async function DepositDetailPage({
   params: Promise<{ payoutId: string }>;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
   if (!user) redirect("/login");
 
   let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];
