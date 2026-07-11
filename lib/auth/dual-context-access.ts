@@ -95,11 +95,23 @@ export async function resolveDualContextAccess(input: {
     };
   }
 
-  const { data: internalRow, error: internalErr } = await supabase
-    .from("internal_users")
-    .select("user_id, role, is_active, account_owner_user_id, created_by")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // internal_users lookup and portal membership are independent reads; run them
+  // concurrently instead of serially to cut one Supabase round-trip off the
+  // identity resolution critical path.
+  const [internalLookup, portal] = await Promise.all([
+    supabase
+      .from("internal_users")
+      .select("user_id, role, is_active, account_owner_user_id, created_by")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    resolveActiveContractorPortalMembership({
+      supabase,
+      userId: user.id,
+      getAdmin: input.getPortalAdmin,
+    }),
+  ]);
+
+  const { data: internalRow, error: internalErr } = internalLookup;
 
   if (internalErr) throw internalErr;
 
@@ -114,12 +126,6 @@ export async function resolveDualContextAccess(input: {
           createdBy: internalRow.created_by ?? null,
         }
       : null;
-
-  const portal = await resolveActiveContractorPortalMembership({
-    supabase,
-    userId: user.id,
-    getAdmin: input.getPortalAdmin,
-  });
 
   let hasActiveAppAccess = false;
   let appAccessBlockedReason: DualContextAccess["appAccessBlockedReason"] = null;
@@ -165,3 +171,4 @@ export async function resolveDualContextAccess(input: {
     appAccessBlockedReason,
   };
 }
+// perf: internal_users + portal membership reads parallelized (see Promise.all above)

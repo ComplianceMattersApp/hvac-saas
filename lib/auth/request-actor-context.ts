@@ -1,7 +1,6 @@
 import { cache } from "react";
 import type { InternalUserRow } from "@/lib/auth/internal-user";
-import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
-import { isSessionInvalidError } from "@/lib/auth/session-error";
+import { getRequestDualContextAccess } from "@/lib/auth/request-identity";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequestActorKind =
@@ -41,26 +40,20 @@ function buildUnauthenticatedActorContext(supabase: any): RequestActorContext {
 
 async function resolveRequestActorContextUncached(): Promise<RequestActorContext> {
   const supabase = await createClient();
-  const _t_getUser = isOpsTimingEnabled() ? Date.now() : 0;
-  const {
-    data: { user },
-    error: userErr,
-  } = await supabase.auth.getUser();
-  finishOpsTiming("ops:requestActorContext:getUser", _t_getUser);
 
-  if (userErr) {
-    if (isSessionInvalidError(userErr)) {
-      return buildUnauthenticatedActorContext(supabase);
-    }
-    throw userErr;
-  }
+  // Identity is resolved once per request via the shared, memoized resolver.
+  // This dedupes the getUser + dual-context chain that the root layout (and any
+  // other caller in the same request) already paid for, rather than repeating
+  // it here. Session-invalid handling lives inside resolveDualContextAccess,
+  // which returns a null user in that case.
+  const _t_assembly = isOpsTimingEnabled() ? Date.now() : 0;
+  const access = await getRequestDualContextAccess();
+  const user = access.user;
 
   if (!user) {
+    finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
     return buildUnauthenticatedActorContext(supabase);
   }
-
-  const _t_assembly = isOpsTimingEnabled() ? Date.now() : 0;
-  const access = await resolveDualContextAccess({ supabase, user });
 
   // Dual-membership users land in app context only when app entitlement is active.
   // Portal access remains available independently when app access is inactive.
