@@ -13,7 +13,10 @@ describe("dual-context routing wiring", () => {
     const loginPage = readRepoFile("app/login/page.tsx");
     const jobDetailActor = readRepoFile("lib/actions/internal-job-detail-read-boundary.ts");
 
-    expect(rootPage).toContain("resolveDualContextAccess");
+    // Root page routes through the request-scoped cached resolver
+    // (getRequestDualContextAccess), which internally calls resolveDualContextAccess;
+    // either satisfies the "delegates to the shared resolver, not ad-hoc reads" intent.
+    expect(rootPage).toMatch(/getRequestDualContextAccess|resolveDualContextAccess/);
     expect(rootPage).toContain("landingPathForDualContextAccess");
     expect(rootPage).not.toContain(".from(\"contractor_users\")");
 

@@ -19,6 +19,7 @@ import { isInternalAccessError } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import {
   TIME_CLOCK_REPORT_EXPORT_LIMIT,
   TIME_CLOCK_REPORT_PAGE_LIMIT,
@@ -41,9 +42,7 @@ export default async function TimeClockReportPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

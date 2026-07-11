@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import DeleteInternalUserButton from "./_components/DeleteInternalUserButton";
 import { confirmTeamSetupFromForm } from "@/lib/actions/internal-business-profile-actions";
@@ -119,9 +120,7 @@ function FieldBillingAccessControls(params: {
 
 async function requireAdminOrRedirect() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

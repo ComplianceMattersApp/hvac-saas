@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { loadPlatformOwnerDashboardModel } from "@/lib/business/platform-owner-dashboard";
 import { loadPlatformOwnerCustomerLiteRows } from "@/lib/business/platform-owner-customer-lite";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 
 type PageParams = Promise<{
   accountOwnerUserId?: string;
@@ -15,13 +16,7 @@ const DEFAULT_CUSTOMER_LIMIT = 50;
 const SEARCH_CUSTOMER_LIMIT = 250;
 
 async function requirePlatformOwnerOrFailClosed() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error) throw error;
+  const user = await getRequestUser();
   if (!user) redirect("/login");
 
   const allowlisted = isPlatformOwnerActor({

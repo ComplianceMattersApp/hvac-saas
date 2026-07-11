@@ -1,21 +1,14 @@
 import { redirect } from "next/navigation";
-import {
-  landingPathForDualContextAccess,
-  resolveDualContextAccess,
-} from "@/lib/auth/dual-context-access";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { landingPathForDualContextAccess } from "@/lib/auth/dual-context-access";
+import { getRequestDualContextAccess } from "@/lib/auth/request-identity";
 
 export default async function HomePage() {
-  const supabase = await createClient();
-
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData?.user) redirect("/login");
-
-  const access = await resolveDualContextAccess({
-    supabase,
-    user: userData.user,
-    getPortalAdmin: createAdminClient,
-  });
+  // Shared, request-scoped resolution — a cache hit against the identity chain
+  // the root layout already resolved for this request (dedupes getUser + the
+  // full dual-context chain). Prior code passed getPortalAdmin: createAdminClient,
+  // which getRequestDualContextAccess also does, so the outcome is identical.
+  const access = await getRequestDualContextAccess();
+  if (!access.user) redirect("/login");
 
   redirect(landingPathForDualContextAccess(access));
 }

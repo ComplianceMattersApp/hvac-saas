@@ -16,19 +16,15 @@ import {
   type PlatformOwnerConsoleView,
   type PlatformOwnerDashboardRow,
 } from "@/lib/business/platform-owner-dashboard";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 
 type OwnerConsoleProductFilter = "all" | "hvac_service" | "ecc_hers" | "hybrid" | "not_set";
 type OwnerConsoleStatusFilter = "all" | "active" | "trial" | "grace" | "expired" | "suspended" | "cancelled" | "not_set";
 
 async function requirePlatformOwnerOrFailClosed() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
-  if (error) throw error;
   if (!user) redirect("/login");
 
   const allowlisted = isPlatformOwnerActor({

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import Link from "next/link";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import {
   resolveJobDetailActor,
   loadScopedInternalJobDetailReadBoundaryOutcome,
@@ -352,15 +353,36 @@ export default async function JobDetailV2Page({
   const sp = (await searchParams) ?? {};
   const bannerMessage = param(sp, "banner");
 
+  // ── timing (JOB_DETAIL_TIMING_DEBUG) ────────────────────────────────────────
+  // Duration-only instrumentation mirroring the v1 [job-detail-timing] shape.
+  // v2 is the permanent job-detail route; v1's harness only ran on the retired
+  // page, so real traffic produced no timings. timedPhase re-throws the original
+  // error untouched (behavior-preserving) and is a no-op passthrough when the
+  // flag is off.
+  const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
+  const renderStartMs = Date.now();
+  const phaseDurationsMs: Record<string, number> = {};
+  const timedPhase = async <T,>(phaseName: string, factory: () => PromiseLike<T>): Promise<T> => {
+    if (!timingEnabled) return factory();
+    const startMs = Date.now();
+    try {
+      return await factory();
+    } finally {
+      phaseDurationsMs[phaseName] = Date.now() - startMs;
+    }
+  };
+
   // ── auth ──────────────────────────────────────────────────────────────────
 
   let supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Shared, request-scoped user resolution — a cache hit against the getUser the
+  // root layout already resolved for this request (dedupes the round-trip).
+  const user = await timedPhase("authGetUser", () => getRequestUser());
   if (!user) redirect("/login");
 
-  const actorResolution = await resolveJobDetailActor({ supabase, userId: user.id });
+  const actorResolution = await timedPhase("actorRoleResolution", () =>
+    resolveJobDetailActor({ supabase, userId: user.id }),
+  );
   if (actorResolution.kind === "contractor") redirect(`/portal/jobs/${jobId}`);
   if (actorResolution.kind === "unauthorized") redirect("/login");
 
@@ -390,11 +412,13 @@ export default async function JobDetailV2Page({
 
   // ── main job query ─────────────────────────────────────────────────────────
 
-  const { data: job, error: jobError } = await supabase
-    .from("jobs")
-    .select(JOB_V2_SELECT)
-    .eq("id", jobId)
-    .single();
+  const { data: job, error: jobError } = await timedPhase("mainJobRead", () =>
+    supabase
+      .from("jobs")
+      .select(JOB_V2_SELECT)
+      .eq("id", jobId)
+      .single(),
+  );
 
   if (jobError) throw jobError;
   if (!job) return notFound();
@@ -414,7 +438,7 @@ export default async function JobDetailV2Page({
     attachmentCountResult,
     timelineCountResult,
     businessProfile,
-  ] = await Promise.all([
+  ] = await timedPhase("supplementalReads", () => Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
       ? getContractors(accountOwnerUserId)
@@ -452,7 +476,7 @@ export default async function JobDetailV2Page({
       .select("id", { count: "exact", head: true })
       .in("job_id", timelineScopeJobIds),
     getInternalBusinessProfileByAccountOwnerId({ supabase, accountOwnerUserId }),
-  ]);
+  ]));
 
   if (customerLocationsError) throw customerLocationsError;
   if (primaryInvoiceError) throw primaryInvoiceError;
@@ -806,6 +830,23 @@ export default async function JobDetailV2Page({
   ];
 
   // ── render ─────────────────────────────────────────────────────────────────
+
+  if (timingEnabled) {
+    console.info(
+      "[job-detail-timing]",
+      JSON.stringify({
+        jobId,
+        route: "v2",
+        phasesMs: {
+          authGetUser: phaseDurationsMs.authGetUser ?? 0,
+          actorRoleResolution: phaseDurationsMs.actorRoleResolution ?? 0,
+          mainJobRead: phaseDurationsMs.mainJobRead ?? 0,
+          supplementalReads: phaseDurationsMs.supplementalReads ?? 0,
+          totalServerRenderBeforeResponse: Date.now() - renderStartMs,
+        },
+      }),
+    );
+  }
 
   return (
     <div style={{ background: "oklch(0.975 0.004 250)", minHeight: "100vh" }}>

@@ -17,7 +17,8 @@ import {
 } from "@/lib/business/platform-owner-dashboard";
 import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
 import { accountScopeInList, resolveReportAccountContractorIds } from "@/lib/reports/report-account-scope";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 
 type PageParams = Promise<{
   accountOwnerUserId?: string;
@@ -49,13 +50,8 @@ type OperationalActivitySnapshot = {
 };
 
 async function requirePlatformOwnerOrFailClosed() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
-  if (error) throw error;
   if (!user) redirect("/login");
 
   const allowlisted = isPlatformOwnerActor({

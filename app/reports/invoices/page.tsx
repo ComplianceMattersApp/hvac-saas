@@ -4,6 +4,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { sendInternalInvoiceEmailFromForm } from "@/lib/actions/internal-invoice-actions";
 import { canManageInvoiceLifecycle, requireFinancialRegisterAccessOrRedirect } from "@/lib/auth/financial-access";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
@@ -83,7 +84,7 @@ export default async function InvoiceLedgerPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getRequestUser();
   if (!user) redirect("/login");
 
   let internalUser: Awaited<ReturnType<typeof requireInternalUser>>["internalUser"];

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import {
   rejectFieldPaymentCollectionReportFromForm,
   verifyFieldPaymentCollectionReportFromForm,
@@ -67,9 +68,7 @@ function formatDate(value: string | null | undefined) {
 
 export default async function PaymentReconciliationPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 
