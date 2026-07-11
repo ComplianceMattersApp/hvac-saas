@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import {
@@ -19,9 +20,7 @@ type SearchParams = Promise<{ notice?: string }>;
 
 async function requireReviewerOrRedirect() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

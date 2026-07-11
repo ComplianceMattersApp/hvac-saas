@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { notFound, redirect } from "next/navigation";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import AccountSnapshotIdentityHeader from "./AccountSnapshotIdentityHeader";
 import CompanyProfileSnapshot from "./CompanyProfileSnapshot";
 import PaymentsReadinessSnapshot from "./PaymentsReadinessSnapshot";
@@ -26,13 +27,8 @@ type TeamUserSnapshot = {
 };
 
 async function requirePlatformOwnerOrFailClosed() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
-  if (error) throw error;
   if (!user) redirect("/login");
 
   const allowlisted = isPlatformOwnerActor({

@@ -14,20 +14,16 @@ import {
   type SupportCaseNote,
 } from "@/lib/business/support-cases";
 import { loadPlatformOwnerDashboardModel } from "@/lib/business/platform-owner-dashboard";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 
 type PageParams = Promise<{
   supportCaseId?: string;
 }>;
 
 async function requirePlatformOwnerOrFailClosed() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
-  if (error) throw error;
   if (!user) redirect("/login");
 
   const allowed = isPlatformOwnerActor({

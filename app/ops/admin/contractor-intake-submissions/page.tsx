@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 
 async function requireReviewerOrRedirect() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

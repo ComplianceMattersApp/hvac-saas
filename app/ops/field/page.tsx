@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -24,8 +25,7 @@ type JobAssignmentRow = { job_id: string | null };
 
 export default async function OpsFieldPage() {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

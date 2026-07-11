@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -89,9 +90,7 @@ function resolveEditablePhone(authUser: any) {
 
 async function requireAdminOrRedirect() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

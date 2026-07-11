@@ -17,6 +17,7 @@ import {
   isKnownPricebookUnitLabel,
 } from "@/lib/business/pricebook-options";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import { PricebookImportPanel } from "./PricebookImportPanel";
 
 type SearchParams = Promise<{ notice?: string; view?: string; q?: string; category?: string }>;
@@ -172,9 +173,7 @@ function normalizeCategoryFilter(raw: unknown) {
 
 async function requireAdminOrRedirect() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

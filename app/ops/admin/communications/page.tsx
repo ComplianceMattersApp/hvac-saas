@@ -13,6 +13,7 @@ import {
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -245,9 +246,7 @@ function VersionSummaryCard({
 
 async function requireAdminOrRedirect() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 

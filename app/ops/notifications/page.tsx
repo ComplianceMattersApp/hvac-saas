@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-access-redirect";
 import { createClient } from "@/lib/supabase/server";
+import { getRequestUser } from "@/lib/auth/request-identity";
 import {
   listInternalNotifications,
   markNotificationAsRead,
@@ -47,9 +48,7 @@ export default async function NotificationsPage({
   const onlyUnread = String(sp.state ?? "").trim().toLowerCase() === "unread";
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getRequestUser();
 
   if (!user) redirect("/login");
 
