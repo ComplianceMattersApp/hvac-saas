@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createClientMock = vi.fn();
+const createAdminClientMock = vi.fn();
 const getInternalUserMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
+  createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-user", () => ({
@@ -18,9 +20,17 @@ vi.mock("@/lib/business/platform-entitlement", () => ({
   })),
 }));
 
+// Portal membership resolution (resolveActiveContractorPortalMembership) issues
+// two reads against the session client — contractor_users.select().eq().limit()
+// then contractors.select().in().limit() — and, when the session client finds
+// nothing, falls back to an admin-client owner lookup
+// (contractors.select().eq("owner_user_id").limit()). This fixture reproduces
+// that shape so the actor-context routing is exercised against the real query
+// path rather than a stale single-row mock.
 function makeSupabaseFixture(input: {
   userId?: string | null;
   contractorId?: string | null;
+  ownerContractorId?: string | null;
   getUserError?: unknown;
 }) {
   const auth = {
@@ -33,22 +43,63 @@ function makeSupabaseFixture(input: {
   };
 
   const from = vi.fn((table: string) => {
-    if (table !== "contractor_users" && table !== "internal_users") {
+    const filters: Record<string, unknown> = {};
+
+    const resolveList = async () => {
+      if (table === "contractor_users") {
+        return {
+          data: input.contractorId ? [{ contractor_id: input.contractorId }] : [],
+          error: null,
+        };
+      }
+      if (table === "contractors") {
+        // Owner-fallback lookup keys on owner_user_id; membership lookup keys on id.
+        if (filters.owner_user_id !== undefined) {
+          return {
+            data: input.ownerContractorId
+              ? [
+                  {
+                    id: input.ownerContractorId,
+                    name: "Owner Co",
+                    lifecycle_state: "active",
+                    owner_user_id: filters.owner_user_id,
+                  },
+                ]
+              : [],
+            error: null,
+          };
+        }
+        return {
+          data: input.contractorId
+            ? [
+                {
+                  id: input.contractorId,
+                  name: "Contractor Co",
+                  lifecycle_state: "active",
+                  owner_user_id: "portal-owner",
+                },
+              ]
+            : [],
+          error: null,
+        };
+      }
       throw new Error(`Unexpected table: ${table}`);
-    }
+    };
 
     const query: any = {
       select: vi.fn(() => query),
-      eq: vi.fn(() => query),
-      maybeSingle: vi.fn(async () => ({
-        data:
-          table === "contractor_users"
-            ? input.contractorId
-              ? { contractor_id: input.contractorId, contractors: { lifecycle_state: "active" } }
-              : null
-            : await getInternalUserMock(),
-        error: null,
-      })),
+      eq: vi.fn((column: string, value: unknown) => {
+        filters[column] = value;
+        return query;
+      }),
+      in: vi.fn(() => query),
+      limit: vi.fn(resolveList),
+      maybeSingle: vi.fn(async () => {
+        if (table === "internal_users") {
+          return { data: await getInternalUserMock(), error: null };
+        }
+        throw new Error(`Unexpected maybeSingle on table: ${table}`);
+      }),
     };
 
     return query;
@@ -64,6 +115,10 @@ describe("getRequestActorContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    // Default admin client resolves no portal membership/owner, so the
+    // admin-fallback path (now shared with the root layout) is a no-op unless a
+    // test opts into it. createAdminClient is called synchronously, not awaited.
+    createAdminClientMock.mockReturnValue(makeSupabaseFixture({ userId: null }));
   });
 
   it("returns unauthenticated when there is no auth user", async () => {

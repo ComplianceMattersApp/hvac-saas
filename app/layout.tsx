@@ -14,13 +14,13 @@ import ShellNavLink from "@/components/layout/ShellNavLink";
 import ShellOpsMenu from "@/components/layout/ShellOpsMenu";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
-import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import { getRequestDualContextAccess } from "@/lib/auth/request-identity";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import { shouldShowPortalMenuItem } from "@/lib/portal/partner-work-access";
-import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
@@ -74,23 +74,22 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const supabase = await createClient();
-  const access = await resolveDualContextAccess({
-    supabase,
-    getPortalAdmin: createAdminClient,
-  });
+  const access = await getRequestDualContextAccess();
   const user = access.user;
 
-  let profileFullName: string | null = null;
-
-  if (user?.id) {
-    const { data: profileRow } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    profileFullName = profileRow?.full_name ? String(profileRow.full_name).trim() : null;
-  }
+  // Kick off the profile name read immediately; it only needs user.id and is
+  // independent of the internal-user identity branch below, so it can resolve
+  // concurrently with the notification/product-mode reads instead of serially.
+  const profileFullNamePromise: PromiseLike<string | null> = user?.id
+    ? supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle()
+        .then(({ data }: { data: { full_name?: unknown } | null }) =>
+          data?.full_name ? String(data.full_name).trim() : null,
+        )
+    : Promise.resolve(null);
 
   let homeHref = "/today";
   let isInternalUser = false;
@@ -109,18 +108,26 @@ export default async function RootLayout({
     isInternalUser = true;
     isAdmin = access.internalUser.role === "admin";
     const accountOwnerUserId = String(access.internalUser.accountOwnerUserId ?? "").trim();
-    unreadNotificationCount = await getInternalUnreadNotificationBadgeCount({
-      supabase,
-      accountOwnerUserId,
-    });
 
     permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(accountOwnerUserId);
 
-    productMode = await resolveProductModeForAccountOwnerId({
-      supabase,
-      accountOwnerUserId,
-    });
+    // Independent reads — resolve concurrently instead of serially.
+    const [badgeCount, resolvedProductMode] = await Promise.all([
+      getInternalUnreadNotificationBadgeCount({
+        supabase,
+        accountOwnerUserId,
+      }),
+      resolveProductModeForAccountOwnerId({
+        supabase,
+        accountOwnerUserId,
+      }),
+    ]);
+
+    unreadNotificationCount = badgeCount;
+    productMode = resolvedProductMode;
   }
+
+  const profileFullName = await profileFullNamePromise;
 
   const showPortalMenuItem = shouldShowPortalMenuItem({
     hasActiveAppAccess: access.hasActiveAppAccess,
