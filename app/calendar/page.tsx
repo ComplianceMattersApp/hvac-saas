@@ -7,6 +7,7 @@ import {
   landingPathForDualContextAccess,
   resolveDualContextAccess,
 } from '@/lib/auth/dual-context-access';
+import { getRequestUser } from '@/lib/auth/request-identity';
 import { isLikelyMobileUserAgent, resolveCalendarDefaultView } from '@/lib/utils/calendar-view-default';
 
 function todayYmdLA(now = new Date()) {
@@ -33,12 +34,15 @@ export default async function CalendarPage({
   }>;
 }) {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
+  // Shared, request-scoped user (cache hit off the layout's getUser). The local
+  // resolveDualContextAccess is kept as-is — without getPortalAdmin — to preserve
+  // this page's exact portal/redirect semantics; only the getUser is deduped.
+  const user = await getRequestUser();
 
-  if (userData?.user?.id) {
+  if (user?.id) {
     const access = await resolveDualContextAccess({
       supabase,
-      user: userData.user,
+      user,
     });
 
     if (!access.hasActiveAppAccess) {
