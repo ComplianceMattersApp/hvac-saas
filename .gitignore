@@ -15,7 +15,9 @@
 
 # next.js
 /.next/
-/out/
+# Capacitor requires webDir (out/) to exist for `cap sync`; keep only the placeholder.
+/out/*
+!/out/index.html
 
 # production
 /build
