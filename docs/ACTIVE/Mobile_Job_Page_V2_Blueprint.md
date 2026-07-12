@@ -1,9 +1,11 @@
 # EveryStep FieldWorks — Mobile Job Page V2 Blueprint
 
-**Status:** ACTIVE DESIGN BLUEPRINT — NOT IMPLEMENTED  
-**Date:** 2026-06-25  
+Status: IMPLEMENTED AND LIVE
+V2 is fully shipped and is the canonical default mobile surface for /jobs/[id]. MobileJobDetailV2Preview renders unconditionally. The mobileLayout=current|classic fallback is retained per the safety contract in §10. This document serves as the durable technical protection contract for the surface — do not modify anchor IDs, server-action names, form field names, or shared booleans without a dedicated audit.
+Last status update: July 2026
+
 **Scope:** Internal mobile `/jobs/[id]` only  
-**Authority:** Subordinate to `Active Spine V4.0 Current.md`, the current workflow-modernization documents, and existing job-detail source-of-truth, role, billing, ECC, service-case, and mobile action contracts.
+**Authority:** Subordinate to `docs/PROJECT_TRUTH.md`, the current workflow-modernization documents, and existing job-detail source-of-truth, role, billing, ECC, service-case, and mobile action contracts.
 
 ---
 
