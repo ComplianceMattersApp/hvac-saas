@@ -1,7 +1,10 @@
 import type { CSSProperties } from "react";
 
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
-import { addWorkshareOutcomeNoteFromForm } from "@/lib/workflows/account-workshare-requests-actions";
+import {
+  addWorkshareOutcomeNoteFromForm,
+  sendWorkshareOutcomeToContractorFromForm,
+} from "@/lib/workflows/account-workshare-requests-actions";
 import type { AccountWorkshareRequestRow } from "@/lib/workflows/account-workshare-requests-read";
 import { formatWorkshareDateTime } from "@/app/ops/workshare/_components/workshare-request-card";
 
@@ -64,21 +67,26 @@ export default function ReceiverWorksharePanel({
   request,
   senderCompanyName,
   receivingJobId,
+  currentResult,
 }: {
   request: AccountWorkshareRequestRow;
   senderCompanyName: string;
   receivingJobId: string;
+  currentResult: "passed" | "failed" | null;
 }) {
   const customer = clean(request.customer_name_snapshot) || "Customer not provided";
   const retestPending = !!request.retest_requested_at && !request.outcome;
-  const outcome = request.outcome;
+  // The result is "sent" only when what the contractor has (request.outcome)
+  // matches the live test result. A ready-but-unsent result awaits the rater.
+  const sent = !!currentResult && request.outcome === currentResult;
+  const readyToSend = !!currentResult && !sent;
 
   return (
     <section id="workshare-partner" data-jobsection="workshare-partner" style={sectionStyle}>
       <div style={{ ...sectionLabelStyle, marginBottom: "6px" }}>Workshare — ECC/HERS</div>
       <p style={{ fontSize: "13px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)", marginBottom: "16px", maxWidth: "640px" }}>
-        This job came from an ECC/HERS request sent by <strong>{senderCompanyName}</strong> for {customer}. The result you
-        record here is returned to them automatically.
+        This job came from an ECC/HERS request sent by <strong>{senderCompanyName}</strong> for {customer}. Review the test
+        result, then send it to them when you&apos;re ready — nothing is shared automatically.
       </p>
 
       {retestPending ? (
@@ -102,57 +110,104 @@ export default function ReceiverWorksharePanel({
         </div>
       ) : null}
 
-      {outcome ? (
-        <div style={{ marginBottom: "16px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
-          <span
-            style={{
-              padding: "5px 12px",
-              borderRadius: "999px",
-              fontSize: "11px",
-              fontWeight: 700,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              border: `1px solid ${outcome === "passed" ? "oklch(0.82 0.09 155)" : "oklch(0.82 0.09 25)"}`,
-              background: outcome === "passed" ? "oklch(0.96 0.04 155)" : "oklch(0.96 0.04 25)",
-              color: outcome === "passed" ? "oklch(0.45 0.13 155)" : "oklch(0.5 0.15 25)",
-            }}
-          >
-            Returned: {outcome === "passed" ? "Passed" : "Failed"}
-          </span>
-          <span style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)" }}>
-            Sent to the contractor automatically.
-          </span>
+      {!currentResult ? (
+        <p style={{ fontSize: "12.5px", color: "oklch(0.55 0.015 262)", marginBottom: "16px" }}>
+          No result yet — complete the ECC test on this job, then you can send the pass/fail to the contractor.
+        </p>
+      ) : readyToSend ? (
+        <div
+          style={{
+            borderRadius: "10px",
+            border: "1px solid oklch(0.9 0.006 250)",
+            background: "oklch(0.99 0.002 250)",
+            padding: "14px",
+            marginBottom: "8px",
+            display: "grid",
+            gap: "10px",
+            maxWidth: "560px",
+          }}
+        >
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "oklch(0.3 0.02 262)" }}>Test result ready:</span>
+            <span
+              style={{
+                padding: "5px 12px",
+                borderRadius: "999px",
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                border: `1px solid ${currentResult === "passed" ? "oklch(0.82 0.09 155)" : "oklch(0.82 0.09 25)"}`,
+                background: currentResult === "passed" ? "oklch(0.96 0.04 155)" : "oklch(0.96 0.04 25)",
+                color: currentResult === "passed" ? "oklch(0.45 0.13 155)" : "oklch(0.5 0.15 25)",
+              }}
+            >
+              {currentResult === "passed" ? "Passed" : "Failed"}
+            </span>
+            <span style={{ fontSize: "12px", color: "oklch(0.5 0.12 65)", fontWeight: 600 }}>Not sent yet</span>
+          </div>
+          <p style={{ fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)" }}>
+            Double-check the result, then send it to {senderCompanyName} when you&apos;re ready.
+          </p>
+          <form action={sendWorkshareOutcomeToContractorFromForm} style={{ display: "grid", gap: "8px" }}>
+            <input type="hidden" name="receiving_job_id" value={receivingJobId} />
+            <label style={fieldLabelStyle}>Add a note (optional)</label>
+            <textarea
+              name="outcome_note"
+              maxLength={2000}
+              rows={2}
+              placeholder='e.g. "Passed after the duct fix — good to schedule the final."'
+              style={textareaStyle}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <ImmediateSubmitButton pendingText="Sending…" className="" style={primaryBtnStyle}>
+                Send result to contractor
+              </ImmediateSubmitButton>
+            </div>
+          </form>
         </div>
       ) : (
-        <p style={{ fontSize: "12.5px", color: "oklch(0.55 0.015 262)", marginBottom: "16px" }}>
-          No result recorded yet — complete the ECC test and the pass/fail is returned to the contractor.
-        </p>
-      )}
-
-      {outcome ? (
-        <form action={addWorkshareOutcomeNoteFromForm} style={{ display: "grid", gap: "8px", maxWidth: "560px" }}>
-          <input type="hidden" name="receiving_job_id" value={receivingJobId} />
-          <label style={fieldLabelStyle}>Message the contractor (optional)</label>
-          {request.outcome_note ? (
-            <div style={{ fontSize: "12.5px", color: "oklch(0.45 0.02 262)" }}>
-              Last note sent: {request.outcome_note}
-            </div>
-          ) : null}
-          <textarea
-            name="outcome_note"
-            required
-            maxLength={2000}
-            rows={2}
-            placeholder='e.g. "Passed after the duct fix — good to schedule the final."'
-            style={textareaStyle}
-          />
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <ImmediateSubmitButton pendingText="Sending…" className="" style={primaryBtnStyle}>
-              Send note
-            </ImmediateSubmitButton>
+        <div style={{ display: "grid", gap: "12px", maxWidth: "560px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
+            <span
+              style={{
+                padding: "5px 12px",
+                borderRadius: "999px",
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                border: `1px solid ${currentResult === "passed" ? "oklch(0.82 0.09 155)" : "oklch(0.82 0.09 25)"}`,
+                background: currentResult === "passed" ? "oklch(0.96 0.04 155)" : "oklch(0.96 0.04 25)",
+                color: currentResult === "passed" ? "oklch(0.45 0.13 155)" : "oklch(0.5 0.15 25)",
+              }}
+            >
+              Sent: {currentResult === "passed" ? "Passed" : "Failed"}
+            </span>
+            <span style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)" }}>The contractor has been notified.</span>
           </div>
-        </form>
-      ) : null}
+          {request.outcome_note ? (
+            <div style={{ fontSize: "12.5px", color: "oklch(0.45 0.02 262)" }}>Last note sent: {request.outcome_note}</div>
+          ) : null}
+          <form action={addWorkshareOutcomeNoteFromForm} style={{ display: "grid", gap: "8px" }}>
+            <input type="hidden" name="receiving_job_id" value={receivingJobId} />
+            <label style={fieldLabelStyle}>Send a follow-up note (optional)</label>
+            <textarea
+              name="outcome_note"
+              required
+              maxLength={2000}
+              rows={2}
+              placeholder="Send the contractor an update."
+              style={textareaStyle}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <ImmediateSubmitButton pendingText="Sending…" className="" style={primaryBtnStyle}>
+                Send note
+              </ImmediateSubmitButton>
+            </div>
+          </form>
+        </div>
+      )}
     </section>
   );
 }

@@ -230,12 +230,14 @@ export async function insertWorkshareRequestOutcomeNotification(params: {
   const customer = String(request.customer_name_snapshot ?? "").trim();
   const forCustomer = customer ? ` for ${customer}` : "";
 
+  const note = String(request.outcome_note ?? "").trim();
+  const noteSuffix = note ? ` Note: ${note}` : "";
   const subject =
     outcome === "passed" ? "ECC/HERS test passed" : "ECC/HERS test failed";
   const body =
-    outcome === "passed"
+    (outcome === "passed"
       ? `${raterName} completed ECC/HERS testing${forCustomer}: PASSED. You can proceed to the final inspection.`
-      : `${raterName} completed ECC/HERS testing${forCustomer}: FAILED. Corrections are needed before a retest.`;
+      : `${raterName} completed ECC/HERS testing${forCustomer}: FAILED. Corrections are needed before a retest.`) + noteSuffix;
 
   await admin.from("notifications").insert({
     job_id: null,

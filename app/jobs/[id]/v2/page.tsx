@@ -677,10 +677,19 @@ export default async function JobDetailV2Page({
   // request)? If so, surface the partner panel with the contractor context.
   const receiverWorkshareRequest = await getWorkshareRequestForReceivingJob(supabase, accountOwnerUserId, jobId);
   let receiverWorkshareSenderName = "Connected contractor";
+  let receiverWorkshareCurrentResult: "passed" | "failed" | null = null;
   if (receiverWorkshareRequest) {
     const senderNames = await resolveWorkshareSenderCompanyNames([receiverWorkshareRequest]);
     receiverWorkshareSenderName =
       senderNames.get(String(receiverWorkshareRequest.sender_account_id ?? "").trim()) || "Connected contractor";
+    // Live ECC result of this receiving job (rater sends it manually).
+    const receiverOps = String(job.ops_status ?? "").toLowerCase();
+    receiverWorkshareCurrentResult =
+      receiverOps === "failed"
+        ? "failed"
+        : ["paperwork_required", "invoice_required", "certs_complete", "closed"].includes(receiverOps)
+          ? "passed"
+          : null;
   }
 
   // brief fields
@@ -2778,6 +2787,7 @@ export default async function JobDetailV2Page({
             request={receiverWorkshareRequest}
             senderCompanyName={receiverWorkshareSenderName}
             receivingJobId={jobId}
+            currentResult={receiverWorkshareCurrentResult}
           />
         ) : null}
 
