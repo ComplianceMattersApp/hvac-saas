@@ -124,6 +124,7 @@ export default function EccHersRequestSection({
   requests,
   defaultScope,
   notice,
+  raterNameById,
 }: {
   jobId: string;
   returnTo: string;
@@ -131,6 +132,7 @@ export default function EccHersRequestSection({
   requests: AccountWorkshareRequestRow[];
   defaultScope: string;
   notice: string;
+  raterNameById?: Record<string, string>;
 }) {
   const sentCount = requests.filter((request) => request.status === "sent").length;
 
@@ -162,17 +164,37 @@ export default function EccHersRequestSection({
 
       <NoticeBanner notice={notice} />
 
-      <form
-        action={createAccountWorkshareRequestFromJobForm}
-        style={{
-          display: "grid",
-          gap: "16px",
-          padding: "18px",
-          borderRadius: "12px",
-          border: "1px solid oklch(0.9 0.006 250)",
-          background: "oklch(0.99 0.002 250)",
-        }}
-      >
+      <details open={requests.length === 0} style={{ marginBottom: requests.length > 0 ? "4px" : 0 }}>
+        <summary
+          style={{
+            display: "inline-flex",
+            cursor: "pointer",
+            listStyle: "none",
+            alignItems: "center",
+            height: "36px",
+            padding: "0 14px",
+            borderRadius: "9px",
+            border: "1px solid oklch(0.85 0.05 255)",
+            background: "oklch(0.97 0.02 255)",
+            color: "oklch(0.45 0.14 255)",
+            fontSize: "12.5px",
+            fontWeight: 600,
+          }}
+        >
+          {requests.length === 0 ? "Send an ECC/HERS request" : "Send another request"}
+        </summary>
+        <form
+          action={createAccountWorkshareRequestFromJobForm}
+          style={{
+            display: "grid",
+            gap: "16px",
+            padding: "18px",
+            borderRadius: "12px",
+            border: "1px solid oklch(0.9 0.006 250)",
+            background: "oklch(0.99 0.002 250)",
+            marginTop: "10px",
+          }}
+        >
         <input type="hidden" name="source_job_id" value={jobId} />
         <input type="hidden" name="return_to" value={returnTo} />
 
@@ -237,7 +259,8 @@ export default function EccHersRequestSection({
             Send request
           </ImmediateSubmitButton>
         </div>
-      </form>
+        </form>
+      </details>
 
       {requests.length > 0 ? (
         <div style={{ marginTop: "18px", display: "grid", gap: "8px" }}>
@@ -280,7 +303,10 @@ export default function EccHersRequestSection({
                   </div>
                   <div style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)", marginTop: "2px" }}>
                     {formatWorkshareDateTime(request.sent_at)}
-                    {request.receiver_account_id ? ` · rater ${request.receiver_account_id.slice(0, 8)}` : ""}
+                    {(() => {
+                      const raterName = raterNameById?.[String(request.receiver_account_id ?? "").trim()];
+                      return raterName ? ` · ${raterName}` : "";
+                    })()}
                     {request.retest_count > 0 ? ` · retest #${request.retest_count}` : ""}
                   </div>
                 </div>

@@ -673,6 +673,26 @@ export default async function JobDetailV2Page({
     }),
   );
 
+  // Company names for the sent-request list (so it never shows a rater account id).
+  const workshareRaterNameById: Record<string, string> = {};
+  {
+    const requestReceivers = Array.from(
+      new Set((workshareRequests ?? []).map((r) => String(r.receiver_account_id ?? "").trim()).filter(Boolean)),
+    );
+    if (requestReceivers.length > 0) {
+      const raterAdmin = workshareLabelAdmin ?? createAdminClient();
+      await Promise.all(
+        requestReceivers.map(async (receiverId) => {
+          const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
+            accountOwnerUserId: receiverId,
+            supabase: raterAdmin,
+          });
+          workshareRaterNameById[receiverId] = String(identity.display_name ?? "").trim() || "Connected rater";
+        }),
+      );
+    }
+  }
+
   // Receiver side: is THIS job a workshare receiving job (created from an accepted
   // request)? If so, surface the partner panel with the contractor context.
   const receiverWorkshareRequest = await getWorkshareRequestForReceivingJob(supabase, accountOwnerUserId, jobId);
@@ -2778,6 +2798,7 @@ export default async function JobDetailV2Page({
             requests={workshareRequests ?? []}
             defaultScope={workshareDefaultScope}
             notice={param(sp, "notice")}
+            raterNameById={workshareRaterNameById}
           />
         ) : null}
 
