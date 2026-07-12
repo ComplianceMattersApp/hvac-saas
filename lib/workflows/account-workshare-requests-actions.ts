@@ -18,6 +18,7 @@ import {
 } from "@/lib/workflows/account-workshare-requests-read";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { createReceiverJobFromWorkshareSnapshot } from "@/lib/workflows/receiver-job-from-workshare";
+import { insertWorkshareRequestReceivedNotification } from "@/lib/workflows/workshare-notifications";
 
 type ActionResult =
   | {
@@ -511,6 +512,17 @@ export async function createAccountWorkshareRequestFromJobForm(formData: FormDat
 
   if (!result.success) {
     redirect(withJobRequestNotice(sourceJobId, "workshare_request_error", returnTo));
+  }
+
+  // Best-effort cross-account awareness: notify the receiver a request arrived.
+  // A side effect of the real send path; never blocks or fails the send.
+  try {
+    await insertWorkshareRequestReceivedNotification({
+      admin: createAdminClient(),
+      request: result.request,
+    });
+  } catch {
+    // swallow — the request is sent; the awareness signal is non-critical.
   }
 
   revalidatePath(resolveWorkshareReturnBase(returnTo, sourceJobId));
