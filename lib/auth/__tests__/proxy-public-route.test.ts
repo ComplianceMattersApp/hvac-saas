@@ -23,6 +23,11 @@ describe("isUnauthedPublicRoute", () => {
     expect(isUnauthedPublicRoute("/payments/checkout-complete?status=success")).toBe(true);
   });
 
+  it("allows the privacy and terms pages without auth", () => {
+    expect(isUnauthedPublicRoute("/privacy")).toBe(true);
+    expect(isUnauthedPublicRoute("/terms")).toBe(true);
+  });
+
   it("does not allow protected ops routes", () => {
     expect(isUnauthedPublicRoute("/ops")).toBe(false);
     expect(isUnauthedPublicRoute("/ops/admin")).toBe(false);
