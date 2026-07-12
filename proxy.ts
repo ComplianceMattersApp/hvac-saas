@@ -108,6 +108,8 @@ export function isUnauthedPublicRoute(pathname: string) {
     pathname.startsWith("/auth") ||
     pathname.startsWith("/set-password") ||
     pathname.startsWith("/proposals") ||
+    pathname.startsWith("/privacy") ||
+    pathname.startsWith("/terms") ||
     pathname.startsWith("/payments/checkout-complete") ||
     // QBO OAuth callback verifies its own state/CSRF via the signed state cookie
     // and writes with the admin client — no user session gate needed.
