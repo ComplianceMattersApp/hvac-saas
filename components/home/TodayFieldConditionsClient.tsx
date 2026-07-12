@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Cloud, CloudRain, LocateFixed, Sun, Wind } from "lucide-react";
 
+import { Capacitor } from "@capacitor/core";
+import { Geolocation } from "@capacitor/geolocation";
+
 import type { TodayFieldConditions } from "@/lib/home/today-field-conditions";
 
 type FieldConditionsStatus = "idle" | "loading" | "ready" | "denied" | "unavailable" | "error";
@@ -58,9 +61,12 @@ export default function TodayFieldConditionsClient() {
   const lastLocationCheckRef = useRef(0);
   const requestInFlightRef = useRef(false);
 
-  const requestConditions = useCallback((mode: "user" | "passive") => {
+  const requestConditions = useCallback(async (mode: "user" | "passive") => {
     if (requestInFlightRef.current) return;
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
+    if (
+      !Capacitor.isNativePlatform() &&
+      (typeof navigator === "undefined" || !navigator.geolocation)
+    ) {
       setLocationSupported(false);
       setStatus("unavailable");
       return;
@@ -68,6 +74,36 @@ export default function TodayFieldConditionsClient() {
 
     requestInFlightRef.current = true;
     if (mode === "user" || !conditions) setStatus("loading");
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const permission = await Geolocation.requestPermissions();
+        if (permission.location !== "granted") {
+          setStatus("denied");
+          requestInFlightRef.current = false;
+          return;
+        }
+        const position = await Geolocation.getCurrentPosition({
+          enableHighAccuracy: false,
+          timeout: 8000,
+        });
+        const coords = {
+          latitude: roundCoordinate(position.coords.latitude),
+          longitude: roundCoordinate(position.coords.longitude),
+        };
+        lastLocationCheckRef.current = Date.now();
+        lastCoordsRef.current = coords;
+        const nextConditions = await fetchConditions(coords).catch(() => null);
+        setConditions(nextConditions);
+        setStatus(nextConditions ? "ready" : "error");
+        requestInFlightRef.current = false;
+        return;
+      } catch {
+        setStatus("unavailable");
+        requestInFlightRef.current = false;
+        return;
+      }
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
