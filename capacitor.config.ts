@@ -13,7 +13,7 @@ const config: CapacitorConfig = {
     backgroundColor: '#0f1f35',
     allowMixedContent: false,
     captureInput: false,
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: process.env.NODE_ENV !== 'production',
   },
   ios: {
     backgroundColor: '#0f1f35',

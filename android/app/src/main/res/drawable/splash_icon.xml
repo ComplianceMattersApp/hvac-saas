@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31) splash icon. The system splash renders on a 240dp canvas
+  and circle-masks the icon to an inner ~160dp safe zone; art that fills the full
+  canvas gets clipped. This inset shrinks the existing launcher foreground (the
+  compass mark) so it sits comfortably inside that safe zone.
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@mipmap/ic_launcher_foreground"
+    android:inset="25%" />

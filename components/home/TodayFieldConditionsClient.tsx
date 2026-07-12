@@ -135,6 +135,26 @@ export default function TodayFieldConditionsClient() {
 
   useEffect(() => {
     let cancelled = false;
+
+    if (Capacitor.isNativePlatform()) {
+      Geolocation.checkPermissions()
+        .then((permission) => {
+          if (cancelled) return;
+          if (permission.location === "granted" || permission.coarseLocation === "granted") {
+            requestConditions("passive");
+          } else if (permission.location === "denied") {
+            setStatus("denied");
+          }
+          // "prompt" / "prompt-with-rationale": leave status idle so the button renders
+          // and the user can tap to trigger the OS permission dialog.
+        })
+        .catch(() => undefined);
+
+      return () => {
+        cancelled = true;
+      };
+    }
+
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setLocationSupported(false);
       return;
@@ -206,7 +226,20 @@ export default function TodayFieldConditionsClient() {
     );
   }
 
-  if (status === "denied") return null;
+  if (status === "denied") {
+    return (
+      <FieldConditionsShell>
+        <div className="text-sm font-semibold text-slate-900">Location is off for this app</div>
+        <button
+          type="button"
+          onClick={() => requestConditions("user")}
+          className="mt-1 text-xs font-semibold text-blue-700 hover:underline"
+        >
+          Enable location for field conditions
+        </button>
+      </FieldConditionsShell>
+    );
+  }
 
   return (
     <FieldConditionsShell>
