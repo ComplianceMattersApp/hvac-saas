@@ -114,8 +114,19 @@ function buildRequestedScopeSnapshot(input: {
   };
 }
 
-function withJobRequestNotice(jobId: string, notice: string) {
-  return `/jobs/${encodeURIComponent(jobId)}?notice=${encodeURIComponent(notice)}#account-workshare-requests`;
+// Resolve the post-submit return base from a posted `return_to`. Only same-app
+// job paths are honored (guards against an open redirect from the hidden field);
+// anything else falls back to the classic job path.
+function resolveWorkshareReturnBase(returnTo: unknown, jobId: string) {
+  const trimmed = cleanString(returnTo);
+  if (/^\/jobs\/[A-Za-z0-9-]+(\/v2)?$/.test(trimmed)) return trimmed;
+  return `/jobs/${encodeURIComponent(jobId)}`;
+}
+
+function withJobRequestNotice(jobId: string, notice: string, returnTo?: unknown) {
+  const base = resolveWorkshareReturnBase(returnTo, jobId);
+  const anchor = base.endsWith("/v2") ? "workshare" : "account-workshare-requests";
+  return `${base}?notice=${encodeURIComponent(notice)}#${anchor}`;
 }
 
 async function resolveInternalContext() {
@@ -409,6 +420,7 @@ export async function declineAccountWorkshareRequest(input: {
 
 export async function createAccountWorkshareRequestFromJobForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
+  const returnTo = formData.get("return_to");
   const result = await createAccountWorkshareRequestFromJob({
     connectionId: cleanString(formData.get("connection_id")),
     sourceJobId,
@@ -419,25 +431,26 @@ export async function createAccountWorkshareRequestFromJobForm(formData: FormDat
   });
 
   if (!result.success) {
-    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error"));
+    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error", returnTo));
   }
 
-  revalidatePath(`/jobs/${sourceJobId}`);
-  redirect(withJobRequestNotice(sourceJobId, "workshare_request_sent"));
+  revalidatePath(resolveWorkshareReturnBase(returnTo, sourceJobId));
+  redirect(withJobRequestNotice(sourceJobId, "workshare_request_sent", returnTo));
 }
 
 export async function cancelAccountWorkshareRequestFromForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
+  const returnTo = formData.get("return_to");
   const result = await cancelAccountWorkshareRequest({
     requestId: cleanString(formData.get("request_id")),
   });
 
   if (!result.success) {
-    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error"));
+    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error", returnTo));
   }
 
-  revalidatePath(`/jobs/${sourceJobId}`);
-  redirect(withJobRequestNotice(sourceJobId, "workshare_request_cancelled"));
+  revalidatePath(resolveWorkshareReturnBase(returnTo, sourceJobId));
+  redirect(withJobRequestNotice(sourceJobId, "workshare_request_cancelled", returnTo));
 }
 
 export async function declineAccountWorkshareRequestFromForm(formData: FormData): Promise<void> {
