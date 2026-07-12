@@ -44,7 +44,7 @@ import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
-import { getInternalBusinessProfileByAccountOwnerId, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { getInternalBusinessProfileByAccountOwnerId, resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
@@ -654,10 +654,24 @@ export default async function JobDetailV2Page({
     (row) => row.sender_account_id === accountOwnerUserId,
   );
   const hasActiveRaterWorkshareConnection = activeRaterWorkshareConnections.length > 0;
-  const workshareConnectionOptions = activeRaterWorkshareConnections.map((row) => ({
-    id: row.id,
-    label: row.invite_company_name || `Connected rater ${row.receiver_account_id.slice(0, 8)}`,
-  }));
+  // Label each rater by their real company name. Prefer the name captured on the
+  // connection invite; otherwise resolve the rater account's business identity
+  // (RLS-scoped to them, so use the service-role client) — never fall back to an id.
+  const workshareLabelAdmin = activeRaterWorkshareConnections.length > 0 ? createAdminClient() : null;
+  const workshareConnectionOptions = await Promise.all(
+    activeRaterWorkshareConnections.map(async (row) => {
+      const inviteName = String(row.invite_company_name ?? "").trim();
+      let label = inviteName;
+      if (!label && workshareLabelAdmin) {
+        const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
+          accountOwnerUserId: row.receiver_account_id,
+          supabase: workshareLabelAdmin,
+        });
+        label = String(identity.display_name ?? "").trim();
+      }
+      return { id: row.id, label: label || "Connected rater" };
+    }),
+  );
 
   // Receiver side: is THIS job a workshare receiving job (created from an accepted
   // request)? If so, surface the partner panel with the contractor context.
