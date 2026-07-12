@@ -65,3 +65,79 @@ export async function insertWorkshareRequestReceivedNotification(params: {
     status: "queued",
   });
 }
+
+export const WORKSHARE_REQUEST_ACCEPTED_NOTIFICATION_TYPE = "workshare_request_accepted";
+export const WORKSHARE_REQUEST_DECLINED_NOTIFICATION_TYPE = "workshare_request_declined";
+
+// D2b: cross-account outcome signal in the other direction. When the receiver
+// (rater) accepts or declines, notify the SENDER (contractor) account that their
+// outbound request was decided. Reuses the same admin-client cross-account write
+// as the arrival notification (actor = receiver, recipient = sender). Deduped by
+// request_id + decision; best-effort — callers must not fail the decision if
+// this throws.
+export async function insertWorkshareRequestDecisionNotification(params: {
+  admin: SupabaseClient;
+  request: AccountWorkshareRequestRow;
+  decision: "accepted" | "declined";
+}): Promise<void> {
+  const { admin, request, decision } = params;
+
+  const recipientAccountOwnerUserId = String(request.sender_account_id ?? "").trim();
+  const receiverAccountId = String(request.receiver_account_id ?? "").trim();
+  const requestId = String(request.id ?? "").trim();
+  const sourceJobId = String(request.source_job_id ?? "").trim();
+  if (!recipientAccountOwnerUserId || !requestId) return;
+
+  const notificationType =
+    decision === "accepted"
+      ? WORKSHARE_REQUEST_ACCEPTED_NOTIFICATION_TYPE
+      : WORKSHARE_REQUEST_DECLINED_NOTIFICATION_TYPE;
+
+  // Dedupe: one outcome notification per (request, decision).
+  const { data: existing } = await admin
+    .from("notifications")
+    .select("id")
+    .eq("account_owner_user_id", recipientAccountOwnerUserId)
+    .eq("notification_type", notificationType)
+    .eq("channel", "in_app")
+    .contains("payload", { request_id: requestId })
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) return;
+
+  const raterIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    accountOwnerUserId: receiverAccountId,
+    supabase: admin,
+  });
+  const raterName = raterIdentity.display_name || "The rater";
+
+  const customer = String(request.customer_name_snapshot ?? "").trim();
+  const forCustomer = customer ? ` for ${customer}` : "";
+  const reason = String(request.decline_reason ?? "").trim();
+
+  const subject =
+    decision === "accepted" ? "ECC/HERS request accepted" : "ECC/HERS request declined";
+  const body =
+    decision === "accepted"
+      ? `${raterName} accepted your ECC/HERS request${forCustomer}.`
+      : `${raterName} declined your ECC/HERS request${forCustomer}.${reason ? ` Reason: ${reason}` : ""}`;
+
+  await admin.from("notifications").insert({
+    job_id: null,
+    account_owner_user_id: recipientAccountOwnerUserId,
+    recipient_type: "internal",
+    recipient_ref: null,
+    channel: "in_app",
+    notification_type: notificationType,
+    subject,
+    body,
+    payload: {
+      source: "account_workshare",
+      request_id: requestId,
+      receiver_account_id: receiverAccountId,
+      source_job_id: sourceJobId,
+      decision,
+    },
+    status: "queued",
+  });
+}

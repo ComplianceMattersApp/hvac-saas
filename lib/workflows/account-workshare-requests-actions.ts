@@ -18,7 +18,10 @@ import {
 } from "@/lib/workflows/account-workshare-requests-read";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { createReceiverJobFromWorkshareSnapshot } from "@/lib/workflows/receiver-job-from-workshare";
-import { insertWorkshareRequestReceivedNotification } from "@/lib/workflows/workshare-notifications";
+import {
+  insertWorkshareRequestReceivedNotification,
+  insertWorkshareRequestDecisionNotification,
+} from "@/lib/workflows/workshare-notifications";
 
 type ActionResult =
   | {
@@ -555,6 +558,17 @@ export async function declineAccountWorkshareRequestFromForm(formData: FormData)
     redirect("/ops/workshare/incoming?notice=workshare_decline_error");
   }
 
+  // Best-effort: tell the sender their request was declined.
+  try {
+    await insertWorkshareRequestDecisionNotification({
+      admin: createAdminClient(),
+      request: result.request,
+      decision: "declined",
+    });
+  } catch {
+    // swallow — the decline stands; the sender signal is non-critical.
+  }
+
   revalidatePath("/ops/workshare/incoming");
   revalidatePath("/ops/workshare/decided");
   redirect("/ops/workshare/incoming?notice=workshare_declined");
@@ -567,6 +581,17 @@ export async function acceptAccountWorkshareRequestFromForm(formData: FormData):
 
   if (!result.success) {
     redirect("/ops/workshare/incoming?notice=workshare_accept_error");
+  }
+
+  // Best-effort: tell the sender their request was accepted.
+  try {
+    await insertWorkshareRequestDecisionNotification({
+      admin: createAdminClient(),
+      request: result.request,
+      decision: "accepted",
+    });
+  } catch {
+    // swallow — the accept stands; the sender signal is non-critical.
   }
 
   revalidatePath("/ops/workshare/incoming");

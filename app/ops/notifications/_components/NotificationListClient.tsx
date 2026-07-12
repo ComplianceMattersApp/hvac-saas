@@ -139,6 +139,8 @@ function notificationTypeLabel(value?: string | null) {
     internal_contractor_intake_proposal_email: "Intake Proposal",
     internal_estimate_proposal_approved: "Proposal Approved",
     workshare_request_received: "Workshare Request",
+    workshare_request_accepted: "Workshare Accepted",
+    workshare_request_declined: "Workshare Declined",
   };
   return labels[key] ?? "Notification";
 }
@@ -434,7 +436,15 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
     type === "internal_estimate_proposal_approved" && estimateId
       ? `/estimates/${estimateId}`
       : null;
-  const workshareHref = type === "workshare_request_received" ? "/ops/workshare/incoming" : null;
+  const worksharePayload =
+    notif.payload && typeof notif.payload === "object" ? (notif.payload as Record<string, unknown>) : {};
+  const workshareSourceJobId = String(worksharePayload.source_job_id ?? "").trim();
+  const workshareLink =
+    type === "workshare_request_received"
+      ? { href: "/ops/workshare/incoming", label: "View request" }
+      : (type === "workshare_request_accepted" || type === "workshare_request_declined") && workshareSourceJobId
+        ? { href: `/jobs/${workshareSourceJobId}/v2`, label: "View job" }
+        : null;
   const jobId = jobIdFromNotification(notif);
 
   return (
@@ -485,15 +495,15 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
               View estimate
             </Link>
           ) : null}
-          {workshareHref ? (
+          {workshareLink ? (
             <Link
-              href={workshareHref}
+              href={workshareLink.href}
               className="inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
-              View request
+              {workshareLink.label}
             </Link>
           ) : null}
-          {!estimateHref && !workshareHref && jobId ? (
+          {!estimateHref && !workshareLink && jobId ? (
             <Link
               href={`/jobs/${jobId}`}
               className="inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
