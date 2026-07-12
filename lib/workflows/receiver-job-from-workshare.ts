@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createJob } from "@/lib/actions/job-actions";
+import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import type { AccountWorkshareRequestRow } from "@/lib/workflows/account-workshare-requests-read";
 
 function clean(value: unknown) {
@@ -29,10 +30,11 @@ function scopeText(snapshot: AccountWorkshareRequestRow["requested_scope_snapsho
 }
 
 // P1-E: create an ECC job owned by the RECEIVER (rater) account from an accepted
-// workshare request's snapshot. Auto-creates a fresh customer + location in the
-// rater's account (no reuse matching this slice), then a root ECC job. Ownership
-// is stamped by the jobs trigger via the customer's owner_user_id. Returns the
-// new job id. Throws on any failure so the caller can compensate.
+// workshare request's snapshot. Reuse-first: matches an existing rater-account
+// customer (by name+phone) and reuses an existing same-address location before
+// creating fresh, then a root ECC job. Ownership is stamped by the jobs trigger
+// via the customer's owner_user_id. Returns the new job id. Throws on any
+// failure so the caller can compensate.
 export async function createReceiverJobFromWorkshareSnapshot(params: {
   admin: SupabaseClient;
   receiverAccountOwnerUserId: string;
@@ -47,20 +49,15 @@ export async function createReceiverJobFromWorkshareSnapshot(params: {
   const email = nullable(request.customer_email_snapshot);
   const phone = nullable(request.customer_phone_snapshot);
 
-  const { data: customerData, error: customerError } = await admin
-    .from("customers")
-    .insert({
-      owner_user_id: receiverAccountOwnerUserId,
-      first_name: first,
-      last_name: last,
-      full_name: fullName,
-      email,
-      phone,
-    })
-    .select("id")
-    .single();
-  if (customerError) throw customerError;
-  const customerId = String((customerData as { id: string }).id);
+  // Reuse-first customer match within the rater's account (phone + name).
+  const { customerId } = await findOrCreateCustomer({
+    supabase: admin,
+    firstName: first,
+    lastName: last,
+    phone,
+    email,
+    ownerUserId: receiverAccountOwnerUserId,
+  });
 
   const addressLine1 =
     nullable(request.location_address_line1_snapshot) || nullable(request.location_address_snapshot);
@@ -69,22 +66,38 @@ export async function createReceiverJobFromWorkshareSnapshot(params: {
   const state = nullable(request.location_state_snapshot) || "CA";
   const zip = nullable(request.location_zip_snapshot);
 
-  const { data: locationData, error: locationError } = await admin
-    .from("locations")
-    .insert({
-      customer_id: customerId,
-      owner_user_id: receiverAccountOwnerUserId,
-      address_line1: addressLine1,
-      address_line2: addressLine2,
-      city,
-      state,
-      zip,
-      postal_code: zip,
-    })
-    .select("id")
-    .single();
-  if (locationError) throw locationError;
-  const locationId = String((locationData as { id: string }).id);
+  // Reuse an existing same-address location for this customer before creating one.
+  let locationId: string | null = null;
+  if (addressLine1) {
+    const { data: existingLocation } = await admin
+      .from("locations")
+      .select("id")
+      .eq("customer_id", customerId)
+      .eq("owner_user_id", receiverAccountOwnerUserId)
+      .eq("address_line1", addressLine1)
+      .limit(1)
+      .maybeSingle();
+    if (existingLocation?.id) locationId = String(existingLocation.id);
+  }
+
+  if (!locationId) {
+    const { data: locationData, error: locationError } = await admin
+      .from("locations")
+      .insert({
+        customer_id: customerId,
+        owner_user_id: receiverAccountOwnerUserId,
+        address_line1: addressLine1,
+        address_line2: addressLine2,
+        city,
+        state,
+        zip,
+        postal_code: zip,
+      })
+      .select("id")
+      .single();
+    if (locationError) throw locationError;
+    locationId = String((locationData as { id: string }).id);
+  }
 
   const title =
     nullable(request.source_job_title_snapshot)

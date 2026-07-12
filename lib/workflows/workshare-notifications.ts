@@ -1,10 +1,47 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveInternalOpsRecipientEmails } from "@/lib/notifications/internal-email-recipients";
+import { sendEmail } from "@/lib/email/sendEmail";
 import type { AccountWorkshareRequestRow } from "@/lib/workflows/account-workshare-requests-read";
 
 // New-work-arrival family (see lib/notifications/internal-awareness.ts).
 export const WORKSHARE_REQUEST_RECEIVED_NOTIFICATION_TYPE = "workshare_request_received";
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Best-effort email echo of a workshare in-app signal to the account's admin/office
+// recipients. §11.7: workshare arrivals/outcomes are inbound external awareness,
+// so an email alert is appropriate. Isolated so an email failure never affects the
+// in-app notification that already succeeded.
+async function sendWorkshareEmail(params: {
+  admin: SupabaseClient;
+  accountOwnerUserId: string;
+  subject: string;
+  body: string;
+}): Promise<void> {
+  try {
+    const recipients = await resolveInternalOpsRecipientEmails({
+      admin: params.admin,
+      accountOwnerUserId: params.accountOwnerUserId,
+    });
+    if (recipients.length === 0) return;
+    await sendEmail({
+      to: recipients,
+      subject: params.subject,
+      html: `<p>${escapeHtml(params.body)}</p>`,
+      text: params.body,
+    });
+  } catch {
+    // best-effort — the in-app notification is the source of truth.
+  }
+}
 
 // Cross-account in-app awareness: when a contractor (sender) sends an ECC/HERS
 // workshare request, notify the RECEIVER (rater) account that a request arrived.
@@ -44,6 +81,7 @@ export async function insertWorkshareRequestReceivedNotification(params: {
   const senderName = senderIdentity.display_name || "A connected contractor";
 
   const customer = String(request.customer_name_snapshot ?? "").trim();
+  const subject = "New ECC/HERS request";
   const body = customer
     ? `${senderName} sent you an ECC/HERS testing request for ${customer}.`
     : `${senderName} sent you an ECC/HERS testing request.`;
@@ -55,7 +93,7 @@ export async function insertWorkshareRequestReceivedNotification(params: {
     recipient_ref: null,
     channel: "in_app",
     notification_type: WORKSHARE_REQUEST_RECEIVED_NOTIFICATION_TYPE,
-    subject: "New ECC/HERS request",
+    subject,
     body,
     payload: {
       source: "account_workshare",
@@ -64,6 +102,8 @@ export async function insertWorkshareRequestReceivedNotification(params: {
     },
     status: "queued",
   });
+
+  await sendWorkshareEmail({ admin, accountOwnerUserId: recipientAccountOwnerUserId, subject, body });
 }
 
 export const WORKSHARE_REQUEST_ACCEPTED_NOTIFICATION_TYPE = "workshare_request_accepted";
@@ -140,4 +180,6 @@ export async function insertWorkshareRequestDecisionNotification(params: {
     },
     status: "queued",
   });
+
+  await sendWorkshareEmail({ admin, accountOwnerUserId: recipientAccountOwnerUserId, subject, body });
 }
