@@ -16,6 +16,12 @@ import {
   normalizeAccountWorkshareRequestRow,
   type AccountWorkshareRequestRow,
 } from "@/lib/workflows/account-workshare-requests-read";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
+import { createReceiverJobFromWorkshareSnapshot } from "@/lib/workflows/receiver-job-from-workshare";
+import {
+  insertWorkshareRequestReceivedNotification,
+  insertWorkshareRequestDecisionNotification,
+} from "@/lib/workflows/workshare-notifications";
 
 type ActionResult =
   | {
@@ -114,8 +120,19 @@ function buildRequestedScopeSnapshot(input: {
   };
 }
 
-function withJobRequestNotice(jobId: string, notice: string) {
-  return `/jobs/${encodeURIComponent(jobId)}?notice=${encodeURIComponent(notice)}#account-workshare-requests`;
+// Resolve the post-submit return base from a posted `return_to`. Only same-app
+// job paths are honored (guards against an open redirect from the hidden field);
+// anything else falls back to the classic job path.
+function resolveWorkshareReturnBase(returnTo: unknown, jobId: string) {
+  const trimmed = cleanString(returnTo);
+  if (/^\/jobs\/[A-Za-z0-9-]+(\/v2)?$/.test(trimmed)) return trimmed;
+  return `/jobs/${encodeURIComponent(jobId)}`;
+}
+
+function withJobRequestNotice(jobId: string, notice: string, returnTo?: unknown) {
+  const base = resolveWorkshareReturnBase(returnTo, jobId);
+  const anchor = base.endsWith("/v2") ? "workshare" : "account-workshare-requests";
+  return `${base}?notice=${encodeURIComponent(notice)}#${anchor}`;
 }
 
 async function resolveInternalContext() {
@@ -362,8 +379,131 @@ export async function cancelAccountWorkshareRequest(input: {
   return { success: true, request };
 }
 
+export async function declineAccountWorkshareRequest(input: {
+  requestId: string;
+  reason: string;
+}): Promise<ActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return failure(authz.error);
+
+  const requestId = cleanString(input.requestId);
+  if (!isUuid(requestId)) return failure("Request id is required.");
+
+  const reason = limitString(input.reason, 2000);
+  if (!reason) return failure("A decline reason is required.");
+
+  const admin = createAdminClient();
+  const loaded = await readRequestById(admin, requestId);
+  if (loaded.error) return failure(loaded.error);
+  if (!loaded.request) return failure("Request not found.");
+
+  // Decline is a RECEIVER action (cancel is the sender's). Authorize at the app
+  // layer before the service-role write; the DB trigger is defense-in-depth.
+  if (loaded.request.receiver_account_id !== authz.accountOwnerUserId) {
+    return failure("Only the receiver account can decline this request.");
+  }
+
+  if (loaded.request.status !== "sent") {
+    return failure("Only sent requests can be declined.");
+  }
+
+  // Status transition + audit event happen atomically inside the RPC. Use the
+  // admin client: the audit table is service-role-write-only, and the RPC is
+  // granted to service_role only.
+  const { data, error } = await admin.rpc("decline_account_workshare_request", {
+    p_request_id: requestId,
+    p_reason: reason,
+    p_actor_user_id: authz.userId,
+  });
+
+  if (error) return failure(error.message || "Could not decline ECC/HERS request.");
+
+  const request = normalizeAccountWorkshareRequestRow(data);
+  if (!request) return failure("Could not decline ECC/HERS request.");
+
+  return { success: true, request };
+}
+
+type AcceptActionResult =
+  | { success: true; request: AccountWorkshareRequestRow; jobId: string }
+  | { success: false; error: string };
+
+export async function acceptAccountWorkshareRequest(input: {
+  requestId: string;
+}): Promise<AcceptActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return { success: false, error: authz.error };
+
+  const requestId = cleanString(input.requestId);
+  if (!isUuid(requestId)) return { success: false, error: "Request id is required." };
+
+  const admin = createAdminClient();
+  const loaded = await readRequestById(admin, requestId);
+  if (loaded.error) return { success: false, error: loaded.error };
+  if (!loaded.request) return { success: false, error: "Request not found." };
+
+  // Accept is a RECEIVER action; authorize before any write.
+  if (loaded.request.receiver_account_id !== authz.accountOwnerUserId) {
+    return { success: false, error: "Only the receiver account can accept this request." };
+  }
+  if (loaded.request.status !== "sent") {
+    return { success: false, error: "Only sent requests can be accepted." };
+  }
+
+  // Operational entitlement gate — the RATER's (receiver's) entitlement, since
+  // the created job is owned by the receiver account.
+  const entitlement = await resolveOperationalMutationEntitlementAccess({
+    supabase: authz.supabase,
+    accountOwnerUserId: authz.accountOwnerUserId,
+  });
+  if (!entitlement.authorized) {
+    return {
+      success: false,
+      error: "Your account's plan does not allow creating jobs right now.",
+    };
+  }
+
+  // Create the rater-account job (customer + location + ECC job) from the snapshot.
+  let jobId: string;
+  try {
+    const created = await createReceiverJobFromWorkshareSnapshot({
+      admin,
+      receiverAccountOwnerUserId: authz.accountOwnerUserId,
+      request: loaded.request,
+    });
+    jobId = created.jobId;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not create the job for this request.";
+    return { success: false, error: message };
+  }
+
+  // Flip status + stamp the back-link + write both audit events atomically.
+  const { data, error } = await admin.rpc("accept_account_workshare_request", {
+    p_request_id: requestId,
+    p_receiving_job_id: jobId,
+    p_actor_user_id: authz.userId,
+  });
+
+  if (error) {
+    // The job was created but the request could not be flipped (e.g. it was
+    // concurrently decided/cancelled). Soft-delete the stranded job so we don't
+    // leave an orphan, then report failure.
+    await admin
+      .from("jobs")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", jobId);
+    return { success: false, error: error.message || "Could not accept ECC/HERS request." };
+  }
+
+  const request = normalizeAccountWorkshareRequestRow(data);
+  if (!request) return { success: false, error: "Could not accept ECC/HERS request." };
+
+  return { success: true, request, jobId };
+}
+
 export async function createAccountWorkshareRequestFromJobForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
+  const returnTo = formData.get("return_to");
   const result = await createAccountWorkshareRequestFromJob({
     connectionId: cleanString(formData.get("connection_id")),
     sourceJobId,
@@ -374,23 +514,88 @@ export async function createAccountWorkshareRequestFromJobForm(formData: FormDat
   });
 
   if (!result.success) {
-    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error"));
+    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error", returnTo));
   }
 
-  revalidatePath(`/jobs/${sourceJobId}`);
-  redirect(withJobRequestNotice(sourceJobId, "workshare_request_sent"));
+  // Best-effort cross-account awareness: notify the receiver a request arrived.
+  // A side effect of the real send path; never blocks or fails the send.
+  try {
+    await insertWorkshareRequestReceivedNotification({
+      admin: createAdminClient(),
+      request: result.request,
+    });
+  } catch {
+    // swallow — the request is sent; the awareness signal is non-critical.
+  }
+
+  revalidatePath(resolveWorkshareReturnBase(returnTo, sourceJobId));
+  redirect(withJobRequestNotice(sourceJobId, "workshare_request_sent", returnTo));
 }
 
 export async function cancelAccountWorkshareRequestFromForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
+  const returnTo = formData.get("return_to");
   const result = await cancelAccountWorkshareRequest({
     requestId: cleanString(formData.get("request_id")),
   });
 
   if (!result.success) {
-    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error"));
+    redirect(withJobRequestNotice(sourceJobId, "workshare_request_error", returnTo));
   }
 
-  revalidatePath(`/jobs/${sourceJobId}`);
-  redirect(withJobRequestNotice(sourceJobId, "workshare_request_cancelled"));
+  revalidatePath(resolveWorkshareReturnBase(returnTo, sourceJobId));
+  redirect(withJobRequestNotice(sourceJobId, "workshare_request_cancelled", returnTo));
+}
+
+export async function declineAccountWorkshareRequestFromForm(formData: FormData): Promise<void> {
+  const result = await declineAccountWorkshareRequest({
+    requestId: cleanString(formData.get("request_id")),
+    reason: cleanString(formData.get("decline_reason")),
+  });
+
+  // Receiver-side surface: redirect back to the incoming queue (not the job page).
+  if (!result.success) {
+    redirect("/ops/workshare/incoming?notice=workshare_decline_error");
+  }
+
+  // Best-effort: tell the sender their request was declined.
+  try {
+    await insertWorkshareRequestDecisionNotification({
+      admin: createAdminClient(),
+      request: result.request,
+      decision: "declined",
+    });
+  } catch {
+    // swallow — the decline stands; the sender signal is non-critical.
+  }
+
+  revalidatePath("/ops/workshare/incoming");
+  revalidatePath("/ops/workshare/decided");
+  redirect("/ops/workshare/incoming?notice=workshare_declined");
+}
+
+export async function acceptAccountWorkshareRequestFromForm(formData: FormData): Promise<void> {
+  const result = await acceptAccountWorkshareRequest({
+    requestId: cleanString(formData.get("request_id")),
+  });
+
+  if (!result.success) {
+    redirect("/ops/workshare/incoming?notice=workshare_accept_error");
+  }
+
+  // Best-effort: tell the sender their request was accepted.
+  try {
+    await insertWorkshareRequestDecisionNotification({
+      admin: createAdminClient(),
+      request: result.request,
+      decision: "accepted",
+    });
+  } catch {
+    // swallow — the accept stands; the sender signal is non-critical.
+  }
+
+  revalidatePath("/ops/workshare/incoming");
+  revalidatePath("/ops/workshare/decided");
+  // Land the rater on their newly created job.
+  redirect(`/jobs/${result.jobId}/v2?banner=workshare_accepted`);
 }

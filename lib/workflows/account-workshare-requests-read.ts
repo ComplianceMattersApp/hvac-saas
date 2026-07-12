@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export const ACCOUNT_WORKSHARE_REQUEST_STATUSES = ["sent", "cancelled"] as const;
+export const ACCOUNT_WORKSHARE_REQUEST_STATUSES = ["sent", "cancelled", "declined", "accepted"] as const;
 export const ACCOUNT_WORKSHARE_REQUEST_TYPES = ["ecc_hers_testing"] as const;
 
 export type AccountWorkshareRequestStatus = (typeof ACCOUNT_WORKSHARE_REQUEST_STATUSES)[number];
@@ -37,6 +37,10 @@ export type AccountWorkshareRequestRow = {
   created_by_user_id: string;
   sent_at: string;
   cancelled_at: string | null;
+  declined_at: string | null;
+  decided_by_user_id: string | null;
+  decline_reason: string | null;
+  accepted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -142,6 +146,10 @@ export function normalizeAccountWorkshareRequestRow(value: any): AccountWorkshar
     created_by_user_id: createdByUserId,
     sent_at: sentAt,
     cancelled_at: cleanNullableString(value?.cancelled_at),
+    declined_at: cleanNullableString(value?.declined_at),
+    decided_by_user_id: cleanNullableString(value?.decided_by_user_id),
+    decline_reason: cleanNullableString(value?.decline_reason),
+    accepted_at: cleanNullableString(value?.accepted_at),
     created_at: createdAt,
     updated_at: updatedAt,
   };
@@ -204,6 +212,32 @@ export async function listAccountWorkshareRequestsForSourceJob(
       .eq("sender_account_id", normalizedSenderAccountId)
       .eq("source_job_id", normalizedSourceJobId)
       .order("sent_at", { ascending: false });
+
+    return { data: (data ?? []) as AccountWorkshareRequestRow[], error };
+  });
+}
+
+export async function listDecidedAccountWorkshareRequestsForReceiver(
+  supabase: SupabaseClient,
+  receiverAccountId: string | null | undefined,
+  options?: { limit?: number | null },
+): Promise<AccountWorkshareRequestRow[]> {
+  const normalizedReceiverAccountId = cleanString(receiverAccountId);
+  if (!normalizedReceiverAccountId) return [];
+
+  const safeLimit = Math.max(1, Math.min(500, Number(options?.limit ?? 100)));
+
+  // Receiver-side decided/history read model: requests this account has acted on
+  // (declined in Slice 1, accepted in Slice 2). Ordered by decision recency
+  // (updated_at DESC).
+  return fetchAccountWorkshareRequestRows(supabase, async (client) => {
+    const { data, error } = await client
+      .from("account_workshare_requests")
+      .select("*")
+      .eq("receiver_account_id", normalizedReceiverAccountId)
+      .in("status", ["declined", "accepted"])
+      .order("updated_at", { ascending: false })
+      .limit(safeLimit);
 
     return { data: (data ?? []) as AccountWorkshareRequestRow[], error };
   });

@@ -63,6 +63,12 @@ import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import CancelJobButton from "@/components/jobs/CancelJobButton";
 
+import {
+  listAccountWorkshareConnectionsForAccount,
+} from "@/lib/workflows/account-workshare-connections-read";
+import { listAccountWorkshareRequestsForSourceJob } from "@/lib/workflows/account-workshare-requests-read";
+import EccHersRequestSection from "./_components/EccHersRequestSection";
+
 import ScrollSpyNav, { type NavItem } from "./_components/ScrollSpyNav";
 import AlertBanner from "./_components/AlertBanner";
 import FinishOutcomeCards from "./_components/FinishOutcomeCards";
@@ -438,6 +444,8 @@ export default async function JobDetailV2Page({
     attachmentCountResult,
     timelineCountResult,
     businessProfile,
+    workshareConnections,
+    workshareRequests,
   ] = await timedPhase("supplementalReads", () => Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
@@ -476,6 +484,12 @@ export default async function JobDetailV2Page({
       .select("id", { count: "exact", head: true })
       .in("job_id", timelineScopeJobIds),
     getInternalBusinessProfileByAccountOwnerId({ supabase, accountOwnerUserId }),
+    listAccountWorkshareConnectionsForAccount(supabase, accountOwnerUserId, {
+      serviceType: "ecc_hers",
+      statuses: ["active"],
+      limit: 100,
+    }),
+    listAccountWorkshareRequestsForSourceJob(supabase, accountOwnerUserId, jobId),
   ]));
 
   if (customerLocationsError) throw customerLocationsError;
@@ -629,12 +643,30 @@ export default async function JobDetailV2Page({
   const timelineJobIds = timelineScopeJobIds;
   const hasDirectNarrativeChain = Boolean(parentJobId);
 
+  // ECC/HERS workshare send surface (P1-C on v2). Only this account's active
+  // sender-side ecc_hers connections make the section available.
+  const activeRaterWorkshareConnections = (workshareConnections ?? []).filter(
+    (row) => row.sender_account_id === accountOwnerUserId,
+  );
+  const hasActiveRaterWorkshareConnection = activeRaterWorkshareConnections.length > 0;
+  const workshareConnectionOptions = activeRaterWorkshareConnections.map((row) => ({
+    id: row.id,
+    label: row.invite_company_name || `Connected rater ${row.receiver_account_id.slice(0, 8)}`,
+  }));
+
   // brief fields
   const visitReasonText = String(job.service_visit_reason ?? job.title ?? "").trim();
   const jobTitleText = String(job.title ?? "").trim();
   const hasCustomerConcern =
     Boolean(jobTitleText) && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase();
   const workSummaryText = String(job.visit_scope_summary ?? "").trim();
+  const workshareDefaultScope =
+    workSummaryText
+    || visitScopeItems
+        .filter((item) => item.kind === "primary")
+        .map((item) => item.title)
+        .filter(Boolean)
+        .join("\n");
   const startedFromPermitWorkflow = /^Created from permit request\b/i.test(String(job.job_notes ?? "").trim());
   const workSummaryPlaceholder = isTerminal
     ? "Visit submitted — no summary captured."
@@ -825,6 +857,7 @@ export default async function JobDetailV2Page({
     { id: "equipment", label: "Equipment" },
     { id: "billing", label: "Work & Billing" },
     { id: "followup", label: "Follow-Up & Chain" },
+    ...(hasActiveRaterWorkshareConnection ? [{ id: "workshare", label: "ECC/HERS Request" }] : []),
     ...(isEccJob ? [{ id: "compliance", label: "Compliance" }] : []),
     { id: "records", label: "Records" },
   ];
@@ -2696,6 +2729,18 @@ export default async function JobDetailV2Page({
             </Suspense>
           </div>
         </section>
+
+        {/* ── ECC/HERS WORK REQUEST (active sender connection only) ─────────── */}
+        {hasActiveRaterWorkshareConnection ? (
+          <EccHersRequestSection
+            jobId={jobId}
+            returnTo={returnTo}
+            connections={workshareConnectionOptions}
+            requests={workshareRequests ?? []}
+            defaultScope={workshareDefaultScope}
+            notice={param(sp, "notice")}
+          />
+        ) : null}
 
         {/* ── ECC & COMPLIANCE (ECC jobs only) ─────────────────────────────── */}
         {isEccJob ? (
