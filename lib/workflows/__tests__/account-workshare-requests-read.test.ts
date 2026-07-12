@@ -44,6 +44,8 @@ function makeRequest(input: Partial<AccountWorkshareRequestRow> & { id: string }
     decided_by_user_id: null,
     decline_reason: null,
     accepted_at: null,
+    outcome: null,
+    outcome_recorded_at: null,
     created_at: "2026-07-08T10:00:00.000Z",
     updated_at: "2026-07-08T10:00:00.000Z",
     ...rest,
