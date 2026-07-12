@@ -186,6 +186,9 @@ Locked V1 rules:
 - Create Follow-Up Visit anchors to an existing job and reuses/ensures `service_case_id` continuity; it does not repurpose `parent_job_id` (which remains tied to direct visit lineage and retest-chain semantics).
 - Continue as New Case preserves the existing root-job create path.
 
+### 7.10 Job-detail layout is V2 (classic retired)
+The canonical job-detail layout is **V2** (`app/jobs/[id]/v2/page.tsx` + `app/jobs/[id]/v2/_components/`). The classic `app/jobs/[id]/page.tsx` is **retired** — normal job views route to `/jobs/{id}/v2`, and the classic route file lingers only pending deletion (tracked in the PERF Slice 3 backlog). Both files still exist on disk, so this is not obvious from the tree. All new job-detail feature work goes in V2; a feature added only to classic is invisible to users (this is exactly why the workshare send control had to be ported to V2). V2 uses an inline design-token object `S` and a `ScrollSpyNav` for right-rail sections.
+
 ---
 
 ## 8. Service Case Container Model (Locked)
@@ -342,6 +345,12 @@ Internal email alerts represent new external/inbound awareness, not echoes of in
 - Plain contractor notes remain `contractor_note`.
 - Contractor correction/review submissions remain `contractor_correction_submission` in canonical event history and must not be flattened into generic contractor-note awareness.
 - Upload-only contractor submissions may remain on the transitional `contractor_note` path until downstream response-tracking and awareness readers are updated together to support a separate upload concept safely.
+
+### 11.10 Cross-account notification boundary (ECC/HERS work-sharing)
+Notifications were originally within-account only (the RPC/RLS write paths assume actor ∈ target account). The ECC/HERS workshare lane introduced the **first cross-account notifications**: a request arrival notifies the *receiver* account, and an accept/decline notifies the *sender* account. Locked rules:
+- Cross-account notification writes go through the **service-role/admin client** (the within-account RPC/RLS paths do not authorize them). The trust anchor is the `account_workshare_requests` row itself, which could only exist through an `active` connection — do not add a generic cross-account grant to the within-account RPC/RLS.
+- These are best-effort side effects fired from the form wrappers, never from the core mutation, so the notification cannot fail or widen the core action's table surface.
+- `workshare_request_received` classifies under **New job notifications**; the accept/declined outcome types are general awareness (list + badge). Email echoes are §11.7-appropriate (inbound external awareness).
 
 > (11.9 "Future notification backlog" — tech dispatch phone notifications — is roadmap material and lives in [CURRENT_ROADMAP.md](./CURRENT_ROADMAP.md).)
 
