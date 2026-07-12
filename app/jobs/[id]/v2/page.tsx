@@ -66,8 +66,13 @@ import CancelJobButton from "@/components/jobs/CancelJobButton";
 import {
   listAccountWorkshareConnectionsForAccount,
 } from "@/lib/workflows/account-workshare-connections-read";
-import { listAccountWorkshareRequestsForSourceJob } from "@/lib/workflows/account-workshare-requests-read";
+import {
+  listAccountWorkshareRequestsForSourceJob,
+  getWorkshareRequestForReceivingJob,
+} from "@/lib/workflows/account-workshare-requests-read";
+import { resolveWorkshareSenderCompanyNames } from "@/lib/workflows/workshare-sender-identity";
 import EccHersRequestSection from "./_components/EccHersRequestSection";
+import ReceiverWorksharePanel from "./_components/ReceiverWorksharePanel";
 
 import ScrollSpyNav, { type NavItem } from "./_components/ScrollSpyNav";
 import AlertBanner from "./_components/AlertBanner";
@@ -654,6 +659,16 @@ export default async function JobDetailV2Page({
     label: row.invite_company_name || `Connected rater ${row.receiver_account_id.slice(0, 8)}`,
   }));
 
+  // Receiver side: is THIS job a workshare receiving job (created from an accepted
+  // request)? If so, surface the partner panel with the contractor context.
+  const receiverWorkshareRequest = await getWorkshareRequestForReceivingJob(supabase, accountOwnerUserId, jobId);
+  let receiverWorkshareSenderName = "Connected contractor";
+  if (receiverWorkshareRequest) {
+    const senderNames = await resolveWorkshareSenderCompanyNames([receiverWorkshareRequest]);
+    receiverWorkshareSenderName =
+      senderNames.get(String(receiverWorkshareRequest.sender_account_id ?? "").trim()) || "Connected contractor";
+  }
+
   // brief fields
   const visitReasonText = String(job.service_visit_reason ?? job.title ?? "").trim();
   const jobTitleText = String(job.title ?? "").trim();
@@ -858,6 +873,7 @@ export default async function JobDetailV2Page({
     { id: "billing", label: "Work & Billing" },
     { id: "followup", label: "Follow-Up & Chain" },
     ...(hasActiveRaterWorkshareConnection ? [{ id: "workshare", label: "ECC/HERS Request" }] : []),
+    ...(receiverWorkshareRequest ? [{ id: "workshare-partner", label: "Workshare" }] : []),
     ...(isEccJob ? [{ id: "compliance", label: "Compliance" }] : []),
     { id: "records", label: "Records" },
   ];
@@ -2739,6 +2755,15 @@ export default async function JobDetailV2Page({
             requests={workshareRequests ?? []}
             defaultScope={workshareDefaultScope}
             notice={param(sp, "notice")}
+          />
+        ) : null}
+
+        {/* ── WORKSHARE PARTNER (receiver side of an accepted request) ─────── */}
+        {receiverWorkshareRequest ? (
+          <ReceiverWorksharePanel
+            request={receiverWorkshareRequest}
+            senderCompanyName={receiverWorkshareSenderName}
+            receivingJobId={jobId}
           />
         ) : null}
 

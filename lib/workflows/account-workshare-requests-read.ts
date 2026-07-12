@@ -43,6 +43,10 @@ export type AccountWorkshareRequestRow = {
   accepted_at: string | null;
   outcome: "passed" | "failed" | null;
   outcome_recorded_at: string | null;
+  outcome_note: string | null;
+  retest_requested_at: string | null;
+  retest_note: string | null;
+  retest_count: number;
   created_at: string;
   updated_at: string;
 };
@@ -159,6 +163,10 @@ export function normalizeAccountWorkshareRequestRow(value: any): AccountWorkshar
     accepted_at: cleanNullableString(value?.accepted_at),
     outcome: normalizeOutcome(value?.outcome),
     outcome_recorded_at: cleanNullableString(value?.outcome_recorded_at),
+    outcome_note: cleanNullableString(value?.outcome_note),
+    retest_requested_at: cleanNullableString(value?.retest_requested_at),
+    retest_note: cleanNullableString(value?.retest_note),
+    retest_count: Number.isFinite(Number(value?.retest_count)) ? Number(value?.retest_count) : 0,
     created_at: createdAt,
     updated_at: updatedAt,
   };
@@ -224,6 +232,29 @@ export async function listAccountWorkshareRequestsForSourceJob(
 
     return { data: (data ?? []) as AccountWorkshareRequestRow[], error };
   });
+}
+
+export async function getWorkshareRequestForReceivingJob(
+  supabase: SupabaseClient,
+  receiverAccountId: string | null | undefined,
+  receivingJobId: string | null | undefined,
+): Promise<AccountWorkshareRequestRow | null> {
+  const normalizedReceiverAccountId = cleanString(receiverAccountId);
+  const normalizedReceivingJobId = cleanString(receivingJobId);
+  if (!normalizedReceiverAccountId || !normalizedReceivingJobId) return null;
+
+  const rows = await fetchAccountWorkshareRequestRows(supabase, async (client) => {
+    const { data, error } = await client
+      .from("account_workshare_requests")
+      .select("*")
+      .eq("receiver_account_id", normalizedReceiverAccountId)
+      .eq("receiving_job_id", normalizedReceivingJobId)
+      .limit(1);
+
+    return { data: (data ?? []) as AccountWorkshareRequestRow[], error };
+  });
+
+  return rows[0] ?? null;
 }
 
 export async function listDecidedAccountWorkshareRequestsForReceiver(

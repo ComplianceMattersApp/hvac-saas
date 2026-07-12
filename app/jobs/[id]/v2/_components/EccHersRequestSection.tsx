@@ -4,6 +4,7 @@ import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import {
   createAccountWorkshareRequestFromJobForm,
   cancelAccountWorkshareRequestFromForm,
+  requestAccountWorkshareRetestFromForm,
 } from "@/lib/workflows/account-workshare-requests-actions";
 import type { AccountWorkshareRequestRow } from "@/lib/workflows/account-workshare-requests-read";
 import { formatWorkshareDateTime } from "@/app/ops/workshare/_components/workshare-request-card";
@@ -240,58 +241,169 @@ export default function EccHersRequestSection({
 
       {requests.length > 0 ? (
         <div style={{ marginTop: "18px", display: "grid", gap: "8px" }}>
-          {requests.map((request) => (
+          {requests.map((request) => {
+            const retestPending = request.status === "accepted" && !!request.retest_requested_at && !request.outcome;
+            const statusLabel =
+              request.status === "sent"
+                ? "sent"
+                : request.status === "accepted"
+                  ? request.outcome
+                    ? `accepted · ${request.outcome === "passed" ? "passed" : "failed"}`
+                    : retestPending
+                      ? "accepted · retest requested"
+                      : "accepted · in testing"
+                  : request.status;
+            return (
             <div
               key={request.id}
               style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "10px",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "11px 14px",
+                display: "grid",
+                gap: "12px",
+                padding: "12px 14px",
                 borderRadius: "10px",
                 border: "1px solid oklch(0.92 0.006 250)",
                 background: "#fff",
               }}
             >
-              <div>
-                <div style={{ fontSize: "13.5px", fontWeight: 600, color: "oklch(0.3 0.02 262)" }}>
-                  Request {request.status === "sent" ? "sent" : request.status}
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "10px",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "13.5px", fontWeight: 600, color: "oklch(0.3 0.02 262)" }}>
+                    Request {statusLabel}
+                  </div>
+                  <div style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)", marginTop: "2px" }}>
+                    {formatWorkshareDateTime(request.sent_at)}
+                    {request.receiver_account_id ? ` · rater ${request.receiver_account_id.slice(0, 8)}` : ""}
+                    {request.retest_count > 0 ? ` · retest #${request.retest_count}` : ""}
+                  </div>
                 </div>
-                <div style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)", marginTop: "2px" }}>
-                  {formatWorkshareDateTime(request.sent_at)}
-                  {request.receiver_account_id ? ` · rater ${request.receiver_account_id.slice(0, 8)}` : ""}
-                </div>
+                {request.status === "sent" ? (
+                  <form action={cancelAccountWorkshareRequestFromForm}>
+                    <input type="hidden" name="source_job_id" value={jobId} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <input type="hidden" name="request_id" value={request.id} />
+                    <ImmediateSubmitButton pendingText="Cancelling…" className="" style={cancelBtnStyle}>
+                      Cancel request
+                    </ImmediateSubmitButton>
+                  </form>
+                ) : request.outcome ? (
+                  <span
+                    style={{
+                      padding: "5px 12px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      border: `1px solid ${request.outcome === "passed" ? "oklch(0.82 0.09 155)" : "oklch(0.82 0.09 25)"}`,
+                      background: request.outcome === "passed" ? "oklch(0.96 0.04 155)" : "oklch(0.96 0.04 25)",
+                      color: request.outcome === "passed" ? "oklch(0.45 0.13 155)" : "oklch(0.5 0.15 25)",
+                    }}
+                  >
+                    {request.outcome === "passed" ? "Test passed" : "Test failed"}
+                  </span>
+                ) : retestPending ? (
+                  <span
+                    style={{
+                      padding: "5px 12px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                      border: "1px solid oklch(0.85 0.06 75)",
+                      background: "oklch(0.96 0.05 75)",
+                      color: "oklch(0.5 0.12 65)",
+                    }}
+                  >
+                    Retest requested
+                  </span>
+                ) : null}
               </div>
-              {request.status === "sent" ? (
-                <form action={cancelAccountWorkshareRequestFromForm}>
-                  <input type="hidden" name="source_job_id" value={jobId} />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <input type="hidden" name="request_id" value={request.id} />
-                  <ImmediateSubmitButton pendingText="Cancelling…" className="" style={cancelBtnStyle}>
-                    Cancel request
-                  </ImmediateSubmitButton>
-                </form>
-              ) : request.outcome ? (
-                <span
+
+              {request.outcome_note ? (
+                <div
                   style={{
-                    padding: "5px 12px",
-                    borderRadius: "999px",
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.04em",
-                    textTransform: "uppercase",
-                    border: `1px solid ${request.outcome === "passed" ? "oklch(0.82 0.09 155)" : "oklch(0.82 0.09 25)"}`,
-                    background: request.outcome === "passed" ? "oklch(0.96 0.04 155)" : "oklch(0.96 0.04 25)",
-                    color: request.outcome === "passed" ? "oklch(0.45 0.13 155)" : "oklch(0.5 0.15 25)",
+                    fontSize: "12.5px",
+                    lineHeight: 1.5,
+                    color: "oklch(0.4 0.02 262)",
+                    background: "oklch(0.98 0.003 250)",
+                    border: "1px solid oklch(0.92 0.006 250)",
+                    borderRadius: "9px",
+                    padding: "9px 11px",
                   }}
                 >
-                  {request.outcome === "passed" ? "Test passed" : "Test failed"}
-                </span>
+                  <strong style={{ fontWeight: 700 }}>Rater note:</strong> {request.outcome_note}
+                </div>
+              ) : null}
+
+              {retestPending && request.retest_note ? (
+                <div style={{ fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)" }}>
+                  Waiting on the tester. You reported: {request.retest_note}
+                </div>
+              ) : null}
+
+              {request.status === "accepted" && request.outcome === "failed" ? (
+                <div
+                  style={{
+                    borderTop: "1px solid oklch(0.94 0.004 250)",
+                    paddingTop: "10px",
+                  }}
+                >
+                  <div style={{ fontSize: "12.5px", fontWeight: 600, color: "oklch(0.5 0.15 25)", marginBottom: "6px" }}>
+                    Test failed. Make your corrections, then request a retest.
+                  </div>
+                  <details>
+                    <summary
+                      style={{
+                        display: "inline-flex",
+                        cursor: "pointer",
+                        listStyle: "none",
+                        alignItems: "center",
+                        height: "34px",
+                        padding: "0 14px",
+                        borderRadius: "9px",
+                        border: "1px solid oklch(0.85 0.05 255)",
+                        background: "oklch(0.97 0.02 255)",
+                        color: "oklch(0.45 0.14 255)",
+                        fontSize: "12.5px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Request retest
+                    </summary>
+                    <form action={requestAccountWorkshareRetestFromForm} style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
+                      <input type="hidden" name="source_job_id" value={jobId} />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <input type="hidden" name="request_id" value={request.id} />
+                      <label style={{ ...fieldLabelStyle, marginBottom: 0 }}>What did you correct?</label>
+                      <textarea
+                        name="retest_note"
+                        required
+                        maxLength={2000}
+                        rows={3}
+                        placeholder="Describe what you fixed so the rater knows what to re-check."
+                        style={textareaStyle}
+                      />
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <ImmediateSubmitButton pendingText="Sending…" className="" style={primaryBtnStyle}>
+                          Request retest
+                        </ImmediateSubmitButton>
+                      </div>
+                    </form>
+                  </details>
+                </div>
               ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </section>

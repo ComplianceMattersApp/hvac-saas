@@ -16,10 +16,13 @@ export async function recordAndNotifyWorkshareOutcome(
     if (!jobId) return;
 
     const admin = createAdminClient();
+    // Chain-aware: the RPC matches the request by the completing job's service_case,
+    // so a retest child job's outcome still reaches the original request.
     const { data, error } = await admin.rpc("record_account_workshare_receiver_outcome", {
-      p_receiving_job_id: jobId,
+      p_completing_job_id: jobId,
       p_outcome: outcome,
       p_actor_user_id: null,
+      p_outcome_note: null,
     });
     if (error) return;
 
