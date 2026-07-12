@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  normalizeWorkshareEquipmentSnapshot,
+  type WorkshareEquipmentSnapshotSystem,
+} from "@/lib/workflows/workshare-equipment-snapshot";
+
 export const ACCOUNT_WORKSHARE_REQUEST_STATUSES = ["sent", "cancelled", "declined", "accepted"] as const;
 export const ACCOUNT_WORKSHARE_REQUEST_TYPES = ["ecc_hers_testing"] as const;
 
@@ -31,6 +36,7 @@ export type AccountWorkshareRequestRow = {
   source_job_description_snapshot: string | null;
   permit_number_snapshot: string | null;
   requested_scope_snapshot: Record<string, unknown>;
+  equipment_snapshot: WorkshareEquipmentSnapshotSystem[];
   sender_notes_snapshot: string | null;
   preferred_date: string | null;
   preferred_window_snapshot: string | null;
@@ -151,6 +157,7 @@ export function normalizeAccountWorkshareRequestRow(value: any): AccountWorkshar
     source_job_description_snapshot: cleanNullableString(value?.source_job_description_snapshot),
     permit_number_snapshot: cleanNullableString(value?.permit_number_snapshot),
     requested_scope_snapshot: normalizeJsonObject(value?.requested_scope_snapshot),
+    equipment_snapshot: normalizeWorkshareEquipmentSnapshot(value?.equipment_snapshot),
     sender_notes_snapshot: cleanNullableString(value?.sender_notes_snapshot),
     preferred_date: cleanNullableString(value?.preferred_date),
     preferred_window_snapshot: cleanNullableString(value?.preferred_window_snapshot),

@@ -19,6 +19,7 @@ import {
 } from "@/lib/workflows/account-workshare-requests-read";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { createReceiverJobFromWorkshareSnapshot } from "@/lib/workflows/receiver-job-from-workshare";
+import { buildWorkshareEquipmentSnapshot } from "@/lib/workflows/workshare-equipment-snapshot";
 import {
   insertWorkshareRequestReceivedNotification,
   insertWorkshareRequestDecisionNotification,
@@ -292,6 +293,10 @@ export async function createAccountWorkshareRequestFromJob(input: {
   const jobReference = cleanNullableString((sourceJob as any).job_display_number)
     || cleanNullableString((sourceJob as any).id);
 
+  // Snapshot the source job's ECC-testable equipment so the rater's accepted job
+  // is pre-populated (best-effort; returns [] on any error).
+  const equipmentSnapshot = await buildWorkshareEquipmentSnapshot(admin, sourceJobId);
+
   const payload = {
     connection_id: connection.id,
     sender_account_id: authz.accountOwnerUserId,
@@ -319,6 +324,7 @@ export async function createAccountWorkshareRequestFromJob(input: {
       requestedScope: input.requestedScope,
       sourceJob,
     }),
+    equipment_snapshot: equipmentSnapshot,
     sender_notes_snapshot: limitString(input.senderNotes, 4000),
     preferred_date: normalizeDateOnly(input.preferredDate),
     preferred_window_snapshot: limitString(input.preferredWindow, 240),

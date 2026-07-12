@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { AccountWorkshareRequestRow } from "@/lib/workflows/account-workshare-requests-read";
+import { countWorkshareEquipmentItems } from "@/lib/workflows/workshare-equipment-snapshot";
 
 export function formatWorkshareDateTime(value: string | null | undefined) {
   const normalized = String(value ?? "").trim();
@@ -172,6 +173,22 @@ export function WorkshareRequestCard({
         <div>
           <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Source job</dt>
           <dd className="mt-1">{sourceJobLabel(request)}</dd>
+        </div>
+        <div>
+          <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Equipment included</dt>
+          <dd className="mt-1">
+            {(() => {
+              const systems = request.equipment_snapshot ?? [];
+              const items = countWorkshareEquipmentItems(systems);
+              if (items === 0) return <span className="text-slate-500">None provided</span>;
+              return (
+                <span>
+                  {items} item{items === 1 ? "" : "s"} across {systems.length} system{systems.length === 1 ? "" : "s"}
+                  {" — copies to your job on accept"}
+                </span>
+              );
+            })()}
+          </dd>
         </div>
       </dl>
 

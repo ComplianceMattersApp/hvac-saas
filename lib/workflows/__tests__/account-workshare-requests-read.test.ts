@@ -34,6 +34,7 @@ function makeRequest(input: Partial<AccountWorkshareRequestRow> & { id: string }
     source_job_description_snapshot: "Scope notes",
     permit_number_snapshot: "P-100",
     requested_scope_snapshot: { requested_scope_text: "HERS testing" },
+    equipment_snapshot: [],
     sender_notes_snapshot: "Gate code",
     preferred_date: null,
     preferred_window_snapshot: null,
