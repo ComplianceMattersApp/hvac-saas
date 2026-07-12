@@ -48,38 +48,20 @@ Milestone position: service model buildout (milestone 1) is closed; billing/invo
 
 If you are starting a session and just need the shortest answer to "what now?":
 
-1. **Owner smoke** the two Merged-awaiting-smoke tracks in live prod (ECC/HERS Work-Sharing; Company Profile Console) — nothing new should start on top of them until smoked.
-2. **Lane 4 (SMS to Toggle-Ready)** is the designated next build lane — continue the locked slice sequence toward flip-the-flag readiness (webhook/signature validation next).
+1. **Lane 6 (App Store Wrap Part A / Android)** is the active build lane — device-smoke the geolocation branch (`lane7-capacitor-statusbar-splash-fixes`), get the splash logo rendering, then merge to `main`.
+2. **Admin Center Restructure** is the designated next build lane — extend the sectioned-console pattern into `/ops/admin`.
 3. **PERF Slice 3** and the **Documentation consolidation Phase 2+** are safe, well-scoped parallel work that does not touch product runtime behavior.
 
-Anything not in the Active lanes list is deferred or runbook-gated — do not start it without an explicit owner decision.
+Several closed lanes are waiting on non-build follow-ups (owner decisions and external approvals) — see **Outstanding follow-ups** below. Anything not in the Active lanes list is deferred or runbook-gated — do not start it without an explicit owner decision.
 
 ---
 
 ## Active lanes
 
-### Lane 4 — SMS to Toggle-Ready ◀ NEXT ACTIVE LANE
-- **Status:** Spec-complete, implementation in progress. The `SMS_*` spec family is locked:
-  - Twilio / provider readiness
-  - sender identity + provider configuration
-  - message intent + provider delivery (audit truth boundaries)
-  - On-the-Way template governance + editing/review actions
-  - compliance / consent + recipient/contact role model
-  Provider-delivery preflight and a manual sandbox provider-submit path exist; live SMS remains blocked behind activation gates.
-- **Goal:** finish the remaining slices so flipping the activation flag turns SMS on — with no active provider cost until toggled. This is a valid competitive selling point once toggle-ready.
-- **Next safe slice:** continue the locked SMS slice sequence toward toggle-readiness — webhook / status callback with signature validation, inbound opt-out / STOP / HELP handling, idempotency and duplicate/out-of-order handling — before any live-send consideration. Customer Communication Polish V1 (appointment reminders, On-the-Way, invoice-sent notifications) folds into this lane as the first high-value events when SMS activates.
-- **Guardrails:** Mark On The Way remains lifecycle/status truth first; SMS intent creation anchors to a successful `on_my_way` `job_events` row; `sms_message_intents` is decision/audit truth; `sms_provider_deliveries` is provider submission/callback truth; `job_events` is never provider-delivery truth. Twilio secrets stay server-only. No live send until legal/provider/A2P/STOP/HELP and explicit activation are complete.
-- **Session size:** medium; well-scoped from prior spec work.
-
-### ECC/HERS Account Work-Sharing (P1) + Partner Network — MERGED, awaiting owner prod smoke
-- **Status:** Merged to `main`; awaiting owner smoke in live prod. Company-to-company ECC/HERS work sharing — a sender/contractor account sends an ECC/HERS testing request to a connected rater/receiver account. Snapshot-based: customer/location/scope values are frozen at send time; the receiver never reads the sender's live jobs or customers. Management UI is consolidated at `/ops/admin/connections`; the receiver's incoming queue (`/ops/workshare/incoming`) is read-only.
-- **Next safe slice:** P1-D2 (accept/decline on incoming requests), then P1-E (receiver job creation).
-- **Guardrails:** both tables RLS-scoped by `current_internal_account_owner_id()`; a request can only be sent on an `active` connection; cross-account name lookups use the service-role client (established pattern). To smoke a populated queue, first send a request from a sender account holding an active connection.
-
-### Company Profile — Sectioned Settings Console (P0–P7) — MERGED, awaiting owner prod smoke
-- **Status:** Merged to `main`; awaiting owner smoke. `/ops/admin/company-profile` restructured from one long scroll into a sectioned settings console — Overview · Identity & Branding · Billing & Payments · ECC/HERS · Team & Roles. Per-section save model unchanged; ECC/HERS stays a link-out to the Partner Network; Team & Roles links out to People & Access.
-- **Next safe slice:** sturdier SVG logo handling (restrictive CSP / `Content-Disposition` / rasterize on upload) is backlogged; the shared readiness/profile DB-boundary `any` types were left as-is.
-- **Guardrails:** logo uploads are restricted server-side by MIME and extension, SVGs script-scanned and rejected before storage; all reads/mutations remain admin-gated and account-scoped server-side. No billing/payment/connection behavior change.
+### Lane 6 — App Store Wrap Part A (Android) ◀ ACTIVE BUILD LANE
+- **Status:** In progress. Capacitor shell installed and the Android project scaffolded in remote-URL mode (WebView → the production app; bundle ID `com.compliancematters.everystep`). Android 15+ status-bar overlap fixed and Supabase-session cookie persistence enabled. Native geolocation work is on `lane7-capacitor-statusbar-splash-fixes`; the splash-screen logo does not yet render correctly.
+- **Next safe slice:** device-smoke the geolocation branch, fix splash-logo rendering, then merge to `main`. Android Play Store submission is ready when the owner decides.
+- **Guardrails:** remote-URL wrap only — web-layer changes keep deploying instantly and no product runtime logic moves into the native shell. Apple App Store and push notifications (Part B) are deferred pending an Apple Developer account (owner decision).
 
 ### Admin Center Restructure
 - **Status:** Active / next, continuing the sectioned-console direction. First-owner acceptance now routes into the Admin Center readiness setup at `/ops/admin`; the Company Profile console established the sectioned-settings pattern to extend.
@@ -87,7 +69,7 @@ Anything not in the Active lanes list is deferred or runbook-gated — do not st
 - **Guardrails:** the locked Company Profile §2A UX model in [ACTIVE/Startup_Maturity_Lane_Model_Lock.md](./ACTIVE/Startup_Maturity_Lane_Model_Lock.md) governs page/field ordering and the primary/Advanced split (provider/Stripe internals stay behind Advanced). Keep account scoping + admin authz server-side; no settings removed without owner sign-off.
 
 ### Documentation Audit / Consolidation
-- **Status:** Active. Full documentation audit complete. Phase 0 (safe deletes + archive scaffolding) and Phase 1 (create PROJECT_TRUTH, CURRENT_ROADMAP, SESSION_CONTEXT_TEMPLATE; retire the Active Spine to a redirect stub) are being executed. Control-plane authority: [ACTIVE/Documentation_Authority_Map.md](./ACTIVE/Documentation_Authority_Map.md) and [ACTIVE/Documentation_Consolidation_Audit.md](./ACTIVE/Documentation_Consolidation_Audit.md).
+- **Status:** Active. Full documentation audit complete. Phase 0 (safe deletes + archive scaffolding) and Phase 1 (PROJECT_TRUTH, CURRENT_ROADMAP, SESSION_CONTEXT_TEMPLATE created; the Active Spine retired to a redirect stub — CURRENT_ROADMAP is now the lane-status authority) are complete as of July 11, 2026. Control-plane authority: [ACTIVE/Documentation_Authority_Map.md](./ACTIVE/Documentation_Authority_Map.md) and [ACTIVE/Documentation_Consolidation_Audit.md](./ACTIVE/Documentation_Consolidation_Audit.md).
 - **Next safe slice:** Phase 2+ — de-dup merges (invite-flow docs, GTM docs, launch-readiness cluster), trim control-plane/roadmap docs to their lanes, archive historical closeouts to `docs/ARCHIVE/closeouts/`, add an SMS documentation index.
 - **Guardrails:** documentation-only. No schema, Supabase, RLS, Stripe/payment, server-action, component, or `.github/instructions`/`.github/prompt` changes. Anything carrying a locked decision, production-protection rule, or owner-approved boundary is flagged for owner review, never blind-deleted.
 
@@ -102,6 +84,12 @@ Anything not in the Active lanes list is deferred or runbook-gated — do not st
 
 One-liner per lane (detail lives in the ledgers):
 
+- **Lane 5 — QuickBooks Online Integration V1** — CLOSED (July 10, 2026). OAuth connect flow with AES-256-GCM-encrypted tokens in a separate `qbo_connections` table; manual one-way sync (EveryStep → QBO invoices + customers); Intuit production review submitted, awaiting external approval.
+- **Lane 4 — SMS Token Rendering V1** — CLOSED (July 9, 2026). Real token rendering in `sms_message_intents` message-body snapshots with quiet-hours write-vs-skip policy locked; no Twilio provider wired yet, so live send stays activation-gated (see Live SMS send under runbook-gated items).
+- **ECC/HERS Partner Network Cleanup** — CLOSED (July 2026). Dedicated `/ops/admin/connections` page; Company Profile reduced to a single "Manage connections →" link.
+- **P1-D1 — ECC/HERS Workshare Receiver Queue** — CLOSED (July 2026). Read-only incoming-request queue at `/ops/workshare/incoming` for receiver/rater accounts; production smoke pending a real cross-account workshare request (not a build task). Accept/decline (P1-D2) → receiver job creation (P1-E) remain the next workshare slices.
+- **Company Profile — Sectioned Settings Console** — CLOSED (July 2026). Navy shell/rail sectioned console with logo MIME/SVG hardening and a `confirmTeamSetup` guard; Integrations (QBO) and Google Review Link added.
+- **Privacy Policy & Terms of Service** — CLOSED (July 2026). Public `/privacy` and `/terms` routes live; URLs entered in the Intuit developer dashboard.
 - **Lane 1 — Field Invoice Flow V1** — CLOSED (July 9, 2026). Non-technical user on a phone goes from job complete to invoice sent without re-entry (pricebook price carry-through, mobile invoice compression, quick-add with optional pricebook save).
 - **Lane 2 — Landing Page Polish** — CLOSED (July 9, 2026). Warm, crafted landing/login + signup funnel (off-white `#faf7f2`, navy, terracotta accent); front-end only. Note: the landing page IS the login page — no separate marketing route.
 - **Lane 3 — Google Review Ask** — CLOSED (July 9, 2026). One-tap Google review ask on `field_complete` jobs via device-intent `mailto:`/`sms:`; per-account `google_review_url`; no SMS provider dependency.
@@ -111,6 +99,20 @@ One-liner per lane (detail lives in the ledgers):
 - **Operational entitlement mutation guard** — CLOSED, production-promoted. Expired/invalid entitlement blocks operational mutations server-side (see PROJECT_TRUTH §16).
 - **True App / PWA V1** — CLOSED for controlled tester use. `proxy.ts` is the correct Next.js 16 routing convention; native-store distribution deferred.
 - **Reporting / analytics (milestone 3)** — substantially complete for current scope.
+
+---
+
+## Outstanding follow-ups (open threads on closed lanes)
+
+Open threads on otherwise-closed lanes. Only the geolocation merge is a build task; everything else is an owner decision or an external dependency.
+
+- **Lane 6 geolocation branch** — device-smoke `lane7-capacitor-statusbar-splash-fixes`, then merge to `main`. *(build follow-up)*
+- **QBO_REDIRECT_URI** — update to the production URL in Vercel env once Intuit approves production keys. *(external dependency)*
+- **Intuit production app review** — awaiting external approval. *(external dependency)*
+- **P1-D1 production smoke** — needs a real cross-account workshare request. *(owner action)*
+- **Twilio activation** — infrastructure ready; live SMS gated on Twilio account setup. *(owner decision)*
+- **Apple Developer Program enrollment** — deferred; blocks the iOS wrap and push notifications. *(owner decision)*
+- **Android Play Store submission** — ready; deferred pending owner decision. *(owner decision)*
 
 ---
 
@@ -147,7 +149,7 @@ These are future/business-layer modules, not spine failures. Each stays parked u
 
 Built or partially built, but held behind an explicit flag/runbook and owner approval before production enablement.
 
-- **Live SMS send** — Gate: toggle-ready slices + webhook/signature validation + STOP/HELP/opt-out + legal/provider/A2P + explicit activation. Owner doc: the `SMS_*` spec family (`SMS_Provider_Twilio_Readiness_Spec.md` and related).
+- **Live SMS send** — Gate: Twilio account setup + provider wiring + STOP/HELP/opt-out + legal/A2P + explicit activation. Token rendering and quiet-hours policy are built (Lane 4 closed); no provider is wired yet. Owner doc: the `SMS_*` spec family (`SMS_Provider_Twilio_Readiness_Spec.md` and related).
 - **Estimates production** — Gate: `ENABLE_ESTIMATES` and `ENABLE_ESTIMATE_EMAIL_SEND` (both disabled in prod; estimate migrations are sandbox-only, production estimate migrations not applied). Owner doc: [ACTIVE/Estimates_Production_Enablement_Runbook.md](./ACTIVE/Estimates_Production_Enablement_Runbook.md).
 - **Support Console** — Gate: `ENABLE_SUPPORT_CONSOLE` (fail-closed, unset in prod); sessions are read-only, account-owner scoped, audited. Owner doc: [ACTIVE/Support_Console_Production_Enablement_Runbook.md](./ACTIVE/Support_Console_Production_Enablement_Runbook.md).
 - **Owner-Scoped Permit Workflow** — Gate: `ENABLE_PERMIT_WORKFLOW_ACCOUNT_OWNER_IDS` allowlist (owner/operator only; internal Permits visibility, contractor Request Permit exposure, and permit mutations all fail closed outside the allowlist). Owner doc: [ACTIVE/Owner_Scoped_Permit_Workflow_V1_Model_Spec.md](./ACTIVE/Owner_Scoped_Permit_Workflow_V1_Model_Spec.md).
@@ -185,11 +187,11 @@ Locked lane order (July 2026):
 1. **Lane 1 — Field Invoice Flow V1** — CLOSED.
 2. **Lane 2 — Landing Page Polish** — CLOSED.
 3. **Lane 3 — Google Review Ask** — CLOSED.
-4. **Lane 4 — SMS to Toggle-Ready** — ACTIVE (next). Reach flip-the-flag readiness; no provider cost until toggled.
-5. **Lane 5 — QuickBooks Online Integration** — two-way sync (customers, invoices, line items, payments into QBO on job completion). Locked boundary: QBO is downstream accounting only; EveryStep remains operational source of truth for all job, customer, invoice, payment, and closeout data. Owner-confirmed buyer expectation and personal-use need. Requires its own audit-first session; most complex remaining lane; sequenced after SMS toggle-ready.
-6. **Lane 6 — App Store Wrap (Capacitor)** — deliberately last. Web/PWA remains the baseline and everything above should be solid before entering App Store review cycles. Apple targets an Unlisted App Store app; Android direct-install/sideload or Play Store. Web-layer changes keep deploying instantly after the wrap is live.
+4. **Lane 4 — SMS Token Rendering V1** — CLOSED. Live send gated on Twilio account setup (see runbook-gated items).
+5. **Lane 5 — QuickBooks Online Integration V1** — CLOSED. Manual one-way sync (EveryStep → QBO) live; Intuit production review pending external approval. Locked boundary holds: QBO is downstream accounting only; EveryStep remains operational source of truth for all job, customer, invoice, payment, and closeout data.
+6. **Lane 6 — App Store Wrap Part A (Android)** — IN PROGRESS. Capacitor remote-URL Android shell; the geolocation branch needs device smoke + merge. Web/PWA remains the baseline and web-layer changes keep deploying instantly. Apple App Store and push notifications (Part B) are deferred pending an Apple Developer account.
 
-Interleaved with the numbered lanes: finish the two MERGED-awaiting-smoke tracks (ECC/HERS Work-Sharing P1-D2 → P1-E; Company Profile console owner smoke), continue the Admin Center restructure, complete the Documentation consolidation, and land the PERF identity-resolution Slice 3.
+Named next lanes after the numbered sequence: **Admin Center Restructure** (extend the sectioned-console pattern into `/ops/admin`) and **Documentation Audit & Spine Consolidation** (Phase 0 + Phase 1 complete as of July 11, 2026; Phase 2 merges and trimming remain). Also in flight: the ECC/HERS workshare accept/decline (P1-D2) → receiver job-creation (P1-E) slices, and the PERF identity-resolution Slice 3.
 
 Underlying product-track checkpoint (recommended emphasis order): service model buildout (milestone 1 closed) → billing/invoice workflow (milestone 2) → reporting/analytics (milestone 3, substantially complete) → RLS completion / permission hardening → Payment P1 closeout (closed) → out-of-box readiness / business identity / settings packaging → Pricebook V1 continuation → smaller service-model / service-workflow refinements.
 
@@ -204,4 +206,4 @@ Underlying product-track checkpoint (recommended emphasis order): service model 
 - [ACTIVE/Domain_Model_Closeout_Evidence_Ledger.md](./ACTIVE/Domain_Model_Closeout_Evidence_Ledger.md) and [ACTIVE/Service_Plan_Model_Closeout_Evidence_Ledger.md](./ACTIVE/Service_Plan_Model_Closeout_Evidence_Ledger.md) — durable closeout evidence.
 - [ACTIVE/Documentation_Authority_Map.md](./ACTIVE/Documentation_Authority_Map.md) — which doc owns what.
 
-Last updated: July 2026 (created during the documentation consolidation, Phase 1).
+Last updated: July 2026 (lane-status refresh after Lanes 4–5 closed and Lane 6 entered progress; created during the documentation consolidation, Phase 1).
