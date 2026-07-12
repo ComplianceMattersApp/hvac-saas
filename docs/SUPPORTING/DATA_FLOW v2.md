@@ -249,3 +249,20 @@ with full audit visibility
 ---
 
 # END
+
+---
+
+## Null Risk Zones (from DATA_FLOW v1, preserved July 2026)
+
+High-risk areas:
+
+- jobs/[id]/tests page reading test_run.data
+- single() queries assuming row exists
+- archive logic relying on partial state
+- calendar date handling
+- ops queue grouped counts
+
+Rule:
+
+Never assume a row exists.
+Always guard nullable JSON.
