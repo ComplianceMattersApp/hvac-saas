@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
-import { declineAccountWorkshareRequestFromForm } from "@/lib/workflows/account-workshare-requests-actions";
+import {
+  acceptAccountWorkshareRequestFromForm,
+  declineAccountWorkshareRequestFromForm,
+} from "@/lib/workflows/account-workshare-requests-actions";
 import {
   listIncomingAccountWorkshareRequestsForReceiver,
   type AccountWorkshareRequestRow,
@@ -15,9 +18,21 @@ export const metadata = {
   description: "Queue of ECC/HERS testing requests sent to this account by connected contractors.",
 };
 
-function DeclineControl({ request }: { request: AccountWorkshareRequestRow }) {
+function RequestActions({ request }: { request: AccountWorkshareRequestRow }) {
   return (
-    <div className="border-t border-slate-100 pt-4">
+    <div className="space-y-3 border-t border-slate-100 pt-4">
+      <form action={acceptAccountWorkshareRequestFromForm}>
+        <input type="hidden" name="request_id" value={request.id} />
+        <button
+          type="submit"
+          className="inline-flex items-center rounded-full bg-emerald-600 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white transition hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+        >
+          Accept &amp; create job
+        </button>
+        <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
+          Creates an ECC/HERS job in your account from this request and opens it.
+        </p>
+      </form>
       <details className="group">
         <summary className="inline-flex cursor-pointer list-none items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700 transition hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-300">
           Decline request
@@ -65,6 +80,14 @@ function NoticeBanner({ notice }: { notice: string | undefined }) {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
         We couldn&apos;t decline that request. It may have already been decided or withdrawn — refresh and try again.
+      </div>
+    );
+  }
+  if (notice === "workshare_accept_error") {
+    return (
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800">
+        We couldn&apos;t accept that request. It may have already been decided or withdrawn, or your plan may not allow
+        creating jobs — refresh and try again.
       </div>
     );
   }
@@ -137,7 +160,7 @@ export default async function OpsWorkshareIncomingPage({
               senderCompanyName={
                 senderNameById.get(String(request.sender_account_id ?? "").trim()) || "Connected contractor"
               }
-              footer={<DeclineControl request={request} />}
+              footer={<RequestActions request={request} />}
             />
           ))}
         </section>

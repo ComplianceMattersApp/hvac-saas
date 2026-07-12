@@ -25,7 +25,7 @@ function DeclinedBadge() {
   );
 }
 
-function DecisionFooter({ request }: { request: AccountWorkshareRequestRow }) {
+function DeclinedFooter({ request }: { request: AccountWorkshareRequestRow }) {
   const reason = String(request.decline_reason ?? "").trim();
   return (
     <div className="rounded-xl border border-rose-100 bg-rose-50/70 p-3">
@@ -35,6 +35,33 @@ function DecisionFooter({ request }: { request: AccountWorkshareRequestRow }) {
       <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">
         {reason || "No reason recorded."}
       </p>
+    </div>
+  );
+}
+
+function AcceptedBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
+      Accepted
+    </span>
+  );
+}
+
+function AcceptedFooter({ request }: { request: AccountWorkshareRequestRow }) {
+  const jobId = String(request.receiving_job_id ?? "").trim();
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+        Accepted {formatWorkshareDateTime(request.accepted_at)}
+      </div>
+      {jobId ? (
+        <Link
+          href={`/jobs/${jobId}/v2`}
+          className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700 transition hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+        >
+          View job
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -60,7 +87,8 @@ export default async function OpsWorkshareDecidedPage() {
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Operations</div>
             <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">Decided ECC/HERS Requests</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              A read-only history of ECC/HERS testing requests you have declined, with the reason recorded on each.
+              A read-only history of ECC/HERS testing requests you have decided — declined (with the reason recorded) or
+              accepted (with a link to the job created in your account).
             </p>
           </div>
           <Link
@@ -78,22 +106,25 @@ export default async function OpsWorkshareDecidedPage() {
             No decided requests yet.
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Requests you decline will appear here for your records.
+            Requests you decline or accept will appear here for your records.
           </p>
         </section>
       ) : (
         <section className="space-y-4">
-          {requests.map((request) => (
-            <WorkshareRequestCard
-              key={request.id}
-              request={request}
-              senderCompanyName={
-                senderNameById.get(String(request.sender_account_id ?? "").trim()) || "Connected contractor"
-              }
-              decisionBadge={<DeclinedBadge />}
-              footer={<DecisionFooter request={request} />}
-            />
-          ))}
+          {requests.map((request) => {
+            const accepted = request.status === "accepted";
+            return (
+              <WorkshareRequestCard
+                key={request.id}
+                request={request}
+                senderCompanyName={
+                  senderNameById.get(String(request.sender_account_id ?? "").trim()) || "Connected contractor"
+                }
+                decisionBadge={accepted ? <AcceptedBadge /> : <DeclinedBadge />}
+                footer={accepted ? <AcceptedFooter request={request} /> : <DeclinedFooter request={request} />}
+              />
+            );
+          })}
         </section>
       )}
     </div>

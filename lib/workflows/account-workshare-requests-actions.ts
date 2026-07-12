@@ -16,6 +16,8 @@ import {
   normalizeAccountWorkshareRequestRow,
   type AccountWorkshareRequestRow,
 } from "@/lib/workflows/account-workshare-requests-read";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
+import { createReceiverJobFromWorkshareSnapshot } from "@/lib/workflows/receiver-job-from-workshare";
 
 type ActionResult =
   | {
@@ -418,6 +420,83 @@ export async function declineAccountWorkshareRequest(input: {
   return { success: true, request };
 }
 
+type AcceptActionResult =
+  | { success: true; request: AccountWorkshareRequestRow; jobId: string }
+  | { success: false; error: string };
+
+export async function acceptAccountWorkshareRequest(input: {
+  requestId: string;
+}): Promise<AcceptActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return { success: false, error: authz.error };
+
+  const requestId = cleanString(input.requestId);
+  if (!isUuid(requestId)) return { success: false, error: "Request id is required." };
+
+  const admin = createAdminClient();
+  const loaded = await readRequestById(admin, requestId);
+  if (loaded.error) return { success: false, error: loaded.error };
+  if (!loaded.request) return { success: false, error: "Request not found." };
+
+  // Accept is a RECEIVER action; authorize before any write.
+  if (loaded.request.receiver_account_id !== authz.accountOwnerUserId) {
+    return { success: false, error: "Only the receiver account can accept this request." };
+  }
+  if (loaded.request.status !== "sent") {
+    return { success: false, error: "Only sent requests can be accepted." };
+  }
+
+  // Operational entitlement gate — the RATER's (receiver's) entitlement, since
+  // the created job is owned by the receiver account.
+  const entitlement = await resolveOperationalMutationEntitlementAccess({
+    supabase: authz.supabase,
+    accountOwnerUserId: authz.accountOwnerUserId,
+  });
+  if (!entitlement.authorized) {
+    return {
+      success: false,
+      error: "Your account's plan does not allow creating jobs right now.",
+    };
+  }
+
+  // Create the rater-account job (customer + location + ECC job) from the snapshot.
+  let jobId: string;
+  try {
+    const created = await createReceiverJobFromWorkshareSnapshot({
+      admin,
+      receiverAccountOwnerUserId: authz.accountOwnerUserId,
+      request: loaded.request,
+    });
+    jobId = created.jobId;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not create the job for this request.";
+    return { success: false, error: message };
+  }
+
+  // Flip status + stamp the back-link + write both audit events atomically.
+  const { data, error } = await admin.rpc("accept_account_workshare_request", {
+    p_request_id: requestId,
+    p_receiving_job_id: jobId,
+    p_actor_user_id: authz.userId,
+  });
+
+  if (error) {
+    // The job was created but the request could not be flipped (e.g. it was
+    // concurrently decided/cancelled). Soft-delete the stranded job so we don't
+    // leave an orphan, then report failure.
+    await admin
+      .from("jobs")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", jobId);
+    return { success: false, error: error.message || "Could not accept ECC/HERS request." };
+  }
+
+  const request = normalizeAccountWorkshareRequestRow(data);
+  if (!request) return { success: false, error: "Could not accept ECC/HERS request." };
+
+  return { success: true, request, jobId };
+}
+
 export async function createAccountWorkshareRequestFromJobForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
   const returnTo = formData.get("return_to");
@@ -467,4 +546,19 @@ export async function declineAccountWorkshareRequestFromForm(formData: FormData)
   revalidatePath("/ops/workshare/incoming");
   revalidatePath("/ops/workshare/decided");
   redirect("/ops/workshare/incoming?notice=workshare_declined");
+}
+
+export async function acceptAccountWorkshareRequestFromForm(formData: FormData): Promise<void> {
+  const result = await acceptAccountWorkshareRequest({
+    requestId: cleanString(formData.get("request_id")),
+  });
+
+  if (!result.success) {
+    redirect("/ops/workshare/incoming?notice=workshare_accept_error");
+  }
+
+  revalidatePath("/ops/workshare/incoming");
+  revalidatePath("/ops/workshare/decided");
+  // Land the rater on their newly created job.
+  redirect(`/jobs/${result.jobId}/v2?banner=workshare_accepted`);
 }

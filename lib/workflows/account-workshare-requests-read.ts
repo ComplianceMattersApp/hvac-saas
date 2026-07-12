@@ -227,15 +227,15 @@ export async function listDecidedAccountWorkshareRequestsForReceiver(
 
   const safeLimit = Math.max(1, Math.min(500, Number(options?.limit ?? 100)));
 
-  // Receiver-side decided/history read model (P1-D2, Slice 1): requests this
-  // account has acted on. Scoped to `declined` this slice; Slice 2 will add
-  // `accepted` to this set. Ordered by decision recency (updated_at DESC).
+  // Receiver-side decided/history read model: requests this account has acted on
+  // (declined in Slice 1, accepted in Slice 2). Ordered by decision recency
+  // (updated_at DESC).
   return fetchAccountWorkshareRequestRows(supabase, async (client) => {
     const { data, error } = await client
       .from("account_workshare_requests")
       .select("*")
       .eq("receiver_account_id", normalizedReceiverAccountId)
-      .eq("status", "declined")
+      .in("status", ["declined", "accepted"])
       .order("updated_at", { ascending: false })
       .limit(safeLimit);
 
