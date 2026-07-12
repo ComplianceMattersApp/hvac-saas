@@ -93,7 +93,7 @@ Anything not in the Active lanes list is deferred or runbook-gated — do not st
 
 ### Performance — Identity Resolution fast-path (Slice 3)
 - **Status:** Slices 1 and 2 are merged to `main` (request-scoped identity dedup + shared memoized `getRequestUser()` + v2 job-detail timing). Slice 3 is open and unstarted.
-- **Next safe slice:** finish the `getRequestUser()` migration across remaining routes, retire the dead v1 job-detail route, then the separate `revalidatePath` / `getClaims` / build-tooling sub-lanes. Backlog: [PERF_IDENTITY_RESOLUTION_SLICE3_BACKLOG.md](../PERF_IDENTITY_RESOLUTION_SLICE3_BACKLOG.md).
+- **Next safe slice:** finish the `getRequestUser()` migration across remaining routes, retire the dead v1 job-detail route, then the separate `revalidatePath` / `getClaims` / build-tooling sub-lanes. Backlog: [PERF_IDENTITY_RESOLUTION_SLICE3_BACKLOG.md](./ACTIVE/PERF_IDENTITY_RESOLUTION_SLICE3_BACKLOG.md).
 - **Guardrails:** behavior-preserving only. No revalidation trimming without dependency mapping; billing paths off-limits; no source-of-truth changes without a dedicated audit.
 
 ---
