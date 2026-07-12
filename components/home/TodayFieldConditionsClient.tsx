@@ -226,6 +226,21 @@ export default function TodayFieldConditionsClient() {
     );
   }
 
+  if (status === "unavailable") {
+    return (
+      <FieldConditionsShell>
+        <div className="text-sm font-semibold text-slate-900">Couldn&apos;t get your location</div>
+        <button
+          type="button"
+          onClick={() => requestConditions("user")}
+          className="mt-1 text-xs font-semibold text-blue-700 hover:underline"
+        >
+          Try again
+        </button>
+      </FieldConditionsShell>
+    );
+  }
+
   if (status === "denied") {
     return (
       <FieldConditionsShell>
