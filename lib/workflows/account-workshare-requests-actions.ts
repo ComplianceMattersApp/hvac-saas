@@ -362,6 +362,51 @@ export async function cancelAccountWorkshareRequest(input: {
   return { success: true, request };
 }
 
+export async function declineAccountWorkshareRequest(input: {
+  requestId: string;
+  reason: string;
+}): Promise<ActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return failure(authz.error);
+
+  const requestId = cleanString(input.requestId);
+  if (!isUuid(requestId)) return failure("Request id is required.");
+
+  const reason = limitString(input.reason, 2000);
+  if (!reason) return failure("A decline reason is required.");
+
+  const admin = createAdminClient();
+  const loaded = await readRequestById(admin, requestId);
+  if (loaded.error) return failure(loaded.error);
+  if (!loaded.request) return failure("Request not found.");
+
+  // Decline is a RECEIVER action (cancel is the sender's). Authorize at the app
+  // layer before the service-role write; the DB trigger is defense-in-depth.
+  if (loaded.request.receiver_account_id !== authz.accountOwnerUserId) {
+    return failure("Only the receiver account can decline this request.");
+  }
+
+  if (loaded.request.status !== "sent") {
+    return failure("Only sent requests can be declined.");
+  }
+
+  // Status transition + audit event happen atomically inside the RPC. Use the
+  // admin client: the audit table is service-role-write-only, and the RPC is
+  // granted to service_role only.
+  const { data, error } = await admin.rpc("decline_account_workshare_request", {
+    p_request_id: requestId,
+    p_reason: reason,
+    p_actor_user_id: authz.userId,
+  });
+
+  if (error) return failure(error.message || "Could not decline ECC/HERS request.");
+
+  const request = normalizeAccountWorkshareRequestRow(data);
+  if (!request) return failure("Could not decline ECC/HERS request.");
+
+  return { success: true, request };
+}
+
 export async function createAccountWorkshareRequestFromJobForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
   const result = await createAccountWorkshareRequestFromJob({
@@ -393,4 +438,20 @@ export async function cancelAccountWorkshareRequestFromForm(formData: FormData):
 
   revalidatePath(`/jobs/${sourceJobId}`);
   redirect(withJobRequestNotice(sourceJobId, "workshare_request_cancelled"));
+}
+
+export async function declineAccountWorkshareRequestFromForm(formData: FormData): Promise<void> {
+  const result = await declineAccountWorkshareRequest({
+    requestId: cleanString(formData.get("request_id")),
+    reason: cleanString(formData.get("decline_reason")),
+  });
+
+  // Receiver-side surface: redirect back to the incoming queue (not the job page).
+  if (!result.success) {
+    redirect("/ops/workshare/incoming?notice=workshare_decline_error");
+  }
+
+  revalidatePath("/ops/workshare/incoming");
+  revalidatePath("/ops/workshare/decided");
+  redirect("/ops/workshare/incoming?notice=workshare_declined");
 }
