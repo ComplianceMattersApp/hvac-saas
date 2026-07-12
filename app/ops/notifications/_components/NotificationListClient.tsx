@@ -141,6 +141,8 @@ function notificationTypeLabel(value?: string | null) {
     workshare_request_received: "Workshare Request",
     workshare_request_accepted: "Workshare Accepted",
     workshare_request_declined: "Workshare Declined",
+    workshare_request_passed: "Workshare Passed",
+    workshare_request_failed: "Workshare Failed",
   };
   return labels[key] ?? "Notification";
 }
@@ -439,10 +441,15 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
   const worksharePayload =
     notif.payload && typeof notif.payload === "object" ? (notif.payload as Record<string, unknown>) : {};
   const workshareSourceJobId = String(worksharePayload.source_job_id ?? "").trim();
+  const isWorkshareSourceJobType =
+    type === "workshare_request_accepted"
+    || type === "workshare_request_declined"
+    || type === "workshare_request_passed"
+    || type === "workshare_request_failed";
   const workshareLink =
     type === "workshare_request_received"
       ? { href: "/ops/workshare/incoming", label: "View request" }
-      : (type === "workshare_request_accepted" || type === "workshare_request_declined") && workshareSourceJobId
+      : isWorkshareSourceJobType && workshareSourceJobId
         ? { href: `/jobs/${workshareSourceJobId}/v2`, label: "View job" }
         : null;
   const jobId = jobIdFromNotification(notif);

@@ -273,6 +273,22 @@ export default function EccHersRequestSection({
                     Cancel request
                   </ImmediateSubmitButton>
                 </form>
+              ) : request.outcome ? (
+                <span
+                  style={{
+                    padding: "5px 12px",
+                    borderRadius: "999px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    border: `1px solid ${request.outcome === "passed" ? "oklch(0.82 0.09 155)" : "oklch(0.82 0.09 25)"}`,
+                    background: request.outcome === "passed" ? "oklch(0.96 0.04 155)" : "oklch(0.96 0.04 25)",
+                    color: request.outcome === "passed" ? "oklch(0.45 0.13 155)" : "oklch(0.5 0.15 25)",
+                  }}
+                >
+                  {request.outcome === "passed" ? "Test passed" : "Test failed"}
+                </span>
               ) : null}
             </div>
           ))}

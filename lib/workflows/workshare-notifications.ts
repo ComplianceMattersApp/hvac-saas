@@ -183,3 +183,78 @@ export async function insertWorkshareRequestDecisionNotification(params: {
 
   await sendWorkshareEmail({ admin, accountOwnerUserId: recipientAccountOwnerUserId, subject, body });
 }
+
+export const WORKSHARE_REQUEST_PASSED_NOTIFICATION_TYPE = "workshare_request_passed";
+export const WORKSHARE_REQUEST_FAILED_NOTIFICATION_TYPE = "workshare_request_failed";
+
+// P1-F.1: cross-account outcome return. When the rater's receiving job finishes
+// ECC testing (pass/fail), notify the SENDER (contractor) so they can proceed to
+// final inspection (pass) or corrections (fail). Same admin-client cross-account
+// pattern; deduped by request_id + outcome; best-effort.
+export async function insertWorkshareRequestOutcomeNotification(params: {
+  admin: SupabaseClient;
+  request: AccountWorkshareRequestRow;
+  outcome: "passed" | "failed";
+}): Promise<void> {
+  const { admin, request, outcome } = params;
+
+  const recipientAccountOwnerUserId = String(request.sender_account_id ?? "").trim();
+  const receiverAccountId = String(request.receiver_account_id ?? "").trim();
+  const requestId = String(request.id ?? "").trim();
+  const sourceJobId = String(request.source_job_id ?? "").trim();
+  if (!recipientAccountOwnerUserId || !requestId) return;
+
+  const notificationType =
+    outcome === "passed"
+      ? WORKSHARE_REQUEST_PASSED_NOTIFICATION_TYPE
+      : WORKSHARE_REQUEST_FAILED_NOTIFICATION_TYPE;
+
+  // Dedupe: one outcome notification per (request, outcome).
+  const { data: existing } = await admin
+    .from("notifications")
+    .select("id")
+    .eq("account_owner_user_id", recipientAccountOwnerUserId)
+    .eq("notification_type", notificationType)
+    .eq("channel", "in_app")
+    .contains("payload", { request_id: requestId })
+    .limit(1)
+    .maybeSingle();
+  if (existing?.id) return;
+
+  const raterIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    accountOwnerUserId: receiverAccountId,
+    supabase: admin,
+  });
+  const raterName = raterIdentity.display_name || "The rater";
+
+  const customer = String(request.customer_name_snapshot ?? "").trim();
+  const forCustomer = customer ? ` for ${customer}` : "";
+
+  const subject =
+    outcome === "passed" ? "ECC/HERS test passed" : "ECC/HERS test failed";
+  const body =
+    outcome === "passed"
+      ? `${raterName} completed ECC/HERS testing${forCustomer}: PASSED. You can proceed to the final inspection.`
+      : `${raterName} completed ECC/HERS testing${forCustomer}: FAILED. Corrections are needed before a retest.`;
+
+  await admin.from("notifications").insert({
+    job_id: null,
+    account_owner_user_id: recipientAccountOwnerUserId,
+    recipient_type: "internal",
+    recipient_ref: null,
+    channel: "in_app",
+    notification_type: notificationType,
+    subject,
+    body,
+    payload: {
+      source: "account_workshare",
+      request_id: requestId,
+      receiver_account_id: receiverAccountId,
+      source_job_id: sourceJobId,
+      outcome,
+    },
+    status: "queued",
+  });
+
+  await sendWorkshareEmail({ admin, accountOwnerUserId: recipientAccountOwnerUserId, subject, body });
+}

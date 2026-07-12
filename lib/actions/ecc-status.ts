@@ -9,6 +9,7 @@ import {
   shouldApplyEccPermitNeededBlocker,
 } from "@/lib/ecc/permit-needed";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
+import { recordAndNotifyWorkshareOutcome } from "@/lib/workflows/workshare-outcome";
 import { resolveOpsStatus } from "@/lib/utils/ops-status";
 import type { OpsStatus } from "@/lib/actions/ops-status";
 import type { EccTestType } from "@/lib/ecc/test-registry";
@@ -471,6 +472,8 @@ export async function evaluateEccOpsStatus(
         manual_lock_prevented: false,
         final_ops_status: "failed",
       });
+      // P1-F.1: return the outcome to the workshare sender (no-op for non-workshare jobs).
+      await recordAndNotifyWorkshareOutcome(jobId, "failed");
     }
     return;
   }
@@ -494,6 +497,8 @@ export async function evaluateEccOpsStatus(
       reason: "all_required_passed",
       timing: options.timing,
     });
+    // P1-F.1: return the outcome to the workshare sender (no-op for non-workshare jobs).
+    await recordAndNotifyWorkshareOutcome(jobId, "passed");
     return;
   }
 

@@ -41,6 +41,8 @@ export type AccountWorkshareRequestRow = {
   decided_by_user_id: string | null;
   decline_reason: string | null;
   accepted_at: string | null;
+  outcome: "passed" | "failed" | null;
+  outcome_recorded_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -66,6 +68,11 @@ function normalizeStatus(value: unknown): AccountWorkshareRequestStatus | null {
   return ACCOUNT_WORKSHARE_REQUEST_STATUSES.includes(normalized as AccountWorkshareRequestStatus)
     ? (normalized as AccountWorkshareRequestStatus)
     : null;
+}
+
+function normalizeOutcome(value: unknown): "passed" | "failed" | null {
+  const normalized = cleanString(value).toLowerCase();
+  return normalized === "passed" || normalized === "failed" ? normalized : null;
 }
 
 function normalizeRequestType(value: unknown): AccountWorkshareRequestType | null {
@@ -150,6 +157,8 @@ export function normalizeAccountWorkshareRequestRow(value: any): AccountWorkshar
     decided_by_user_id: cleanNullableString(value?.decided_by_user_id),
     decline_reason: cleanNullableString(value?.decline_reason),
     accepted_at: cleanNullableString(value?.accepted_at),
+    outcome: normalizeOutcome(value?.outcome),
+    outcome_recorded_at: cleanNullableString(value?.outcome_recorded_at),
     created_at: createdAt,
     updated_at: updatedAt,
   };
