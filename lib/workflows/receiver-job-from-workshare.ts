@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createJob } from "@/lib/actions/job-actions";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import type { AccountWorkshareRequestRow } from "@/lib/workflows/account-workshare-requests-read";
+import { recreateJobEquipmentFromSnapshot } from "@/lib/workflows/workshare-equipment-snapshot";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -128,6 +129,10 @@ export async function createReceiverJobFromWorkshareSnapshot(params: {
     },
     { serviceCaseWriteClient: admin },
   );
+
+  // Rebuild the contractor's ECC systems + equipment on the new job so the rater
+  // can test immediately without re-typing (best-effort; never blocks the accept).
+  await recreateJobEquipmentFromSnapshot(admin, created.id, request.equipment_snapshot);
 
   return { jobId: created.id };
 }

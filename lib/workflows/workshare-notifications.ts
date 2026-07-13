@@ -230,12 +230,14 @@ export async function insertWorkshareRequestOutcomeNotification(params: {
   const customer = String(request.customer_name_snapshot ?? "").trim();
   const forCustomer = customer ? ` for ${customer}` : "";
 
+  const note = String(request.outcome_note ?? "").trim();
+  const noteSuffix = note ? ` Note: ${note}` : "";
   const subject =
     outcome === "passed" ? "ECC/HERS test passed" : "ECC/HERS test failed";
   const body =
-    outcome === "passed"
+    (outcome === "passed"
       ? `${raterName} completed ECC/HERS testing${forCustomer}: PASSED. You can proceed to the final inspection.`
-      : `${raterName} completed ECC/HERS testing${forCustomer}: FAILED. Corrections are needed before a retest.`;
+      : `${raterName} completed ECC/HERS testing${forCustomer}: FAILED. Corrections are needed before a retest.`) + noteSuffix;
 
   await admin.from("notifications").insert({
     job_id: null,
@@ -252,6 +254,104 @@ export async function insertWorkshareRequestOutcomeNotification(params: {
       receiver_account_id: receiverAccountId,
       source_job_id: sourceJobId,
       outcome,
+    },
+    status: "queued",
+  });
+
+  await sendWorkshareEmail({ admin, accountOwnerUserId: recipientAccountOwnerUserId, subject, body });
+}
+
+export const WORKSHARE_RETEST_REQUESTED_NOTIFICATION_TYPE = "workshare_retest_requested";
+export const WORKSHARE_REQUEST_NOTE_NOTIFICATION_TYPE = "workshare_request_note";
+
+// P1-F.3: the contractor (sender) asks the rater (receiver) for a retest after a
+// fail. Notifies the RECEIVER, carrying the corrections note so the rater knows
+// what changed (no assumptions). Links to the rater's receiving job.
+export async function insertWorkshareRetestRequestedNotification(params: {
+  admin: SupabaseClient;
+  request: AccountWorkshareRequestRow;
+}): Promise<void> {
+  const { admin, request } = params;
+
+  const recipientAccountOwnerUserId = String(request.receiver_account_id ?? "").trim();
+  const senderAccountId = String(request.sender_account_id ?? "").trim();
+  const requestId = String(request.id ?? "").trim();
+  const receivingJobId = String(request.receiving_job_id ?? "").trim();
+  if (!recipientAccountOwnerUserId || !requestId) return;
+
+  const senderIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    accountOwnerUserId: senderAccountId,
+    supabase: admin,
+  });
+  const senderName = senderIdentity.display_name || "A connected contractor";
+
+  const customer = String(request.customer_name_snapshot ?? "").trim();
+  const forCustomer = customer ? ` for ${customer}` : "";
+  const note = String(request.retest_note ?? "").trim();
+
+  const subject = "ECC/HERS retest requested";
+  const body = `${senderName} requested a retest${forCustomer}.${note ? ` What was corrected: ${note}` : ""}`;
+
+  await admin.from("notifications").insert({
+    job_id: null,
+    account_owner_user_id: recipientAccountOwnerUserId,
+    recipient_type: "internal",
+    recipient_ref: null,
+    channel: "in_app",
+    notification_type: WORKSHARE_RETEST_REQUESTED_NOTIFICATION_TYPE,
+    subject,
+    body,
+    payload: {
+      source: "account_workshare",
+      request_id: requestId,
+      sender_account_id: senderAccountId,
+      receiving_job_id: receivingJobId,
+    },
+    status: "queued",
+  });
+
+  await sendWorkshareEmail({ admin, accountOwnerUserId: recipientAccountOwnerUserId, subject, body });
+}
+
+// P1-F.3: the rater (receiver) sends a free-text note to the contractor alongside
+// the outcome (e.g. "passed after the duct fix"). Notifies the SENDER; links to
+// their source job.
+export async function insertWorkshareOutcomeNoteNotification(params: {
+  admin: SupabaseClient;
+  request: AccountWorkshareRequestRow;
+}): Promise<void> {
+  const { admin, request } = params;
+
+  const recipientAccountOwnerUserId = String(request.sender_account_id ?? "").trim();
+  const receiverAccountId = String(request.receiver_account_id ?? "").trim();
+  const requestId = String(request.id ?? "").trim();
+  const sourceJobId = String(request.source_job_id ?? "").trim();
+  const note = String(request.outcome_note ?? "").trim();
+  if (!recipientAccountOwnerUserId || !requestId || !note) return;
+
+  const raterIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    accountOwnerUserId: receiverAccountId,
+    supabase: admin,
+  });
+  const raterName = raterIdentity.display_name || "The rater";
+
+  const subject = "Note from your ECC/HERS rater";
+  const body = `${raterName}: ${note}`;
+
+  await admin.from("notifications").insert({
+    job_id: null,
+    account_owner_user_id: recipientAccountOwnerUserId,
+    recipient_type: "internal",
+    recipient_ref: null,
+    channel: "in_app",
+    notification_type: WORKSHARE_REQUEST_NOTE_NOTIFICATION_TYPE,
+    subject,
+    body,
+    payload: {
+      source: "account_workshare",
+      request_id: requestId,
+      receiver_account_id: receiverAccountId,
+      source_job_id: sourceJobId,
     },
     status: "queued",
   });

@@ -358,6 +358,8 @@ describe("account workshare requests actions", () => {
     expect(new Set(fixture.tableCalls)).toEqual(new Set([
       "account_workshare_connections",
       "customers",
+      "job_systems",
+      "job_equipment",
       "account_workshare_requests",
     ]));
     expect(fixture.tableCalls.join(" ")).not.toContain("jobs");

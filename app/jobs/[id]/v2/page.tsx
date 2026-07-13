@@ -44,7 +44,7 @@ import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
-import { getInternalBusinessProfileByAccountOwnerId, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { getInternalBusinessProfileByAccountOwnerId, resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
@@ -66,8 +66,13 @@ import CancelJobButton from "@/components/jobs/CancelJobButton";
 import {
   listAccountWorkshareConnectionsForAccount,
 } from "@/lib/workflows/account-workshare-connections-read";
-import { listAccountWorkshareRequestsForSourceJob } from "@/lib/workflows/account-workshare-requests-read";
+import {
+  listAccountWorkshareRequestsForSourceJob,
+  getWorkshareRequestForReceivingJob,
+} from "@/lib/workflows/account-workshare-requests-read";
+import { resolveWorkshareSenderCompanyNames } from "@/lib/workflows/workshare-sender-identity";
 import EccHersRequestSection from "./_components/EccHersRequestSection";
+import ReceiverWorksharePanel from "./_components/ReceiverWorksharePanel";
 
 import ScrollSpyNav, { type NavItem } from "./_components/ScrollSpyNav";
 import AlertBanner from "./_components/AlertBanner";
@@ -649,10 +654,63 @@ export default async function JobDetailV2Page({
     (row) => row.sender_account_id === accountOwnerUserId,
   );
   const hasActiveRaterWorkshareConnection = activeRaterWorkshareConnections.length > 0;
-  const workshareConnectionOptions = activeRaterWorkshareConnections.map((row) => ({
-    id: row.id,
-    label: row.invite_company_name || `Connected rater ${row.receiver_account_id.slice(0, 8)}`,
-  }));
+  // Label each rater by their real company name. Prefer the name captured on the
+  // connection invite; otherwise resolve the rater account's business identity
+  // (RLS-scoped to them, so use the service-role client) — never fall back to an id.
+  const workshareLabelAdmin = activeRaterWorkshareConnections.length > 0 ? createAdminClient() : null;
+  const workshareConnectionOptions = await Promise.all(
+    activeRaterWorkshareConnections.map(async (row) => {
+      const inviteName = String(row.invite_company_name ?? "").trim();
+      let label = inviteName;
+      if (!label && workshareLabelAdmin) {
+        const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
+          accountOwnerUserId: row.receiver_account_id,
+          supabase: workshareLabelAdmin,
+        });
+        label = String(identity.display_name ?? "").trim();
+      }
+      return { id: row.id, label: label || "Connected rater" };
+    }),
+  );
+
+  // Company names for the sent-request list (so it never shows a rater account id).
+  const workshareRaterNameById: Record<string, string> = {};
+  {
+    const requestReceivers = Array.from(
+      new Set((workshareRequests ?? []).map((r) => String(r.receiver_account_id ?? "").trim()).filter(Boolean)),
+    );
+    if (requestReceivers.length > 0) {
+      const raterAdmin = workshareLabelAdmin ?? createAdminClient();
+      await Promise.all(
+        requestReceivers.map(async (receiverId) => {
+          const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
+            accountOwnerUserId: receiverId,
+            supabase: raterAdmin,
+          });
+          workshareRaterNameById[receiverId] = String(identity.display_name ?? "").trim() || "Connected rater";
+        }),
+      );
+    }
+  }
+
+  // Receiver side: is THIS job a workshare receiving job (created from an accepted
+  // request)? If so, surface the partner panel with the contractor context.
+  const receiverWorkshareRequest = await getWorkshareRequestForReceivingJob(supabase, accountOwnerUserId, jobId);
+  let receiverWorkshareSenderName = "Connected contractor";
+  let receiverWorkshareCurrentResult: "passed" | "failed" | null = null;
+  if (receiverWorkshareRequest) {
+    const senderNames = await resolveWorkshareSenderCompanyNames([receiverWorkshareRequest]);
+    receiverWorkshareSenderName =
+      senderNames.get(String(receiverWorkshareRequest.sender_account_id ?? "").trim()) || "Connected contractor";
+    // Live ECC result of this receiving job (rater sends it manually).
+    const receiverOps = String(job.ops_status ?? "").toLowerCase();
+    receiverWorkshareCurrentResult =
+      receiverOps === "failed"
+        ? "failed"
+        : ["paperwork_required", "invoice_required", "certs_complete", "closed"].includes(receiverOps)
+          ? "passed"
+          : null;
+  }
 
   // brief fields
   const visitReasonText = String(job.service_visit_reason ?? job.title ?? "").trim();
@@ -858,6 +916,7 @@ export default async function JobDetailV2Page({
     { id: "billing", label: "Work & Billing" },
     { id: "followup", label: "Follow-Up & Chain" },
     ...(hasActiveRaterWorkshareConnection ? [{ id: "workshare", label: "ECC/HERS Request" }] : []),
+    ...(receiverWorkshareRequest ? [{ id: "workshare-partner", label: "Workshare" }] : []),
     ...(isEccJob ? [{ id: "compliance", label: "Compliance" }] : []),
     { id: "records", label: "Records" },
   ];
@@ -2739,6 +2798,17 @@ export default async function JobDetailV2Page({
             requests={workshareRequests ?? []}
             defaultScope={workshareDefaultScope}
             notice={param(sp, "notice")}
+            raterNameById={workshareRaterNameById}
+          />
+        ) : null}
+
+        {/* ── WORKSHARE PARTNER (receiver side of an accepted request) ─────── */}
+        {receiverWorkshareRequest ? (
+          <ReceiverWorksharePanel
+            request={receiverWorkshareRequest}
+            senderCompanyName={receiverWorkshareSenderName}
+            receivingJobId={jobId}
+            currentResult={receiverWorkshareCurrentResult}
           />
         ) : null}
 

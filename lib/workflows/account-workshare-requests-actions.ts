@@ -14,13 +14,18 @@ import {
 } from "@/lib/workflows/account-workshare-connections-read";
 import {
   normalizeAccountWorkshareRequestRow,
+  getWorkshareRequestForReceivingJob,
   type AccountWorkshareRequestRow,
 } from "@/lib/workflows/account-workshare-requests-read";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { createReceiverJobFromWorkshareSnapshot } from "@/lib/workflows/receiver-job-from-workshare";
+import { buildWorkshareEquipmentSnapshot } from "@/lib/workflows/workshare-equipment-snapshot";
 import {
   insertWorkshareRequestReceivedNotification,
   insertWorkshareRequestDecisionNotification,
+  insertWorkshareRequestOutcomeNotification,
+  insertWorkshareRetestRequestedNotification,
+  insertWorkshareOutcomeNoteNotification,
 } from "@/lib/workflows/workshare-notifications";
 
 type ActionResult =
@@ -289,6 +294,10 @@ export async function createAccountWorkshareRequestFromJob(input: {
   const jobReference = cleanNullableString((sourceJob as any).job_display_number)
     || cleanNullableString((sourceJob as any).id);
 
+  // Snapshot the source job's ECC-testable equipment so the rater's accepted job
+  // is pre-populated (best-effort; returns [] on any error).
+  const equipmentSnapshot = await buildWorkshareEquipmentSnapshot(admin, sourceJobId);
+
   const payload = {
     connection_id: connection.id,
     sender_account_id: authz.accountOwnerUserId,
@@ -316,6 +325,7 @@ export async function createAccountWorkshareRequestFromJob(input: {
       requestedScope: input.requestedScope,
       sourceJob,
     }),
+    equipment_snapshot: equipmentSnapshot,
     sender_notes_snapshot: limitString(input.senderNotes, 4000),
     preferred_date: normalizeDateOnly(input.preferredDate),
     preferred_window_snapshot: limitString(input.preferredWindow, 240),
@@ -501,6 +511,188 @@ export async function acceptAccountWorkshareRequest(input: {
   return { success: true, request, jobId };
 }
 
+export async function requestAccountWorkshareRetest(input: {
+  requestId: string;
+  note: string;
+}): Promise<ActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return failure(authz.error);
+
+  const requestId = cleanString(input.requestId);
+  if (!isUuid(requestId)) return failure("Request id is required.");
+
+  const note = limitString(input.note, 2000);
+  if (!note) return failure("Tell the rater what you corrected so they can retest.");
+
+  const admin = createAdminClient();
+  const loaded = await readRequestById(admin, requestId);
+  if (loaded.error) return failure(loaded.error);
+  if (!loaded.request) return failure("Request not found.");
+
+  // Retest is a SENDER action, only after a failed outcome.
+  if (loaded.request.sender_account_id !== authz.accountOwnerUserId) {
+    return failure("Only the sender account can request a retest.");
+  }
+  if (loaded.request.status !== "accepted" || loaded.request.outcome !== "failed") {
+    return failure("A retest can only be requested after a failed test.");
+  }
+
+  const { data, error } = await admin.rpc("request_account_workshare_retest", {
+    p_request_id: requestId,
+    p_note: note,
+    p_actor_user_id: authz.userId,
+  });
+  if (error) return failure(error.message || "Could not request a retest.");
+
+  const row = Array.isArray(data) ? data[0] : data;
+  const request = normalizeAccountWorkshareRequestRow(row);
+  if (!request) return failure("Could not request a retest.");
+
+  return { success: true, request };
+}
+
+// Derive the ECC pass/fail result from a job's ops_status (mirrors the terminal
+// branches of evaluateEccOpsStatus): failed => failed; the closeout chain => passed.
+function deriveEccOutcome(opsStatus: unknown): "passed" | "failed" | null {
+  const status = cleanString(opsStatus).toLowerCase();
+  if (status === "failed") return "failed";
+  if (["paperwork_required", "invoice_required", "certs_complete", "closed"].includes(status)) {
+    return "passed";
+  }
+  return null;
+}
+
+// Rater-controlled send: the ECC result is NOT auto-sent to the contractor. The
+// rater reviews it and calls this when ready. Records the outcome (+ optional
+// note) and returns the request so the caller can notify.
+export async function sendWorkshareOutcomeToContractor(input: {
+  receivingJobId: string;
+  note?: string | null;
+}): Promise<ActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return failure(authz.error);
+
+  const receivingJobId = cleanString(input.receivingJobId);
+  if (!isUuid(receivingJobId)) return failure("Job id is required.");
+
+  const note = limitString(input.note ?? "", 2000);
+
+  const admin = createAdminClient();
+  const request = await getWorkshareRequestForReceivingJob(admin, authz.accountOwnerUserId, receivingJobId);
+  if (!request) return failure("No workshare request found for this job.");
+
+  // Derive the current ECC result from the receiving job.
+  const { data: job, error: jobError } = await admin
+    .from("jobs")
+    .select("ops_status")
+    .eq("id", receivingJobId)
+    .maybeSingle();
+  if (jobError) return failure(jobError.message || "Could not read the job status.");
+
+  const outcome = deriveEccOutcome((job as { ops_status?: string } | null)?.ops_status);
+  if (!outcome) {
+    return failure("The test result isn't final yet — finish the ECC test before sending.");
+  }
+
+  const { data, error } = await admin.rpc("record_account_workshare_receiver_outcome", {
+    p_completing_job_id: receivingJobId,
+    p_outcome: outcome,
+    p_actor_user_id: authz.userId,
+    p_outcome_note: note,
+  });
+  if (error) return failure(error.message || "Could not send the result.");
+
+  const row = Array.isArray(data) ? data[0] : data;
+  const updated = normalizeAccountWorkshareRequestRow(row);
+  // No row = the outcome + note were already sent unchanged; return the current one.
+  return { success: true, request: updated ?? request };
+}
+
+export async function addWorkshareOutcomeNote(input: {
+  receivingJobId: string;
+  note: string;
+}): Promise<ActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return failure(authz.error);
+
+  const receivingJobId = cleanString(input.receivingJobId);
+  if (!isUuid(receivingJobId)) return failure("Job id is required.");
+
+  const note = limitString(input.note, 2000);
+  if (!note) return failure("Enter a note for the contractor.");
+
+  const admin = createAdminClient();
+  const request = await getWorkshareRequestForReceivingJob(admin, authz.accountOwnerUserId, receivingJobId);
+  if (!request) return failure("No workshare request found for this job.");
+  if (!request.outcome) return failure("You can add a note once the test result is recorded.");
+
+  // Trigger Arm 4 permits an outcome_note-only update on an outcome-recorded row.
+  const nowIso = new Date().toISOString();
+  const { data, error } = await admin
+    .from("account_workshare_requests")
+    .update({ outcome_note: note, updated_at: nowIso })
+    .eq("id", request.id)
+    .select("*")
+    .maybeSingle();
+  if (error) return failure(error.message || "Could not add the note.");
+
+  const updated = normalizeAccountWorkshareRequestRow(data);
+  if (!updated) return failure("Could not add the note.");
+
+  return { success: true, request: updated };
+}
+
+export async function acknowledgeWorkshareOutcome(input: {
+  requestId: string;
+}): Promise<ActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return failure(authz.error);
+
+  const requestId = cleanString(input.requestId);
+  if (!isUuid(requestId)) return failure("Request id is required.");
+
+  const admin = createAdminClient();
+  const loaded = await readRequestById(admin, requestId);
+  if (loaded.error) return failure(loaded.error);
+  if (!loaded.request) return failure("Request not found.");
+
+  if (loaded.request.sender_account_id !== authz.accountOwnerUserId) {
+    return failure("Only the sender account can mark this handled.");
+  }
+  if (!loaded.request.outcome) {
+    return failure("There is no returned result to mark handled.");
+  }
+
+  // Trigger Arm 4 permits an ack-only update on an outcome-recorded row.
+  const nowIso = new Date().toISOString();
+  const { data, error } = await admin
+    .from("account_workshare_requests")
+    .update({ outcome_acknowledged_at: nowIso, updated_at: nowIso })
+    .eq("id", requestId)
+    .select("*")
+    .maybeSingle();
+  if (error) return failure(error.message || "Could not mark handled.");
+
+  const updated = normalizeAccountWorkshareRequestRow(data);
+  if (!updated) return failure("Could not mark handled.");
+
+  return { success: true, request: updated };
+}
+
+export async function acknowledgeWorkshareOutcomeFromForm(formData: FormData): Promise<void> {
+  const result = await acknowledgeWorkshareOutcome({
+    requestId: cleanString(formData.get("request_id")),
+  });
+
+  if (!result.success) {
+    redirect("/ops/workshare/returned?notice=workshare_ack_error");
+  }
+
+  revalidatePath("/ops/workshare/returned");
+  revalidatePath("/ops");
+  redirect("/ops/workshare/returned?notice=workshare_handled");
+}
+
 export async function createAccountWorkshareRequestFromJobForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
   const returnTo = formData.get("return_to");
@@ -598,4 +790,85 @@ export async function acceptAccountWorkshareRequestFromForm(formData: FormData):
   revalidatePath("/ops/workshare/decided");
   // Land the rater on their newly created job.
   redirect(`/jobs/${result.jobId}/v2?banner=workshare_accepted`);
+}
+
+export async function requestAccountWorkshareRetestFromForm(formData: FormData): Promise<void> {
+  const sourceJobId = cleanString(formData.get("source_job_id"));
+  const returnTo = formData.get("return_to");
+  const result = await requestAccountWorkshareRetest({
+    requestId: cleanString(formData.get("request_id")),
+    note: cleanString(formData.get("retest_note")),
+  });
+
+  if (!result.success) {
+    redirect(withJobRequestNotice(sourceJobId, "workshare_retest_error", returnTo));
+  }
+
+  // Best-effort: notify the rater a retest was requested (with the corrections note).
+  try {
+    await insertWorkshareRetestRequestedNotification({
+      admin: createAdminClient(),
+      request: result.request,
+    });
+  } catch {
+    // swallow — the retest request stands; the signal is non-critical.
+  }
+
+  revalidatePath(resolveWorkshareReturnBase(returnTo, sourceJobId));
+  redirect(withJobRequestNotice(sourceJobId, "workshare_retest_requested", returnTo));
+}
+
+export async function sendWorkshareOutcomeToContractorFromForm(formData: FormData): Promise<void> {
+  const receivingJobId = cleanString(formData.get("receiving_job_id"));
+  const base = `/jobs/${encodeURIComponent(receivingJobId)}/v2`;
+  const result = await sendWorkshareOutcomeToContractor({
+    receivingJobId,
+    note: cleanNullableString(formData.get("outcome_note")),
+  });
+
+  if (!result.success) {
+    redirect(`${base}?notice=workshare_send_error`);
+  }
+
+  // Best-effort: notify the contractor of the result (deduped by request+outcome).
+  try {
+    if (result.request.outcome) {
+      await insertWorkshareRequestOutcomeNotification({
+        admin: createAdminClient(),
+        request: result.request,
+        outcome: result.request.outcome,
+      });
+    }
+  } catch {
+    // swallow — the result is recorded; the signal is non-critical.
+  }
+
+  revalidatePath(base);
+  redirect(`${base}?notice=workshare_result_sent`);
+}
+
+export async function addWorkshareOutcomeNoteFromForm(formData: FormData): Promise<void> {
+  const receivingJobId = cleanString(formData.get("receiving_job_id"));
+  const base = `/jobs/${encodeURIComponent(receivingJobId)}/v2`;
+  const result = await addWorkshareOutcomeNote({
+    receivingJobId,
+    note: cleanString(formData.get("outcome_note")),
+  });
+
+  if (!result.success) {
+    redirect(`${base}?notice=workshare_note_error`);
+  }
+
+  // Best-effort: notify the contractor of the rater's note.
+  try {
+    await insertWorkshareOutcomeNoteNotification({
+      admin: createAdminClient(),
+      request: result.request,
+    });
+  } catch {
+    // swallow — the note is saved; the signal is non-critical.
+  }
+
+  revalidatePath(base);
+  redirect(`${base}?notice=workshare_note_sent`);
 }
