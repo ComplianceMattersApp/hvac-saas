@@ -228,9 +228,9 @@ describe("/ops Full Ops command center IA wiring", () => {
   it("scopes contractor options to the rendered bucket via server-nav chips so per-bucket counts stay correct", () => {
     // Queue chips navigate (server round-trip) rather than switching the panel
     // client-side, so the SSR-computed contractor facet always matches the
-    // bucket being viewed.
-    expect(opsPageSource).toContain('kind: "link" as const');
-    expect(opsPageSource).not.toContain('kind: "switchable" as const');
+    // bucket being viewed. Chips carry the active-bucket highlight for that nav.
+    expect(opsPageSource).toContain("active: chip.isSelected");
+    expect(opsPageSource).not.toContain('"switchable"');
     // Picker source is the selected bucket's rows (before the contractor filter),
     // not a bucket-agnostic sweep of every open job.
     expect(opsPageSource).toContain(
@@ -238,6 +238,9 @@ describe("/ops Full Ops command center IA wiring", () => {
     );
     expect(opsPageSource).not.toContain("loadActiveQueueContractorFocusSourceRows");
     expect(opsPageSource).toContain("contractorFocusInternalCount += 1");
+    // Closeout facet counts the full closeout set, not the 10-row preview.
+    expect(opsPageSource).toContain('selectedWorkspaceKey === "closeout"');
+    expect(opsPageSource).toContain("? closeoutQueueRowsFull");
   });
 
   it("keeps sorting combined with Contractor and selected queue", () => {

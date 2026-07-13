@@ -864,10 +864,14 @@ export default async function OpsPage({
       accountOwnerUserId: internalUser.account_owner_user_id,
       jobs: closeoutProjectionInputs(closeoutCountSourceRows),
     });
-    const closeoutCount = listCloseoutQueueJobs(
+    // Full closeout set (uncapped) — reused for both the chip count and the
+    // Contractor Focus facet so the picker counts every closeout job, not just
+    // the 10-row workbench preview (loadCloseoutWorkspaceRows slices to 10).
+    const closeoutQueueRowsFull = listCloseoutQueueJobs(
       closeoutCountSourceRows,
       (job: any) => closeoutCountProjectionByJobId.get(String(job?.id ?? "").trim()) ?? job,
-    ).length;
+    );
+    const closeoutCount = closeoutQueueRowsFull.length;
     const permitRequestsSchemaAvailable = permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable;
     const activePermitRequestRows = activePermitRequestsResult.rows;
     const effectiveBoardBucketFilter = resolveEffectiveOpsBoardBucketFilter({
@@ -1296,6 +1300,8 @@ export default async function OpsPage({
         ? activePermitRequestRows
         : selectedWorkspaceKey === "contractor_intake"
         ? reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []
+        : selectedWorkspaceKey === "closeout"
+        ? closeoutQueueRowsFull
         : reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? [];
     const contractorFocusCounts = new Map<string, number>();
     const contractorFocusNameById = new Map<string, string>();
@@ -1672,7 +1678,6 @@ export default async function OpsPage({
     // bucket's contractor counts. Server-nav chips keep the rendered bucket and
     // those facets in sync.
     const opsBoardClientChips = workspaceQueueChips.map((chip) => ({
-      kind: "link" as const,
       key: chip.key,
       href: chip.href,
       label: chip.label,
@@ -1686,9 +1691,6 @@ export default async function OpsPage({
       count: tab.count,
       href: tab.href,
     }));
-    const opsBoardBucketPreviewLimits = Object.fromEntries(
-      workspaceQueueChips.map((chip) => [chip.bucket, Math.max(chip.count, 10)])
-    );
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const selectedPermitAttachmentResult = selectedPermitRows.length
@@ -2587,7 +2589,6 @@ export default async function OpsPage({
                 pinnedViews: activeQueuePinnedViews,
                 canExportContractorSafeCsv,
               }}
-              bucketPreviewLimits={opsBoardBucketPreviewLimits}
               contractorParam={contractorFocusFilter ?? ""}
               hasContractorFilter={contractorFocusIds.length > 0}
               clearContractorHref={clearOpsBoardFiltersHref}
