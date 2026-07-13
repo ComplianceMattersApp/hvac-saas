@@ -50,6 +50,7 @@ export type AccountWorkshareRequestRow = {
   outcome: "passed" | "failed" | null;
   outcome_recorded_at: string | null;
   outcome_note: string | null;
+  outcome_acknowledged_at: string | null;
   retest_requested_at: string | null;
   retest_note: string | null;
   retest_count: number;
@@ -171,6 +172,7 @@ export function normalizeAccountWorkshareRequestRow(value: any): AccountWorkshar
     outcome: normalizeOutcome(value?.outcome),
     outcome_recorded_at: cleanNullableString(value?.outcome_recorded_at),
     outcome_note: cleanNullableString(value?.outcome_note),
+    outcome_acknowledged_at: cleanNullableString(value?.outcome_acknowledged_at),
     retest_requested_at: cleanNullableString(value?.retest_requested_at),
     retest_note: cleanNullableString(value?.retest_note),
     retest_count: Number.isFinite(Number(value?.retest_count)) ? Number(value?.retest_count) : 0,
@@ -218,6 +220,58 @@ export async function listSentAccountWorkshareRequestsForSender(
 
     return { data: (data ?? []) as AccountWorkshareRequestRow[], error };
   });
+}
+
+// Sender-facing "returned work": requests this account sent where the rater has
+// returned an outcome that the contractor has not yet handled (unacknowledged).
+// A failed outcome clears when a retest is requested (outcome -> null); a passed
+// outcome clears when the contractor marks it handled (sets outcome_acknowledged_at).
+export async function listReturnedWorkshareRequestsForSender(
+  supabase: SupabaseClient,
+  senderAccountId: string | null | undefined,
+  options?: { limit?: number | null },
+): Promise<AccountWorkshareRequestRow[]> {
+  const normalizedSenderAccountId = cleanString(senderAccountId);
+  if (!normalizedSenderAccountId) return [];
+
+  const safeLimit = Math.max(1, Math.min(500, Number(options?.limit ?? 100)));
+
+  return fetchAccountWorkshareRequestRows(supabase, async (client) => {
+    const { data, error } = await client
+      .from("account_workshare_requests")
+      .select("*")
+      .eq("sender_account_id", normalizedSenderAccountId)
+      .eq("status", "accepted")
+      .not("outcome", "is", null)
+      .is("outcome_acknowledged_at", null)
+      .order("outcome_recorded_at", { ascending: false })
+      .limit(safeLimit);
+
+    return { data: (data ?? []) as AccountWorkshareRequestRow[], error };
+  });
+}
+
+export async function countReturnedWorkshareRequestsForSender(
+  supabase: SupabaseClient,
+  senderAccountId: string | null | undefined,
+): Promise<number> {
+  const normalizedSenderAccountId = cleanString(senderAccountId);
+  if (!normalizedSenderAccountId) return 0;
+
+  try {
+    const { count, error } = await supabase
+      .from("account_workshare_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("sender_account_id", normalizedSenderAccountId)
+      .eq("status", "accepted")
+      .not("outcome", "is", null)
+      .is("outcome_acknowledged_at", null);
+
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function listAccountWorkshareRequestsForSourceJob(

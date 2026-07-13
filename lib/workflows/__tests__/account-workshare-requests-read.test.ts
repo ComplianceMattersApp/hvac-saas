@@ -48,6 +48,7 @@ function makeRequest(input: Partial<AccountWorkshareRequestRow> & { id: string }
     outcome: null,
     outcome_recorded_at: null,
     outcome_note: null,
+    outcome_acknowledged_at: null,
     retest_requested_at: null,
     retest_note: null,
     retest_count: 0,

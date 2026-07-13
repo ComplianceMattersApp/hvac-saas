@@ -21,9 +21,8 @@ import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
-import { listOpenWorkflowHandoffRequestsForInstallerAccount } from "@/lib/workflows/workflow-handoff-requests-read";
-import { listActiveConnectedRecipientHandoffProjectionsForAccount } from "@/lib/workflows/connected-recipient-handoff-projection-read";
 import { listSenderWorkshareConnectionsForReceiver } from "@/lib/workflows/account-workshare-connections-read";
+import { countReturnedWorkshareRequestsForSender } from "@/lib/workflows/account-workshare-requests-read";
 
 import {
   formatBusinessDateUS,
@@ -281,15 +280,10 @@ export default async function OpsPage({
     })
     : null;
 
-  const [handoffRequestsPendingRows, connectedHandoffPartnerRows, incomingWorkshareConnectionRows] = await Promise.all([
-    listOpenWorkflowHandoffRequestsForInstallerAccount(supabase, {
-      installerAccountOwnerUserId: internalUser.account_owner_user_id,
-    }),
-    listActiveConnectedRecipientHandoffProjectionsForAccount(supabase, internalUser.account_owner_user_id),
+  const [incomingWorkshareConnectionRows, returnedWorkshareCount] = await Promise.all([
     listSenderWorkshareConnectionsForReceiver(supabase, internalUser.account_owner_user_id),
+    countReturnedWorkshareRequestsForSender(supabase, internalUser.account_owner_user_id),
   ]);
-  const handoffRequestsPendingCount = handoffRequestsPendingRows.filter((row) => row.handoff_status === "sent").length;
-  const connectedHandoffPartnerCount = connectedHandoffPartnerRows.length;
   // Show the incoming ECC/HERS request queue only to accounts that have an active
   // workshare connection where they are the receiver — no point surfacing an empty
   // queue to accounts that have not set up connections yet.
@@ -1794,12 +1788,11 @@ export default async function OpsPage({
               <Link href="/today" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
                 Go to Today
               </Link>
-              <Link href="/ops/handoffs" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
-                Handoff Requests
-              </Link>
-              <Link href="/ops/connected-handoffs" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
-                Connected Handoffs
-              </Link>
+              {returnedWorkshareCount > 0 ? (
+                <Link href="/ops/workshare/returned" className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-[12px] font-semibold text-blue-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
+                  Returned Work · {returnedWorkshareCount}
+                </Link>
+              ) : null}
             </div>
           </div>
         </section>
@@ -2579,25 +2572,25 @@ export default async function OpsPage({
             ) : null}
           </section>
 
-          <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Handoffs</div>
-            <div className="space-y-2">
-              <Link href="/ops/handoffs" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
-                <span className="font-medium text-slate-700">{handoffRequestsPendingCount} requests pending</span>
-                <span className="font-semibold text-blue-700">Review &rarr;</span>
-              </Link>
-              <Link href="/ops/connected-handoffs" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
-                <span className="font-medium text-slate-700">{connectedHandoffPartnerCount} connected</span>
-                <span className="font-semibold text-blue-700">View &rarr;</span>
-              </Link>
-              {hasActiveIncomingWorkshareConnection ? (
-                <Link href="/ops/workshare/incoming" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
-                  <span className="font-medium text-slate-700">Incoming ECC/HERS requests</span>
-                  <span className="font-semibold text-blue-700">View &rarr;</span>
-                </Link>
-              ) : null}
-            </div>
-          </section>
+          {returnedWorkshareCount > 0 || hasActiveIncomingWorkshareConnection ? (
+            <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Workshare</div>
+              <div className="space-y-2">
+                {returnedWorkshareCount > 0 ? (
+                  <Link href="/ops/workshare/returned" className="flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm transition-colors hover:bg-blue-50">
+                    <span className="font-medium text-blue-900">{returnedWorkshareCount} returned · needs action</span>
+                    <span className="font-semibold text-blue-700">Review &rarr;</span>
+                  </Link>
+                ) : null}
+                {hasActiveIncomingWorkshareConnection ? (
+                  <Link href="/ops/workshare/incoming" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
+                    <span className="font-medium text-slate-700">Incoming ECC/HERS requests</span>
+                    <span className="font-semibold text-blue-700">View &rarr;</span>
+                  </Link>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
 
           {showTeamClockStatusCard ? (
             <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">

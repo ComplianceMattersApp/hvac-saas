@@ -642,6 +642,57 @@ export async function addWorkshareOutcomeNote(input: {
   return { success: true, request: updated };
 }
 
+export async function acknowledgeWorkshareOutcome(input: {
+  requestId: string;
+}): Promise<ActionResult> {
+  const authz = await resolveInternalContext();
+  if (!authz.ok) return failure(authz.error);
+
+  const requestId = cleanString(input.requestId);
+  if (!isUuid(requestId)) return failure("Request id is required.");
+
+  const admin = createAdminClient();
+  const loaded = await readRequestById(admin, requestId);
+  if (loaded.error) return failure(loaded.error);
+  if (!loaded.request) return failure("Request not found.");
+
+  if (loaded.request.sender_account_id !== authz.accountOwnerUserId) {
+    return failure("Only the sender account can mark this handled.");
+  }
+  if (!loaded.request.outcome) {
+    return failure("There is no returned result to mark handled.");
+  }
+
+  // Trigger Arm 4 permits an ack-only update on an outcome-recorded row.
+  const nowIso = new Date().toISOString();
+  const { data, error } = await admin
+    .from("account_workshare_requests")
+    .update({ outcome_acknowledged_at: nowIso, updated_at: nowIso })
+    .eq("id", requestId)
+    .select("*")
+    .maybeSingle();
+  if (error) return failure(error.message || "Could not mark handled.");
+
+  const updated = normalizeAccountWorkshareRequestRow(data);
+  if (!updated) return failure("Could not mark handled.");
+
+  return { success: true, request: updated };
+}
+
+export async function acknowledgeWorkshareOutcomeFromForm(formData: FormData): Promise<void> {
+  const result = await acknowledgeWorkshareOutcome({
+    requestId: cleanString(formData.get("request_id")),
+  });
+
+  if (!result.success) {
+    redirect("/ops/workshare/returned?notice=workshare_ack_error");
+  }
+
+  revalidatePath("/ops/workshare/returned");
+  revalidatePath("/ops");
+  redirect("/ops/workshare/returned?notice=workshare_handled");
+}
+
 export async function createAccountWorkshareRequestFromJobForm(formData: FormData): Promise<void> {
   const sourceJobId = cleanString(formData.get("source_job_id"));
   const returnTo = formData.get("return_to");
