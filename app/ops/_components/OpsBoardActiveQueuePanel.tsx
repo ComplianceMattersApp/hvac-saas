@@ -48,7 +48,6 @@ export type OpsBoardHiddenChip = {
 type Props = {
   chips: OpsBoardChip[];
   hiddenTodayChips: OpsBoardHiddenChip[];
-  contractorFocusSelector?: React.ReactNode;
   initialBucket: string;
   initialPanel: OpsBoardPanelData;
   bucketPreviewLimits: Record<string, number>;
@@ -70,7 +69,6 @@ function buildQueryString(params: Record<string, string | undefined | null>) {
 export default function OpsBoardActiveQueuePanel({
   chips,
   hiddenTodayChips,
-  contractorFocusSelector,
   initialBucket,
   initialPanel,
   bucketPreviewLimits,
@@ -224,8 +222,6 @@ export default function OpsBoardActiveQueuePanel({
           </Link>
         ))}
       </div>
-
-      {contractorFocusSelector}
 
       <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
         <label className="grid gap-1">

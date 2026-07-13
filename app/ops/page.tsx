@@ -1889,16 +1889,6 @@ export default async function OpsPage({
             ))}
           </div>
 
-          {showWorkspaceContractorFilter ? (
-            <ContractorFocusSelector
-              allCount={contractorFocusAllCount}
-              internalWorkCount={contractorFocusInternalCount}
-              internalWorkId={INTERNAL_WORK_CONTRACTOR_FOCUS_ID}
-              options={contractorFocusOptions}
-              selectedIds={contractorFocusIds}
-            />
-          ) : null}
-
           <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Reason</label>
@@ -2559,19 +2549,14 @@ export default async function OpsPage({
           </>
           ) : (
             <OpsBoardActiveQueuePanel
+              // Remount when the contractor focus changes so the panel re-seeds
+              // its client-side row cache from the freshly filtered server rows.
+              // Apply() navigates via router.push (a soft nav), which keeps this
+              // client component mounted — without a key its useState-seeded
+              // panelCache would keep serving the pre-filter rows.
+              key={`ops-panel-${contractorFocusFilter ?? "all"}`}
               chips={opsBoardClientChips}
               hiddenTodayChips={opsBoardHiddenTodayChips}
-              contractorFocusSelector={
-                showWorkspaceContractorFilter ? (
-                  <ContractorFocusSelector
-                    allCount={contractorFocusAllCount}
-                    internalWorkCount={contractorFocusInternalCount}
-                    internalWorkId={INTERNAL_WORK_CONTRACTOR_FOCUS_ID}
-                    options={contractorFocusOptions}
-                    selectedIds={contractorFocusIds}
-                  />
-                ) : null
-              }
               initialBucket={effectiveBoardBucketFilter}
               initialPanel={{
                 queueLabel: selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label,
@@ -2592,6 +2577,19 @@ export default async function OpsPage({
         </div>
 
         <aside className="space-y-3 sm:space-y-4">
+          {showWorkspaceContractorFilter ? (
+            <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Focus</div>
+              <ContractorFocusSelector
+                allCount={contractorFocusAllCount}
+                internalWorkCount={contractorFocusInternalCount}
+                internalWorkId={INTERNAL_WORK_CONTRACTOR_FOCUS_ID}
+                options={contractorFocusOptions}
+                selectedIds={contractorFocusIds}
+              />
+            </section>
+          ) : null}
+
           <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Queue Health</div>
             <div className="grid grid-cols-2 gap-2">
