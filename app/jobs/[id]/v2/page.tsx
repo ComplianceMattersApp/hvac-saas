@@ -18,6 +18,9 @@ import {
   addPublicNoteFromForm,
   updateJobVisitScopeFromForm,
   changeJobServiceLocationFromForm,
+  confirmEccRetestReadyFromForm,
+  scheduleRetestNowFromForm,
+  createRetestJobFromForm,
 } from "@/lib/actions/job-actions";
 import {
   markJobFieldCompleteFromForm,
@@ -45,6 +48,8 @@ import { getActiveWaitingState } from "@/lib/utils/ops-status";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { getInternalBusinessProfileByAccountOwnerId, resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
+import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
@@ -451,6 +456,8 @@ export default async function JobDetailV2Page({
     businessProfile,
     workshareConnections,
     workshareRequests,
+    productMode,
+    activeRetestChild,
   ] = await timedPhase("supplementalReads", () => Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
@@ -495,6 +502,22 @@ export default async function JobDetailV2Page({
       limit: 100,
     }),
     listAccountWorkshareRequestsForSourceJob(supabase, accountOwnerUserId, jobId),
+    resolveProductModeForAccountOwnerId({ supabase, accountOwnerUserId }),
+    // active linked retest child (mirrors legacy job detail): only ECC parents, at most one live child
+    (async () => {
+      if (String(job.job_type ?? "").trim().toLowerCase() !== "ecc" || job.parent_job_id) return null;
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, status, ops_status, scheduled_date, window_start, window_end")
+        .eq("parent_job_id", jobId)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ?? null;
+    })(),
   ]));
 
   if (customerLocationsError) throw customerLocationsError;
@@ -746,6 +769,22 @@ export default async function JobDetailV2Page({
     ? `Failed Test - ${failedReasonBannerNote}`
     : "Failed Test";
   const canShowContractorReportPanel = hasAssignedContractor && ["failed", "pending_info"].includes(opsStatus);
+
+  // ── ECC retest bridge (ported from legacy job detail) ──────────────────────
+  // Everyone reaching this page is internal (contractors were redirected above),
+  // so we gate on the product surface + job type + ops status only.
+  const retestSurfaceEnabled = resolveProductSurfaceProfile(productMode).surfaces.retest;
+  const hasActiveRetestChild = Boolean((activeRetestChild as any)?.id);
+  const showConfirmRetestReady =
+    retestSurfaceEnabled &&
+    isEccJob &&
+    !hasActiveRetestChild &&
+    ["failed", "pending_office_review"].includes(opsStatus);
+  const showScheduleRetest =
+    retestSurfaceEnabled &&
+    isEccJob &&
+    !hasActiveRetestChild &&
+    opsStatus === "retest_needed";
   const closeoutNeeds = getCloseoutNeeds({
     field_complete: job.field_complete,
     job_type: job.job_type,
@@ -2914,6 +2953,148 @@ export default async function JobDetailV2Page({
                 action={markEccPermitAvailableFromForm}
               />
             </div>
+
+            {showConfirmRetestReady ? (
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "16px",
+                  borderRadius: "11px",
+                  border: "1px solid oklch(0.85 0.06 65)",
+                  background: "oklch(0.98 0.02 75)",
+                }}
+              >
+                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.42 0.12 55)" }}>
+                  Confirm Retest Ready
+                </div>
+                <p style={{ marginTop: "5px", fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.06 60)" }}>
+                  Confirm the corrections are done so this job is ready for another ECC test visit. This moves
+                  it into retest scheduling.
+                </p>
+                <form action={confirmEccRetestReadyFromForm} style={{ marginTop: "12px" }}>
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <ImmediateSubmitButton
+                    pendingText="Confirming…"
+                    className=""
+                    style={{ ...(S.outlineBtn(true) as React.CSSProperties) } as React.CSSProperties}
+                  >
+                    Confirm Retest Ready
+                  </ImmediateSubmitButton>
+                </form>
+              </div>
+            ) : null}
+
+            {showScheduleRetest ? (
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "16px",
+                  borderRadius: "11px",
+                  border: "1px solid oklch(0.85 0.06 65)",
+                  background: "oklch(0.98 0.02 75)",
+                }}
+              >
+                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.42 0.12 55)" }}>
+                  Schedule Retest
+                </div>
+                <p style={{ marginTop: "5px", fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.06 60)" }}>
+                  Schedule a linked retest visit now, or move it to the scheduling queue.
+                </p>
+                <form
+                  action={scheduleRetestNowFromForm}
+                  style={{
+                    marginTop: "12px",
+                    padding: "14px",
+                    borderRadius: "10px",
+                    border: "1px solid oklch(0.9 0.02 75)",
+                    background: "#fff",
+                    display: "grid",
+                    gap: "12px",
+                  }}
+                >
+                  <input type="hidden" name="parent_job_id" value={jobId} />
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "oklch(0.34 0.02 262)" }}>
+                    <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+                    <span>Copy equipment from original</span>
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: "10px" }}>
+                    <label style={{ ...(S.fieldLabel as React.CSSProperties), display: "grid", gap: "5px", marginBottom: 0 }}>
+                      Date
+                      <input
+                        type="date"
+                        name="scheduled_date"
+                        required
+                        style={{
+                          height: "38px",
+                          borderRadius: "9px",
+                          border: "1px solid oklch(0.9 0.006 250)",
+                          padding: "0 10px",
+                          fontSize: "13px",
+                          fontFamily: "inherit",
+                          fontWeight: 400,
+                          color: "oklch(0.3 0.02 262)",
+                        }}
+                      />
+                    </label>
+                    <label style={{ ...(S.fieldLabel as React.CSSProperties), display: "grid", gap: "5px", marginBottom: 0 }}>
+                      Start
+                      <input
+                        type="time"
+                        name="window_start"
+                        style={{
+                          height: "38px",
+                          borderRadius: "9px",
+                          border: "1px solid oklch(0.9 0.006 250)",
+                          padding: "0 10px",
+                          fontSize: "13px",
+                          fontFamily: "inherit",
+                          fontWeight: 400,
+                          color: "oklch(0.3 0.02 262)",
+                        }}
+                      />
+                    </label>
+                    <label style={{ ...(S.fieldLabel as React.CSSProperties), display: "grid", gap: "5px", marginBottom: 0 }}>
+                      End
+                      <input
+                        type="time"
+                        name="window_end"
+                        style={{
+                          height: "38px",
+                          borderRadius: "9px",
+                          border: "1px solid oklch(0.9 0.006 250)",
+                          padding: "0 10px",
+                          fontSize: "13px",
+                          fontFamily: "inherit",
+                          fontWeight: 400,
+                          color: "oklch(0.3 0.02 262)",
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <ImmediateSubmitButton
+                      pendingText="Scheduling…"
+                      className=""
+                      style={{ ...(S.outlineBtn(true) as React.CSSProperties) } as React.CSSProperties}
+                    >
+                      Schedule Retest Now
+                    </ImmediateSubmitButton>
+                    <ImmediateSubmitButton
+                      formNoValidate
+                      formAction={async (formData: FormData) => {
+                        "use server";
+                        await createRetestJobFromForm(formData);
+                      }}
+                      pendingText="Creating…"
+                      className=""
+                      style={{ ...(S.outlineBtn(false) as React.CSSProperties) } as React.CSSProperties}
+                    >
+                      Move to Needs Scheduling
+                    </ImmediateSubmitButton>
+                  </div>
+                </form>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
