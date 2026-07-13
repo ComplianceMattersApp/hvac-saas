@@ -1072,27 +1072,6 @@ export default async function OpsPage({
       return sortOpsBoardRows(queueRes.data ?? [], boardSort);
     }
 
-    // Contractor Focus lives in the SSR-only right rail, but the job-queue
-    // chips (Waiting, Field Work, Exceptions, …) switch client-side without a
-    // server re-render. If we scoped the picker's contractors to the initially
-    // rendered bucket, switching to another queue client-side would leave the
-    // picker listing the wrong bucket's contractors. So source the picker from
-    // every open job across the job queues — the list stays complete and stable
-    // no matter which bucket is being viewed. Row filtering still narrows the
-    // currently visible queue via contractorFocusIdSet.
-    async function loadActiveQueueContractorFocusSourceRows() {
-      const queueRes = await supabase
-        .from("jobs")
-        .select(workspaceSelect)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .neq("ops_status", "closed")
-        .order("created_at", { ascending: true });
-
-      if (queueRes.error) throw queueRes.error;
-      return queueRes.data ?? [];
-    }
-
     const workspacePreviewEntries = await Promise.all(
       requestedWorkspaceKeys.map(async (workspaceKey) => [workspaceKey, await loadWorkspacePreviewRows(workspaceKey)] as const),
     );
@@ -1307,12 +1286,17 @@ export default async function OpsPage({
       .order("name", { ascending: true });
     if (workspaceContractorsRes.error) throw workspaceContractorsRes.error;
     const workspaceContractors = workspaceContractorsRes.data ?? [];
+    // Contractor Focus is scoped to the bucket currently being rendered. Queue
+    // chips navigate (server round-trip), so the rendered bucket always matches
+    // what the user is viewing and these per-bucket counts stay correct. Use the
+    // bucket's rows before the contractor filter is applied so the picker lists
+    // every contractor in the bucket, not just the selected one.
     const contractorFocusSourceRows =
       selectedWorkspaceKey === "permits"
         ? activePermitRequestRows
         : selectedWorkspaceKey === "contractor_intake"
         ? reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []
-        : await loadActiveQueueContractorFocusSourceRows();
+        : reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? [];
     const contractorFocusCounts = new Map<string, number>();
     const contractorFocusNameById = new Map<string, string>();
     let contractorFocusInternalCount = 0;
@@ -1681,12 +1665,21 @@ export default async function OpsPage({
         href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
       },
     };
-    const JOB_QUEUE_BUCKETS = new Set(["pending", "field_work", "waiting", "exceptions", "closeout", "follow_ups"]);
-    const opsBoardClientChips = workspaceQueueChips.map((chip) =>
-      JOB_QUEUE_BUCKETS.has(chip.bucket)
-        ? { kind: "switchable" as const, key: chip.key, bucket: chip.bucket, label: chip.label, mobileLabel: chip.mobileLabel, count: chip.count }
-        : { kind: "link" as const, key: chip.key, href: chip.href, label: chip.label, mobileLabel: chip.mobileLabel, count: chip.count }
-    );
+    // Every queue chip navigates (server round-trip) rather than switching the
+    // panel purely client-side. The board's SSR-only surfaces — the Contractor
+    // Focus picker and Queue Health — are computed for whichever bucket the
+    // server renders, so a client-only switch left them showing the wrong
+    // bucket's contractor counts. Server-nav chips keep the rendered bucket and
+    // those facets in sync.
+    const opsBoardClientChips = workspaceQueueChips.map((chip) => ({
+      kind: "link" as const,
+      key: chip.key,
+      href: chip.href,
+      label: chip.label,
+      mobileLabel: chip.mobileLabel,
+      count: chip.count,
+      active: chip.isSelected,
+    }));
     const opsBoardHiddenTodayChips = hiddenTodayWorkspaceTabs.map((tab) => ({
       key: tab.key,
       label: tab.label,
@@ -2566,12 +2559,12 @@ export default async function OpsPage({
           </>
           ) : (
             <OpsBoardActiveQueuePanel
-              // Remount when the contractor focus changes so the panel re-seeds
-              // its client-side row cache from the freshly filtered server rows.
-              // Apply() navigates via router.push (a soft nav), which keeps this
-              // client component mounted — without a key its useState-seeded
-              // panelCache would keep serving the pre-filter rows.
-              key={`ops-panel-${contractorFocusFilter ?? "all"}`}
+              // Remount whenever the rendered bucket or contractor focus changes.
+              // Queue chips and Apply() both navigate via soft nav, which keeps
+              // this client component mounted — without a bucket+contractor key
+              // its useState-seeded activeBucket/panelCache would keep serving
+              // the previously rendered bucket's (or pre-filter) rows.
+              key={`ops-panel-${effectiveBoardBucketFilter}-${contractorFocusFilter ?? "all"}`}
               chips={opsBoardClientChips}
               hiddenTodayChips={opsBoardHiddenTodayChips}
               contractorFocusSelector={

@@ -36,7 +36,7 @@ export type OpsBoardPanelData = {
 
 export type OpsBoardChip =
   | { kind: "switchable"; key: string; bucket: string; label: string; mobileLabel: string; count: number }
-  | { kind: "link"; key: string; href: string; label: string; mobileLabel: string; count: number };
+  | { kind: "link"; key: string; href: string; label: string; mobileLabel: string; count: number; active?: boolean };
 
 export type OpsBoardHiddenChip = {
   key: string;
@@ -173,8 +173,11 @@ export default function OpsBoardActiveQueuePanel({
               <Link
                 key={chip.key}
                 href={chip.href}
+                aria-current={chip.active ? "page" : undefined}
                 className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
-                  chip.count === 0
+                  chip.active
+                    ? "border-navy bg-navy text-white"
+                    : chip.count === 0
                     ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"
                     : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                 }`}

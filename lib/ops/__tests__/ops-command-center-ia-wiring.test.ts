@@ -225,14 +225,18 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsRowCardSource).toContain("Open Job");
   });
 
-  it("derives contractor options from the full active queue (bucket-agnostic) so the SSR picker stays complete across client-side bucket switches", () => {
-    expect(opsPageSource).toContain("async function loadActiveQueueContractorFocusSourceRows()");
-    expect(opsPageSource).toContain(": await loadActiveQueueContractorFocusSourceRows()");
-    // Job-queue chips switch client-side, so the picker must not be scoped to a
-    // single bucket's ops_status set.
-    expect(opsPageSource).not.toContain(
-      'async function loadWaitingContractorFocusSourceRows()',
+  it("scopes contractor options to the rendered bucket via server-nav chips so per-bucket counts stay correct", () => {
+    // Queue chips navigate (server round-trip) rather than switching the panel
+    // client-side, so the SSR-computed contractor facet always matches the
+    // bucket being viewed.
+    expect(opsPageSource).toContain('kind: "link" as const');
+    expect(opsPageSource).not.toContain('kind: "switchable" as const');
+    // Picker source is the selected bucket's rows (before the contractor filter),
+    // not a bucket-agnostic sweep of every open job.
+    expect(opsPageSource).toContain(
+      "reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []",
     );
+    expect(opsPageSource).not.toContain("loadActiveQueueContractorFocusSourceRows");
     expect(opsPageSource).toContain("contractorFocusInternalCount += 1");
   });
 
