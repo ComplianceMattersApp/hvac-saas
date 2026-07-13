@@ -225,11 +225,14 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsRowCardSource).toContain("Open Job");
   });
 
-  it("derives Waiting contractor options from the full active queue before contractor filtering", () => {
-    expect(opsPageSource).toContain("async function loadWaitingContractorFocusSourceRows()");
-    expect(opsPageSource).toContain('selectedWorkspaceKey === "waiting"');
-    expect(opsPageSource).toContain("? await loadWaitingContractorFocusSourceRows()");
-    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"])');
+  it("derives contractor options from the full active queue (bucket-agnostic) so the SSR picker stays complete across client-side bucket switches", () => {
+    expect(opsPageSource).toContain("async function loadActiveQueueContractorFocusSourceRows()");
+    expect(opsPageSource).toContain(": await loadActiveQueueContractorFocusSourceRows()");
+    // Job-queue chips switch client-side, so the picker must not be scoped to a
+    // single bucket's ops_status set.
+    expect(opsPageSource).not.toContain(
+      'async function loadWaitingContractorFocusSourceRows()',
+    );
     expect(opsPageSource).toContain("contractorFocusInternalCount += 1");
   });
 

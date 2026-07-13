@@ -1072,14 +1072,21 @@ export default async function OpsPage({
       return sortOpsBoardRows(queueRes.data ?? [], boardSort);
     }
 
-    async function loadWaitingContractorFocusSourceRows() {
+    // Contractor Focus lives in the SSR-only right rail, but the job-queue
+    // chips (Waiting, Field Work, Exceptions, …) switch client-side without a
+    // server re-render. If we scoped the picker's contractors to the initially
+    // rendered bucket, switching to another queue client-side would leave the
+    // picker listing the wrong bucket's contractors. So source the picker from
+    // every open job across the job queues — the list stays complete and stable
+    // no matter which bucket is being viewed. Row filtering still narrows the
+    // currently visible queue via contractorFocusIdSet.
+    async function loadActiveQueueContractorFocusSourceRows() {
       const queueRes = await supabase
         .from("jobs")
         .select(workspaceSelect)
         .is("deleted_at", null)
         .neq("status", "cancelled")
         .neq("ops_status", "closed")
-        .in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"])
         .order("created_at", { ascending: true });
 
       if (queueRes.error) throw queueRes.error;
@@ -1303,9 +1310,9 @@ export default async function OpsPage({
     const contractorFocusSourceRows =
       selectedWorkspaceKey === "permits"
         ? activePermitRequestRows
-        : selectedWorkspaceKey === "waiting"
-        ? await loadWaitingContractorFocusSourceRows()
-        : reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? [];
+        : selectedWorkspaceKey === "contractor_intake"
+        ? reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []
+        : await loadActiveQueueContractorFocusSourceRows();
     const contractorFocusCounts = new Map<string, number>();
     const contractorFocusNameById = new Map<string, string>();
     let contractorFocusInternalCount = 0;
