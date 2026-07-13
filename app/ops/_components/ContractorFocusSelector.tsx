@@ -86,15 +86,32 @@ export default function ContractorFocusSelector({
     setOpen(false);
   }
 
+  const hasActiveSelection = selectedCount > 0;
+
   return (
-    <div className="mb-3">
+    <div className="mb-3 flex sm:justify-end">
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
+        aria-label="Filter by contractor"
+        className={[
+          "inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors",
+          "sm:min-h-9 sm:w-auto sm:justify-center sm:rounded-full sm:py-1.5",
+          hasActiveSelection
+            ? "border-blue-300 bg-blue-50 text-blue-800 hover:border-blue-400 hover:bg-blue-100"
+            : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50",
+        ].join(" ")}
       >
-        <span className="truncate">{summary || `All Contractors · ${allCount}`}</span>
-        <span className="text-[10px] text-slate-500" aria-hidden="true">▾</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5 shrink-0 opacity-70">
+            <path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v1.086a1.5 1.5 0 0 1-.44 1.06L12.5 10.71v4.79a1.5 1.5 0 0 1-2.17 1.34l-1.5-.75A1.5 1.5 0 0 1 8 14.75v-4.04L3.44 6.646A1.5 1.5 0 0 1 3 5.586V4.5Z" />
+          </svg>
+          <span className="text-[10px] font-bold uppercase tracking-[0.11em] text-current opacity-60 sm:hidden">
+            Contractor Focus
+          </span>
+          <span className="truncate">{summary || `All Contractors · ${allCount}`}</span>
+        </span>
+        <span className="text-[10px] opacity-60" aria-hidden="true">▾</span>
       </button>
 
       {open ? (

@@ -1115,6 +1115,13 @@ export default async function OpsPage({
       return String(row?.contractor_id ?? "").trim();
     }
 
+    function rowContractorFocusName(row: any) {
+      if (selectedWorkspaceKey === "contractor_intake" || selectedWorkspaceKey === "permits") {
+        return String(row?.contractorName ?? "").trim();
+      }
+      return String(row?.contractors?.name ?? "").trim();
+    }
+
     function filterRowsByContractorFocus(rows: any[]) {
       if (contractorFocusIdSet.size === 0) return rows;
       return rows.filter((row) => {
@@ -1300,20 +1307,57 @@ export default async function OpsPage({
         ? await loadWaitingContractorFocusSourceRows()
         : reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? [];
     const contractorFocusCounts = new Map<string, number>();
+    const contractorFocusNameById = new Map<string, string>();
     let contractorFocusInternalCount = 0;
     for (const row of contractorFocusSourceRows) {
       const contractorId = rowContractorFocusId(row);
-      if (contractorId) contractorFocusCounts.set(contractorId, (contractorFocusCounts.get(contractorId) ?? 0) + 1);
-      else contractorFocusInternalCount += 1;
+      if (contractorId) {
+        contractorFocusCounts.set(contractorId, (contractorFocusCounts.get(contractorId) ?? 0) + 1);
+        if (!contractorFocusNameById.has(contractorId)) {
+          const rowName = rowContractorFocusName(row);
+          if (rowName) contractorFocusNameById.set(contractorId, rowName);
+        }
+      } else contractorFocusInternalCount += 1;
     }
     const showWorkspaceContractorFilter =
       showContractorFocusSelection && (workspaceContractors.length > 0 || contractorFocusInternalCount > 0);
-    const contractorFocusOptions: ContractorFocusOption[] = workspaceContractors.map((contractorOption: { id: string; name: string | null }): ContractorFocusOption => ({
-      id: contractorOption.id,
-      name: String(contractorOption.name ?? "").trim() || contractorOption.id,
-      count: contractorFocusCounts.get(contractorOption.id) ?? 0,
-      selected: contractorFocusIdSet.has(contractorOption.id),
-    }));
+    // Selectable options = the union of lifecycle-active contractors and any
+    // contractor that actually owns a job in this queue. A queued job can be
+    // assigned to a contractor that is not lifecycle-active (or to a duplicate
+    // contractor record), which previously left it visible in the queue but
+    // absent from — or zeroed out in — the focus filter, so it could never be
+    // selected (the "Top Rank isn't selectable" bug). De-dupe by name, and when
+    // an active-list record has no queued jobs but a same-named queue contractor
+    // does, point the option at the id that owns the jobs so the checkbox
+    // actually filters to the rows the user can see.
+    const contractorFocusByName = new Map<string, { id: string; name: string; count: number }>();
+    const focusNameKey = (name: string) => name.trim().toLowerCase();
+    for (const contractorOption of workspaceContractors as Array<{ id: string; name: string | null }>) {
+      const name = String(contractorOption.name ?? "").trim() || contractorOption.id;
+      contractorFocusByName.set(focusNameKey(name), {
+        id: contractorOption.id,
+        name,
+        count: contractorFocusCounts.get(contractorOption.id) ?? 0,
+      });
+    }
+    for (const [contractorId, count] of contractorFocusCounts) {
+      const name = contractorFocusNameById.get(contractorId) || contractorId;
+      const key = focusNameKey(name);
+      const existing = contractorFocusByName.get(key);
+      if (!existing) {
+        contractorFocusByName.set(key, { id: contractorId, name, count });
+      } else if (existing.count === 0 && count > 0) {
+        contractorFocusByName.set(key, { id: contractorId, name: existing.name, count });
+      }
+    }
+    const contractorFocusOptions: ContractorFocusOption[] = Array.from(contractorFocusByName.values()).map(
+      (entry): ContractorFocusOption => ({
+        id: entry.id,
+        name: entry.name,
+        count: entry.count,
+        selected: contractorFocusIdSet.has(entry.id),
+      }),
+    );
     const contractorFocusAllCount = contractorFocusSourceRows.length;
     const activeWorkspaceBaseHref = `/ops${buildQueryString({
       bucket: effectiveBoardBucketFilter,
