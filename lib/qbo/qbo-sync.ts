@@ -64,26 +64,32 @@ async function updateInvoiceSyncFields(
 }
 
 function resolveCustomerInput(invoiceRow: any, customerRow: any | null): QboCustomerInput {
-  const nameFromCustomer =
+  // The invoice billing snapshot is the frozen bill-to and already reflects who
+  // pays (contractor vs customer), so it is the PRIMARY source here — the job's
+  // customer row is only a fallback. This is what makes a contractor-billed
+  // invoice map to the contractor in QBO instead of the end customer.
+  // `qbo_customer_name` pins the exact QBO DisplayName so the invoice attaches to
+  // an existing QBO customer rather than creating a near-duplicate.
+  const customerName =
     nonEmpty(customerRow?.billing_name) ??
     nonEmpty(customerRow?.full_name) ??
-    nonEmpty(
-      [customerRow?.first_name, customerRow?.last_name].filter(Boolean).join(" "),
-    );
+    nonEmpty([customerRow?.first_name, customerRow?.last_name].filter(Boolean).join(" "));
   const displayName =
-    nameFromCustomer ??
+    nonEmpty(invoiceRow.qbo_customer_name) ??
     nonEmpty(invoiceRow.billing_name) ??
+    customerName ??
     `Invoice ${invoiceRow.invoice_display_number ?? invoiceRow.invoice_number ?? invoiceRow.id}`;
 
   return {
     displayName,
-    email: nonEmpty(customerRow?.email) ?? nonEmpty(invoiceRow.billing_email),
-    phone: nonEmpty(customerRow?.phone) ?? nonEmpty(invoiceRow.billing_phone),
-    billingAddressLine1:
-      nonEmpty(customerRow?.billing_address_line1) ?? nonEmpty(invoiceRow.billing_address_line1),
-    billingCity: nonEmpty(customerRow?.billing_city) ?? nonEmpty(invoiceRow.billing_city),
-    billingState: nonEmpty(customerRow?.billing_state) ?? nonEmpty(invoiceRow.billing_state),
-    billingZip: nonEmpty(customerRow?.billing_zip) ?? nonEmpty(invoiceRow.billing_zip),
+    email: nonEmpty(invoiceRow.billing_email) ?? nonEmpty(customerRow?.email),
+    phone: nonEmpty(invoiceRow.billing_phone) ?? nonEmpty(customerRow?.phone),
+    billingAddressLine1: nonEmpty(invoiceRow.billing_address_line1) ?? nonEmpty(customerRow?.billing_address_line1),
+    billingAddressLine2: nonEmpty(invoiceRow.billing_address_line2) ?? nonEmpty(customerRow?.billing_address_line2),
+    billingCity: nonEmpty(invoiceRow.billing_city) ?? nonEmpty(customerRow?.billing_city),
+    billingState: nonEmpty(invoiceRow.billing_state) ?? nonEmpty(customerRow?.billing_state),
+    billingZip: nonEmpty(invoiceRow.billing_zip) ?? nonEmpty(customerRow?.billing_zip),
+    billingCountry: nonEmpty(invoiceRow.billing_country) ?? nonEmpty(customerRow?.billing_country),
   };
 }
 

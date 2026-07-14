@@ -184,6 +184,48 @@ describe("syncInvoiceToQbo", () => {
   });
 });
 
+describe("bill-to-aware QBO customer mapping", () => {
+  const lines = { list: [{ item_name_snapshot: "Duct", quantity: 1, unit_price: 100, line_subtotal: 100, sort_order: 1 }] };
+
+  it("uses qbo_customer_name to attach to the existing QBO customer, not the end customer", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-c", status: "issued", account_owner_user_id: "acc", job_id: "job-c",
+          customer_id: "cust-1", billing_name: "Service Master", qbo_customer_name: "Service Master, Inc.",
+          billing_email: "ap@sm.example", invoice_display_number: 3001, invoice_date: "2026-07-14", qbo_invoice_id: null,
+        },
+      },
+      jobs: { single: { billing_disposition: null } },
+      customers: { single: { full_name: "Beck Raintree" } },
+      internal_invoice_line_items: lines,
+    });
+    await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-c" });
+    expect(findOrCreateQboCustomer).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: expect.objectContaining({ displayName: "Service Master, Inc." }) }),
+    );
+  });
+
+  it("falls back to the invoice snapshot billing_name over the end customer when no qbo name", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-c2", status: "issued", account_owner_user_id: "acc", job_id: "job-c2",
+          customer_id: "cust-1", billing_name: "Service Master", qbo_customer_name: null,
+          invoice_display_number: 3002, invoice_date: "2026-07-14", qbo_invoice_id: null,
+        },
+      },
+      jobs: { single: { billing_disposition: null } },
+      customers: { single: { full_name: "Beck Raintree" } },
+      internal_invoice_line_items: lines,
+    });
+    await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-c2" });
+    expect(findOrCreateQboCustomer).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: expect.objectContaining({ displayName: "Service Master" }) }),
+    );
+  });
+});
+
 describe("syncAllPendingInvoicesToQbo — connect-time cutoff", () => {
   const lineItems = { list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 10, line_subtotal: 10, sort_order: 1 }] };
 

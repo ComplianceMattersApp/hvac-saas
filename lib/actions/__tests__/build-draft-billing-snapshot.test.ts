@@ -12,6 +12,8 @@ const contractorBilling = {
   billing_city: "Sacramento",
   billing_state: "CA",
   billing_zip: "95811",
+  billing_country: "US",
+  qbo_customer_name: "Service Master, Inc.",
 };
 
 const customerBilling = {
@@ -50,6 +52,9 @@ describe("buildDraftBillingSnapshot", () => {
     expect(snap.billing_address_line1).toBe("100 Contractor Way");
     expect(snap.billing_city).toBe("Sacramento");
     expect(snap.billing_zip).toBe("95811");
+    // Phase 4: country + QBO identity are frozen onto the snapshot too.
+    expect(snap.billing_country).toBe("US");
+    expect(snap.qbo_customer_name).toBe("Service Master, Inc.");
   });
 
   it("customer billing → addressed to the customer with their address", () => {

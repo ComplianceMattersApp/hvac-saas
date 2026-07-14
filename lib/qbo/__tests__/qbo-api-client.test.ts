@@ -39,9 +39,11 @@ describe("qbo-api-client", () => {
         email: "a@b.com",
         phone: null,
         billingAddressLine1: "1 Main",
+        billingAddressLine2: "Ste 2",
         billingCity: "Austin",
         billingState: "TX",
         billingZip: "78701",
+        billingCountry: "US",
       },
     });
     expect(result).toEqual({ id: "55", syncToken: "0" });
@@ -51,7 +53,7 @@ describe("qbo-api-client", () => {
     expect(createOpts.method).toBe("POST");
     const createBody = JSON.parse(String(createOpts.body));
     expect(createBody.DisplayName).toBe("Acme Co");
-    expect(createBody.BillAddr).toMatchObject({ Line1: "1 Main", City: "Austin", PostalCode: "78701" });
+    expect(createBody.BillAddr).toMatchObject({ Line1: "1 Main", Line2: "Ste 2", City: "Austin", PostalCode: "78701", Country: "US" });
   });
 
   it("findOrCreateQboCustomer returns the existing customer without creating", async () => {
@@ -65,9 +67,11 @@ describe("qbo-api-client", () => {
         email: null,
         phone: null,
         billingAddressLine1: null,
+        billingAddressLine2: null,
         billingCity: null,
         billingState: null,
         billingZip: null,
+        billingCountry: null,
       },
     });
     expect(result).toEqual({ id: "9", syncToken: "3" });

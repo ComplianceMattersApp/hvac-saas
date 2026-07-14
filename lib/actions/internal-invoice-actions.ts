@@ -280,7 +280,7 @@ async function loadCanonicalDraftBillingSources(params: {
   if (customerId) {
     const { data, error } = await adminSupabase
       .from('customers')
-      .select('owner_user_id, full_name, first_name, last_name, billing_name, email, phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip')
+      .select('owner_user_id, full_name, first_name, last_name, billing_name, email, phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, qbo_customer_name')
       .eq('id', customerId)
       .eq('owner_user_id', params.internalUser.account_owner_user_id)
       .maybeSingle();
@@ -298,7 +298,7 @@ async function loadCanonicalDraftBillingSources(params: {
   if (contractorId) {
     const { data, error } = await adminSupabase
       .from('contractors')
-      .select('owner_user_id, name, billing_name, billing_email, billing_phone, billing_contact_name, billing_contact_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip')
+      .select('owner_user_id, name, billing_name, billing_email, billing_phone, billing_contact_name, billing_contact_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, qbo_customer_name')
       .eq('id', contractorId)
       .eq('owner_user_id', params.internalUser.account_owner_user_id)
       .maybeSingle();

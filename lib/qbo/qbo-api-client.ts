@@ -23,9 +23,11 @@ export interface QboCustomerInput {
   email: string | null;
   phone: string | null;
   billingAddressLine1: string | null;
+  billingAddressLine2: string | null;
   billingCity: string | null;
   billingState: string | null;
   billingZip: string | null;
+  billingCountry: string | null;
 }
 
 export interface QboInvoiceLineInput {
@@ -177,9 +179,11 @@ export async function findOrCreateQboCustomer(
   if (customer.phone) body.PrimaryPhone = { FreeFormNumber: customer.phone };
   const billAddr: Record<string, unknown> = {};
   if (customer.billingAddressLine1) billAddr.Line1 = customer.billingAddressLine1;
+  if (customer.billingAddressLine2) billAddr.Line2 = customer.billingAddressLine2;
   if (customer.billingCity) billAddr.City = customer.billingCity;
   if (customer.billingState) billAddr.CountrySubDivisionCode = customer.billingState;
   if (customer.billingZip) billAddr.PostalCode = customer.billingZip;
+  if (customer.billingCountry) billAddr.Country = customer.billingCountry;
   if (Object.keys(billAddr).length > 0) body.BillAddr = billAddr;
 
   const created = await qboFetch({

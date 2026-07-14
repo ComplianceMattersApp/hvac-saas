@@ -7,6 +7,9 @@ export type BillingSourceFields = {
   billing_city?: string | null;
   billing_state?: string | null;
   billing_zip?: string | null;
+  billing_country?: string | null;
+  /** Exact QuickBooks DisplayName to match this bill-to to (avoids duplicates). */
+  qbo_customer_name?: string | null;
 };
 
 export type CustomerBillingSource = BillingSourceFields & {
@@ -48,6 +51,8 @@ export function resolveJobBillingSource(params: {
         billing_city: params.contractorBilling?.billing_city ?? null,
         billing_state: params.contractorBilling?.billing_state ?? null,
         billing_zip: params.contractorBilling?.billing_zip ?? null,
+        billing_country: params.contractorBilling?.billing_country ?? null,
+        qbo_customer_name: params.contractorBilling?.qbo_customer_name ?? null,
       },
     };
   }
@@ -64,6 +69,8 @@ export function resolveJobBillingSource(params: {
         billing_city: params.customerBilling?.billing_city ?? null,
         billing_state: params.customerBilling?.billing_state ?? null,
         billing_zip: params.customerBilling?.billing_zip ?? null,
+        billing_country: params.customerBilling?.billing_country ?? null,
+        qbo_customer_name: params.customerBilling?.qbo_customer_name ?? null,
       },
     };
   }
@@ -80,6 +87,8 @@ export function resolveJobBillingSource(params: {
         billing_city: params.jobBilling?.billing_city ?? null,
         billing_state: params.jobBilling?.billing_state ?? null,
         billing_zip: params.jobBilling?.billing_zip ?? null,
+        billing_country: params.jobBilling?.billing_country ?? null,
+        qbo_customer_name: params.jobBilling?.qbo_customer_name ?? null,
       },
     };
   }
@@ -95,6 +104,8 @@ export function resolveJobBillingSource(params: {
       billing_city: null,
       billing_state: null,
       billing_zip: null,
+      billing_country: null,
+      qbo_customer_name: null,
     },
   };
 }

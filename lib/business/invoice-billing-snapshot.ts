@@ -27,6 +27,8 @@ export type InvoiceBillingSnapshot = {
   billing_city: string | null;
   billing_state: string | null;
   billing_zip: string | null;
+  billing_country: string | null;
+  qbo_customer_name: string | null;
 };
 
 /**
@@ -85,5 +87,9 @@ export function buildDraftBillingSnapshot(params: {
     billing_city: firstNonEmpty(billing.billing_city),
     billing_state: firstNonEmpty(billing.billing_state),
     billing_zip: firstNonEmpty(billing.billing_zip),
+    billing_country: firstNonEmpty(billing.billing_country),
+    // Frozen QBO identity from the bill-to source, so the sync attaches to the
+    // right existing QBO customer instead of creating a near-duplicate.
+    qbo_customer_name: firstNonEmpty(billing.qbo_customer_name),
   };
 }
