@@ -9,11 +9,15 @@ type ContractorRow = {
   billing_name?: string | null;
   billing_email?: string | null;
   billing_phone?: string | null;
+  billing_contact_name?: string | null;
+  billing_contact_email?: string | null;
   billing_address_line1?: string | null;
   billing_address_line2?: string | null;
   billing_city?: string | null;
   billing_state?: string | null;
   billing_zip?: string | null;
+  billing_country?: string | null;
+  qbo_customer_name?: string | null;
 };
 
 export function ContractorForm({
@@ -113,24 +117,50 @@ export function ContractorForm({
 
         <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:p-5">
           <div className="space-y-1">
-            <h2 className="text-base font-semibold tracking-[-0.01em] text-slate-950">Billing Profile</h2>
+            <h2 className="text-base font-semibold tracking-[-0.01em] text-slate-950">Bill-To (contractor-billed invoices)</h2>
             <p className="text-xs leading-5 text-slate-600">
-              Billing contact and remittance information for contractor-facing documents.
+              When a job bills this contractor, the invoice is addressed here. Fill it in
+              completely so contractor invoices aren&rsquo;t sent as a bare name.
             </p>
           </div>
 
           <div className="space-y-3">
-            <input
-              name="billing_name"
-              placeholder="Billing Name"
-              defaultValue={contractor?.billing_name ?? ""}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-700">Billing name (who is billed)</label>
+              <input
+                name="billing_name"
+                placeholder="Defaults to the contractor name"
+                defaultValue={contractor?.billing_name ?? ""}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Billing contact (AP) name</label>
+                <input
+                  name="billing_contact_name"
+                  placeholder="e.g. Accounts Payable"
+                  defaultValue={contractor?.billing_contact_name ?? ""}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">Billing contact email (invoice goes here)</label>
+                <input
+                  name="billing_contact_email"
+                  type="email"
+                  placeholder="ap@contractor.com"
+                  defaultValue={contractor?.billing_contact_email ?? ""}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input
                 name="billing_email"
-                placeholder="Billing Email"
+                placeholder="Billing Email (fallback)"
                 defaultValue={contractor?.billing_email ?? ""}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
               />
@@ -155,7 +185,7 @@ export function ContractorForm({
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
             />
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <input
                 name="billing_city"
                 placeholder="City"
@@ -174,6 +204,26 @@ export function ContractorForm({
                 defaultValue={contractor?.billing_zip ?? ""}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
               />
+              <input
+                name="billing_country"
+                placeholder="Country"
+                defaultValue={contractor?.billing_country ?? ""}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+            </div>
+
+            <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3">
+              <label className="mb-1 block text-xs font-medium text-slate-700">QuickBooks customer name (exact)</label>
+              <input
+                name="qbo_customer_name"
+                placeholder="Exact DisplayName in your QuickBooks"
+                defaultValue={contractor?.qbo_customer_name ?? ""}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] focus:outline-none focus:ring-2 focus:ring-slate-200"
+              />
+              <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                Optional. Set this to the exact customer name in QuickBooks so synced invoices
+                attach to the existing customer instead of creating a near-duplicate.
+              </p>
             </div>
           </div>
         </div>

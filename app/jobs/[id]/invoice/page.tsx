@@ -1606,6 +1606,24 @@ export default async function InternalInvoiceWorkspacePage({
                 <div className="mt-2 text-sm leading-6 text-slate-600">{billingAddress.join(", ")}</div>
               ) : null}
 
+              {invoice.status === "draft"
+              && String((job as any).billing_recipient ?? "").trim().toLowerCase() === "contractor"
+              && (!invoice.billing_email || !invoice.billing_address_line1) ? (
+                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-900">
+                  This contractor bill-to is incomplete (missing{invoice.billing_email ? "" : " billing email"}
+                  {!invoice.billing_email && !invoice.billing_address_line1 ? " and" : ""}
+                  {invoice.billing_address_line1 ? "" : " address"}).{" "}
+                  {(job as any).contractor_id ? (
+                    <a href={`/contractors/${(job as any).contractor_id}/edit`} className="font-semibold underline">
+                      Complete the contractor record
+                    </a>
+                  ) : (
+                    "Complete the contractor record"
+                  )}
+                  , then re-pull the Bill To below.
+                </div>
+              ) : null}
+
               {invoice.status === "draft" && canManageFinancialInvoiceLifecycle ? (
                 <form action={updateInvoiceBillToFromForm} className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3">
                   <input type="hidden" name="job_id" value={jobId} />

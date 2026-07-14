@@ -64,6 +64,17 @@ describe("buildDraftBillingSnapshot", () => {
     expect(snap.billing_city).toBe("Stockton");
   });
 
+  it("contractor billing prefers the AP billing_contact_email over billing_email", () => {
+    const snap = buildDraftBillingSnapshot({
+      billingRecipient: "contractor",
+      customerBilling,
+      // fixture billing_email is ap@servicemaster.example; the AP contact must win
+      contractorBilling: { ...contractorBilling, billing_contact_email: "accounts-payable@sm.example" },
+      jobBilling: emptyJobBilling,
+    });
+    expect(snap.billing_email).toBe("accounts-payable@sm.example");
+  });
+
   it("contractor with no bill-to → falls back to the contractor name, address blank (Phase 2 to complete)", () => {
     const snap = buildDraftBillingSnapshot({
       billingRecipient: "contractor",

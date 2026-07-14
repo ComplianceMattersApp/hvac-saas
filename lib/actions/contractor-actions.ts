@@ -144,6 +144,10 @@ export async function createContractorFromForm(formData: FormData) {
   const billing_city = String(formData.get("billing_city") ?? "").trim() || null;
   const billing_state = String(formData.get("billing_state") ?? "").trim() || null;
   const billing_zip = String(formData.get("billing_zip") ?? "").trim() || null;
+  const billing_country = String(formData.get("billing_country") ?? "").trim() || null;
+  const billing_contact_name = String(formData.get("billing_contact_name") ?? "").trim() || null;
+  const billing_contact_email = String(formData.get("billing_contact_email") ?? "").trim() || null;
+  const qbo_customer_name = String(formData.get("qbo_customer_name") ?? "").trim() || null;
 
   const { data, error } = await supabase
     .from("contractors")
@@ -155,11 +159,15 @@ export async function createContractorFromForm(formData: FormData) {
       billing_name: billing_name || name, // default
       billing_email,
       billing_phone,
+      billing_contact_name,
+      billing_contact_email,
       billing_address_line1,
       billing_address_line2,
       billing_city,
       billing_state,
       billing_zip,
+      billing_country,
+      qbo_customer_name,
       owner_user_id: accountOwnerUserId,
     })
     .select("id")
@@ -204,6 +212,10 @@ export async function updateContractorFromForm(formData: FormData) {
   const billing_city = String(formData.get("billing_city") ?? "").trim() || null;
   const billing_state = String(formData.get("billing_state") ?? "").trim() || null;
   const billing_zip = String(formData.get("billing_zip") ?? "").trim() || null;
+  const billing_country = String(formData.get("billing_country") ?? "").trim() || null;
+  const billing_contact_name = String(formData.get("billing_contact_name") ?? "").trim() || null;
+  const billing_contact_email = String(formData.get("billing_contact_email") ?? "").trim() || null;
+  const qbo_customer_name = String(formData.get("qbo_customer_name") ?? "").trim() || null;
 
   const scopedContractor = await loadScopedInternalContractorForMutation({
     accountOwnerUserId,
@@ -223,14 +235,18 @@ export async function updateContractorFromForm(formData: FormData) {
       phone,
       email,
       notes,
-      billing_name,
+      billing_name: billing_name || name, // default to the contractor name; never blank it out
       billing_email,
       billing_phone,
+      billing_contact_name,
+      billing_contact_email,
       billing_address_line1,
       billing_address_line2,
       billing_city,
       billing_state,
       billing_zip,
+      billing_country,
+      qbo_customer_name,
       owner_user_id: accountOwnerUserId,
     })
     .eq("id", contractor_id);

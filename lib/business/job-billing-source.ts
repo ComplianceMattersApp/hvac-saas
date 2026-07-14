@@ -17,6 +17,10 @@ export type CustomerBillingSource = BillingSourceFields & {
 
 export type ContractorBillingSource = BillingSourceFields & {
   name?: string | null;
+  /** Accounts-payable contact the invoice is addressed to (distinct from name). */
+  billing_contact_name?: string | null;
+  /** Email a contractor-billed invoice is sent to; preferred over billing_email. */
+  billing_contact_email?: string | null;
 };
 
 export type BillingRecipientMode = 'customer' | 'contractor' | 'other';
@@ -36,7 +40,8 @@ export function resolveJobBillingSource(params: {
       billingSourceLabel: 'Contractor',
       billing: {
         billing_name: params.contractorBilling?.billing_name ?? params.contractorBilling?.name ?? null,
-        billing_email: params.contractorBilling?.billing_email ?? null,
+        // Route contractor invoices to the AP/billing contact when one is set.
+        billing_email: params.contractorBilling?.billing_contact_email ?? params.contractorBilling?.billing_email ?? null,
         billing_phone: params.contractorBilling?.billing_phone ?? null,
         billing_address_line1: params.contractorBilling?.billing_address_line1 ?? null,
         billing_address_line2: params.contractorBilling?.billing_address_line2 ?? null,
