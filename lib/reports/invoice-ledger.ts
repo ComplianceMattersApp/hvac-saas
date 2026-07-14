@@ -1,5 +1,6 @@
 import { displayDateLA, formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
 import { preferredInvoiceReference, preferredJobReference } from "@/lib/utils/display-references";
+import { normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 
 export const INVOICE_LEDGER_PAGE_LIMIT = 250;
 export const INVOICE_LEDGER_EXPORT_LIMIT = 5000;
@@ -164,6 +165,7 @@ type JobRow = {
   customer_last_name: string | null;
   job_address: string | null;
   city: string | null;
+  billing_disposition: string | null;
   contractors?: { name?: string | null } | Array<{ name?: string | null }> | null;
 };
 
@@ -663,7 +665,7 @@ export async function listInvoiceLedgerRows(params: {
   const [jobsResult, customersResult, locationsResult, deliveriesResult, paymentSummaryMap] = await Promise.all([
     params.supabase
       .from("jobs")
-      .select("id, job_display_number, title, contractor_id, customer_first_name, customer_last_name, job_address, city, contractors(name)")
+      .select("id, job_display_number, title, contractor_id, customer_first_name, customer_last_name, job_address, city, billing_disposition, contractors(name)")
       .in("id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"]),
     params.supabase
       .from("customers")
@@ -765,6 +767,19 @@ export async function listInvoiceLedgerRows(params: {
     const amountPaidCents = paymentSummary?.amountPaidCents ?? 0;
     const balanceDueCents = paymentSummary?.balanceDueCents ?? Math.max(0, Number(invoice.total_cents ?? 0) || 0);
 
+    // Disposition-aware payment status: a job resolved as externally billed / no
+    // charge isn't "Unpaid" — surface the disposition so the column doesn't read
+    // as an outstanding receivable. Only overrides when no payment was recorded,
+    // so a genuinely collected invoice still shows Paid/Partial.
+    const basePaymentStatus = paymentSummary?.paymentStatus ?? "unpaid";
+    const jobDisposition = normalizeJobBillingDisposition(job?.billing_disposition);
+    const paymentStatusLabel =
+      jobDisposition && basePaymentStatus === "unpaid"
+        ? jobDisposition === "no_charge"
+          ? "No Charge Recorded"
+          : "Externally Billed"
+        : formatPaymentStatusLabel(basePaymentStatus);
+
     return {
       invoiceId,
       jobId,
@@ -802,7 +817,7 @@ export async function listInvoiceLedgerRows(params: {
       invoiceDateValue: String(invoice.invoice_date ?? "").trim() || null,
       issuedAtValue: String(invoice.issued_at ?? "").trim() || null,
       voidedAtValue: String(invoice.voided_at ?? "").trim() || null,
-      paymentStatusLabel: formatPaymentStatusLabel(paymentSummary?.paymentStatus ?? "unpaid"),
+      paymentStatusLabel,
       lastPaymentDateDisplay: formatTimestampDisplay(paymentSummary?.lastPaymentDate ?? null),
       paymentCountDisplay: paymentSummary && paymentSummary.paymentCount > 0 ? String(paymentSummary.paymentCount) : "-",
     } satisfies InvoiceLedgerRow;
