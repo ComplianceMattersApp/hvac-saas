@@ -15,7 +15,7 @@ const invoicePageSrc = readFileSync(
 describe("Bill To control + re-pull wiring", () => {
   it("exposes updateInvoiceBillToFromForm and shares the snapshot helper with draft creation", () => {
     expect(actionsSrc).toContain("export async function updateInvoiceBillToFromForm");
-    expect(actionsSrc).toContain("function buildDraftBillingSnapshot");
+    expect(actionsSrc).toContain("import { buildDraftBillingSnapshot }");
     // both draft creation and re-pull build the snapshot via the shared helper
     const helperCalls = actionsSrc.match(/buildDraftBillingSnapshot\(\{/g) ?? [];
     expect(helperCalls.length).toBeGreaterThanOrEqual(2);

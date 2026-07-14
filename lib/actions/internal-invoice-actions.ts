@@ -26,6 +26,7 @@ import {
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE } from '@/lib/business/internal-invoice-delivery';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
+import { buildDraftBillingSnapshot } from '@/lib/business/invoice-billing-snapshot';
 import { autoSyncIssuedInvoiceToQbo } from '@/lib/qbo/qbo-auto-sync';
 import { resolveOperationalTenantIdentity } from '@/lib/email/operational-tenant-branding';
 import {
@@ -1331,70 +1332,6 @@ async function logInvoiceEvent(params: {
     meta,
     userId: params.userId,
   });
-}
-
-/**
- * Build the invoice draft's billing snapshot from the resolved bill-to source.
- * Shared by draft creation AND the "Bill To" re-pull action so the two never
- * drift. Contractor-billed invoices intentionally omit the street address
- * (preserves existing behavior — revisit in the contractor-completeness slice).
- */
-function buildDraftBillingSnapshot(params: {
-  billingRecipient: string | null | undefined;
-  customerBilling: any;
-  contractorBilling: any;
-  jobBilling: ReturnType<typeof buildJobOverrideBillingSnapshot>;
-}) {
-  const { billing } = resolveJobBillingSource({
-    billingRecipient: params.billingRecipient,
-    customerBilling: params.customerBilling,
-    contractorBilling: params.contractorBilling,
-    jobBilling: params.jobBilling,
-  });
-
-  const customerFallbackName = firstNonEmpty(
-    params.customerBilling?.billing_name,
-    params.customerBilling?.full_name,
-    [params.customerBilling?.first_name, params.customerBilling?.last_name].filter(Boolean).join(' '),
-  );
-
-  const draftBilling = {
-    billing_name: firstNonEmpty(
-      billing.billing_name,
-      customerFallbackName,
-      params.contractorBilling?.billing_name,
-      params.contractorBilling?.name,
-      params.jobBilling.billing_name,
-    ),
-    billing_email: firstNonEmpty(
-      billing.billing_email,
-      params.customerBilling?.billing_email,
-      params.contractorBilling?.billing_email,
-      params.jobBilling.billing_email,
-    ),
-    billing_phone: firstNonEmpty(
-      billing.billing_phone,
-      params.customerBilling?.billing_phone,
-      params.contractorBilling?.billing_phone,
-      params.jobBilling.billing_phone,
-    ),
-    billing_address_line1: null as string | null,
-    billing_address_line2: null as string | null,
-    billing_city: null as string | null,
-    billing_state: null as string | null,
-    billing_zip: null as string | null,
-  };
-
-  const billingRecipientMode = String(params.billingRecipient ?? '').trim().toLowerCase();
-  if (billingRecipientMode !== 'contractor') {
-    draftBilling.billing_address_line1 = firstNonEmpty(billing.billing_address_line1);
-    draftBilling.billing_address_line2 = firstNonEmpty(billing.billing_address_line2);
-    draftBilling.billing_city = firstNonEmpty(billing.billing_city);
-    draftBilling.billing_state = firstNonEmpty(billing.billing_state);
-    draftBilling.billing_zip = firstNonEmpty(billing.billing_zip);
-  }
-
-  return draftBilling;
 }
 
 /**

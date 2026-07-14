@@ -490,18 +490,16 @@ describe('internal invoice mutation same-account hardening', () => {
   });
 
   it('keeps invoice draft billing address explicit-only and avoids service-location fallback', () => {
-    // The address guard now lives in the shared buildDraftBillingSnapshot helper
-    // (used by both draft creation and the Bill To re-pull), keyed off the passed
-    // billingRecipient rather than reading context.job directly.
-    const snapshotIndex = internalInvoiceActionsSource.indexOf('function buildDraftBillingSnapshot');
-    const snapshotEnd = internalInvoiceActionsSource.indexOf('export async function updateInvoiceBillToFromForm', snapshotIndex);
-    const snapshotSlice = internalInvoiceActionsSource.slice(snapshotIndex, snapshotEnd);
-
-    expect(snapshotIndex).toBeGreaterThanOrEqual(0);
-    expect(snapshotSlice).toContain("const billingRecipientMode = String(params.billingRecipient ?? '').trim().toLowerCase();");
-    expect(snapshotSlice).toContain("if (billingRecipientMode !== 'contractor')");
-    expect(snapshotSlice).toContain("draftBilling.billing_address_line1 = firstNonEmpty(billing.billing_address_line1);");
-    expect(snapshotSlice).not.toContain("locationBilling?.address_line1");
-    expect(snapshotSlice).not.toContain("jobBilling.billing_address_line1");
+    // The snapshot builder now lives in lib/business/invoice-billing-snapshot.ts
+    // (a pure, testable module shared by draft creation and the Bill To re-pull).
+    // The address comes from the resolved bill-to source (recipient's own
+    // address), never from the service location or the job override.
+    const snapshotSrc = readFileSync(
+      resolve(__dirname, '../../business/invoice-billing-snapshot.ts'),
+      'utf-8',
+    );
+    expect(snapshotSrc).toContain('billing_address_line1: firstNonEmpty(billing.billing_address_line1)');
+    expect(snapshotSrc).not.toContain('locationBilling?.address_line1');
+    expect(snapshotSrc).not.toContain('jobBilling.billing_address_line1');
   });
 });
