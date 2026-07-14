@@ -1,5 +1,5 @@
 import { getQboBaseUrl } from "./qbo-env";
-import { getValidQboAccessToken, recordQboConnectionSyncOutcome } from "./qbo-connection";
+import { getQboConnectionForAccount, getValidQboAccessToken, recordQboConnectionSyncOutcome } from "./qbo-connection";
 import {
   createQboInvoice,
   findOrCreateQboCustomer,
@@ -31,6 +31,18 @@ interface QboSyncContext {
   realmId: string;
   baseUrl: string;
   servicesItemRef: string;
+  /** Connect-time cutoff: invoices issued before this instant never sync. */
+  syncStartAt?: string | null;
+}
+
+/** True when an issued invoice predates the connect-time sync-start cutoff. */
+function issuedBeforeSyncStart(issuedAt: unknown, syncStartAt: string): boolean {
+  const raw = typeof issuedAt === "string" ? issuedAt.trim() : "";
+  if (!raw) return true; // issued invoice with no timestamp → treat as pre-cutoff (safer to skip)
+  const issuedMs = new Date(raw).getTime();
+  const startMs = new Date(syncStartAt).getTime();
+  if (Number.isNaN(issuedMs) || Number.isNaN(startMs)) return false;
+  return issuedMs < startMs;
 }
 
 function toNumber(value: unknown): number {
@@ -119,6 +131,13 @@ async function syncSingleInvoiceWithContext(
     // later-issued draft is still picked up by the bulk query.
     if (invoiceRow.status !== "issued") {
       return { invoiceId, status: "skipped", error: `Invoice status is '${invoiceRow.status}'` };
+    }
+
+    // Sync-start cutoff (defense-in-depth alongside the candidate-query filter):
+    // invoices issued before the connect time are assumed already handled outside
+    // QBO. Not persisted, so it re-evaluates if the cutoff ever changes.
+    if (ctx.syncStartAt && issuedBeforeSyncStart(invoiceRow.issued_at, ctx.syncStartAt)) {
+      return { invoiceId, status: "skipped", error: "Issued before QBO sync start (pre-connect)" };
     }
 
     // Eligibility: skip work the job resolved without a collectible platform invoice.
@@ -269,13 +288,28 @@ export async function syncAllPendingInvoicesToQbo(params: {
 }> {
   const { supabase, accountOwnerUserId, dryRun = false } = params;
 
-  // Candidate query: issued invoices not yet synced (or previously errored).
-  const { data: candidateRows, error: candidateError } = await supabase
+  // Sync-start cutoff: invoices issued before the connect time are assumed already
+  // handled outside QBO and must never sync (prevents duplicating pre-connect
+  // invoices). Derived from the connection's connected_at. Never block the run on
+  // this read — the per-invoice guard in syncSingleInvoiceWithContext still applies.
+  let syncStartAt: string | null = null;
+  try {
+    const connection = await getQboConnectionForAccount({ supabase, accountOwnerUserId });
+    syncStartAt = connection?.connectedAt ?? null;
+  } catch {
+    syncStartAt = null;
+  }
+
+  // Candidate query: issued invoices not yet synced (or previously errored),
+  // restricted to those issued on/after the sync-start cutoff.
+  let candidateQuery = supabase
     .from("internal_invoices")
     .select("id")
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("status", "issued")
     .or("qbo_sync_status.is.null,qbo_sync_status.eq.error");
+  if (syncStartAt) candidateQuery = candidateQuery.gte("issued_at", syncStartAt);
+  const { data: candidateRows, error: candidateError } = await candidateQuery;
 
   const results: QboInvoiceSyncResult[] = [];
   if (candidateError || !candidateRows || candidateRows.length === 0) {
@@ -310,6 +344,7 @@ export async function syncAllPendingInvoicesToQbo(params: {
       realmId: token.realmId,
       baseUrl,
       servicesItemRef,
+      syncStartAt,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "QBO sync setup failed";

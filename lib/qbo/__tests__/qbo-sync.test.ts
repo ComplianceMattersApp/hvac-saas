@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const {
   getValidQboAccessToken,
   recordQboConnectionSyncOutcome,
+  getQboConnectionForAccount,
   findOrCreateQboServicesItem,
   findOrCreateQboCustomer,
   createQboInvoice,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   getValidQboAccessToken: vi.fn(),
   recordQboConnectionSyncOutcome: vi.fn(),
+  getQboConnectionForAccount: vi.fn(),
   findOrCreateQboServicesItem: vi.fn(),
   findOrCreateQboCustomer: vi.fn(),
   createQboInvoice: vi.fn(),
@@ -18,6 +20,7 @@ const {
 vi.mock("@/lib/qbo/qbo-connection", () => ({
   getValidQboAccessToken,
   recordQboConnectionSyncOutcome,
+  getQboConnectionForAccount,
 }));
 vi.mock("@/lib/qbo/qbo-api-client", () => ({
   findOrCreateQboServicesItem,
@@ -27,7 +30,7 @@ vi.mock("@/lib/qbo/qbo-api-client", () => ({
 }));
 vi.mock("@/lib/qbo/qbo-env", () => ({ getQboBaseUrl: () => "https://sandbox.example.com" }));
 
-import { syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
+import { syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
 
 /**
  * Fake supabase that serves per-table `single` (for .maybeSingle) and `list`
@@ -44,6 +47,7 @@ function makeSupabase(tables: Record<string, { single?: any; list?: any[] }>) {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     or: vi.fn(() => builder),
+    gte: vi.fn(() => builder),
     order: vi.fn(() => builder),
     maybeSingle: vi.fn(async () => ({ data: tables[builder.__table]?.single ?? null, error: null })),
     update: vi.fn((payload: any) => {
@@ -59,6 +63,7 @@ function makeSupabase(tables: Record<string, { single?: any; list?: any[] }>) {
 beforeEach(() => {
   vi.clearAllMocks();
   getValidQboAccessToken.mockResolvedValue({ accessToken: "AT", realmId: "R" });
+  getQboConnectionForAccount.mockResolvedValue(null);
   recordQboConnectionSyncOutcome.mockResolvedValue(undefined);
   findOrCreateQboServicesItem.mockResolvedValue("7");
   findOrCreateQboCustomer.mockResolvedValue({ id: "C1", syncToken: "0" });
@@ -176,5 +181,45 @@ describe("syncInvoiceToQbo", () => {
     const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv5" });
     expect(result.status).toBe("skipped");
     expect(findOrCreateQboServicesItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncAllPendingInvoicesToQbo — connect-time cutoff", () => {
+  const lineItems = { list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 10, line_subtotal: 10, sort_order: 1 }] };
+
+  it("skips a candidate issued before connected_at (pre-connect — no duplicate)", async () => {
+    getQboConnectionForAccount.mockResolvedValue({ connectedAt: "2026-07-01T00:00:00Z" });
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        list: [{ id: "old" }],
+        single: {
+          id: "old", status: "issued", account_owner_user_id: "acc", issued_at: "2026-06-10T10:00:00Z",
+          job_id: null, customer_id: null, billing_name: "X", invoice_display_number: 1, invoice_date: "2026-06-10", qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: lineItems,
+    });
+    const res = await syncAllPendingInvoicesToQbo({ supabase: builder, accountOwnerUserId: "acc" });
+    expect(res.synced).toBe(0);
+    expect(res.skipped).toBe(1);
+    expect(createQboInvoice).not.toHaveBeenCalled();
+    expect(res.results[0].error).toMatch(/before QBO sync start/i);
+  });
+
+  it("syncs a candidate issued on/after connected_at", async () => {
+    getQboConnectionForAccount.mockResolvedValue({ connectedAt: "2026-07-01T00:00:00Z" });
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        list: [{ id: "new" }],
+        single: {
+          id: "new", status: "issued", account_owner_user_id: "acc", issued_at: "2026-07-20T10:00:00Z",
+          job_id: null, customer_id: null, billing_name: "X", invoice_display_number: 2, invoice_date: "2026-07-20", qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: lineItems,
+    });
+    const res = await syncAllPendingInvoicesToQbo({ supabase: builder, accountOwnerUserId: "acc" });
+    expect(res.synced).toBe(1);
+    expect(createQboInvoice).toHaveBeenCalled();
   });
 });
