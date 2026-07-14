@@ -26,6 +26,7 @@ import {
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE } from '@/lib/business/internal-invoice-delivery';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
+import { autoSyncIssuedInvoiceToQbo } from '@/lib/qbo/qbo-auto-sync';
 import { resolveOperationalTenantIdentity } from '@/lib/email/operational-tenant-branding';
 import {
   normalizeInternalInvoiceItemType,
@@ -1782,6 +1783,15 @@ async function applyInternalInvoiceIssueMutation(context: LoadedInternalInvoiceC
     serviceCaseId: context.job.service_case_id ?? null,
     previousOpsStatus,
     source: 'internal_invoice_issue_recompute',
+  });
+
+  // Auto-sync the freshly-issued invoice to QBO so users never have to run a
+  // manual sync. Best-effort and never throws: unconnected accounts and envs
+  // without QBO are no-ops; transient failures are recorded on the invoice for
+  // the next retry. Both "Issue" and "Issue & Send" flow through here.
+  await autoSyncIssuedInvoiceToQbo({
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
   });
 }
 
