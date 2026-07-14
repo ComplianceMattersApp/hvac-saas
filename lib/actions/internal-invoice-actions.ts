@@ -1333,6 +1333,138 @@ async function logInvoiceEvent(params: {
   });
 }
 
+/**
+ * Build the invoice draft's billing snapshot from the resolved bill-to source.
+ * Shared by draft creation AND the "Bill To" re-pull action so the two never
+ * drift. Contractor-billed invoices intentionally omit the street address
+ * (preserves existing behavior — revisit in the contractor-completeness slice).
+ */
+function buildDraftBillingSnapshot(params: {
+  billingRecipient: string | null | undefined;
+  customerBilling: any;
+  contractorBilling: any;
+  jobBilling: ReturnType<typeof buildJobOverrideBillingSnapshot>;
+}) {
+  const { billing } = resolveJobBillingSource({
+    billingRecipient: params.billingRecipient,
+    customerBilling: params.customerBilling,
+    contractorBilling: params.contractorBilling,
+    jobBilling: params.jobBilling,
+  });
+
+  const customerFallbackName = firstNonEmpty(
+    params.customerBilling?.billing_name,
+    params.customerBilling?.full_name,
+    [params.customerBilling?.first_name, params.customerBilling?.last_name].filter(Boolean).join(' '),
+  );
+
+  const draftBilling = {
+    billing_name: firstNonEmpty(
+      billing.billing_name,
+      customerFallbackName,
+      params.contractorBilling?.billing_name,
+      params.contractorBilling?.name,
+      params.jobBilling.billing_name,
+    ),
+    billing_email: firstNonEmpty(
+      billing.billing_email,
+      params.customerBilling?.billing_email,
+      params.contractorBilling?.billing_email,
+      params.jobBilling.billing_email,
+    ),
+    billing_phone: firstNonEmpty(
+      billing.billing_phone,
+      params.customerBilling?.billing_phone,
+      params.contractorBilling?.billing_phone,
+      params.jobBilling.billing_phone,
+    ),
+    billing_address_line1: null as string | null,
+    billing_address_line2: null as string | null,
+    billing_city: null as string | null,
+    billing_state: null as string | null,
+    billing_zip: null as string | null,
+  };
+
+  const billingRecipientMode = String(params.billingRecipient ?? '').trim().toLowerCase();
+  if (billingRecipientMode !== 'contractor') {
+    draftBilling.billing_address_line1 = firstNonEmpty(billing.billing_address_line1);
+    draftBilling.billing_address_line2 = firstNonEmpty(billing.billing_address_line2);
+    draftBilling.billing_city = firstNonEmpty(billing.billing_city);
+    draftBilling.billing_state = firstNonEmpty(billing.billing_state);
+    draftBilling.billing_zip = firstNonEmpty(billing.billing_zip);
+  }
+
+  return draftBilling;
+}
+
+/**
+ * "Bill To" control: change who a draft invoice bills (customer / contractor /
+ * other) and RE-PULL the billing snapshot from that source. This decouples
+ * "which contractor is assigned" from "who pays" — a job can keep its contractor
+ * while billing the customer, and vice versa. Only mutates DRAFT invoices.
+ */
+export async function updateInvoiceBillToFromForm(formData: FormData) {
+  const context = await loadInternalInvoiceContext(formData);
+
+  requireInvoiceLifecycleAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
+  if (!context.invoice) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
+  }
+  if (context.invoice.status !== 'draft') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_locked', context.returnTo));
+  }
+
+  const requested = String(formData.get('billing_recipient') ?? '').trim().toLowerCase();
+  if (requested !== 'customer' && requested !== 'contractor' && requested !== 'other') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_bill_to_invalid', context.returnTo));
+  }
+  if (requested === 'contractor' && !String(context.job.contractor_id ?? '').trim()) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_bill_to_no_contractor', context.returnTo));
+  }
+
+  // Persist the job's bill-to classification (admin write, already access-gated).
+  const adminSupabase = createAdminClient();
+  const { error: jobErr } = await adminSupabase
+    .from('jobs')
+    .update({ billing_recipient: requested })
+    .eq('id', context.jobId);
+  if (jobErr) throw jobErr;
+
+  // Re-pull the draft snapshot from the newly-selected source.
+  const { customerBilling, contractorBilling } = await loadCanonicalDraftBillingSources({
+    internalUser: context.internalUser,
+    job: context.job,
+  });
+  const draftBilling = buildDraftBillingSnapshot({
+    billingRecipient: requested,
+    customerBilling,
+    contractorBilling,
+    jobBilling: buildJobOverrideBillingSnapshot(context.job),
+  });
+
+  const { error: invErr } = await context.supabase
+    .from('internal_invoices')
+    .update({
+      ...draftBilling,
+      updated_by_user_id: context.userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', context.invoice.id)
+    .eq('status', 'draft');
+  if (invErr) throw invErr;
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
+  revalidatePath('/reports/invoices');
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_bill_to_updated', context.returnTo));
+}
+
 export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
@@ -1351,53 +1483,12 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
 
   const jobBilling = buildJobOverrideBillingSnapshot(context.job);
 
-  const { billing } = resolveJobBillingSource({
+  const draftBilling = buildDraftBillingSnapshot({
     billingRecipient: context.job.billing_recipient,
     customerBilling,
     contractorBilling,
     jobBilling,
   });
-
-  const customerFallbackName = firstNonEmpty(
-    customerBilling?.billing_name,
-    customerBilling?.full_name,
-    [customerBilling?.first_name, customerBilling?.last_name].filter(Boolean).join(' '),
-  );
-
-  const draftBilling = {
-    billing_name: firstNonEmpty(
-      billing.billing_name,
-      customerFallbackName,
-      contractorBilling?.billing_name,
-      contractorBilling?.name,
-      jobBilling.billing_name,
-    ),
-    billing_email: firstNonEmpty(
-      billing.billing_email,
-      customerBilling?.billing_email,
-      contractorBilling?.billing_email,
-      jobBilling.billing_email,
-    ),
-    billing_phone: firstNonEmpty(
-      billing.billing_phone,
-      customerBilling?.billing_phone,
-      contractorBilling?.billing_phone,
-      jobBilling.billing_phone,
-    ),
-    billing_address_line1: null as string | null,
-    billing_address_line2: null as string | null,
-    billing_city: null as string | null,
-    billing_state: null as string | null,
-    billing_zip: null as string | null,
-  };
-  const billingRecipientMode = String(context.job.billing_recipient ?? '').trim().toLowerCase();
-  if (billingRecipientMode !== 'contractor') {
-    draftBilling.billing_address_line1 = firstNonEmpty(billing.billing_address_line1);
-    draftBilling.billing_address_line2 = firstNonEmpty(billing.billing_address_line2);
-    draftBilling.billing_city = firstNonEmpty(billing.billing_city);
-    draftBilling.billing_state = firstNonEmpty(billing.billing_state);
-    draftBilling.billing_zip = firstNonEmpty(billing.billing_zip);
-  }
 
   const draftPayload = {
     account_owner_user_id: context.internalUser.account_owner_user_id,

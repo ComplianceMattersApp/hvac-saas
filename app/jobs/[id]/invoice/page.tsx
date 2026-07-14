@@ -50,6 +50,7 @@ import {
   markInternalInvoiceNoChargeFromForm,
   removeInternalInvoiceLineItemFromForm,
   saveInternalInvoiceDraftFromForm,
+  updateInvoiceBillToFromForm,
   sendInternalInvoiceEmailFromForm,
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
@@ -207,6 +208,9 @@ function bannerMessage(value?: string | null) {
     external_billing_recorded:
       "Billed outside EveryStep FieldWorks. Draft charges were kept for reference. No internal payment or Stripe collection was recorded.",
     internal_invoice_draft_created: "Draft invoice created.",
+    internal_invoice_bill_to_updated: "Bill To updated — billing details re-pulled from the selected source.",
+    internal_invoice_bill_to_invalid: "Choose a valid Bill To (Customer, Contractor, or Other).",
+    internal_invoice_bill_to_no_contractor: "Assign a contractor to this job before billing the contractor.",
     internal_invoice_supplemental_draft_created: "Supplemental draft invoice created.",
     internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
@@ -437,6 +441,7 @@ export default async function InternalInvoiceWorkspacePage({
       job_type,
       ops_status,
       customer_id,
+      contractor_id,
       location_id,
       service_case_id,
       invoice_complete,
@@ -472,6 +477,7 @@ export default async function InternalInvoiceWorkspacePage({
       job_type,
       ops_status,
       customer_id,
+      contractor_id,
       location_id,
       service_case_id,
       invoice_complete,
@@ -1598,6 +1604,40 @@ export default async function InternalInvoiceWorkspacePage({
               </div>
               {billingAddress.length > 0 ? (
                 <div className="mt-2 text-sm leading-6 text-slate-600">{billingAddress.join(", ")}</div>
+              ) : null}
+
+              {invoice.status === "draft" && canManageFinancialInvoiceLifecycle ? (
+                <form action={updateInvoiceBillToFromForm} className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3">
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={invoice.id} />
+                  <input type="hidden" name="tab" value="info" />
+                  <label className={labelClass}>Bill To</label>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <select
+                      name="billing_recipient"
+                      defaultValue={String((job as any).billing_recipient ?? "customer").trim().toLowerCase() || "customer"}
+                      className={`${inputClass} sm:w-auto`}
+                    >
+                      <option value="customer">Customer</option>
+                      <option value="contractor">
+                        Contractor{(job as any).contractor_id ? "" : " (assign one first)"}
+                      </option>
+                      <option value="other">Other / third party</option>
+                    </select>
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                    >
+                      Apply &amp; re-pull
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    Sets who this invoice bills and re-pulls their billing details from the customer or
+                    contractor record. Assigning a contractor does <strong>not</strong> force
+                    contractor billing — pick who actually pays here. Use &ldquo;Other&rdquo; to bill a
+                    third party, then enter details below.
+                  </p>
+                </form>
               ) : null}
 
               {invoice.status === "draft" && canManageFinancialInvoiceLifecycle ? (
