@@ -78,6 +78,39 @@ describe("qbo-connection", () => {
     expect(captured.upsert.status).toBe("active");
   });
 
+  it("upsertQboConnection preserves the original connected_at on reconnect", async () => {
+    const original = "2026-07-14T05:25:52.000Z";
+    // A prior (now disconnected) connection exists — re-authorizing must keep its
+    // connected_at so the sync-start cutoff doesn't move and orphan invoices.
+    const { builder, captured } = makeSupabase(activeRow({ connected_at: original, status: "disconnected" }));
+    await upsertQboConnection({
+      supabase: builder,
+      accountOwnerUserId: "acc",
+      realmId: "r1",
+      accessToken: "AT2",
+      refreshToken: "RT2",
+      expiresAt: new Date(),
+      environment: "production",
+    });
+    expect(captured.upsert.connected_at).toBe(original);
+    expect(captured.upsert.status).toBe("active");
+  });
+
+  it("upsertQboConnection stamps connected_at on a first connect (no existing row)", async () => {
+    const { builder, captured } = makeSupabase(null);
+    await upsertQboConnection({
+      supabase: builder,
+      accountOwnerUserId: "acc",
+      realmId: "r1",
+      accessToken: "AT",
+      refreshToken: "RT",
+      expiresAt: new Date(),
+      environment: "sandbox",
+    });
+    expect(typeof captured.upsert.connected_at).toBe("string");
+    expect(captured.upsert.connected_at.length).toBeGreaterThan(0);
+  });
+
   it("getValidQboAccessToken returns the stored token when not near expiry", async () => {
     const { builder } = makeSupabase(activeRow());
     const result = await getValidQboAccessToken({ supabase: builder, accountOwnerUserId: "acc" });

@@ -68,6 +68,17 @@ export async function upsertQboConnection(params: {
   const { supabase, accountOwnerUserId, realmId, accessToken, refreshToken, expiresAt, environment } =
     params;
   const nowIso = new Date().toISOString();
+
+  // Preserve the ORIGINAL connect time across reconnects (any status). connected_at
+  // is the sync-start cutoff — re-authorizing to fix a token must NOT move it
+  // forward, or invoices issued between connects would be orphaned from sync.
+  const { data: existingRow } = await supabase
+    .from("qbo_connections")
+    .select("connected_at")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+  const connectedAtIso = existingRow?.connected_at ? String(existingRow.connected_at) : nowIso;
+
   const { error } = await supabase.from("qbo_connections").upsert(
     {
       account_owner_user_id: accountOwnerUserId,
@@ -77,7 +88,7 @@ export async function upsertQboConnection(params: {
       token_expires_at: expiresAt.toISOString(),
       environment,
       status: "active",
-      connected_at: nowIso,
+      connected_at: connectedAtIso,
       last_sync_error: null,
     },
     { onConflict: "account_owner_user_id" },

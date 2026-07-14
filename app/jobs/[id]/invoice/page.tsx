@@ -55,6 +55,8 @@ import {
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
+import { syncSingleInvoiceToQboFromForm } from "@/lib/actions/qbo-sync-actions";
+import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import {
   collectIssuedInvoiceCardPaymentFromForm,
   collectTenantInvoicePaymentNowFromForm,
@@ -211,6 +213,10 @@ function bannerMessage(value?: string | null) {
     internal_invoice_bill_to_updated: "Bill To updated — billing details re-pulled from the selected source.",
     internal_invoice_bill_to_invalid: "Choose a valid Bill To (Customer, Contractor, or Other).",
     internal_invoice_bill_to_no_contractor: "Assign a contractor to this job before billing the contractor.",
+    internal_invoice_qbo_synced: "Invoice synced to QuickBooks.",
+    internal_invoice_qbo_sync_failed: "QuickBooks sync did not complete — check the invoice's QBO status/error and try again.",
+    internal_invoice_qbo_not_connected: "QuickBooks isn't connected for this account. Connect it in the QuickBooks integration settings, then try again.",
+    internal_invoice_qbo_not_configured: "QuickBooks isn't configured for this environment.",
     internal_invoice_supplemental_draft_created: "Supplemental draft invoice created.",
     internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
@@ -1589,8 +1595,19 @@ export default async function InternalInvoiceWorkspacePage({
                   Invoice issue authority is not available for your current role.
                 </div>
               ) : (
-                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/75 px-3 py-2.5 text-sm text-emerald-900">
-                  This invoice is issued. Charges are frozen as the billed record.
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/75 px-3 py-2.5 text-sm text-emerald-900">
+                    This invoice is issued. Charges are frozen as the billed record.
+                  </div>
+                  {getQboAvailability().available && canManageFinancialInvoiceLifecycle ? (
+                    <form action={syncSingleInvoiceToQboFromForm}>
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input type="hidden" name="invoice_id" value={invoice.id} />
+                      <SubmitButton loadingText="Syncing to QuickBooks..." className={`${darkButtonClass} w-full`}>
+                        Sync to QuickBooks
+                      </SubmitButton>
+                    </form>
+                  ) : null}
                 </div>
               )}
             </section>

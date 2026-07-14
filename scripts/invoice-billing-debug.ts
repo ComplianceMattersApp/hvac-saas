@@ -59,7 +59,7 @@ async function main() {
       ? supabase
           .from("contractors")
           .select(
-            "id, name, billing_name, billing_email, billing_phone, billing_address_line1, billing_city, billing_state, billing_zip",
+            "id, name, billing_name, billing_email, billing_phone, billing_contact_name, billing_contact_email, billing_address_line1, billing_city, billing_state, billing_zip, billing_country, qbo_customer_name",
           )
           .eq("id", job.contractor_id)
           .maybeSingle()
@@ -76,7 +76,7 @@ async function main() {
     supabase
       .from("internal_invoices")
       .select(
-        "invoice_display_number, status, billing_name, billing_email, billing_phone, billing_address_line1, billing_city, billing_state, billing_zip",
+        "invoice_display_number, status, billing_name, billing_email, billing_phone, billing_address_line1, billing_city, billing_state, billing_zip, billing_country, qbo_customer_name, qbo_sync_status, qbo_sync_error, qbo_customer_id, qbo_invoice_id, qbo_last_synced_at",
       )
       .eq("job_id", jobId)
       .order("created_at", { ascending: false })
@@ -89,7 +89,8 @@ async function main() {
   console.log("  → this is what drives the invoice bill-to (contractor | customer | other | null)");
 
   show("CONTRACTOR (contractors row — the contractor bill-to source)", contractorRes.data, [
-    "name", "billing_name", "billing_email", "billing_phone", "billing_address_line1", "billing_city", "billing_state", "billing_zip",
+    "name", "billing_name", "billing_contact_name", "billing_contact_email", "billing_email", "billing_phone",
+    "billing_address_line1", "billing_city", "billing_state", "billing_zip", "billing_country", "qbo_customer_name",
   ]);
   show("CUSTOMER (customers row)", customerRes.data, [
     "full_name", "billing_name", "email", "phone", "billing_address_line1", "billing_city", "billing_state", "billing_zip",
@@ -97,8 +98,12 @@ async function main() {
   show("JOB-LEVEL override (used only when billing_recipient='other')", job, [
     "billing_name", "billing_email", "billing_phone", "billing_address_line1", "billing_city", "billing_state", "billing_zip",
   ]);
-  show("LATEST INVOICE snapshot (what the invoice currently shows)", invoiceRes.data, [
-    "invoice_display_number", "status", "billing_name", "billing_email", "billing_phone", "billing_address_line1", "billing_city", "billing_state", "billing_zip",
+  show("LATEST INVOICE snapshot (what the invoice currently shows + what QBO will use)", invoiceRes.data, [
+    "invoice_display_number", "status", "billing_name", "qbo_customer_name", "billing_email", "billing_phone",
+    "billing_address_line1", "billing_city", "billing_state", "billing_zip", "billing_country",
+  ]);
+  show("QBO SYNC RESULT (what actually happened on issue)", invoiceRes.data, [
+    "qbo_sync_status", "qbo_sync_error", "qbo_customer_id", "qbo_invoice_id", "qbo_last_synced_at",
   ]);
   console.log("");
 }
