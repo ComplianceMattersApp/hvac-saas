@@ -1071,7 +1071,7 @@ export default async function InternalInvoiceWorkspacePage({
           </div>
         </section>
       ) : showGuidedDraft ? (
-        <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
+        <div className="grid w-full gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.4fr)]">
           <main className="space-y-5">
             <section className={`${panelClass} p-4 sm:p-5`}>
               <div className="flex flex-wrap items-start justify-between gap-3">

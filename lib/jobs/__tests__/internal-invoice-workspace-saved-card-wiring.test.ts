@@ -93,6 +93,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
 
   it("uses the established invoice card language for a guided draft workspace", () => {
     expect(source).toContain("const showGuidedDraft = Boolean(");
+    expect(source).toContain('className="grid w-full gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.4fr)]"');
     expect(source).toContain("Review what will be billed");
     expect(source).toContain("Who is paying?");
     expect(source).toContain("Edit charges or add work");
