@@ -1250,8 +1250,8 @@ async function importEligibleVisitScopeItemsToDraftInvoice(params: {
   }
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
-  const quantityHundredths = 100;
   const payload = await Promise.all(eligibleScopeItems.map(async ({ scopeItemId, scopeItem }, index) => {
+    const quantityHundredths = parseQuantityToHundredths(String(scopeItem.expected_quantity ?? 1));
     const unitPriceCents = await resolveEffectiveUnitPriceCents(
       context.supabase,
       scopeItem.expected_unit_price,

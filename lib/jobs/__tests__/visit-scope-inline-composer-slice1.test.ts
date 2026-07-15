@@ -39,7 +39,7 @@ describe("visit scope inline composer slice 1", () => {
     expect(builderSource).toContain("rounded-xl border border-slate-200 bg-white px-3 py-2.5");
     expect(builderSource).toContain("Price");
     expect(builderSource).toContain('aria-label={`Price for ${item.title.trim() || "scope item"}`}');
-    expect(builderSource).toContain("Carries into the draft invoice charge when you build the invoice.");
+    expect(builderSource).toContain("Quantity and unit price carry into the draft invoice charge.");
     expect(builderSource).toContain('{isExpanded ? "Done" : "Edit"}');
     expect(builderSource).toContain("setExpandedItemId((prev) => (prev === item.id ? null : item.id))");
     expect(builderSource).toContain("value={item.title}");

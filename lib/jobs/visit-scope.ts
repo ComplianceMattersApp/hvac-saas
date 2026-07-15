@@ -7,6 +7,7 @@ export type VisitScopeItem = {
   kind: VisitScopeItemKind;
   source_pricebook_item_id?: string | null;
   expected_unit_price?: number | null;
+  expected_quantity?: number | null;
   unit_label?: string | null;
   item_type?: string | null;
   category?: string | null;
@@ -23,6 +24,7 @@ const VISIT_SCOPE_ITEM_UNIT_LABEL_MAX = 40;
 const VISIT_SCOPE_ITEM_ITEM_TYPE_MAX = 40;
 const VISIT_SCOPE_ITEM_CATEGORY_MAX = 80;
 const VISIT_SCOPE_ITEM_EXPECTED_PRICE_MAX = 99999999;
+const VISIT_SCOPE_ITEM_EXPECTED_QUANTITY_MAX = 999999;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -49,6 +51,13 @@ function sanitizeVisitScopeExpectedUnitPrice(value: unknown): number | null {
 
   const bounded = Math.min(parsed, VISIT_SCOPE_ITEM_EXPECTED_PRICE_MAX);
   return Number(bounded.toFixed(2));
+}
+
+function sanitizeVisitScopeExpectedQuantity(value: unknown): number {
+  if (value === null || value === undefined || value === "") return 1;
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value).trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+  return Number(Math.min(parsed, VISIT_SCOPE_ITEM_EXPECTED_QUANTITY_MAX).toFixed(2));
 }
 
 function buildFallbackUuidV4() {
@@ -98,6 +107,9 @@ export function sanitizeVisitScopeItems(value: unknown): VisitScopeItem[] {
     const expectedUnitPrice = sanitizeVisitScopeExpectedUnitPrice(
       (row as { expected_unit_price?: unknown })?.expected_unit_price,
     );
+    const expectedQuantity = sanitizeVisitScopeExpectedQuantity(
+      (row as { expected_quantity?: unknown })?.expected_quantity,
+    );
     const unitLabel = String((row as { unit_label?: unknown })?.unit_label ?? "")
       .trim()
       .replace(/\s+/g, " ")
@@ -130,6 +142,7 @@ export function sanitizeVisitScopeItems(value: unknown): VisitScopeItem[] {
       kind: normalizeVisitScopeItemKind((row as { kind?: unknown })?.kind),
       source_pricebook_item_id: sourcePricebookItemId,
       expected_unit_price: expectedUnitPrice,
+      expected_quantity: expectedQuantity,
       unit_label: unitLabel || null,
       item_type: itemType || null,
       category: category || null,

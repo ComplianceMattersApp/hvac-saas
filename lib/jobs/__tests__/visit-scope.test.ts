@@ -95,7 +95,7 @@ describe("visit scope durable item ids", () => {
     });
   });
 
-  it("preserves optional pricebook metadata and expected unit price", () => {
+  it("preserves optional pricebook metadata, quantity, and expected unit price", () => {
     const sourcePricebookId = "b98cf45f-6452-4ee6-ae94-3da666fd5218";
     const rows = sanitizeVisitScopeItems([
       {
@@ -105,6 +105,7 @@ describe("visit scope durable item ids", () => {
         kind: "primary",
         source_pricebook_item_id: sourcePricebookId,
         expected_unit_price: "89",
+        expected_quantity: "11",
         unit_label: "each",
         item_type: "diagnostic",
         category: "Diagnostic",
@@ -115,10 +116,21 @@ describe("visit scope durable item ids", () => {
     expect(rows[0]).toMatchObject({
       source_pricebook_item_id: sourcePricebookId,
       expected_unit_price: 89,
+      expected_quantity: 11,
       unit_label: "each",
       item_type: "diagnostic",
       category: "Diagnostic",
     });
+  });
+
+  it("defaults legacy or invalid quantities to one", () => {
+    const rows = sanitizeVisitScopeItems([
+      { title: "Legacy", details: null, kind: "primary" },
+      { title: "Zero", details: null, kind: "primary", expected_quantity: 0 },
+      { title: "Fractional", details: null, kind: "primary", expected_quantity: 2.5 },
+    ]);
+
+    expect(rows.map((row) => row.expected_quantity)).toEqual([1, 1, 2.5]);
   });
 
   it("normalizes malformed expected unit price values safely", () => {

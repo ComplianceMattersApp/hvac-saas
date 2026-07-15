@@ -101,6 +101,7 @@ type MaintenanceAgreementPrefill = {
     kind?: "primary" | "companion_service";
     source_pricebook_item_id?: string | null;
     expected_unit_price?: number | null;
+    expected_quantity?: number | null;
     unit_label?: string | null;
     item_type?: string | null;
     category?: string | null;
@@ -178,6 +179,7 @@ type NewJobDraft = {
     kind: "primary" | "companion_service";
     source_pricebook_item_id?: string | null;
     expected_unit_price?: number | null;
+    expected_quantity?: number | null;
     unit_label?: string | null;
     item_type?: string | null;
     category?: string | null;
@@ -384,6 +386,10 @@ function mapPrefillVisitScopeItems(
         : Number.isFinite(Number(item.expected_unit_price))
           ? Math.max(0, Number(item.expected_unit_price))
           : null,
+    expected_quantity:
+      Number.isFinite(Number(item.expected_quantity)) && Number(item.expected_quantity) > 0
+        ? Number(item.expected_quantity)
+        : 1,
     unit_label: String(item.unit_label ?? "").trim() || null,
     item_type: String(item.item_type ?? "").trim() || null,
     category: String(item.category ?? "").trim() || null,
@@ -1231,6 +1237,10 @@ const [billingRecipient, setBillingRecipient] = useState<
             item.expected_unit_price === null || item.expected_unit_price === undefined
               ? null
               : Math.max(0, Number(item.expected_unit_price)),
+          expected_quantity:
+            Number.isFinite(Number(item.expected_quantity)) && Number(item.expected_quantity) > 0
+              ? Number(item.expected_quantity)
+              : 1,
           unit_label: String(item.unit_label ?? "").trim() || null,
           item_type: String(item.item_type ?? "").trim() || null,
           category: String(item.category ?? "").trim() || null,
@@ -1308,6 +1318,10 @@ const [billingRecipient, setBillingRecipient] = useState<
                 : Number.isFinite(Number(item.expected_unit_price))
                   ? Math.max(0, Number(item.expected_unit_price))
                   : null,
+            expected_quantity:
+              Number.isFinite(Number(item.expected_quantity)) && Number(item.expected_quantity) > 0
+                ? Number(item.expected_quantity)
+                : 1,
             unit_label: String(item.unit_label ?? "").trim() || null,
             item_type: String(item.item_type ?? "").trim() || null,
             category: String(item.category ?? "").trim() || null,

@@ -45,6 +45,7 @@ type ScopeCandidate = {
   details?: string;
   source_pricebook_item_id?: string | null;
   expected_unit_price?: number | null;
+  expected_quantity?: number | null;
   unit_label?: string | null;
   item_type?: string | null;
   category?: string | null;
@@ -173,6 +174,10 @@ function toDraftItems(
             : Number.isFinite(Number(item.expected_unit_price))
               ? Math.max(0, Number(item.expected_unit_price))
               : null,
+        expected_quantity:
+          Number.isFinite(Number(item.expected_quantity)) && Number(item.expected_quantity) > 0
+            ? Number(item.expected_quantity)
+            : 1,
         unit_label: String(item.unit_label ?? "").trim() || null,
         item_type: String(item.item_type ?? "").trim() || null,
         category: String(item.category ?? "").trim() || null,
@@ -364,6 +369,10 @@ export default function VisitScopeBuilder({
           item.expected_unit_price === null || item.expected_unit_price === undefined || Number.isNaN(Number(item.expected_unit_price))
             ? 0
             : Math.max(0, Number(item.expected_unit_price)),
+        expected_quantity:
+          Number.isFinite(Number(item.expected_quantity)) && Number(item.expected_quantity) > 0
+            ? Number(item.expected_quantity)
+            : 1,
         unit_label: String(item.unit_label ?? "").trim() || null,
         item_type: String(item.item_type ?? "").trim() || null,
         category: String(item.category ?? "").trim() || null,
@@ -408,6 +417,10 @@ export default function VisitScopeBuilder({
         !Number.isFinite(Number(candidate.expected_unit_price))
           ? 0
           : Math.max(0, Number(candidate.expected_unit_price)),
+      expected_quantity:
+        Number.isFinite(Number(candidate.expected_quantity)) && Number(candidate.expected_quantity) > 0
+          ? Number(candidate.expected_quantity)
+          : 1,
       unit_label: String(candidate.unit_label ?? "").trim() || null,
       item_type: String(candidate.item_type ?? "").trim() || null,
       category: String(candidate.category ?? "").trim() || null,
@@ -777,10 +790,27 @@ export default function VisitScopeBuilder({
                       ) : null}
                     </div>
 
-                    <div className="w-full space-y-2 lg:w-auto lg:min-w-[12rem] lg:max-w-[12rem]">
-                      <div className="space-y-1">
+                    <div className="w-full space-y-2 lg:w-auto lg:min-w-[18rem] lg:max-w-[18rem]">
+                      <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2">
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:text-right">
+                            Qty
+                          </label>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={item.expected_quantity ?? 1}
+                            onChange={(event) => patchItem(item.id, {
+                              expected_quantity: Math.max(0.01, Number(event.target.value) || 1),
+                            })}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm text-slate-900 shadow-sm"
+                            aria-label={`Quantity for ${item.title.trim() || "scope item"}`}
+                          />
+                        </div>
+                        <div className="space-y-1">
                         <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:text-right">
-                          Price
+                          Unit Price
                         </label>
                         <div className="relative">
                           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
@@ -801,10 +831,11 @@ export default function VisitScopeBuilder({
                             aria-label={`Price for ${item.title.trim() || "scope item"}`}
                           />
                         </div>
-                        <p className="text-xs text-slate-500 lg:text-right">
-                          Carries into the draft invoice charge when you build the invoice.
-                        </p>
+                        </div>
                       </div>
+                        <p className="text-xs text-slate-500 lg:text-right">
+                          Quantity and unit price carry into the draft invoice charge.
+                        </p>
 
                       <div className="flex items-center justify-end gap-2">
                         <button

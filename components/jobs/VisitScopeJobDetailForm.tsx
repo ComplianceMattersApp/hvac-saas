@@ -44,6 +44,7 @@ export default function VisitScopeJobDetailForm({
       kind: item.kind,
       source_pricebook_item_id: item.source_pricebook_item_id ?? null,
       expected_unit_price: item.expected_unit_price ?? null,
+      expected_quantity: item.expected_quantity ?? 1,
       unit_label: item.unit_label ?? null,
       item_type: item.item_type ?? null,
       category: item.category ?? null,
