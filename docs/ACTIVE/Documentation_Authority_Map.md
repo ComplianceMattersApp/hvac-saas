@@ -9,13 +9,19 @@ This map defines where current truth, roadmap intent, launch gates, domain contr
 
 Use this file to prevent ACTIVE docs from carrying duplicate versions of the same story.
 
-The current control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md). It confirms the cleanup sequence and should be used before any broad documentation consolidation, archival move, or control-plane rewrite.
+The June 2026 consolidation assessment is preserved in [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md) as historical audit evidence. The July 2026 control plane supersedes its earlier Active Spine recommendation.
+
+Current control-plane authority:
+
+- [PROJECT_TRUTH.md](../PROJECT_TRUTH.md): stable product truth, locked architecture, and standing operational constraints.
+- [CURRENT_ROADMAP.md](../CURRENT_ROADMAP.md): active lane status, sequencing, and next safe slices.
+- [SESSION_CONTEXT_TEMPLATE.md](../SESSION_CONTEXT_TEMPLATE.md): session-start context and execution discipline.
 
 ## Authority Roles
 
 | Doc family | Role | Should contain | Should not contain |
 | --- | --- | --- | --- |
-| Active Spine | Concise current product truth | Current operating posture, durable source-of-truth boundaries, current release posture, links to canonical specs | Chronological punch-list logs, full implementation closeouts, detailed roadmap backlog |
+| Project Truth | Stable current product truth | Current operating posture, durable source-of-truth boundaries, locked architecture, links to canonical specs | Chronological punch-list logs, full implementation closeouts, detailed roadmap backlog |
 | Release Scope / Roadmap | Strategic sequencing | Locked release scope, deferred/gated lanes, unlock criteria, roadmap order | Minor tactical fixes, UI polish logs, repeated model-spec detail |
 | Prelaunch Checklist | Launch readiness / operator gates | Launch-blocking checks, operator readiness, runbook-gated launch steps | Full feature history, tactical closeout details, domain model contracts |
 | Domain model specs | Durable domain contracts | Source-of-truth model, invariants, domain boundaries, approved model decisions | Global roadmap tracking, unrelated punch-list completions |
@@ -39,10 +45,13 @@ The current control-plane audit is [Documentation_Consolidation_Audit.md](./Docu
 
 The control-plane docs are:
 
-- [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md): concise current product truth.
-- [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md): strategic sequence, deferred lanes, and unlock criteria.
+- [PROJECT_TRUTH.md](../PROJECT_TRUTH.md): stable current product truth and locked constraints.
+- [CURRENT_ROADMAP.md](../CURRENT_ROADMAP.md): active sequence, deferred lanes, and unlock criteria.
+- [SESSION_CONTEXT_TEMPLATE.md](../SESSION_CONTEXT_TEMPLATE.md): session-start execution context.
 - [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md): launch gates and operator readiness.
 - [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md): minor fix and low-risk tactical evidence.
+
+[Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) is a retirement pointer only and must not be cited as current authority.
 
 Supporting strategic docs such as the Business Layer Roadmap, Payments Roadmap, and Workflow Modernization Plan may remain ACTIVE, but they should not override the control-plane docs or duplicate historical closeout detail.
 
@@ -50,7 +59,7 @@ Supporting strategic docs such as the Business Layer Roadmap, Payments Roadmap, 
 
 Future docs prompts should name the intended authority target:
 
-- "Update the Spine" means concise current product truth only.
+- "Update product truth" means update `docs/PROJECT_TRUTH.md` with durable current truth only.
 - "Update the Roadmap" means strategic sequencing, deferred lanes, and unlock criteria only.
 - "Update Prelaunch" means launch-readiness gates only.
 - "Update a domain spec" means durable model/source-of-truth contract only.
@@ -61,6 +70,6 @@ Future docs prompts should name the intended authority target:
 - Tactical closeouts: [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md)
 - Domain model closeout evidence: [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md)
 - Service Plan model closeout evidence: [Service_Plan_Model_Closeout_Evidence_Ledger.md](./Service_Plan_Model_Closeout_Evidence_Ledger.md)
-- Current product truth: [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md)
-- Release/deferred order: [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md)
+- Current product truth: [PROJECT_TRUTH.md](../PROJECT_TRUTH.md)
+- Release/deferred order: [CURRENT_ROADMAP.md](../CURRENT_ROADMAP.md)
 - Launch gates: [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md)

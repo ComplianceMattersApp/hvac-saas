@@ -1,10 +1,12 @@
 # Workflow Modernization B1 Current Queue Contract Audit
 
+> **Historical audit — superseded for current implementation truth.** This document records the queue state observed during the B1 audit. Its recommendations and implementation-gap statements must not be treated as the current queue contract. Current durable queue truth is owned by [`docs/PROJECT_TRUTH.md`](../PROJECT_TRUTH.md), especially §§8.3–8.5 and §12. Current sequencing is owned by [`docs/CURRENT_ROADMAP.md`](../CURRENT_ROADMAP.md). Verify current code and tests before changing queue behavior.
+
 ## 1. Status / Authority / Scope
 
-Status: ACTIVE AUDIT / MODEL COMPARISON
+Status: HISTORICAL AUDIT / MODEL COMPARISON — SUPERSEDED FOR CURRENT IMPLEMENTATION TRUTH
 
-Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md`, `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`, `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`, and active payment/ECC/source-of-truth specs.
+Authority: Historical evidence only. Current authority is `docs/PROJECT_TRUTH.md`; current sequencing is `docs/CURRENT_ROADMAP.md`.
 
 Scope: docs/audit only.
 

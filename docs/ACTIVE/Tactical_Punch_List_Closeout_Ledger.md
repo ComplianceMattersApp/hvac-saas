@@ -3,9 +3,19 @@
 Status: ACTIVE TACTICAL CLOSEOUT LEDGER
 Scope: minor fixes, low-risk polish, small regressions, tactical performance fixes, and punch-list completions. This file records evidence; it does not authorize product code, schema, migration, Supabase, Stripe, payment, ECC, portal, SMS, QBO, support, or env changes.
 
-Authority: governed by [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). The Active Spine remains current product truth; this ledger is tactical evidence and should not be treated as a model spec.
+Authority: governed by [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). [`docs/PROJECT_TRUTH.md`](../PROJECT_TRUTH.md) owns current product truth; this ledger is tactical evidence and should not be treated as a model spec.
 
-Control-plane rule: record minor UI polish, low-risk regressions, duplicate-submit/pending-state fixes, tactical performance fixes, and small punch-list completions here with concise commit evidence and guardrails. Do not use this ledger for durable model contracts, launch gates, roadmap sequencing, production runbook execution, or historical lane consolidation. If a tactical fix changes current product truth, add only a short Spine summary with a backlink here.
+## July 2026 Field Ops Queue Regression Guardrails
+
+Status: CLOSED for the July 15, 2026 implementation slices merged to `main`.
+
+- Commits: `df588e9d` (contractor label above fold) and `0a66cb43` (ECC retest active-queue exclusivity).
+- Needs Scheduling cards reuse the existing narrow contractor enrichment but show contractor/Internal Work identity on the collapsed card rather than only inside Open & Act. Service-only product-mode boundaries remain unchanged.
+- Linked ECC retest chains use current-operative-leaf queue ownership: once a non-cancelled, non-deleted ECC retest child exists, the eligible failed/retest/review parent is suppressed from active Ops Waiting/Exceptions rows and counts while remaining historically failed in ECC and timeline truth.
+- Main Ops counts/rows and focused Waiting/Exceptions routes share the same suppression helper. No job status, test run, parent linkage, event history, schema, migration, billing, payment, Stripe, or QBO behavior changed.
+- Evidence: `lib/ops/retest-queue-exclusivity.ts`, `lib/ops/__tests__/retest-queue-exclusivity.test.ts`, and `lib/ops/__tests__/ops-retest-queue-exclusivity-wiring.test.ts`.
+
+Control-plane rule: record minor UI polish, low-risk regressions, duplicate-submit/pending-state fixes, tactical performance fixes, and small punch-list completions here with concise commit evidence and guardrails. Do not use this ledger for durable model contracts, launch gates, roadmap sequencing, production runbook execution, or historical lane consolidation. If a tactical fix changes current product truth, add only a short `docs/PROJECT_TRUTH.md` summary with a backlink here.
 
 ## July 2026 Invoice Charge Form Progressive Disclosure Closeout
 

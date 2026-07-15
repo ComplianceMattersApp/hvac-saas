@@ -364,10 +364,17 @@ Ops pages should optimize for immediate clarity, next-action recognition, and re
 ### 12.2 Information priority
 High-value operational information surfaces high: notes · failure reason · schedule state · assignment context.
 
-### 12.3 Redundancy rule
+For applicable ECC/HERS and Hybrid queue cards, contractor identity is high-value routing context and must be visible on the collapsed/front-facing card. Do not require Open & Act expansion to identify the responsible contractor. Internal Work may use the account/business identity fallback. Service-only surfaces must not introduce irrelevant contractor concepts.
+
+### 12.3 Queue membership parity
+Queue chips/counts, visible queue rows, focused queue routes, filters, and exports must apply the same membership contract. A count must not include a record that the corresponding active queue suppresses, and a focused route must not reintroduce a record suppressed by the main Ops workspace.
+
+Linked ECC retest chains additionally follow §8.5 active-leaf exclusivity. The shared classifier/read model is presentation/routing logic only and must not rewrite failed-parent test truth or event history.
+
+### 12.4 Redundancy rule
 Avoid duplicate instructional text when the status and reason already communicate the meaning.
 
-### 12.4 Right-rail rule
+### 12.5 Right-rail rule
 Secondary/history/supporting information belongs in supporting zones when it improves scanability.
 
 ---
