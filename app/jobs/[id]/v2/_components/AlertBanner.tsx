@@ -23,6 +23,10 @@ const BANNER_COPY: Record<string, string> = {
   visit_scope_saved: "Work saved.",
   visit_scope_payload_invalid: "Work items payload is invalid — please try again.",
   visit_scope_required: "Work summary is required for service jobs.",
+  job_title_saved: "Job title saved.",
+  job_title_already_saved: "Job title is already up to date.",
+  job_title_required: "Job title is required.",
+  job_title_update_failed: "Job title could not be saved — please try again.",
   // location
   service_location_updated: "Service location updated.",
   service_location_change_invalid: "Invalid location — please select a different location.",

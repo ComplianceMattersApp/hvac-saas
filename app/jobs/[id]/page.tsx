@@ -20,6 +20,7 @@ import {
   advanceJobStatusFromForm,
   updateJobServiceContractFromForm,
   updateJobVisitScopeFromForm,
+  updateJobTitleFromForm,
   createNextServiceVisitFromForm,
   createCallbackVisitFromForm,
   completeDataEntryFromForm,
@@ -3504,10 +3505,8 @@ const jobHeaderReference = formatJobDisplayReference({
   jobId: job.id,
 });
 const visitReasonText =
-  firstNonEmpty(serviceVisitReasonText, jobTitleText, visitScopeLeadText) ??
+  firstNonEmpty(serviceVisitReasonText, jobTitleText) ??
   "No visit reason saved yet.";
-const shouldShowCustomerConcern =
-  Boolean(jobTitleText) && normalizeCompareText(jobTitleText) !== normalizeCompareText(visitReasonText);
 const shouldShowWorkSummary =
   Boolean(visitScopeSummary) &&
   normalizeCompareText(visitScopeSummary) !== normalizeCompareText(visitReasonText) &&
@@ -3826,6 +3825,8 @@ const showCorrectionReviewResolution =
           updateJobOpsFromForm={updateJobOpsFromForm}
           updateJobScheduleFromForm={updateJobScheduleFromForm}
           updateJobVisitScopeFromForm={updateJobVisitScopeFromForm}
+          updateJobTitleFromForm={updateJobTitleFromForm}
+          jobTitleText={jobTitleText}
           visitReasonText={visitReasonText}
           visitScopeCount={visitScopeCount}
           visitScopeItems={visitScopeItems}
@@ -4860,34 +4861,6 @@ const showCorrectionReviewResolution =
             <SectionEyebrow>Visit Reason</SectionEyebrow>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isInternalUser ? (
-              <Disclosure className="w-full sm:w-[22rem]" title="Edit">
-                <form action={updateJobVisitScopeFromForm} className="w-full">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="tab" value={tab} />
-                  <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#visit-reason-card`} />
-                  <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
-                  <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Visit Reason / Visit Title
-                  </label>
-                  <textarea
-                    name="visit_scope_summary"
-                    defaultValue={visitScopeSummary ?? ""}
-                    rows={3}
-                    maxLength={600}
-                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-                  />
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
-                      Save
-                    </SubmitButton>
-                    <a href="#visit-reason-card" className="text-xs font-semibold text-slate-600 transition-colors hover:text-slate-900">
-                      Cancel
-                    </a>
-                  </div>
-                </form>
-              </Disclosure>
-            ) : null}
             {job.job_type === "service" ? (
               <a
                 href="#visit-scope-section"
@@ -4904,16 +4877,28 @@ const showCorrectionReviewResolution =
             {visitReasonText}
           </div>
 
-          {shouldShowCustomerConcern ? (
-            <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
+          <div id="job-title-card" className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">
-                Customer Concern
+                Job Title
               </div>
-              <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
-                {jobTitleText}
-              </div>
+              {isInternalUser ? (
+                <Disclosure className="w-full sm:w-[22rem]" title="Edit">
+                  <form action={updateJobTitleFromForm} className="w-full">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-title-card`} />
+                    <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Job Title</label>
+                    <input name="title" defaultValue={jobTitleText ?? ""} required maxLength={200} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm" />
+                    <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} mt-2`}>Save Job Title</SubmitButton>
+                  </form>
+                </Disclosure>
+              ) : null}
             </div>
-          ) : null}
+            <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
+              {jobTitleText || "No job title saved yet."}
+            </div>
+          </div>
 
           {shouldShowIntakeNotes ? (
             <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
@@ -4926,14 +4911,24 @@ const showCorrectionReviewResolution =
             </div>
           ) : null}
 
-          {shouldShowWorkSummary ? (
+          {visitScopeSummary || isInternalUser ? (
             <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">
-                Work Summary
-              </div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Work Summary</div>
               <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
-                {visitScopeSummary}
+                {visitScopeSummary || "No work summary saved yet."}
               </div>
+              {isInternalUser ? (
+                <Disclosure className="mt-2 w-full sm:w-[28rem]" title="Edit Work Summary">
+                  <form action={updateJobVisitScopeFromForm} className="w-full">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#visit-reason-card`} />
+                    <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
+                    <textarea name="visit_scope_summary" defaultValue={visitScopeSummary ?? ""} rows={3} maxLength={600} className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm" />
+                    <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} mt-2`}>Save Work Summary</SubmitButton>
+                  </form>
+                </Disclosure>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -6093,6 +6088,11 @@ const showCorrectionReviewResolution =
           message={`${surfaceProfile.labels.workItems} saved.`}
         />
       )}
+
+      {banner === "job_title_saved" && <FlashBanner type="success" message="Job title saved." />}
+      {banner === "job_title_already_saved" && <FlashBanner type="warning" message="Job title was already up to date." />}
+      {banner === "job_title_required" && <FlashBanner type="warning" message="Job title is required." />}
+      {banner === "job_title_update_failed" && <FlashBanner type="warning" message="Job title could not be saved." />}
 
       {banner === "visit_scope_already_saved" && (
         <FlashBanner

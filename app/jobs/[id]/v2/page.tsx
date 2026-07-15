@@ -17,6 +17,7 @@ import {
   addInternalNoteFromForm,
   addPublicNoteFromForm,
   updateJobVisitScopeFromForm,
+  updateJobTitleFromForm,
   changeJobServiceLocationFromForm,
   confirmEccRetestReadyFromForm,
   scheduleRetestNowFromForm,
@@ -738,8 +739,6 @@ export default async function JobDetailV2Page({
   // brief fields
   const visitReasonText = String(job.service_visit_reason ?? job.title ?? "").trim();
   const jobTitleText = String(job.title ?? "").trim();
-  const hasCustomerConcern =
-    Boolean(jobTitleText) && jobTitleText.toLowerCase() !== visitReasonText.toLowerCase();
   const workSummaryText = String(job.visit_scope_summary ?? "").trim();
   const workshareDefaultScope =
     workSummaryText
@@ -1179,18 +1178,28 @@ export default async function JobDetailV2Page({
           style={S.section}
         >
           <div style={{ ...S.sectionLabel, marginBottom: "20px" }}>Job Brief</div>
-          {/* Visit Reason / Customer Concern / Contractor / Billing */}
+          {/* Job Title / Visit Reason / Contractor / Billing */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px 48px" }}>
+            <div>
+              <div style={S.fieldLabel}>Job Title</div>
+              <form action={updateJobTitleFromForm} style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="tab" value="info" />
+                <input type="hidden" name="return_to" value={`${returnTo}#brief`} />
+                <input
+                  name="title"
+                  defaultValue={jobTitleText}
+                  required
+                  maxLength={200}
+                  style={{ width: "100%", minHeight: "38px", borderRadius: "9px", border: "1px solid oklch(0.86 0.008 250)", padding: "8px 10px", font: "inherit" }}
+                />
+                <button type="submit" style={{ ...S.outlineBtn(false), justifySelf: "start" }}>Save Job Title</button>
+              </form>
+            </div>
             <div>
               <div style={S.fieldLabel}>Visit Reason</div>
               <div style={S.fieldValue}>{visitReasonText || "—"}</div>
             </div>
-            {hasCustomerConcern ? (
-              <div>
-                <div style={S.fieldLabel}>Customer Concern</div>
-                <div style={S.fieldValue}>{jobTitleText}</div>
-              </div>
-            ) : null}
             <div>
               <div style={S.fieldLabel}>Contractor</div>
               <div style={S.fieldValue}>{contractorDisplayName}</div>

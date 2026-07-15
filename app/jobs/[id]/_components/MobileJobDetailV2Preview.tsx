@@ -552,7 +552,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     }))
     .filter((item: any) => item.title)
     .slice(0, 3);
-  const serviceWorkSummary = String(visitScopeSummary || visitReasonText || "").trim();
+  const serviceWorkSummary = String(visitScopeSummary || "").trim();
   const showServiceWorkLane = isEcc ? companionServiceItems.length > 0 : Boolean(hasVisitScopeDefined || serviceWorkSummary);
   const showEccWorkScopeLane = isEcc && !showServiceWorkLane && Boolean(hasVisitScopeDefined || serviceWorkSummary);
   const showEccReviewSummary = isEcc && showLinkedRetestCreated;
@@ -989,7 +989,7 @@ export default function MobileJobDetailV2Preview(props: any) {
               <>
                 {serviceWorkSummary ? (
                   <div className="px-3 py-3">
-                    <div className="text-sm font-semibold text-slate-500">Visit reason / summary</div>
+                    <div className="text-sm font-semibold text-slate-500">Work Summary</div>
                     <p className="mt-1 text-base leading-6 text-slate-800">{serviceWorkSummary}</p>
                   </div>
                 ) : null}
@@ -1061,7 +1061,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             <div className="v2-work-scope-summary mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
               {serviceWorkSummary ? (
                 <div className="px-3 py-3">
-                  <div className="text-sm font-semibold text-slate-500">Visit reason / summary</div>
+                  <div className="text-sm font-semibold text-slate-500">Work Summary</div>
                   <p className="mt-1 text-base leading-6 text-slate-800">{serviceWorkSummary}</p>
                 </div>
               ) : null}

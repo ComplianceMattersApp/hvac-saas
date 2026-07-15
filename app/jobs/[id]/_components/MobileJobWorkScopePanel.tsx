@@ -6,11 +6,12 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
     hasVisitScopeDefined,
     isInternalUser,
     job,
+    jobTitleText,
     primaryButtonClass,
-    shouldShowWorkSummary,
     SubmitButton,
     tab,
     updateJobVisitScopeFromForm,
+    updateJobTitleFromForm,
     visitReasonText,
     visitScopeItems,
     visitScopeItemsJsonForInlineEdit,
@@ -21,49 +22,55 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
 
   return (
     <>
-      <div id="mobile-visit-reason-card" className="rounded-xl border border-slate-200/80 bg-slate-50/75 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)]">
+      <div id="mobile-job-title-card" className="rounded-xl border border-slate-200/80 bg-slate-50/75 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)]">
         {isInternalUser ? (
           <details className="group">
             <summary className="cursor-pointer list-none">
               <div className="flex items-start justify-between gap-3">
-                <div className="text-sm font-semibold text-[#0f1f35]">Visit Reason</div>
+                <div className="text-sm font-semibold text-[#0f1f35]">Job Title</div>
                 <span className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors group-hover:bg-slate-50">
                   Edit
                 </span>
               </div>
             </summary>
-            <form action={updateJobVisitScopeFromForm} className="mt-3 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+            <form action={updateJobTitleFromForm} className="mt-3 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="tab" value={tab} />
-              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-visit-reason-card`} />
-              <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
+              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-job-title-card`} />
               <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Visit Reason / Visit Title
+                Job Title
               </label>
-              <textarea
-                name="visit_scope_summary"
-                defaultValue={visitScopeSummary ?? ""}
-                rows={3}
-                maxLength={600}
+              <input
+                name="title"
+                defaultValue={jobTitleText ?? ""}
+                maxLength={200}
+                required
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
               />
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
                   Save
                 </SubmitButton>
-                <a href="#mobile-visit-reason-card" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <a href="#mobile-job-title-card" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                   Cancel
                 </a>
               </div>
             </form>
           </details>
         ) : (
-          <div className="text-sm font-semibold text-[#0f1f35]">Visit Reason</div>
+          <div className="text-sm font-semibold text-[#0f1f35]">Job Title</div>
         )}
         <div className="mt-1 whitespace-pre-wrap break-words text-base font-semibold leading-6 text-slate-950">
-          {visitReasonText}
+          {jobTitleText || "No job title saved yet."}
         </div>
       </div>
+
+      {String(job?.service_visit_reason ?? "").trim() ? (
+        <div id="mobile-visit-reason-card" className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+          <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
+          <div className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-800">{visitReasonText}</div>
+        </div>
+      ) : null}
 
       {visitScopeItems.length > 0 ? (
         <div className="space-y-2">
@@ -121,14 +128,25 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
         </div>
       ) : null}
 
-      {shouldShowWorkSummary ? (
+      {visitScopeSummary || isInternalUser ? (
         <details className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
           <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
             Work Summary
           </summary>
           <div className="mt-2 whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-base leading-6 text-slate-700">
-            {visitScopeSummary}
+            {visitScopeSummary || "No work summary saved yet."}
           </div>
+          {isInternalUser ? (
+            <form action={updateJobVisitScopeFromForm} className="mt-3 border-t border-slate-200 pt-3">
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="tab" value={tab} />
+              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} />
+              <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
+              <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Work Summary</label>
+              <textarea name="visit_scope_summary" defaultValue={visitScopeSummary ?? ""} rows={3} maxLength={600} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm" />
+              <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} mt-3`}>Save Work Summary</SubmitButton>
+            </form>
+          ) : null}
         </details>
       ) : null}
 

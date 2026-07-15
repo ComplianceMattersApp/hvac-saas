@@ -3055,6 +3055,62 @@ export async function updateJobVisitScopeFromForm(formData: FormData) {
   });
 }
 
+export async function updateJobTitleFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { userId: actingUserId, internalUser } = await requireInternalUser({ supabase });
+  const jobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const nextTitle = String(formData.get("title") || "").trim().slice(0, 200);
+
+  if (!jobId || !nextTitle) {
+    redirectToJobWithBanner({ jobId, banner: "job_title_required", tabRaw, returnToRaw });
+  }
+
+  const beforeJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: "title",
+  });
+  if (!beforeJob) {
+    redirectToJobWithBanner({ jobId, banner: "job_title_update_failed", tabRaw, returnToRaw });
+  }
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const beforeTitle = String(beforeJob?.title ?? "").trim();
+  if (beforeTitle !== nextTitle) {
+    const { error } = await supabase.from("jobs").update({ title: nextTitle }).eq("id", jobId);
+    if (error) {
+      redirectToJobWithBanner({ jobId, banner: "job_title_update_failed", tabRaw, returnToRaw });
+    }
+    await insertJobEvent({
+      supabase,
+      jobId,
+      event_type: "ops_update",
+      meta: {
+        source: "job_detail_job_title",
+        changes: [{ field: "jobs.title", from: beforeTitle || null, to: nextTitle }],
+      },
+      userId: actingUserId,
+    });
+  }
+
+  revalidatePath(`/jobs/${jobId}`, "page");
+  revalidatePath("/jobs", "page");
+  revalidatePath("/ops", "page");
+  redirectToJobWithBanner({
+    jobId,
+    banner: beforeTitle === nextTitle ? "job_title_already_saved" : "job_title_saved",
+    tabRaw,
+    returnToRaw,
+    cacheBust: true,
+  });
+}
+
 export async function promoteCompanionScopeToServiceJobFromForm(formData: FormData) {
   const supabase = await createClient();
 

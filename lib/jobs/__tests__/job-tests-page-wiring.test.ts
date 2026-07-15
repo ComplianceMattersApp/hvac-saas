@@ -593,17 +593,24 @@ describe("job detail field operations board layout", () => {
     expect(mobileScheduleSlice).not.toContain('className="group relative self-start overflow-hidden');
   });
 
-  it("keeps visit reason and intake notes below the location preview", () => {
+  it("keeps job title, visit reason, work summary, and intake notes bound to distinct fields", () => {
     expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
     expect(mobileJobWorkScopePanelSource).toContain("Visit Reason");
     expect(jobPageSource).toContain("const visitReasonText =");
     expect(mobileJobWorkScopePanelSource).toContain("{visitReasonText}");
     expect(jobPageSource).toContain('id="visit-reason-card"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
+    expect(mobileJobWorkScopePanelSource).toContain('id="mobile-job-title-card"');
+    expect(mobileJobWorkScopePanelSource).toContain("updateJobTitleFromForm");
+    expect(mobileJobWorkScopePanelSource).toContain('name="title"');
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
     expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_summary"');
     expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
-    expect(jobPageSource).toContain("Customer Concern");
+    expect(mobileJobWorkScopePanelSource).not.toContain("Visit Reason / Visit Title");
+    expect(jobPageSource).toContain("Job Title");
+    expect(jobPageSource).toContain("form action={updateJobTitleFromForm}");
+    expect(jobPageSource).toContain("form action={updateJobVisitScopeFromForm}");
+    expect(jobPageSource).not.toContain("Customer Concern");
     expect(jobPageSource).toContain("Intake Notes");
     expect(jobPageSource).toContain("whitespace-pre-wrap break-words");
   });
@@ -693,7 +700,7 @@ describe("job detail field operations board layout", () => {
     expect(mobileWorkScopeSlice).toContain("createInternalInvoiceDraftFromForm");
   });
 
-  it("keeps mobile Visit Reason editing aligned inside the Visit Reason card", () => {
+  it("keeps mobile Visit Reason read-only and edits Work Summary separately", () => {
     const mobileVisitReasonStart = mobileJobWorkScopePanelSource.indexOf('id="mobile-visit-reason-card"');
     const mobileVisitReasonEnd = mobileJobWorkScopePanelSource.indexOf("{visitScopeItems.map((item: any, index: number) => {", mobileVisitReasonStart);
     const mobileVisitReasonSlice =
@@ -701,12 +708,12 @@ describe("job detail field operations board layout", () => {
         ? mobileJobWorkScopePanelSource.slice(mobileVisitReasonStart, mobileVisitReasonEnd)
         : "";
 
-    expect(mobileVisitReasonSlice).toContain('<details className="group">');
-    expect(mobileVisitReasonSlice).toContain('className="mt-3 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm"');
-    expect(mobileVisitReasonSlice).toContain('className="mt-3 grid grid-cols-2 gap-2"');
-    expect(mobileVisitReasonSlice).toContain('inline-flex min-h-10 items-center justify-center rounded-xl');
-    expect(mobileVisitReasonSlice).toContain('name="visit_scope_summary"');
-    expect(mobileVisitReasonSlice).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
+    expect(mobileVisitReasonSlice).toContain("Visit Reason");
+    expect(mobileVisitReasonSlice).toContain("{visitReasonText}");
+    expect(mobileVisitReasonSlice).not.toContain("updateJobVisitScopeFromForm");
+    expect(mobileJobWorkScopePanelSource).toContain("Save Work Summary");
+    expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_summary"');
+    expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
   });
 
   it("removes the mobile Tools jump button while preserving lower tools", () => {
