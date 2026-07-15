@@ -91,13 +91,25 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain('id="invoice-payment-actions"');
   });
 
+  it("uses the established invoice card language for a guided draft workspace", () => {
+    expect(source).toContain("const showGuidedDraft = Boolean(");
+    expect(source).toContain("Review what will be billed");
+    expect(source).toContain("Who is paying?");
+    expect(source).toContain("Edit charges or add work");
+    expect(source).toContain("Next Step");
+    expect(source).toContain("Ready to issue");
+    expect(source).toContain("Issue &amp; Send Invoice");
+    expect(source).toContain("Need another invoice control?");
+    expect(source).toContain("Billing details, notes, no-charge resolution, and administrative controls remain available in the full workspace.");
+  });
+
   it("shows Create Add-On Invoice only for issued primary invoice with lifecycle authority", () => {
     expect(source).toContain("createSupplementalInternalInvoiceFromForm");
     expect(source).toContain("const canCreateSupplementalDraftFromCurrentInvoice = Boolean(");
     expect(source).toContain("invoice.invoice_kind === \"primary\"");
     expect(source).toContain("invoice.status === \"issued\"");
     expect(source).toContain("&& canManageFinancialInvoiceLifecycle");
-    expect(source).toContain("{supplementalParentInvoiceId ? (");
+    expect(source).toContain("{supplementalParentInvoiceId && !showPostSendCompletion && !showGuidedDraft ? (");
     expect(source).toContain("Create Add-On Invoice");
     expect(source).toContain("Reason for add-on invoice");
     expect(source).toContain("Customer added warranty, service plan, or additional work.");

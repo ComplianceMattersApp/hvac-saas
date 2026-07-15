@@ -670,6 +670,12 @@ export default async function InternalInvoiceWorkspacePage({
     && workspaceView !== "payment"
     && workspaceView !== "all",
   );
+  const showGuidedDraft = Boolean(
+    invoice
+    && invoice.status === "draft"
+    && !billingDispositionResolved
+    && workspaceView !== "all",
+  );
   const selectedInvoiceWorkspaceBaseHref = invoice
     ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}`
     : `/jobs/${jobId}/invoice`;
@@ -904,7 +910,7 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
             {/* Slice B cleanup: internal workflow language is desktop-only; the
                 status chips are enough context for the compressed mobile flow. */}
-            {isMobileWorkspace || showPostSendCompletion ? null : (
+            {isMobileWorkspace || showPostSendCompletion || showGuidedDraft ? null : (
               <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
                 <p className="mt-1">
@@ -923,7 +929,7 @@ export default async function InternalInvoiceWorkspacePage({
             </div>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            {!showPostSendCompletion ? (
+            {!showPostSendCompletion && !showGuidedDraft ? (
               <Link
                 href={isMobileWorkspace ? `/jobs/${jobId}?tab=ops` : `/jobs/${jobId}?tab=info#internal-invoice-panel`}
                 className={secondaryButtonClass}
@@ -931,7 +937,7 @@ export default async function InternalInvoiceWorkspacePage({
                 Back to Job
               </Link>
             ) : null}
-            {invoice && !showPostSendCompletion ? (
+            {invoice && !showPostSendCompletion && !showGuidedDraft ? (
               <Link
                 href={`/jobs/${jobId}/invoice/print?invoice_id=${encodeURIComponent(invoice.id)}`}
                 target="_blank"
@@ -942,7 +948,7 @@ export default async function InternalInvoiceWorkspacePage({
               </Link>
             ) : null}
             {/* Slice B cleanup: redundant on mobile where charges scroll inline. */}
-            {invoice && !isMobileWorkspace && !showPostSendCompletion ? (
+            {invoice && !isMobileWorkspace && !showPostSendCompletion && !showGuidedDraft ? (
               <Link href="#invoice-charges" className={darkButtonClass}>
                 Open Invoice Charges
               </Link>
@@ -1000,14 +1006,14 @@ export default async function InternalInvoiceWorkspacePage({
           </div>
         ) : null}
 
-        {!showPostSendCompletion ? (
+        {!showPostSendCompletion && !showGuidedDraft ? (
           <SupplementalInvoiceFamilySection
             items={supplementalInvoiceFamilyItems}
             description="Add-on invoices for this job stay listed here, including drafts that have not been issued. Open one to review its charges or continue billing."
           />
         ) : null}
 
-        {supplementalParentInvoiceId && !showPostSendCompletion ? (
+        {supplementalParentInvoiceId && !showPostSendCompletion && !showGuidedDraft ? (
           <section id="addon-invoice" className="mt-4 rounded-xl border border-emerald-200/90 bg-emerald-50/60 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-900">Add-On Invoice</div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-emerald-950">Create Add-On Invoice</h2>
@@ -1064,6 +1070,161 @@ export default async function InternalInvoiceWorkspacePage({
             )}
           </div>
         </section>
+      ) : showGuidedDraft ? (
+        <div className="mx-auto grid max-w-5xl gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
+          <main className="space-y-5">
+            <section className={`${panelClass} p-4 sm:p-5`}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Invoice Draft</div>
+                  <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Review what will be billed</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">Confirm the payer and charges, then issue and send from the next-step card.</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Draft Total</div>
+                  <div className="mt-0.5 text-lg font-semibold text-slate-950">{formatCurrencyFromCents(invoice.total_cents)}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Billed To</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-950">{invoice.billing_name || "Billing recipient needed"}</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-600">
+                      {[invoice.billing_email, invoice.billing_phone].filter(Boolean).join(" · ") || "No email or phone saved"}
+                    </div>
+                  </div>
+                  {canManageFinancialInvoiceLifecycle ? (
+                    <details className="group sm:text-right">
+                      <summary className={`${secondaryButtonClass} cursor-pointer list-none`}>Change Bill To</summary>
+                      <form action={updateInvoiceBillToFromForm} className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-left sm:min-w-72">
+                        <input type="hidden" name="job_id" value={jobId} />
+                        <input type="hidden" name="invoice_id" value={invoice.id} />
+                        <input type="hidden" name="tab" value="info" />
+                        <input type="hidden" name="return_to" value={returnTo} />
+                        <label className={labelClass}>Who is paying?</label>
+                        <select name="billing_recipient" defaultValue={String((job as any).billing_recipient ?? "customer").trim().toLowerCase() || "customer"} className={`${inputClass} mt-1`}>
+                          <option value="customer">Customer</option>
+                          <option value="contractor">Contractor{(job as any).contractor_id ? "" : " (assign one first)"}</option>
+                          <option value="other">Other / third party</option>
+                        </select>
+                        <SubmitButton loadingText="Updating..." className={`${darkButtonClass} mt-3 w-full`}>Update Bill To</SubmitButton>
+                      </form>
+                    </details>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/80">
+                {invoice.line_items.length === 0 ? (
+                  <div className="px-4 py-4 text-sm text-amber-800">No charges have been added yet.</div>
+                ) : (
+                  <div className="divide-y divide-slate-200/80">
+                    {invoice.line_items.map((lineItem) => (
+                      <div key={lineItem.id} className="grid gap-2 bg-white px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-950">{lineItem.item_name_snapshot}</div>
+                          {lineItem.description_snapshot ? <div className="mt-0.5 text-xs text-slate-500">{lineItem.description_snapshot}</div> : null}
+                        </div>
+                        <div className="text-sm text-slate-600">{formatDecimalInput(lineItem.quantity)} × {formatCurrencyFromAmount(lineItem.unit_price)}</div>
+                        <div className="text-sm font-semibold text-slate-950">{formatCurrencyFromAmount(lineItem.line_subtotal)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {canAccessDraftLineWorkspace ? (
+                <details className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-800">Edit charges or add work</summary>
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <InternalInvoiceLineItemsTable
+                      jobId={jobId}
+                      selectedInvoiceId={invoice.id}
+                      tab="info"
+                      capabilities={fieldBillingCapabilities}
+                      lineItems={invoice.line_items}
+                      totalCents={invoice.total_cents}
+                      addLineItemAction={addInternalInvoiceLineItemFromForm}
+                      addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
+                      addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
+                      markNoChargeAction={markInternalInvoiceNoChargeFromForm}
+                      markExternallyBilledAction={markInternalInvoiceExternallyBilledFromForm}
+                      billingDisposition={jobBillingDisposition}
+                      updateLineItemAction={updateInternalInvoiceLineItemFromForm}
+                      removeLineItemAction={removeInternalInvoiceLineItemFromForm}
+                      pricebookPickerItems={pricebookPickerItems}
+                      visitScopePickerItems={visitScopePickerItems}
+                      workspaceFieldLabelClass={labelClass}
+                      workspaceInputClass={inputClass}
+                      primaryButtonClass={primaryButtonClass}
+                      secondaryButtonClass={secondaryButtonClass}
+                      isMobileWorkspace={isMobileWorkspace}
+                      saveFieldItemToPricebookAction={saveFieldItemToPricebookFromForm}
+                      checkFieldPricebookItemNameExistsAction={checkFieldPricebookItemNameExistsFromForm}
+                    />
+                  </div>
+                </details>
+              ) : null}
+            </section>
+          </main>
+
+          <aside className="space-y-5">
+            <section className={`${panelClass} p-4 sm:p-5`}>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Next Step</div>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">{canIssue ? "Ready to issue" : "Needs attention"}</h2>
+              <div className="mt-3 space-y-2">
+                {readinessRow("Billing recipient", recipientReady, recipientReady ? String(invoice.billing_name) : "Add a billing name.")}
+                {readinessRow("Charges", chargesReady, chargesReady ? `${lineItemCount} charge${lineItemCount === 1 ? "" : "s"}.` : "Add at least 1 charge.")}
+                {readinessRow("Total", totalReady, totalReady ? formatCurrencyFromCents(invoice.total_cents) : "Total must be above $0.00.")}
+                {readinessRow("Job closeout", jobReady, jobReady ? "Job and field work are complete." : "Complete the job and field work first.")}
+              </div>
+
+              {canIssue && canIssueInvoiceLifecycle && canSendInvoiceLifecycle ? (
+                <form action={issueAndSendInternalInvoiceFromForm} className="mt-4 space-y-3">
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={invoice.id} />
+                  <input type="hidden" name="tab" value="info" />
+                  <input type="hidden" name="return_to" value={returnTo} />
+                  <div>
+                    <label className={labelClass}>Send To</label>
+                    <input type="email" name="recipient_email" defaultValue={invoice.billing_email ?? ""} placeholder="billing@example.com" className={inputClass} required />
+                  </div>
+                  {duplicateChargeRisks.length > 0 ? (
+                    <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
+                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
+                    </label>
+                  ) : null}
+                  <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`}>Issue &amp; Send Invoice</SubmitButton>
+                </form>
+              ) : canIssue && canIssueInvoiceLifecycle ? (
+                <form action={issueInternalInvoiceFromForm} className="mt-4">
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={invoice.id} />
+                  <input type="hidden" name="tab" value="info" />
+                  <input type="hidden" name="return_to" value={returnTo} />
+                  {duplicateChargeRisks.length > 0 ? (
+                    <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
+                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
+                    </label>
+                  ) : null}
+                  <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`}>Issue Invoice</SubmitButton>
+                </form>
+              ) : null}
+
+              {!canIssue ? <p className="mt-4 text-xs leading-5 text-slate-500">Resolve the items above to enable invoice issuance.</p> : null}
+            </section>
+
+            <section className={`${panelClass} p-4`}>
+              <div className="text-sm font-semibold text-slate-900">Need another invoice control?</div>
+              <p className="mt-1 text-xs leading-5 text-slate-500">Billing details, notes, no-charge resolution, and administrative controls remain available in the full workspace.</p>
+              <Link href={`${selectedInvoiceWorkspaceBaseHref}&view=all#invoice-workspace`} className={`${secondaryButtonClass} mt-3 w-full`}>More Invoice Options</Link>
+            </section>
+          </aside>
+        </div>
       ) : showPostSendCompletion ? (
         <section className={`${panelClass} p-5 sm:p-6`}>
           <div className="mx-auto max-w-3xl">
