@@ -2764,73 +2764,7 @@ async function deliverInternalInvoiceEmailForContext(
   const attemptKind: InternalInvoiceEmailAttemptKind = successfulSendExists ? 'resent' : 'sent';
   const attemptNumber = sendHistory.length + 1;
 
-  const tenantIdentity = await resolveOperationalTenantIdentity({
-    supabase: context.supabase,
-    accountOwnerUserId: context.internalUser.account_owner_user_id,
-  });
-
-  const serviceLocation = await resolveServiceLocationLabelForInvoiceEmail({
-    supabase: context.supabase,
-    accountOwnerUserId: context.internalUser.account_owner_user_id,
-    locationId: context.job.location_id,
-  });
-  const serviceCustomerName = [context.job.customer_first_name, context.job.customer_last_name]
-    .map((value: unknown) => String(value ?? '').trim())
-    .filter(Boolean)
-    .join(' ')
-    .trim() || null;
-  const shouldLookupContractorGreetingName =
-    !getTrimmedString(invoice.billing_name)
-    && String(context.job.billing_recipient ?? '').trim().toLowerCase() === 'contractor'
-    && !String(context.job.billing_name ?? '').trim();
-  const contractorDisplayName = shouldLookupContractorGreetingName
-    ? await resolveContractorGreetingNameForInvoiceEmail({
-        supabase: context.supabase,
-        accountOwnerUserId: context.internalUser.account_owner_user_id,
-        contractorId: context.job.contractor_id,
-      })
-    : null;
-  const greetingName = resolveInternalInvoiceGreetingName({
-    invoice,
-    job: context.job,
-    contractorDisplayName,
-  });
-  const paymentUrl = await resolveInvoicePaymentLinkForEmail({
-    supabase: context.supabase,
-    accountOwnerUserId: context.internalUser.account_owner_user_id,
-    jobId: context.jobId,
-    invoice,
-  });
-
-  const invoiceReference = formatInvoiceDisplayReference({
-    invoiceDisplayNumber: invoice.invoice_display_number,
-    invoiceNumber: invoice.invoice_number,
-    invoiceId: invoice.id,
-  });
-  const subject = `${invoiceReference} from ${tenantIdentity.displayName}`;
-  const body = buildInternalInvoiceEmailBody({
-    businessName: tenantIdentity.displayName,
-    companyLogoUrl: tenantIdentity.logoUrl,
-    supportEmail: tenantIdentity.supportEmail,
-    supportPhone: tenantIdentity.supportPhone,
-    paymentUrl,
-    invoice,
-    greetingName,
-    jobTitle: context.job.title ?? null,
-    serviceLocation: serviceLocation || null,
-    customerName: serviceCustomerName,
-  });
-  const textBody = buildInternalInvoiceEmailText({
-    businessName: tenantIdentity.displayName,
-    supportEmail: tenantIdentity.supportEmail,
-    supportPhone: tenantIdentity.supportPhone,
-    paymentUrl,
-    invoice,
-    greetingName,
-    jobTitle: context.job.title ?? null,
-    serviceLocation: serviceLocation || null,
-    customerName: serviceCustomerName,
-  });
+  const email = await buildInternalInvoiceEmailForContext(context);
 
   const queuedDelivery = await insertInternalInvoiceEmailNotification({
     supabase: context.supabase,
@@ -2838,7 +2772,7 @@ async function deliverInternalInvoiceEmailForContext(
     invoiceId: invoice.id,
     invoiceNumber: invoice.invoice_number,
     recipientEmail,
-    subject,
+    subject: email.subject,
     body: attemptKind === 'resent' ? 'Internal invoice resend queued.' : 'Internal invoice email queued.',
     attemptKind,
     attemptNumber,
@@ -2849,9 +2783,9 @@ async function deliverInternalInvoiceEmailForContext(
   try {
     const sendResult = await sendEmail({
       to: recipientEmail,
-      subject,
-      html: body,
-      text: textBody,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
     });
     providerMessageId = String(sendResult?.data?.id ?? '').trim() || null;
   } catch (error) {
@@ -2902,6 +2836,108 @@ async function deliverInternalInvoiceEmailForContext(
   });
 
   return { attemptKind, status: 'sent' };
+}
+
+async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoiceContext) {
+  const invoice = context.invoice;
+  if (!invoice) throw new Error('Invoice is required to preview.');
+
+  const tenantIdentity = await resolveOperationalTenantIdentity({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+  });
+
+  const serviceLocation = await resolveServiceLocationLabelForInvoiceEmail({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    locationId: context.job.location_id,
+  });
+  const serviceCustomerName = [context.job.customer_first_name, context.job.customer_last_name]
+    .map((value: unknown) => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim() || null;
+  const shouldLookupContractorGreetingName =
+    !getTrimmedString(invoice.billing_name)
+    && String(context.job.billing_recipient ?? '').trim().toLowerCase() === 'contractor'
+    && !String(context.job.billing_name ?? '').trim();
+  const contractorDisplayName = shouldLookupContractorGreetingName
+    ? await resolveContractorGreetingNameForInvoiceEmail({
+        supabase: context.supabase,
+        accountOwnerUserId: context.internalUser.account_owner_user_id,
+        contractorId: context.job.contractor_id,
+      })
+    : null;
+  const greetingName = resolveInternalInvoiceGreetingName({
+    invoice,
+    job: context.job,
+    contractorDisplayName,
+  });
+  const paymentUrl = await resolveInvoicePaymentLinkForEmail({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    jobId: context.jobId,
+    invoice,
+  });
+
+  const invoiceReference = formatInvoiceDisplayReference({
+    invoiceDisplayNumber: invoice.invoice_display_number,
+    invoiceNumber: invoice.invoice_number,
+    invoiceId: invoice.id,
+  });
+  const subject = `${invoiceReference} from ${tenantIdentity.displayName}`;
+  const html = buildInternalInvoiceEmailBody({
+    businessName: tenantIdentity.displayName,
+    companyLogoUrl: tenantIdentity.logoUrl,
+    supportEmail: tenantIdentity.supportEmail,
+    supportPhone: tenantIdentity.supportPhone,
+    paymentUrl,
+    invoice,
+    greetingName,
+    jobTitle: context.job.title ?? null,
+    serviceLocation: serviceLocation || null,
+    customerName: serviceCustomerName,
+  });
+  const text = buildInternalInvoiceEmailText({
+    businessName: tenantIdentity.displayName,
+    supportEmail: tenantIdentity.supportEmail,
+    supportPhone: tenantIdentity.supportPhone,
+    paymentUrl,
+    invoice,
+    greetingName,
+    jobTitle: context.job.title ?? null,
+    serviceLocation: serviceLocation || null,
+    customerName: serviceCustomerName,
+  });
+
+  return { subject, html, text, paymentUrl };
+}
+
+export async function loadInternalInvoiceCustomerEmailPreview(formData: FormData) {
+  const context = await loadInternalInvoiceContext(formData);
+
+  requireFieldInvoiceSendAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized'),
+  });
+
+  if (!context.invoice || context.invoice.status !== 'issued') {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_requires_issued'));
+  }
+
+  const email = await buildInternalInvoiceEmailForContext(context);
+  return {
+    ...email,
+    recipientEmail: getTrimmedString(context.invoice.billing_email).toLowerCase(),
+    invoiceReference: formatInvoiceDisplayReference({
+      invoiceDisplayNumber: context.invoice.invoice_display_number,
+      invoiceNumber: context.invoice.invoice_number,
+      invoiceId: context.invoice.id,
+    }),
+  };
 }
 
 export async function sendInternalInvoiceEmailFromForm(formData: FormData) {

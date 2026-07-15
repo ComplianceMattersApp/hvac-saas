@@ -32,7 +32,6 @@ import {
   type InternalInvoiceEmailDeliveryRecord,
 } from "@/lib/business/internal-invoice-delivery";
 import {
-  createTenantInvoicePaymentLink,
   resolveInvoiceCollectedPaymentLedger,
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
@@ -896,30 +895,6 @@ export default async function InternalInvoiceWorkspacePage({
       ? stripePaymentReceivedCopy(latestStripeReceivedPayment, invoiceHeaderReference)
       : null;
   const supplementalReasonLabel = formatSupplementalReasonLabel(invoice?.supplemental_reason);
-  let customerPaymentPreviewUrl: string | null = null;
-  if (
-    invoice
-    && invoice.status === "issued"
-    && invoicePaymentLinkUiState.showCreateButton
-    && (canSendInvoiceLifecycle || canManageFinancialInvoiceLifecycle)
-  ) {
-    try {
-      const paymentLink = await createTenantInvoicePaymentLink({
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        jobId,
-        invoiceId: invoice.id,
-        supabase,
-      });
-      customerPaymentPreviewUrl = String(paymentLink.paymentLinkUrl ?? "").trim() || null;
-    } catch (error) {
-      console.warn("Customer invoice payment preview unavailable", {
-        jobId,
-        invoiceId: invoice.id,
-        message: error instanceof Error ? error.message : "unknown_error",
-      });
-    }
-  }
-
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
       <section className={`${panelClass} overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-5 sm:p-6`}>
@@ -2174,56 +2149,18 @@ export default async function InternalInvoiceWorkspacePage({
             </section>
 
               {invoice.status === "issued" && canSendInvoiceLifecycle ? (
-              <section className={`${panelClass} overflow-hidden p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Customer View</div>
-                <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">What the customer can pay</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  This mirrors the payment call-to-action included in the invoice email.
-                </p>
-
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{invoiceHeaderReference}</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-950">{invoice.billing_name || "Billing recipient"}</div>
-                      <div className="mt-1 text-xs text-slate-600">{invoice.billing_email || "Billing email unavailable"}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-slate-500">Balance due</div>
-                      <div className="mt-1 text-lg font-semibold text-slate-950">
-                        {formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? 0)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {customerPaymentPreviewUrl ? (
-                    <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3">
-                      <div className="text-sm text-slate-700">The email will include this payment action:</div>
-                      <a
-                        href={customerPaymentPreviewUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`${primaryButtonClass} mt-3 w-full`}
-                      >
-                        Pay Invoice
-                      </a>
-                      <div className="mt-2 text-center text-xs text-slate-500">Opens the same secure customer payment page.</div>
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-6 text-amber-900">
-                      No online payment button will be included. Review the balance, billing disposition, and Stripe readiness before sending.
-                    </div>
-                  )}
-                </div>
-              </section>
-            ) : null}
-
-              {invoice.status === "issued" && canSendInvoiceLifecycle ? (
               <section className={`${panelClass} p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Send Invoice</div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   Invoice issue and invoice send are separate steps. Sending is communication-only and does not create a second invoice or change charge lines.
                 </p>
+                <Link
+                  href={`/jobs/${jobId}/invoice/email-preview?invoice_id=${encodeURIComponent(invoice.id)}`}
+                  target="_blank"
+                  className={`${secondaryButtonClass} mt-3 w-full`}
+                >
+                  Preview Customer Email
+                </Link>
                 <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="invoice_id" value={invoice.id} />
