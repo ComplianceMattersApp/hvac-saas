@@ -1987,6 +1987,17 @@ export default async function JobDetailPage({
     }),
   );
 
+  const attachmentCountPromise = timedPhase("attachmentCount", async () => {
+    const { count, error } = await supabase
+      .from("attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("entity_type", "job")
+      .eq("entity_id", jobId);
+
+    if (error) return null;
+    return Number(count ?? 0) || 0;
+  });
+
   const latestJobNotesPreviewPromise = timelineSummaryPromise.then((timelineSummary) =>
     timedPhase("latestJobNotesPreview", async () => {
       // Follow-up slice: Pinned Job Notes V1 (requires durable source-of-truth pin field).
@@ -2466,6 +2477,7 @@ export default async function JobDetailPage({
     serviceCaseSummary,
     timelineSummary,
     noteCountSummary,
+    attachmentCount,
     latestJobNotesPreview,
     onTheWayUndoEligibility,
     billingPartyReads,
@@ -2483,6 +2495,7 @@ export default async function JobDetailPage({
     serviceCaseSummaryPromise,
     timelineSummaryPromise,
     noteCountSummaryPromise,
+    attachmentCountPromise,
     latestJobNotesPreviewPromise,
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
@@ -3540,6 +3553,9 @@ const internalNotesMeta = noteCountSummary.internalCount
 const timelineNotesMeta = noteCountSummary.timelineNoteEventCount
   ? `${noteCountSummary.timelineNoteEventCount} note${noteCountSummary.timelineNoteEventCount === 1 ? "" : "s"}`
   : undefined;
+const attachmentCountMeta = attachmentCount === null
+  ? undefined
+  : `${attachmentCount} file${attachmentCount === 1 ? "" : "s"}`;
 const sharedNotesSummaryText = undefined;
 const internalNotesSummaryText = undefined;
 const timelineSummaryText = undefined;
@@ -3792,6 +3808,8 @@ const showCorrectionReviewResolution =
           sharedNoteBannerMessage={sharedNoteBannerMessage}
           sharedNoteBannerType={sharedNoteBannerType}
           sharedNotesMeta={sharedNotesMeta}
+          attachmentCount={attachmentCount}
+          attachmentCountMeta={attachmentCountMeta}
           shouldShowWorkSummary={shouldShowWorkSummary}
           showCertsPermitRequiredBlocker={showCertsPermitRequiredBlocker}
           showConfirmRetestReady={showConfirmRetestReady}
@@ -6963,6 +6981,7 @@ const showCorrectionReviewResolution =
                 <a href="#job-record-attachments" data-record-launcher="job-record-attachments" className={recordLauncherClass}>
           <CollapsibleHeader
               title="Attachments"
+              meta={attachmentCountMeta}
               icon={<PaperclipIcon className="h-4 w-4" />}
               compactOnMobile
             />

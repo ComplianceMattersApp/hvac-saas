@@ -149,6 +149,7 @@ type MobileJobDetailCurrentProps = {
   sharedNoteBannerMessage: any;
   sharedNoteBannerType: any;
   sharedNotesMeta: any;
+  attachmentCountMeta: any;
   shouldShowWorkSummary: any;
   showCertsPermitRequiredBlocker: any;
   showConfirmRetestReady: any;
@@ -335,6 +336,7 @@ export default function MobileJobDetailCurrent(props: MobileJobDetailCurrentProp
     sharedNoteBannerMessage,
     sharedNoteBannerType,
     sharedNotesMeta,
+    attachmentCountMeta,
     shouldShowWorkSummary,
     showCertsPermitRequiredBlocker,
     showConfirmRetestReady,
@@ -897,7 +899,7 @@ export default function MobileJobDetailCurrent(props: MobileJobDetailCurrentProp
                 href={`/jobs/${job.id}/attachments`}
                 className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-20px_rgba(37,99,235,0.55)] transition-[background-color,box-shadow,transform] hover:bg-blue-800 hover:shadow-[0_16px_28px_-20px_rgba(37,99,235,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-[0.5px]"
               >
-                Attachments
+                {attachmentCountMeta ? `Attachments · ${attachmentCountMeta}` : "Attachments"}
               </Link>
             </div>
             <div className="mt-3 grid gap-3">

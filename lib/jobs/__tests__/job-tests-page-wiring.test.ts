@@ -615,6 +615,23 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("whitespace-pre-wrap break-words");
   });
 
+  it("uses count-only note and attachment indicators without loading payloads for the summary", () => {
+    const mobileV2Source = readFileSync(
+      resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx"),
+      "utf8",
+    );
+
+    expect(jobPageSource).toContain('select("id", { count: "exact", head: true })');
+    expect(jobPageSource).toContain('.in("event_type", ["public_note", "contractor_note", "contractor_correction_submission"])');
+    expect(jobPageSource).toContain('.eq("event_type", "internal_note")');
+    expect(jobPageSource).toContain('.from("attachments")');
+    expect(jobPageSource).toContain('.eq("entity_type", "job")');
+    expect(jobPageSource).toContain("const attachmentCountMeta =");
+    expect(mobileV2Source).toContain("Files & Attachments");
+    expect(mobileV2Source).toContain("{attachmentCountMeta ?");
+    expect(mobileJobDetailCurrentSource).toContain('`Attachments · ${attachmentCountMeta}`');
+  });
+
   it("does not duplicate intake note in right notes card and keeps honest empty-state copy", () => {
     const jobNotesCardStart = jobPageSource.indexOf('id="internal-notes"');
     const jobNotesCardEnd = jobPageSource.indexOf('id="next-service-action"', jobNotesCardStart);

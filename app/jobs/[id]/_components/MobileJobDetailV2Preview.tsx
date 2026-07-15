@@ -424,6 +424,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     JobLocationPreviewFallback,
     sharedNoteBannerMessage,
     sharedNotesMeta,
+    attachmentCountMeta,
     confirmedNextDueContext,
   } = props;
 
@@ -1134,7 +1135,10 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </span>
                 <span className={evidenceLabelClass}>Files & Attachments</span>
               </span>
-              <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+              <span className="flex max-w-[52%] shrink-0 items-center justify-end gap-1.5">
+                {attachmentCountMeta ? <span className={evidenceBadgeClass}>{attachmentCountMeta}</span> : null}
+                <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+              </span>
             </Link>
           </div>
         </section>
