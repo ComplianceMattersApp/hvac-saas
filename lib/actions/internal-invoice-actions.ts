@@ -51,6 +51,7 @@ import { sendEmail } from '@/lib/email/sendEmail';
 import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
 import { formatInvoiceDisplayReference } from '@/lib/utils/display-references';
+import { resolveInternalInvoiceDuplicateRisks } from '@/lib/business/internal-invoice-duplicate-risk';
 import { withJobsBillingDispositionSelectFallback } from '@/lib/supabase/jobs-billing-disposition-compat';
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
@@ -1832,6 +1833,20 @@ async function applyInternalInvoiceIssueMutation(context: LoadedInternalInvoiceC
   });
 }
 
+async function requireDuplicateChargeReviewBeforeIssue(context: LoadedInternalInvoiceContext, formData: FormData) {
+  if (!context.invoice || String(formData.get('duplicate_charge_review_confirmed') ?? '') === '1') return;
+  const risks = await resolveInternalInvoiceDuplicateRisks({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    invoiceId: context.invoice.id,
+    customerId: context.invoice.customer_id,
+    lineItems: context.invoice.line_items ?? [],
+  });
+  if (risks.length > 0) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_duplicate_review_required', context.returnTo));
+  }
+}
+
 export async function issueInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
@@ -1863,6 +1878,8 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
   if (!billingName || context.invoice.total_cents <= 0 || (context.invoice.line_items?.length ?? 0) === 0) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issue_incomplete', context.returnTo));
   }
+
+  await requireDuplicateChargeReviewBeforeIssue(context, formData);
 
   await applyInternalInvoiceIssueMutation(context);
 
@@ -2959,6 +2976,9 @@ export async function issueAndSendInternalInvoiceFromForm(formData: FormData) {
   if (!billingName || context.invoice.total_cents <= 0 || (context.invoice.line_items?.length ?? 0) === 0) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issue_incomplete', context.returnTo));
   }
+
+
+  await requireDuplicateChargeReviewBeforeIssue(context, formData);
 
   // Recipient email is mandatory for the compound action: the send must be able to
   // succeed before we issue. If it is missing/invalid we redirect WITHOUT mutating.

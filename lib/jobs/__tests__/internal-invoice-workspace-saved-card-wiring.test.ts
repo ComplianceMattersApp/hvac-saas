@@ -61,7 +61,8 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("resolveInternalInvoiceFamilySummaryByJobId");
     expect(source).toContain("const supplementalInvoiceFamilyItems =");
     expect(source).toContain("<SupplementalInvoiceFamilySection");
-    expect(source).toContain('description="Primary invoice controls stay focused on the current invoice. Supplemental invoices remain read-only family context here."');
+    expect(source).toContain('description="Add-on invoices for this job stay listed here, including drafts that have not been issued. Open one to review its charges or continue billing."');
+    expect(source).toContain("billingName: familyInvoice.billing_name");
     expect(source).not.toContain("Create Supplemental Invoice");
     expect(source).not.toContain("Add follow-up charge");
   });
@@ -88,7 +89,8 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Reason for add-on invoice");
     expect(source).toContain("Customer added warranty, service plan, or additional work.");
     expect(source).toContain("original_internal_invoice_id");
-    expect(source).toContain("Create a separate invoice linked to this job and original invoice. Use this when new billable work appears after the original invoice was issued or paid.");
+    expect(source).toContain("Create a separate invoice linked to this same job and original invoice.");
+    expect(source).toContain("If it does, create a continuation job instead.");
   });
 
   it("keeps invoice builder guidance in plain billing language", () => {
@@ -97,6 +99,13 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Review the current charges, then add another charge for fees, add-ons, or anything not already listed on the invoice.");
     expect(source).not.toContain("Use direct invoice charges from Pricebook/manual only for billing cleanup or add-ons not captured in Work Items.");
     expect(source).not.toContain("Use direct invoice charges when the billed item was not captured as a Work Item.");
+  });
+
+  it("surfaces exact duplicate charge risks and requires issue acknowledgement", () => {
+    expect(source).toContain("resolveInternalInvoiceDuplicateRisks");
+    expect(source).toContain("Possible duplicate billing found");
+    expect(source).toContain('name="duplicate_charge_review_confirmed"');
+    expect(source).toContain("I reviewed the matching invoice and confirm this is a separate charge.");
   });
 
   it("uses shared short invoice reference helper in the primary header and billing details", () => {

@@ -56,7 +56,7 @@ export default function SupplementalInvoiceFamilySection(
     <section id="supplemental-invoices" className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-slate-950">Supplemental invoices</h4>
+          <h4 className="text-sm font-semibold text-slate-950">Add-on invoices</h4>
           <p className="mt-1 text-xs leading-5 text-slate-600">{props.description}</p>
         </div>
         <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">

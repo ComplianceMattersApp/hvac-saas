@@ -38,6 +38,7 @@ import {
 import { loadFailedAutopayAttentionItems } from "@/lib/business/failed-autopay-attention-read-model";
 import { runScheduledAutopayEligibilityDryRun } from "@/lib/business/scheduled-autopay-eligibility";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import { resolveInternalInvoiceDuplicateRisks } from "@/lib/business/internal-invoice-duplicate-risk";
 import {
   addInternalInvoiceLineItemFromForm,
   addInternalInvoiceLineItemFromPricebookForm,
@@ -223,6 +224,7 @@ function bannerMessage(value?: string | null) {
     internal_invoice_issued: "Invoice issued. Send it to the billing recipient when ready.",
     internal_invoice_issue_blocked: "Invoice cannot be issued until job and field work are complete.",
     internal_invoice_issue_incomplete: "Review recipient, charges, and total before issuing.",
+    internal_invoice_duplicate_review_required: "Possible duplicate charges were found. Review the matching invoice and confirm before issuing.",
     internal_invoice_no_charge_saved: "Billing resolved as No Charge.",
     internal_invoice_externally_billed_saved:
       "Billed outside EveryStep FieldWorks. Draft charges were kept for reference. No internal payment or Stripe collection was recorded.",
@@ -579,9 +581,20 @@ export default async function InternalInvoiceWorkspacePage({
     totalCents: familyInvoice.total_cents,
     balanceDueCents: familyInvoice.balance_due_cents,
     supplementalReason: familyInvoice.supplemental_reason,
+    billingName: familyInvoice.billing_name,
+    billToKind: familyInvoice.bill_to_kind,
     workspaceHref: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(familyInvoice.id)}#invoice-workspace`,
     isSelected: familyInvoice.id === invoice?.id,
   }));
+  const duplicateChargeRisks = invoice?.status === "draft"
+    ? await resolveInternalInvoiceDuplicateRisks({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        invoiceId: invoice.id,
+        customerId: invoice.customer_id,
+        lineItems: invoice.line_items,
+      })
+    : [];
 
   const rawVisitScopeRows = Array.isArray((job as any).visit_scope_items)
     ? (job as any).visit_scope_items
@@ -947,9 +960,34 @@ export default async function InternalInvoiceWorkspacePage({
           </div>
         ) : null}
 
+        {duplicateChargeRisks.length > 0 ? (
+          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <div className="font-semibold">Possible duplicate billing found</div>
+            <p className="mt-1 leading-6">
+              This draft has the same complete charge set as another active invoice for this service customer. Review it before issuing this invoice.
+            </p>
+            <div className="mt-2 space-y-2">
+              {duplicateChargeRisks.map((risk) => (
+                <div key={risk.invoiceId} className="rounded-lg border border-amber-200 bg-white/80 px-3 py-2">
+                  <Link
+                    href={`/jobs/${risk.jobId}/invoice?invoice_id=${encodeURIComponent(risk.invoiceId)}#invoice-workspace`}
+                    className="font-semibold underline decoration-amber-400 underline-offset-2"
+                  >
+                    {risk.invoiceDisplayNumber || risk.invoiceNumber || "Other invoice"}
+                  </Link>
+                  <span> · {risk.status === "issued" ? "Issued" : "Draft"} · {formatCurrencyFromCents(risk.totalCents)}</span>
+                  <div className="mt-0.5 text-xs text-amber-800">
+                    {risk.jobTitle || "Other job"}{risk.billingName ? ` · Billed to ${risk.billingName}` : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <SupplementalInvoiceFamilySection
           items={supplementalInvoiceFamilyItems}
-          description="Primary invoice controls stay focused on the current invoice. Supplemental invoices remain read-only family context here."
+          description="Add-on invoices for this job stay listed here, including drafts that have not been issued. Open one to review its charges or continue billing."
         />
 
         {supplementalParentInvoiceId ? (
@@ -957,7 +995,7 @@ export default async function InternalInvoiceWorkspacePage({
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-900">Add-On Invoice</div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-emerald-950">Create Add-On Invoice</h2>
             <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Create a separate invoice linked to this job and original invoice. Use this when new billable work appears after the original invoice was issued or paid.
+              Create a separate invoice linked to this same job and original invoice. Use this for added billable work that does not need its own appointment or work history. If it does, create a continuation job instead.
             </p>
             <form action={createSupplementalInternalInvoiceFromForm} className="mt-3 space-y-3">
               <input type="hidden" name="job_id" value={jobId} />
@@ -1538,6 +1576,12 @@ export default async function InternalInvoiceWorkspacePage({
                       Sending to <span className="font-semibold text-slate-900">{invoice.billing_name}</span>
                       <span className="block text-xs text-slate-500">{invoice.billing_email}</span>
                     </div>
+                    {duplicateChargeRisks.length > 0 ? (
+                      <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                        <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
+                        <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
+                      </label>
+                    ) : null}
                     <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`}>
                       Issue &amp; Send Invoice
                     </SubmitButton>
@@ -1548,6 +1592,12 @@ export default async function InternalInvoiceWorkspacePage({
                     <input type="hidden" name="invoice_id" value={invoice.id} />
                     <input type="hidden" name="tab" value="info" />
                     <input type="hidden" name="return_to" value={mobileReturnTo} />
+                    {duplicateChargeRisks.length > 0 ? (
+                      <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                        <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
+                        <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
+                      </label>
+                    ) : null}
                     <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`}>
                       Issue Invoice
                     </SubmitButton>
@@ -1586,6 +1636,12 @@ export default async function InternalInvoiceWorkspacePage({
                   <input type="hidden" name="invoice_id" value={invoice.id} />
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
+                  {duplicateChargeRisks.length > 0 ? (
+                    <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
+                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
+                    </label>
+                  ) : null}
                   <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>
                     Issue Invoice
                   </SubmitButton>

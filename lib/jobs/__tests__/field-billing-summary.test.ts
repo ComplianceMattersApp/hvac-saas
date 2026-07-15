@@ -195,7 +195,7 @@ describe("FieldBillingSummary", () => {
       ],
     });
 
-    expect(html).toContain("Supplemental invoices");
+    expect(html).toContain("Add-on invoices");
     expect(html).toContain("Each invoice keeps separate billed and payment truth.");
     expect(html).toContain("Invoice #2051");
     expect(html).toContain("Invoice inv-supp");
