@@ -37,6 +37,7 @@ import {
   releaseAndReevaluateFromForm,
   updateJobOpsDetailsFromForm,
   updateJobOpsFromForm,
+  resolveFailureByCorrectionReviewFromForm,
 } from "@/lib/actions/job-ops-actions";
 import { createInternalInvoiceDraftFromForm } from "@/lib/actions/internal-invoice-actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
@@ -785,6 +786,11 @@ export default async function JobDetailV2Page({
     isEccJob &&
     !hasActiveRetestChild &&
     opsStatus === "retest_needed";
+  const showCorrectionReviewResolution =
+    retestSurfaceEnabled &&
+    isEccJob &&
+    !hasActiveRetestChild &&
+    ["failed", "retest_needed", "pending_office_review"].includes(opsStatus);
   const closeoutNeeds = getCloseoutNeeds({
     field_complete: job.field_complete,
     job_type: job.job_type,
@@ -3118,6 +3124,38 @@ export default async function JobDetailV2Page({
                       Move to Needs Scheduling
                     </ImmediateSubmitButton>
                   </div>
+                </form>
+              </div>
+            ) : null}
+
+            {showCorrectionReviewResolution ? (
+              <div
+                style={{
+                  marginTop: "16px",
+                  padding: "16px",
+                  borderRadius: "11px",
+                  border: "1px solid oklch(0.86 0.035 250)",
+                  background: "oklch(0.985 0.004 250)",
+                }}
+              >
+                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.32 0.02 262)" }}>
+                  Resolve by Documentation Review
+                </div>
+                <p style={{ marginTop: "5px", fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.48 0.025 262)" }}>
+                  Use this only when submitted correction notes and photos are sufficient to resolve the failure without a physical retest visit.
+                </p>
+                <form action={resolveFailureByCorrectionReviewFromForm} style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="return_to" value={`${returnTo}#compliance`} />
+                  <textarea
+                    name="review_note"
+                    rows={3}
+                    placeholder="Document what was reviewed and why a field retest is not required."
+                    style={{ width: "100%", borderRadius: "9px", border: "1px solid oklch(0.86 0.008 250)", padding: "9px 10px", font: "inherit", resize: "vertical" }}
+                  />
+                  <button type="submit" style={{ ...S.outlineBtn(false), justifySelf: "start" }}>
+                    Pass by Documentation Review
+                  </button>
                 </form>
               </div>
             ) : null}

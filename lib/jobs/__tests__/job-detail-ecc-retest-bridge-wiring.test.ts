@@ -8,6 +8,11 @@ const jobDetailSource = readFileSync(
   "utf-8",
 );
 
+const desktopV2JobDetailSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/v2/page.tsx"),
+  "utf-8",
+);
+
 const mobileJobDetailCurrentSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
   "utf-8",
@@ -96,5 +101,21 @@ describe("job detail ECC retest bridge wiring", () => {
     expect(actionBlock).toContain("returnToRaw,");
     expect(actionBlock).toContain("fallbackPath: `/jobs/${jobId}?tab=ops`");
     expect(actionBlock).toContain("redirectToJob();");
+  });
+
+  it("keeps pass-by-documentation available after Retest Ready is confirmed on both job-detail surfaces", () => {
+    for (const source of [jobDetailSource, desktopV2JobDetailSource]) {
+      const predicateStart = source.indexOf("const showCorrectionReviewResolution =");
+      const predicateEnd = source.indexOf(";", predicateStart);
+      const predicate = source.slice(predicateStart, predicateEnd);
+
+      expect(predicateStart).toBeGreaterThanOrEqual(0);
+      expect(predicate).toContain('"retest_needed"');
+      expect(source).toContain("resolveFailureByCorrectionReviewFromForm");
+    }
+
+    expect(desktopV2JobDetailSource).toContain("Resolve by Documentation Review");
+    expect(desktopV2JobDetailSource).toContain("Pass by Documentation Review");
+    expect(desktopV2JobDetailSource).toContain('name="review_note"');
   });
 });

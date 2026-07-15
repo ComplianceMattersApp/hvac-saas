@@ -3611,7 +3611,7 @@ const showCorrectionReviewResolution =
   surfaceProfile.surfaces.retest &&
   job.job_type === "ecc" &&
   !hasActiveRetestChild &&
-  ["failed", "pending_office_review"].includes(normalizedJobOpsStatus);
+  ["failed", "retest_needed", "pending_office_review"].includes(normalizedJobOpsStatus);
   const JobDetailTimingLog = () => {
     emitTimingLog({
       invoicePanelActive: showInternalInvoicePanel,
