@@ -22,6 +22,7 @@ describe("permit request domain contract", () => {
       "accepted_in_process",
       "on_hold_additional_info_needed",
       "permit_created",
+      "not_needed",
     ]);
     expect(ACTIVE_PERMIT_REQUEST_STATUSES).toEqual([
       "permit_request",
@@ -38,12 +39,15 @@ describe("permit request domain contract", () => {
       "permit_created",
       "permit_ready_for_testing",
       "permit_pending_install",
+      "permit_request_not_needed",
     ]);
   });
 
   it("keeps permit_created out of the active permit queue", () => {
     expect(isPermitRequestStatus("permit_created")).toBe(true);
     expect(isActivePermitRequestStatus("permit_created")).toBe(false);
+    expect(isPermitRequestStatus("not_needed")).toBe(true);
+    expect(isActivePermitRequestStatus("not_needed")).toBe(false);
   });
 
   it("labels internal and contractor states without service-style waiting reasons", () => {
@@ -53,6 +57,7 @@ describe("permit request domain contract", () => {
       "On Hold — Additional Information Needed",
     );
     expect(getPermitRequestInternalStatusLabel("permit_created")).toBe("Permit Created");
+    expect(getPermitRequestInternalStatusLabel("not_needed")).toBe("Not Needed");
 
     expect(getPermitRequestContractorStatusLabel({ status: "permit_request" })).toBe("Submitted");
     expect(getPermitRequestContractorStatusLabel({ status: "accepted_in_process" })).toBe(

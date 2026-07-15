@@ -30,6 +30,10 @@ export type InternalPermitRequestStateActionInput = {
   permitRequestId: string;
 };
 
+export type InternalMarkPermitRequestNotNeededInput = InternalPermitRequestStateActionInput & {
+  reason: string;
+};
+
 export type InternalPermitRequestIntakeInput = {
   permitRequestId: string;
   requestLabel?: string | null;
@@ -146,6 +150,20 @@ function readPermitRequestStateActionInput(input: FormData | InternalPermitReque
 
   return {
     permitRequestId: getTrimmedValue(input.permitRequestId, 120) ?? "",
+  };
+}
+
+function readMarkPermitRequestNotNeededInput(input: FormData | InternalMarkPermitRequestNotNeededInput) {
+  if (input instanceof FormData) {
+    return {
+      permitRequestId: getTrimmedValue(input.get("permit_request_id"), 120) ?? "",
+      reason: getTrimmedValue(input.get("reason"), 500) ?? "",
+    };
+  }
+
+  return {
+    permitRequestId: getTrimmedValue(input.permitRequestId, 120) ?? "",
+    reason: getTrimmedValue(input.reason, 500) ?? "",
   };
 }
 
@@ -1311,6 +1329,54 @@ export async function resumeInternalPermitRequest(
   return {
     permitRequestId: context.permitRequest.id,
     status: "accepted_in_process" as const,
+  };
+}
+
+export async function markInternalPermitRequestNotNeeded(
+  input: FormData | InternalMarkPermitRequestNotNeededInput,
+) {
+  const parsed = readMarkPermitRequestNotNeededInput(input);
+  if (!parsed.reason) {
+    throw new Error("Add a reason before marking the permit request not needed.");
+  }
+
+  const context = await requireInternalPermitMutationContext({
+    permitRequestId: parsed.permitRequestId,
+  });
+  const completedAt = new Date().toISOString();
+  const { error: updateErr } = await context.admin
+    .from("permit_requests")
+    .update({
+      status: "not_needed",
+      hold_reason: null,
+      on_hold_at: null,
+      completed_by_user_id: context.userId,
+      completed_at: completedAt,
+    })
+    .eq("id", context.permitRequest.id)
+    .eq("account_owner_user_id", context.accountOwnerUserId);
+
+  if (updateErr) throw updateErr;
+
+  await insertPermitRequestTransitionEvent(context.admin, {
+    accountOwnerUserId: context.accountOwnerUserId,
+    permitRequestId: context.permitRequest.id,
+    actorUserId: context.userId,
+    eventType: "permit_request_not_needed",
+    fromStatus: context.permitRequest.status,
+    toStatus: "not_needed",
+    jobId: context.permitRequest.job_id,
+    serviceCaseId: context.permitRequest.service_case_id,
+    meta: {
+      reason: parsed.reason,
+    },
+  });
+
+  revalidatePath("/ops");
+
+  return {
+    permitRequestId: context.permitRequest.id,
+    status: "not_needed" as const,
   };
 }
 

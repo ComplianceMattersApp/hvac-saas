@@ -3,6 +3,7 @@ export const PERMIT_REQUEST_STATUSES = [
   "accepted_in_process",
   "on_hold_additional_info_needed",
   "permit_created",
+  "not_needed",
 ] as const;
 
 export type PermitRequestStatus = (typeof PERMIT_REQUEST_STATUSES)[number];
@@ -17,6 +18,7 @@ export type ActivePermitRequestStatus = (typeof ACTIVE_PERMIT_REQUEST_STATUSES)[
 
 export const TERMINAL_PERMIT_REQUEST_STATUSES = [
   "permit_created",
+  "not_needed",
 ] as const satisfies readonly PermitRequestStatus[];
 
 export const PERMIT_REQUEST_HOLD_REASONS = [
@@ -40,6 +42,7 @@ export const PERMIT_REQUEST_EVENT_TYPES = [
   "permit_created",
   "permit_ready_for_testing",
   "permit_pending_install",
+  "permit_request_not_needed",
 ] as const;
 
 export type PermitRequestEventType = (typeof PERMIT_REQUEST_EVENT_TYPES)[number];
@@ -49,6 +52,7 @@ export const PERMIT_REQUEST_INTERNAL_STATUS_LABELS: Record<PermitRequestStatus, 
   accepted_in_process: "Accepted / In Process",
   on_hold_additional_info_needed: "On Hold — Additional Information Needed",
   permit_created: "Permit Created",
+  not_needed: "Not Needed",
 };
 
 export const PERMIT_REQUEST_CONTRACTOR_STATUS_LABELS: Record<PermitRequestStatus, string> = {
@@ -56,6 +60,7 @@ export const PERMIT_REQUEST_CONTRACTOR_STATUS_LABELS: Record<PermitRequestStatus
   accepted_in_process: "In Progress",
   on_hold_additional_info_needed: "Additional Information Needed",
   permit_created: "Permit Created",
+  not_needed: "Not Needed",
 };
 
 const PERMIT_REQUEST_STATUS_SET = new Set<string>(PERMIT_REQUEST_STATUSES);

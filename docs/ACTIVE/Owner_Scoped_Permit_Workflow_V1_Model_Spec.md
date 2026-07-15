@@ -50,6 +50,7 @@ Active queue states:
 
 Terminal state:
 - `Permit Created`
+- `Not Needed` removes an unnecessary request from the active queue without deleting its request, attachments, or event history. It requires an internal reason and records the acting user and completion timestamp.
 
 Post-permit routing:
 - `Ready for Testing` creates or routes an ECC alteration job to Scheduling with `jobs.ops_status = need_to_schedule`.

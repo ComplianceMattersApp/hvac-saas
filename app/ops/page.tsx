@@ -47,6 +47,7 @@ import {
   createInternalManualPermitRequest,
   holdInternalPermitRequest,
   markInternalPermitCreated,
+  markInternalPermitRequestNotNeeded,
   resumeInternalPermitRequest,
   updateInternalPermitRequestIntake,
 } from "@/lib/actions/internal-permit-request-actions";
@@ -1786,6 +1787,19 @@ export default async function OpsPage({
       redirect("/ops?bucket=permits#ops-workspace");
     }
 
+    async function markPermitRequestNotNeededFromOps(formData: FormData) {
+      "use server";
+
+      try {
+        await markInternalPermitRequestNotNeeded(formData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Permit request could not be marked not needed.";
+        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
+      }
+
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
+
     async function updatePermitRequestIntakeFromOps(formData: FormData) {
       "use server";
 
@@ -2176,6 +2190,32 @@ export default async function OpsPage({
                             </form>
                           ) : null}
                       </div>
+
+                      <details className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                        <summary className="cursor-pointer text-[12px] font-semibold text-slate-600">
+                          Permit No Longer Needed
+                        </summary>
+                        <form action={markPermitRequestNotNeededFromOps} className="mt-2 grid gap-2">
+                          <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Reason
+                            <textarea
+                              name="reason"
+                              required
+                              maxLength={500}
+                              rows={2}
+                              placeholder="Why is this permit request no longer needed?"
+                              className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <div className="text-xs text-slate-500">
+                            This removes the request from the active queue and preserves its history.
+                          </div>
+                          <button type="submit" className="justify-self-start rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">
+                            Mark Not Needed
+                          </button>
+                        </form>
+                      </details>
 
                       <details className="mt-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
                         <summary className="cursor-pointer text-[12px] font-semibold text-blue-700">

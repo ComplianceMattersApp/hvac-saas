@@ -67,11 +67,16 @@ describe("Ops workspace permit queue wiring", () => {
     expect(opsPageSource).toContain("holdInternalPermitRequest");
     expect(opsPageSource).toContain("resumeInternalPermitRequest");
     expect(opsPageSource).toContain("markInternalPermitCreated");
+    expect(opsPageSource).toContain("markInternalPermitRequestNotNeeded");
     expect(opsPageSource).toContain("markPermitCreatedFromOps");
     expect(branch).toContain("Accept / Start Permit");
     expect(branch).toContain("Put On Hold");
     expect(branch).toContain("Resume / In Process");
     expect(branch).toContain("Mark Permit Created");
+    expect(branch).toContain("Permit No Longer Needed");
+    expect(branch).toContain('name="reason"');
+    expect(branch).toContain("Mark Not Needed");
+    expect(branch).toContain("preserves its history");
   });
 
   it("renders create-job-and-mark-created UI for unlinked active permit requests", () => {

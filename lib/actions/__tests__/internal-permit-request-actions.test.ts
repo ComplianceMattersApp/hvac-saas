@@ -624,6 +624,70 @@ describe("internal manual permit request actions", () => {
     ]);
   });
 
+  it.each(["permit_request", "accepted_in_process", "on_hold_additional_info_needed"])(
+    "marks active %s permit requests not needed with actor, timestamp, and reason history",
+    async (status) => {
+      const fixture = buildFixture({ permitRequestStatus: status });
+      createClientMock.mockResolvedValue(fixture.baseClient);
+      createAdminClientMock.mockReturnValue(fixture.adminClient);
+
+      const { markInternalPermitRequestNotNeeded } = await import("@/lib/actions/internal-permit-request-actions");
+      await expect(markInternalPermitRequestNotNeeded({
+        permitRequestId: "permit-1",
+        reason: "Customer confirmed the work does not require a permit.",
+      })).resolves.toEqual({ permitRequestId: "permit-1", status: "not_needed" });
+
+      expect(fixture.calls.permitRequestUpdatePayloads).toEqual([
+        expect.objectContaining({
+          status: "not_needed",
+          completed_by_user_id: "internal-user-1",
+          completed_at: expect.any(String),
+          hold_reason: null,
+          on_hold_at: null,
+        }),
+      ]);
+      expect(fixture.calls.permitEventInsertPayloads).toEqual([
+        expect.objectContaining({
+          event_type: "permit_request_not_needed",
+          actor_user_id: "internal-user-1",
+          from_status: status,
+          to_status: "not_needed",
+          meta: expect.objectContaining({
+            reason: "Customer confirmed the work does not require a permit.",
+          }),
+        }),
+      ]);
+      expect(fixture.calls.jobMutations).toBe(0);
+      expect(fixture.calls.jobEventMutations).toBe(0);
+    },
+  );
+
+  it("requires a reason before marking a permit request not needed", async () => {
+    const fixture = buildFixture();
+    createClientMock.mockResolvedValue(fixture.baseClient);
+    createAdminClientMock.mockReturnValue(fixture.adminClient);
+    const { markInternalPermitRequestNotNeeded } = await import("@/lib/actions/internal-permit-request-actions");
+
+    await expect(markInternalPermitRequestNotNeeded({ permitRequestId: "permit-1", reason: "  " }))
+      .rejects.toThrow("Add a reason before marking the permit request not needed.");
+    expect(fixture.calls.permitRequestUpdatePayloads).toHaveLength(0);
+    expect(fixture.calls.permitEventInsertPayloads).toHaveLength(0);
+  });
+
+  it("does not allow an issued permit to be marked not needed", async () => {
+    const fixture = buildFixture({ permitRequestStatus: "permit_created" });
+    createClientMock.mockResolvedValue(fixture.baseClient);
+    createAdminClientMock.mockReturnValue(fixture.adminClient);
+    const { markInternalPermitRequestNotNeeded } = await import("@/lib/actions/internal-permit-request-actions");
+
+    await expect(markInternalPermitRequestNotNeeded({
+      permitRequestId: "permit-1",
+      reason: "Attempted after issuance",
+    })).rejects.toThrow("Permit request is not active.");
+    expect(fixture.calls.permitRequestUpdatePayloads).toHaveLength(0);
+    expect(fixture.calls.permitEventInsertPayloads).toHaveLength(0);
+  });
+
   it("rejects active-state actions for contractors and out-of-account permit requests", async () => {
     const contractorFixture = buildFixture({ internalUser: false });
     createClientMock.mockResolvedValue(contractorFixture.baseClient);
