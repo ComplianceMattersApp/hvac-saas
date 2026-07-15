@@ -67,6 +67,10 @@ export type InternalInvoiceRecord = {
   updated_by_user_id: string;
   created_at: string;
   updated_at: string;
+  qbo_invoice_id: string | null;
+  qbo_customer_id: string | null;
+  qbo_sync_status: "pending" | "synced" | "error" | "skipped" | null;
+  qbo_sync_error: string | null;
   line_items: InternalInvoiceLineItemRecord[];
 };
 
@@ -125,6 +129,10 @@ const INTERNAL_INVOICE_SELECT = [
   "updated_by_user_id",
   "created_at",
   "updated_at",
+  "qbo_invoice_id",
+  "qbo_customer_id",
+  "qbo_sync_status",
+  "qbo_sync_error",
 ].join(", ");
 
 const INTERNAL_INVOICE_LINE_ITEM_SELECT = [

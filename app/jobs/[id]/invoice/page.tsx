@@ -393,6 +393,7 @@ export default async function InternalInvoiceWorkspacePage({
   const requestedInvoiceId = firstSearchValue(sp.invoice_id) ?? firstSearchValue(sp.supplemental_invoice_id);
   const checkoutSessionId = firstSearchValue(sp.checkout_session_id);
   const checkoutSessionUrl = firstSearchValue(sp.checkout_session_url);
+  const workspaceView = firstSearchValue(sp.view);
   // Slice B: compressed mobile workspace gate. Desktop is untouched when false.
   const isMobileWorkspace = firstSearchValue(sp.mobileLayout) === "v2";
   const supabase = await createClient();
@@ -662,6 +663,16 @@ export default async function InternalInvoiceWorkspacePage({
   const canIssue = Boolean(invoice && isDraft && !billingDispositionResolved && recipientReady && chargesReady && totalReady && jobReady);
   const latestSuccessfulInternalInvoiceEmailDelivery =
     (internalInvoiceEmailDeliveries as InternalInvoiceEmailDeliveryRecord[]).find((delivery) => delivery.status === "sent") ?? null;
+  const showPostSendCompletion = Boolean(
+    invoice
+    && invoice.status === "issued"
+    && latestSuccessfulInternalInvoiceEmailDelivery
+    && workspaceView !== "payment"
+    && workspaceView !== "all",
+  );
+  const selectedInvoiceWorkspaceBaseHref = invoice
+    ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}`
+    : `/jobs/${jobId}/invoice`;
   const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
   const paymentSummary = internalInvoicePaymentLedger?.summary ?? null;
   const canManageFinancialInvoiceLifecycle = canManageInvoiceLifecycle({
@@ -893,7 +904,7 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
             {/* Slice B cleanup: internal workflow language is desktop-only; the
                 status chips are enough context for the compressed mobile flow. */}
-            {isMobileWorkspace ? null : (
+            {isMobileWorkspace || showPostSendCompletion ? null : (
               <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
                 <p className="mt-1">
@@ -912,13 +923,15 @@ export default async function InternalInvoiceWorkspacePage({
             </div>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            <Link
-              href={isMobileWorkspace ? `/jobs/${jobId}?tab=ops` : `/jobs/${jobId}?tab=info#internal-invoice-panel`}
-              className={secondaryButtonClass}
-            >
-              Back to Job
-            </Link>
-            {invoice ? (
+            {!showPostSendCompletion ? (
+              <Link
+                href={isMobileWorkspace ? `/jobs/${jobId}?tab=ops` : `/jobs/${jobId}?tab=info#internal-invoice-panel`}
+                className={secondaryButtonClass}
+              >
+                Back to Job
+              </Link>
+            ) : null}
+            {invoice && !showPostSendCompletion ? (
               <Link
                 href={`/jobs/${jobId}/invoice/print?invoice_id=${encodeURIComponent(invoice.id)}`}
                 target="_blank"
@@ -929,7 +942,7 @@ export default async function InternalInvoiceWorkspacePage({
               </Link>
             ) : null}
             {/* Slice B cleanup: redundant on mobile where charges scroll inline. */}
-            {invoice && !isMobileWorkspace ? (
+            {invoice && !isMobileWorkspace && !showPostSendCompletion ? (
               <Link href="#invoice-charges" className={darkButtonClass}>
                 Open Invoice Charges
               </Link>
@@ -987,12 +1000,14 @@ export default async function InternalInvoiceWorkspacePage({
           </div>
         ) : null}
 
-        <SupplementalInvoiceFamilySection
-          items={supplementalInvoiceFamilyItems}
-          description="Add-on invoices for this job stay listed here, including drafts that have not been issued. Open one to review its charges or continue billing."
-        />
+        {!showPostSendCompletion ? (
+          <SupplementalInvoiceFamilySection
+            items={supplementalInvoiceFamilyItems}
+            description="Add-on invoices for this job stay listed here, including drafts that have not been issued. Open one to review its charges or continue billing."
+          />
+        ) : null}
 
-        {supplementalParentInvoiceId ? (
+        {supplementalParentInvoiceId && !showPostSendCompletion ? (
           <section id="addon-invoice" className="mt-4 rounded-xl border border-emerald-200/90 bg-emerald-50/60 p-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-900">Add-On Invoice</div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-emerald-950">Create Add-On Invoice</h2>
@@ -1047,6 +1062,72 @@ export default async function InternalInvoiceWorkspacePage({
                 Draft creation requires direct invoice draft authority.
               </div>
             )}
+          </div>
+        </section>
+      ) : showPostSendCompletion ? (
+        <section className={`${panelClass} p-5 sm:p-6`}>
+          <div className="mx-auto max-w-3xl">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800">
+                  Invoice sent
+                </div>
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">This invoice is ready for the next step.</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Sent to <span className="font-semibold text-slate-900">{invoice.billing_name || "billing recipient"}</span>
+                  {latestSuccessfulInternalInvoiceEmailDelivery?.recipientEmail
+                    ? ` at ${latestSuccessfulInternalInvoiceEmailDelivery.recipientEmail}`
+                    : ""}.
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left sm:min-w-44 sm:text-right">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Balance Due</div>
+                <div className="mt-1 text-2xl font-semibold text-slate-950">{formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? invoice.total_cents)}</div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700">Invoice</div>
+                <div className="mt-1 text-sm font-semibold text-emerald-950">Issued</div>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700">Delivery</div>
+                <div className="mt-1 text-sm font-semibold text-emerald-950">Email sent</div>
+              </div>
+              <div className={`rounded-xl border px-3 py-3 ${invoice.qbo_sync_status === "synced" ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}`}>
+                <div className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${invoice.qbo_sync_status === "synced" ? "text-emerald-700" : "text-amber-700"}`}>QuickBooks</div>
+                <div className={`mt-1 text-sm font-semibold ${invoice.qbo_sync_status === "synced" ? "text-emerald-950" : "text-amber-950"}`}>
+                  {invoice.qbo_sync_status === "synced" ? "Synced" : invoice.qbo_sync_status === "error" ? "Needs attention" : "Pending"}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-2 sm:grid-cols-2">
+              <Link href={`/jobs/${jobId}?tab=ops`} className={`${darkButtonClass} w-full`}>
+                Finish — Back to Job
+              </Link>
+              {Number(paymentSummary?.balanceDueCents ?? invoice.total_cents) > 0 ? (
+                <Link href={`${selectedInvoiceWorkspaceBaseHref}&view=payment#invoice-payment-actions`} className={`${primaryButtonClass} w-full`}>
+                  Collect or Record Payment
+                </Link>
+              ) : (
+                <div className="flex min-h-11 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-900">
+                  Paid in full
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Link href={`/jobs/${jobId}/invoice/print?invoice_id=${encodeURIComponent(invoice.id)}`} target="_blank" className={secondaryButtonClass}>
+                View / Save PDF
+              </Link>
+              <Link href={`${selectedInvoiceWorkspaceBaseHref}&view=all#invoice-workspace`} className={secondaryButtonClass}>
+                More Invoice Options
+              </Link>
+            </div>
+            <p className="mt-4 text-xs leading-5 text-slate-500">
+              Payment can be collected now or later. The invoice remains open until payment is recorded or confirmed.
+            </p>
           </div>
         </section>
       ) : (
@@ -1260,7 +1341,7 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
 
             {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
-              <section className={`${panelClass} order-10 p-4 sm:p-5`}>
+              <section id="invoice-payment-actions" className={`${panelClass} order-10 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Collection Actions</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Choose a payment action</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">

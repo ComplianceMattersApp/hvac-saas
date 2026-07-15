@@ -79,6 +79,18 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("/invoice/print?invoice_id=${encodeURIComponent(invoice.id)}");
   });
 
+  it("replaces the full workspace with a focused completion screen after a successful send", () => {
+    expect(source).toContain("const showPostSendCompletion = Boolean(");
+    expect(source).toContain('workspaceView !== "payment"');
+    expect(source).toContain('workspaceView !== "all"');
+    expect(source).toContain("Invoice sent");
+    expect(source).toContain("This invoice is ready for the next step.");
+    expect(source).toContain("Finish — Back to Job");
+    expect(source).toContain("Collect or Record Payment");
+    expect(source).toContain("More Invoice Options");
+    expect(source).toContain('id="invoice-payment-actions"');
+  });
+
   it("shows Create Add-On Invoice only for issued primary invoice with lifecycle authority", () => {
     expect(source).toContain("createSupplementalInternalInvoiceFromForm");
     expect(source).toContain("const canCreateSupplementalDraftFromCurrentInvoice = Boolean(");
