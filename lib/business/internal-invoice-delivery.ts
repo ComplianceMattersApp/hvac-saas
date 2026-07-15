@@ -17,6 +17,7 @@ export type InternalInvoiceEmailDeliveryRecord = {
   sentAt: string | null;
   createdAt: string | null;
   errorDetail: string | null;
+  providerMessageId: string | null;
 };
 
 function normalizeAttemptKind(value: unknown): InternalInvoiceEmailAttemptKind {
@@ -67,6 +68,7 @@ function normalizeInternalInvoiceEmailDeliveryRow(row: any, fallbackAttemptNumbe
     sentAt: String(row?.sent_at ?? "").trim() || null,
     createdAt: String(row?.created_at ?? "").trim() || null,
     errorDetail: payloadErrorDetail ?? noteErrorDetail,
+    providerMessageId: String(payload?.provider_message_id ?? "").trim() || null,
   };
 }
 

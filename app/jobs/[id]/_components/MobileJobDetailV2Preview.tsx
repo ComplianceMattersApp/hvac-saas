@@ -521,7 +521,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const canShowNativeExternalBillingAction =
     Boolean(showExternalDataEntryPrompt) && !showPrimaryCloseoutBlockers && !isReadOnlyState && !isEccComplianceActive;
   const canShowNativeInvoiceWorkspaceLink =
-    canShowNativeInvoiceSummaryAction && Boolean(internalInvoiceTruth);
+    Boolean(internalInvoiceTruth);
   const canShowNativeInvoiceDraftAction =
     canShowNativeInvoiceSummaryAction &&
     !internalInvoiceTruth &&
@@ -1175,10 +1175,10 @@ export default function MobileJobDetailV2Preview(props: any) {
             </form>
           ) : canShowNativeInvoiceWorkspaceLink ? (
             <Link
-              href={`/jobs/${job.id}/invoice?mobileLayout=v2#invoice-workspace`}
+              href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}&mobileLayout=v2#invoice-workspace`}
               className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
             >
-              <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
+              <span className="min-w-0 break-words text-center">View Invoice</span>
               <ChevronRightIcon className="h-5 w-5" />
             </Link>
           ) : canShowNativeInvoiceDraftAction ? (

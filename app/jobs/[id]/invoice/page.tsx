@@ -1314,11 +1314,11 @@ export default async function InternalInvoiceWorkspacePage({
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800">
-                  Invoice sent
+                  Email accepted
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">This invoice is ready for the next step.</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Sent to <span className="font-semibold text-slate-900">{invoice.billing_name || "billing recipient"}</span>
+                  Accepted for delivery to <span className="font-semibold text-slate-900">{invoice.billing_name || "billing recipient"}</span>
                   {latestSuccessfulInternalInvoiceEmailDelivery?.recipientEmail
                     ? ` at ${latestSuccessfulInternalInvoiceEmailDelivery.recipientEmail}`
                     : ""}.
@@ -1337,7 +1337,7 @@ export default async function InternalInvoiceWorkspacePage({
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-700">Delivery</div>
-                <div className="mt-1 text-sm font-semibold text-emerald-950">Email sent</div>
+                <div className="mt-1 text-sm font-semibold text-emerald-950">Accepted by provider</div>
               </div>
               <div className={`rounded-xl border px-3 py-3 ${invoice.qbo_sync_status === "synced" ? "border-emerald-200 bg-emerald-50/70" : "border-amber-200 bg-amber-50/70"}`}>
                 <div className={`text-[10px] font-semibold uppercase tracking-[0.1em] ${invoice.qbo_sync_status === "synced" ? "text-emerald-700" : "text-amber-700"}`}>QuickBooks</div>
@@ -1370,7 +1370,7 @@ export default async function InternalInvoiceWorkspacePage({
               </Link>
             </div>
             <p className="mt-4 text-xs leading-5 text-slate-500">
-              Payment can be collected now or later. The invoice remains open until payment is recorded or confirmed.
+              Email-provider acceptance does not confirm inbox delivery or that the message was read. Payment can be collected now or later; the invoice remains open until payment is recorded or confirmed.
             </p>
           </div>
         </section>
@@ -2186,7 +2186,7 @@ export default async function InternalInvoiceWorkspacePage({
                                 : "border-amber-200 bg-amber-50 text-amber-800"
                             }`}
                           >
-                            {delivery.status}
+                            {delivery.status === "sent" ? "accepted" : delivery.status}
                           </span>
                         </div>
                         <div className="mt-1 text-xs text-slate-500">

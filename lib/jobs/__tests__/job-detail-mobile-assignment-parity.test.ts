@@ -335,7 +335,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('"Companion Service Work"');
     expect(mobileJobDetailV2PreviewSource).toContain('"Work Performed"');
     expect(mobileJobDetailV2PreviewSource).toContain('"Work to Do"');
-    expect(mobileJobDetailV2PreviewSource).toContain("Visit reason / summary");
+    expect(mobileJobWorkScopePanelSource).toContain("Work Summary");
     expect(mobileJobDetailV2PreviewSource).toContain("No Work Items saved yet.");
     expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";');
@@ -389,7 +389,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobStatusActionSurfaceSource).toContain("markCertsCompleteFromForm");
     expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-permit-info"');
     expect(mobileJobDetailV2PreviewSource).toContain('id="mobile-permit-edit"');
-    expect(mobileJobDetailV2PreviewSource).toContain('<span className={previewPillClass}>Open</span>');
+    expect(mobileJobDetailV2PreviewSource).toContain('<span className={previewPillClass}>{complianceWorkSummary?.permit || "Open"}</span>');
     expect(mobileJobDetailV2PreviewSource).toContain('isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"');
     expect(mobileJobDetailV2PreviewSource).not.toContain('isEccPermitNeededActive ? "Needed" : "Status"');
     expect(mobileJobDetailV2PreviewSource).toContain("const v2PermitReturnTo = `/jobs/${job.id}?tab=${tab}&mobileLayout=v2#mobile-permit-info`;");
@@ -415,7 +415,11 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('name="return_to" value={v2BillingReturnTo}');
     expect(mobileJobDetailV2PreviewSource).toContain("form action={createInternalInvoiceDraftFromForm}");
     expect(mobileJobDetailV2PreviewSource).toContain('name="auto_import_visit_scope_items" value="1"');
-    expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/invoice?mobileLayout=v2#invoice-workspace`}');
+    expect(mobileJobDetailV2PreviewSource).toContain('const canShowNativeInvoiceWorkspaceLink =');
+    expect(mobileJobDetailV2PreviewSource).toContain('Boolean(internalInvoiceTruth);');
+    expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}&mobileLayout=v2#invoice-workspace`}');
+    expect(mobileJobDetailV2PreviewSource).toContain('>View Invoice</span>');
+    expect(mobileJobWorkScopePanelSource).toContain('invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}&mobileLayout=v2');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-next-service-action"');
     expect(mobileJobDetailV2PreviewSource).not.toContain("props.isEccPermitNeededActive ||\n      Boolean(props.closeoutNeeds?.needsCerts)");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markEccPermitAvailableFromForm}");

@@ -83,7 +83,9 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("const showPostSendCompletion = Boolean(");
     expect(source).toContain('workspaceView !== "payment"');
     expect(source).toContain('workspaceView !== "all"');
-    expect(source).toContain("Invoice sent");
+    expect(source).toContain("Email accepted");
+    expect(source).toContain("Accepted by provider");
+    expect(source).toContain("Email-provider acceptance does not confirm inbox delivery or that the message was read.");
     expect(source).toContain("This invoice is ready for the next step.");
     expect(source).toContain("Finish — Back to Job");
     expect(source).toContain("Collect or Record Payment");

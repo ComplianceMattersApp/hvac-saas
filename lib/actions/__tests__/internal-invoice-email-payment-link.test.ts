@@ -632,6 +632,7 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
   it('returns to invoice report with sent banner and records sent communication history', async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
+    sendEmailMock.mockResolvedValueOnce({ data: { id: 'resend-message-2104' }, error: null });
 
     const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
 
@@ -653,6 +654,8 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
         invoice_id: 'inv-1',
         recipient_email: 'billing@example.com',
         attempt_kind: 'sent',
+        provider_name: 'resend',
+        provider_message_id: 'resend-message-2104',
       }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith('/reports/invoices');

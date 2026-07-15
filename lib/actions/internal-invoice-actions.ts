@@ -1073,6 +1073,7 @@ async function markInternalInvoiceEmailNotification(params: {
   notificationId: string;
   status: 'sent' | 'failed';
   errorDetail?: string | null;
+  providerMessageId?: string | null;
 }) {
   const { data: existingNotification, error: existingNotificationErr } = await params.supabase
     .from('notifications')
@@ -1088,6 +1089,12 @@ async function markInternalInvoiceEmailNotification(params: {
 
   if (params.status === 'sent') {
     patch.sent_at = new Date().toISOString();
+    const providerMessageId = String(params.providerMessageId ?? '').trim();
+    patch.payload = {
+      ...(existingNotification?.payload ?? {}),
+      provider_name: 'resend',
+      ...(providerMessageId ? { provider_message_id: providerMessageId } : {}),
+    };
   }
 
   const errorDetail = String(params.errorDetail ?? '').trim();
@@ -2838,13 +2845,15 @@ async function deliverInternalInvoiceEmailForContext(
     status: 'queued',
   });
 
+  let providerMessageId: string | null = null;
   try {
-    await sendEmail({
+    const sendResult = await sendEmail({
       to: recipientEmail,
       subject,
       html: body,
       text: textBody,
     });
+    providerMessageId = String(sendResult?.data?.id ?? '').trim() || null;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown send error';
 
@@ -2876,6 +2885,7 @@ async function deliverInternalInvoiceEmailForContext(
     supabase: context.supabase,
     notificationId: queuedDelivery.id,
     status: 'sent',
+    providerMessageId,
   });
 
   await logInvoiceEvent({

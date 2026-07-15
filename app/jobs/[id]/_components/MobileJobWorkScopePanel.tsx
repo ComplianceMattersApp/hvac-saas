@@ -290,10 +290,10 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
               <ReceiptIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
             </div>
             {internalInvoiceTruth ? (
-              <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={`${mobileFieldActionClass} mt-3 w-full`}>
+              <Link href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}&mobileLayout=v2#invoice-workspace`} className={`${mobileFieldActionClass} mt-3 w-full`}>
                 <span className="inline-flex items-center gap-2">
                   <ReceiptIcon className="h-4.5 w-4.5" />
-                  <span>{jobPageInvoiceNextAction}</span>
+                  <span>View Invoice</span>
                 </span>
               </Link>
             ) : hasDirectInvoiceWorkflowAccess ? (
