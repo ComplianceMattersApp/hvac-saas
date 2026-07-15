@@ -1,5 +1,6 @@
 import { decryptToken, encryptToken } from "./qbo-encryption";
 import { refreshQboTokens } from "./qbo-oauth-client";
+import { randomUUID } from "crypto";
 
 /**
  * QBO connection read/write helpers. Tokens are encrypted before storage and
@@ -22,6 +23,8 @@ export interface QboConnection {
   connectedAt: string;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
+  refreshLeaseId: string | null;
+  refreshLeaseExpiresAt: string | null;
 }
 
 function mapRow(row: any): QboConnection {
@@ -37,6 +40,8 @@ function mapRow(row: any): QboConnection {
     connectedAt: row.connected_at,
     lastSyncedAt: row.last_synced_at ?? null,
     lastSyncError: row.last_sync_error ?? null,
+    refreshLeaseId: row.refresh_lease_id ?? null,
+    refreshLeaseExpiresAt: row.refresh_lease_expires_at ?? null,
   };
 }
 
@@ -54,6 +59,19 @@ export async function getQboConnectionForAccount(params: {
   if (error) throw new Error(`Failed to load QBO connection: ${error.message}`);
   if (!data) return null;
   return mapRow(data);
+}
+
+export async function getQboConnectionForAccountIncludingInactive(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<QboConnection | null> {
+  const { data, error } = await params.supabase
+    .from("qbo_connections")
+    .select("*")
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .maybeSingle();
+  if (error) throw new Error(`Failed to load QBO connection: ${error.message}`);
+  return data ? mapRow(data) : null;
 }
 
 export async function upsertQboConnection(params: {
@@ -90,6 +108,8 @@ export async function upsertQboConnection(params: {
       status: "active",
       connected_at: connectedAtIso,
       last_sync_error: null,
+      refresh_lease_id: null,
+      refresh_lease_expires_at: null,
     },
     { onConflict: "account_owner_user_id" },
   );
@@ -102,17 +122,67 @@ export async function updateQboConnectionTokens(params: {
   accessToken: string;
   refreshToken: string;
   expiresAt: Date;
+  refreshLeaseId?: string | null;
 }): Promise<void> {
-  const { supabase, accountOwnerUserId, accessToken, refreshToken, expiresAt } = params;
-  const { error } = await supabase
+  const { supabase, accountOwnerUserId, accessToken, refreshToken, expiresAt, refreshLeaseId } = params;
+  let query = supabase
     .from("qbo_connections")
     .update({
       access_token_encrypted: encryptToken(accessToken),
       refresh_token_encrypted: encryptToken(refreshToken),
       token_expires_at: expiresAt.toISOString(),
+      refresh_lease_id: null,
+      refresh_lease_expires_at: null,
+      status: "active",
+      last_sync_error: null,
     })
     .eq("account_owner_user_id", accountOwnerUserId);
+  if (refreshLeaseId) query = query.eq("refresh_lease_id", refreshLeaseId);
+  const { data, error } = await query.select("id").maybeSingle();
   if (error) throw new Error(`Failed to update QBO tokens: ${error.message}`);
+  if (!data?.id) throw new Error("QBO refresh lease was lost before the rotated token could be stored.");
+}
+
+function accessTokenIsFresh(connection: QboConnection) {
+  return new Date(connection.tokenExpiresAt).getTime() - Date.now() > 5 * 60 * 1000;
+}
+
+function isInvalidRefreshTokenError(error: unknown) {
+  const message = String(error instanceof Error ? error.message : error ?? "").toLowerCase();
+  return message.includes("refresh token is invalid") || message.includes("invalid_grant") || message.includes("authorize again");
+}
+
+async function waitForConcurrentQboRefresh(params: { supabase: any; accountOwnerUserId: string }) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const connection = await getQboConnectionForAccount(params);
+    if (!connection) return null;
+    if (accessTokenIsFresh(connection)) {
+      return { accessToken: decryptToken(connection.accessTokenEncrypted), realmId: connection.realmId };
+    }
+  }
+  throw new Error("QuickBooks token refresh is still in progress. Try the sync again in a moment.");
+}
+
+async function releaseQboRefreshLease(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  refreshLeaseId: string;
+  reauthorizationRequired?: boolean;
+}) {
+  const patch: Record<string, unknown> = {
+    refresh_lease_id: null,
+    refresh_lease_expires_at: null,
+  };
+  if (params.reauthorizationRequired) {
+    patch.status = "error";
+    patch.last_sync_error = "QuickBooks authorization expired. Reconnect QuickBooks to resume syncing.";
+  }
+  await params.supabase
+    .from("qbo_connections")
+    .update(patch)
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .eq("refresh_lease_id", params.refreshLeaseId);
 }
 
 export async function disconnectQboConnection(params: {
@@ -139,25 +209,52 @@ export async function getValidQboAccessToken(params: {
   const connection = await getQboConnectionForAccount({ supabase, accountOwnerUserId });
   if (!connection) return null;
 
-  const expiresAtMs = new Date(connection.tokenExpiresAt).getTime();
-  const fiveMinutesMs = 5 * 60 * 1000;
-  if (expiresAtMs - Date.now() > fiveMinutesMs) {
+  if (accessTokenIsFresh(connection)) {
     return {
       accessToken: decryptToken(connection.accessTokenEncrypted),
       realmId: connection.realmId,
     };
   }
 
-  const refreshToken = decryptToken(connection.refreshTokenEncrypted);
-  const refreshed = await refreshQboTokens(refreshToken);
-  await updateQboConnectionTokens({
-    supabase,
-    accountOwnerUserId,
-    accessToken: refreshed.accessToken,
-    refreshToken: refreshed.refreshToken,
-    expiresAt: refreshed.expiresAt,
+  const refreshLeaseId = randomUUID();
+  const { data: acquired, error: leaseError } = await supabase.rpc("acquire_qbo_refresh_lease", {
+    p_account_owner_user_id: accountOwnerUserId,
+    p_lease_id: refreshLeaseId,
+    p_lease_seconds: 30,
   });
-  return { accessToken: refreshed.accessToken, realmId: connection.realmId };
+  if (leaseError) throw new Error(`Failed to coordinate QBO token refresh: ${leaseError.message}`);
+  if (!acquired) {
+    return waitForConcurrentQboRefresh({ supabase, accountOwnerUserId });
+  }
+
+  const leasedConnection = await getQboConnectionForAccount({ supabase, accountOwnerUserId });
+  if (!leasedConnection) return null;
+  if (accessTokenIsFresh(leasedConnection)) {
+    await releaseQboRefreshLease({ supabase, accountOwnerUserId, refreshLeaseId });
+    return { accessToken: decryptToken(leasedConnection.accessTokenEncrypted), realmId: leasedConnection.realmId };
+  }
+
+  try {
+    const refreshToken = decryptToken(leasedConnection.refreshTokenEncrypted);
+    const refreshed = await refreshQboTokens(refreshToken);
+    await updateQboConnectionTokens({
+      supabase,
+      accountOwnerUserId,
+      accessToken: refreshed.accessToken,
+      refreshToken: refreshed.refreshToken,
+      expiresAt: refreshed.expiresAt,
+      refreshLeaseId,
+    });
+    return { accessToken: refreshed.accessToken, realmId: leasedConnection.realmId };
+  } catch (error) {
+    await releaseQboRefreshLease({
+      supabase,
+      accountOwnerUserId,
+      refreshLeaseId,
+      reauthorizationRequired: isInvalidRefreshTokenError(error),
+    });
+    throw error;
+  }
 }
 
 export async function recordQboConnectionSyncOutcome(params: {

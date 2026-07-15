@@ -12,7 +12,7 @@ import {
 const KEY = "c".repeat(64);
 
 function makeSupabase(row: any | null) {
-  const captured: { upsert: any; update: any } = { upsert: null, update: null };
+  const captured: { upsert: any; update: any; updates: any[]; rpc: any } = { upsert: null, update: null, updates: [], rpc: null };
   const builder: any = {
     from: vi.fn(() => builder),
     select: vi.fn(() => builder),
@@ -25,7 +25,12 @@ function makeSupabase(row: any | null) {
     }),
     update: vi.fn((payload: any) => {
       captured.update = payload;
+      captured.updates.push(payload);
       return builder;
+    }),
+    rpc: vi.fn(async (_name: string, payload: any) => {
+      captured.rpc = payload;
+      return { data: true, error: null };
     }),
     then: (resolve: (v: any) => void) => resolve({ data: row, error: null }),
   };
@@ -130,6 +135,40 @@ describe("qbo-connection", () => {
     expect(captured.update.access_token_encrypted).toBeDefined();
     expect(decryptToken(captured.update.access_token_encrypted)).toBe("new-at");
     expect(decryptToken(captured.update.refresh_token_encrypted)).toBe("new-rt");
+    expect(captured.rpc).toMatchObject({ p_account_owner_user_id: "acc", p_lease_seconds: 30 });
+    expect(captured.update.refresh_lease_id).toBeNull();
+  });
+
+  it("marks the connection for reauthorization when Intuit rejects the refresh token", async () => {
+    refreshQboTokens.mockRejectedValueOnce(new Error("The Refresh token is invalid, please Authorize again."));
+    const { builder, captured } = makeSupabase(activeRow({
+      token_expires_at: new Date(Date.now() + 120_000).toISOString(),
+    }));
+    await expect(getValidQboAccessToken({ supabase: builder, accountOwnerUserId: "acc" }))
+      .rejects.toThrow("Authorize again");
+    expect(captured.updates).toContainEqual(expect.objectContaining({
+      status: "error",
+      refresh_lease_id: null,
+      last_sync_error: expect.stringContaining("Reconnect QuickBooks"),
+    }));
+  });
+
+  it("does not reuse a refresh token when another request owns the refresh lease", async () => {
+    const expired = activeRow({ token_expires_at: new Date(Date.now() + 120_000).toISOString() });
+    const refreshed = activeRow({
+      access_token_encrypted: encryptToken("other-request-at"),
+      refresh_token_encrypted: encryptToken("other-request-rt"),
+      token_expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    });
+    let reads = 0;
+    const builder: any = {
+      from: vi.fn(() => builder), select: vi.fn(() => builder), eq: vi.fn(() => builder),
+      maybeSingle: vi.fn(async () => ({ data: reads++ === 0 ? expired : refreshed, error: null })),
+      rpc: vi.fn(async () => ({ data: false, error: null })),
+    };
+    const result = await getValidQboAccessToken({ supabase: builder, accountOwnerUserId: "acc" });
+    expect(result).toEqual({ accessToken: "other-request-at", realmId: "r1" });
+    expect(refreshQboTokens).not.toHaveBeenCalled();
   });
 
   it("getValidQboAccessToken returns null when there is no active connection", async () => {

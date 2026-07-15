@@ -29,7 +29,7 @@ import { getRequestUser } from "@/lib/auth/request-identity";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
-import { getQboConnectionForAccount } from "@/lib/qbo/qbo-connection";
+import { getQboConnectionForAccountIncludingInactive } from "@/lib/qbo/qbo-connection";
 import { QboIntegrationSection } from "./_components/QboIntegrationSection";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 import { SettingsSection } from "./_components/SettingsSection";
@@ -213,9 +213,9 @@ export default async function AdminCompanyProfilePage({
   // QBO Integrations section. The read is defensive (returns null if the table
   // is missing or unreadable) so QBO never blocks the Company Profile page.
   const qboAvailable = getQboAvailability().available;
-  let qboConnection: Awaited<ReturnType<typeof getQboConnectionForAccount>> = null;
+  let qboConnection: Awaited<ReturnType<typeof getQboConnectionForAccountIncludingInactive>> = null;
   try {
-    qboConnection = await getQboConnectionForAccount({ supabase, accountOwnerUserId: ownerId });
+    qboConnection = await getQboConnectionForAccountIncludingInactive({ supabase, accountOwnerUserId: ownerId });
   } catch {
     qboConnection = null;
   }

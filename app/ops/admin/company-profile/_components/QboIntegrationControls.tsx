@@ -14,6 +14,7 @@ import {
 
 export interface QboConnectionSummary {
   realmId: string;
+  status: "active" | "disconnected" | "error";
   environment: string;
   connectedAtLabel: string;
   lastSyncedLabel: string;
@@ -59,6 +60,28 @@ export function QboIntegrationControls({
             className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
           >
             Connect QuickBooks
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  if (connection.status !== "active") {
+    const needsReauthorization = connection.status === "error";
+    return (
+      <div className="space-y-3">
+        <div className={`rounded-xl border px-3.5 py-3 text-sm ${needsReauthorization ? "border-red-200 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+          <div className="font-semibold">{needsReauthorization ? "QuickBooks reauthorization required" : "QuickBooks is disconnected"}</div>
+          <p className="mt-1 leading-6">
+            {needsReauthorization
+              ? "The saved QuickBooks authorization is no longer valid. Reconnect once to resume invoice and payment syncing."
+              : "Reconnect QuickBooks to resume invoice and payment syncing."}
+          </p>
+          {connection.lastSyncError ? <p className="mt-1 text-xs">{connection.lastSyncError}</p> : null}
+        </div>
+        <form action={connectAction}>
+          <button type="submit" className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+            Reconnect QuickBooks
           </button>
         </form>
       </div>

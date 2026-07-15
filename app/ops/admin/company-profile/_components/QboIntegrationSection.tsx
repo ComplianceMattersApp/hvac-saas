@@ -21,6 +21,7 @@ export function QboIntegrationSection({
   const summary: QboConnectionSummary | null = qboConnection
     ? {
         realmId: qboConnection.realmId,
+        status: qboConnection.status,
         environment: qboConnection.environment,
         connectedAtLabel: formatTimestampDateDisplayLA(qboConnection.connectedAt),
         lastSyncedLabel: qboConnection.lastSyncedAt
