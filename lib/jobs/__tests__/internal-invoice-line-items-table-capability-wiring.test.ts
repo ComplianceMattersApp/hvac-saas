@@ -26,6 +26,14 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).toContain("const canRemoveLine = capabilities.can_remove_invoice_line");
   });
 
+  it("supports a compact nested-card layout without enabling mobile-only behavior", () => {
+    expect(source).toContain("compactWorkspace?: boolean");
+    expect(source).toContain("const useCompactLayout = isMobileWorkspace || compactWorkspace");
+    expect(source).toContain("if (!isMobileWorkspace || !checkFieldPricebookItemNameExistsAction");
+    expect(source).toContain("useCompactLayout ? 'grid-cols-1 sm:grid-cols-2'");
+    expect(invoicePageSource).toContain("compactWorkspace");
+  });
+
   it("gates draft-line editor controls by granular capabilities", () => {
     expect(source).toContain("disabled={!canEditDescription}");
     expect(source).toContain("disabled={!canEditQuantity}");

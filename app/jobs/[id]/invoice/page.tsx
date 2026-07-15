@@ -1161,6 +1161,7 @@ export default async function InternalInvoiceWorkspacePage({
                       primaryButtonClass={primaryButtonClass}
                       secondaryButtonClass={secondaryButtonClass}
                       isMobileWorkspace={isMobileWorkspace}
+                      compactWorkspace
                       saveFieldItemToPricebookAction={saveFieldItemToPricebookFromForm}
                       checkFieldPricebookItemNameExistsAction={checkFieldPricebookItemNameExistsFromForm}
                     />

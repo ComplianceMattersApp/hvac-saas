@@ -62,6 +62,10 @@ type InternalInvoiceLineItemsTableProps = {
   secondaryButtonClass: string;
   // Slice B: compressed mobile field workspace. Off by default so desktop is unchanged.
   isMobileWorkspace?: boolean;
+  // Use the compact presentation when this builder is nested in a narrower
+  // desktop card. This changes layout only; mobile-only field behavior remains
+  // controlled by isMobileWorkspace.
+  compactWorkspace?: boolean;
   // Slice C: optional field "save custom charge to Pricebook" actions. Only used on
   // the mobile workspace; desktop never calls them.
   saveFieldItemToPricebookAction?: (formData: FormData) => Promise<FieldPricebookSaveResult>;
@@ -588,10 +592,12 @@ export default function InternalInvoiceLineItemsTable({
   primaryButtonClass,
   secondaryButtonClass,
   isMobileWorkspace = false,
+  compactWorkspace = false,
   saveFieldItemToPricebookAction,
   checkFieldPricebookItemNameExistsAction,
 }: InternalInvoiceLineItemsTableProps) {
   const router = useRouter();
+  const useCompactLayout = isMobileWorkspace || compactWorkspace;
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [feedback, setFeedback] = useState<InlineFeedback | null>(null);
@@ -846,14 +852,14 @@ export default function InternalInvoiceLineItemsTable({
         </div>
       ) : isZeroDollarDraft ? (
         <div className="border-b border-amber-200/80 bg-amber-50/75 px-5 py-3">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className={`flex flex-col gap-3 ${useCompactLayout ? '' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
             <div className="min-w-0">
               <div className="text-sm font-semibold text-amber-950">$0.00 invoice - choose how to handle it</div>
               <div className="mt-1 text-xs leading-5 text-amber-900">
                 Add a charge if billing is missing. No Charge resolves billing without collecting money. External Billing Complete resolves billing handled outside EveryStep FieldWorks.
               </div>
             </div>
-            <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            <div className={`grid shrink-0 gap-2 ${useCompactLayout ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:flex sm:flex-wrap sm:justify-end'}`}>
               <button
                 type="button"
                 onClick={openAddForm}
@@ -926,7 +932,7 @@ export default function InternalInvoiceLineItemsTable({
           return (
             <div className="border-b border-sky-200/80 bg-sky-50/75 px-5 py-3">
               {/* Slice B cleanup (Fix 3): collapse behind a disclosure on mobile. */}
-              {isMobileWorkspace ? (
+              {useCompactLayout ? (
                 <details>
                   <summary className="cursor-pointer list-none text-sm font-semibold text-sky-950">External billing option</summary>
                   <div className="mt-2">{externalBillingBlock}</div>
@@ -939,7 +945,7 @@ export default function InternalInvoiceLineItemsTable({
         })()
       ) : null}
 
-      <div className="hidden grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3 md:grid">
+      <div className={`${useCompactLayout ? 'hidden' : 'hidden md:grid'} grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3`}>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charge</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</div>
@@ -1028,11 +1034,11 @@ export default function InternalInvoiceLineItemsTable({
 
         {lineItems.map((lineItem, index) => {
           // Slice B: on mobile no row is auto-expanded; all rows are tap-to-expand.
-          const isPrimaryRow = !isMobileWorkspace && index === 0;
+          const isPrimaryRow = !useCompactLayout && index === 0;
           const isExpanded = isPrimaryRow || expandedAdditionalRowId === lineItem.id;
           const rowCanInteract = canEditAnyLine || canRemoveLine;
 
-          if (!isExpanded && isMobileWorkspace) {
+          if (!isExpanded && useCompactLayout) {
             const summaryLine = (
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-slate-950">{lineItem.item_name_snapshot}</div>
@@ -1115,7 +1121,7 @@ export default function InternalInvoiceLineItemsTable({
             );
           }
 
-          if (isMobileWorkspace) {
+          if (useCompactLayout) {
             return (
               <div key={lineItem.id} className="bg-white/72">
                 <form action={handleUpdateLineItem} className="px-4 py-4">
