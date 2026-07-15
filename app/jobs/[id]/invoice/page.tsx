@@ -56,7 +56,7 @@ import {
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
-import { syncSingleInvoiceToQboFromForm } from "@/lib/actions/qbo-sync-actions";
+import { syncSingleInvoiceToQboFromForm, syncSinglePaymentToQboFromForm } from "@/lib/actions/qbo-sync-actions";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import {
   collectIssuedInvoiceCardPaymentFromForm,
@@ -218,6 +218,8 @@ function bannerMessage(value?: string | null) {
     internal_invoice_qbo_sync_failed: "QuickBooks sync did not complete — check the invoice's QBO status/error and try again.",
     internal_invoice_qbo_not_connected: "QuickBooks isn't connected for this account. Connect it in the QuickBooks integration settings, then try again.",
     internal_invoice_qbo_not_configured: "QuickBooks isn't configured for this environment.",
+    internal_invoice_payment_qbo_synced: "Payment synced to QuickBooks.",
+    internal_invoice_payment_qbo_sync_failed: "Payment did not sync to QuickBooks. Review the error and try again.",
     internal_invoice_supplemental_draft_created: "Supplemental draft invoice created.",
     internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
@@ -846,7 +848,7 @@ export default async function InternalInvoiceWorkspacePage({
           ? "Reported payment awaiting office confirmation."
           : Number(paymentSummary?.balanceDueCents ?? 0) > 0
           ? canManageFinancialInvoiceLifecycle
-            ? "Collect card payment, report cash/check/other for confirmation, or record office payment."
+            ? "Record a received check, cash, or bank payment, or collect by card."
             : "Collect card payment or report cash, check, or other payment for confirmation."
           : "Invoice is paid. Review payment history or audit details if needed.";
   const invoiceRevenueWorkflowRail = resolveInvoiceRevenueWorkflowRail({
@@ -1262,10 +1264,10 @@ export default async function InternalInvoiceWorkspacePage({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Collection Actions</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Choose a payment action</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Choose one available action below: collect card payment, create a payment link, or record office payment.
+                  Choose one available action below: record money you received, collect a card payment, or create a payment link.
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Use Record Office Payment only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.
+                  Record Received Payment is final payment truth. Use it only when the check, cash, or transfer was actually received or independently confirmed.
                 </p>
 
                 {canShowManualSavedCardCharge ? (
@@ -1334,15 +1336,21 @@ export default async function InternalInvoiceWorkspacePage({
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">Record Office Payment</div>
+                    <div className="text-sm font-semibold text-slate-950">Record Received Payment</div>
                     <div className="mt-1 text-sm leading-6 text-slate-600">
-                      Use only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.
+                      Use this when you personally received or confirmed the money. Saving immediately updates this invoice&apos;s paid amount and open balance.
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
-                      <label className={labelClass}>Amount</label>
-                      <input name="payment_amount" inputMode="decimal" placeholder="0.00" className={inputClass} required />
+                      <label className={labelClass}>Amount Received</label>
+                      <input
+                        name="payment_amount"
+                        inputMode="decimal"
+                        defaultValue={formatDecimalInput(Number(paymentSummary?.balanceDueCents ?? 0) / 100)}
+                        className={inputClass}
+                        required
+                      />
                     </div>
                     <div>
                       <label className={labelClass}>Payment Method</label>
@@ -1357,7 +1365,7 @@ export default async function InternalInvoiceWorkspacePage({
                       </select>
                     </div>
                     <div>
-                      <label className={labelClass}>Reference</label>
+                      <label className={labelClass}>Check # / Reference</label>
                       <input name="received_reference" placeholder="Check # or confirmation" className={inputClass} />
                     </div>
                     <div>
@@ -1370,7 +1378,7 @@ export default async function InternalInvoiceWorkspacePage({
                     className={darkButtonClass}
                     disabled={!paymentSummary || paymentSummary.balanceDueCents <= 0}
                   >
-                    Record Office Payment
+                    Record Payment
                   </SubmitButton>
                 </form>
 
@@ -1479,7 +1487,40 @@ export default async function InternalInvoiceWorkspacePage({
                           <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-800">
                             {isStripeSourcedPayment(payment) ? "Payment received" : "Recorded"}
                           </span>
+                          {payment.qbo_sync_status === "synced" ? (
+                            <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-800">
+                              QuickBooks synced
+                            </span>
+                          ) : payment.qbo_sync_status === "pending" ? (
+                            <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800">
+                              QuickBooks pending
+                            </span>
+                          ) : payment.qbo_sync_status === "failed" ? (
+                            <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-rose-800">
+                              QuickBooks needs attention
+                            </span>
+                          ) : null}
                         </div>
+                        {payment.received_reference || payment.notes ? (
+                          <div className="mt-1 text-xs leading-5 text-slate-600">
+                            {payment.received_reference ? `Reference: ${payment.received_reference}` : ""}
+                            {payment.received_reference && payment.notes ? " · " : ""}
+                            {payment.notes ? payment.notes : ""}
+                          </div>
+                        ) : null}
+                        {payment.qbo_sync_status === "failed" && payment.qbo_sync_error ? (
+                          <div className="mt-1 text-xs leading-5 text-rose-700">QuickBooks: {payment.qbo_sync_error}</div>
+                        ) : null}
+                        {getQboAvailability().available && payment.qbo_sync_status === "failed" ? (
+                          <form action={syncSinglePaymentToQboFromForm} className="mt-2">
+                            <input type="hidden" name="job_id" value={jobId} />
+                            <input type="hidden" name="invoice_id" value={invoice.id} />
+                            <input type="hidden" name="payment_id" value={payment.id} />
+                            <SubmitButton loadingText="Retrying QuickBooks..." className={secondaryButtonClass}>
+                              Retry QuickBooks Payment Sync
+                            </SubmitButton>
+                          </form>
+                        ) : null}
                         {isStripeSourcedPayment(payment) ? (
                           <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-2 text-xs leading-5 text-emerald-900">
                             <div className="font-semibold text-emerald-950">Stripe confirmed this payment.</div>

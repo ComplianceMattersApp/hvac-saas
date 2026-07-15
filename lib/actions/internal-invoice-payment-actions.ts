@@ -23,6 +23,7 @@ import {
   resolveInvoiceCollectedPaymentSummary,
 } from '@/lib/business/internal-invoice-payments';
 import { upsertInvoicePaymentAllocationForPaymentRow } from '@/lib/business/payment-allocations';
+import { autoSyncRecordedPaymentToQbo } from '@/lib/qbo/qbo-payment-auto-sync';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import {
   type TenantInvoiceCheckoutSessionActionState,
@@ -415,6 +416,11 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
       amount_display: (amountCents / 100).toFixed(2),
       source: 'manual_off_platform',
     },
+  });
+
+  await autoSyncRecordedPaymentToQbo({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    paymentId: paymentTruth.paymentId,
   });
 
   revalidatePath(`/jobs/${jobId}`);
@@ -1246,6 +1252,11 @@ export async function verifyFieldPaymentCollectionReportFromForm(formData: FormD
       verification_note: verificationNote,
       source: 'field_payment_reconciliation',
     },
+  });
+
+  await autoSyncRecordedPaymentToQbo({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    paymentId: paymentTruth.paymentId,
   });
 
   revalidateFieldPaymentReconciliationVisibilityPaths(jobId);

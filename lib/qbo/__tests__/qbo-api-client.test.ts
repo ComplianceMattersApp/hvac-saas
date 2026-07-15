@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   QboApiError,
   createQboInvoice,
+  createQboPayment,
   findOrCreateQboCustomer,
 } from "@/lib/qbo/qbo-api-client";
 
@@ -27,6 +28,37 @@ afterEach(() => {
 });
 
 describe("qbo-api-client", () => {
+  it("creates a payment linked to the synced invoice", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { Payment: { Id: "P55", SyncToken: "0" } } },
+    ]);
+    const result = await createQboPayment({
+      ...base,
+      payment: {
+        customerRef: "C1",
+        invoiceRef: "I1",
+        amount: 720,
+        txnDate: "2026-07-14",
+        paymentRefNum: "CHK-104",
+        privateNote: "Received in field",
+      },
+    });
+    expect(result).toEqual({ id: "P55", syncToken: "0" });
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(request.body));
+    expect(body).toMatchObject({
+      CustomerRef: { value: "C1" },
+      TotalAmt: 720,
+      TxnDate: "2026-07-14",
+      PaymentRefNum: "CHK-104",
+      PrivateNote: "Received in field",
+    });
+    expect(body.Line[0]).toMatchObject({
+      Amount: 720,
+      LinkedTxn: [{ TxnId: "I1", TxnType: "Invoice" }],
+    });
+  });
+
   it("findOrCreateQboCustomer queries first, then creates when none found", async () => {
     const fetchMock = mockFetchSequence([
       { status: 200, body: { QueryResponse: {} } },

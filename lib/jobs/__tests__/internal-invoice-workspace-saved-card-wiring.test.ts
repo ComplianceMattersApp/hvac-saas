@@ -159,9 +159,9 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Cash, check, and other reported payments are submitted for office confirmation before they count as collected payment.");
     expect(source).toContain("Card collection is not enabled for your role.");
     expect(source).toContain("Online payments are not ready.");
-    expect(source).toContain("Use Record Office Payment only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.");
+    expect(source).toContain("Record Received Payment is final payment truth.");
     expect(source).toContain("Create payment link");
-    expect(source).toContain("Record Office Payment");
+    expect(source).toContain("Record Received Payment");
     expect(source).toContain("collectTenantInvoicePaymentNowFromForm");
     expect(source).toContain("recordInternalInvoicePaymentFromForm");
     expect(source).toContain("reportNonCardFieldPaymentCollectionFromForm");
@@ -219,8 +219,10 @@ describe("internal invoice workspace saved-card charge wiring", () => {
 
   it("keeps owner manual payment as final truth path and not confirm-payment routing", () => {
     expect(source).toContain("action={recordInternalInvoicePaymentFromForm}");
-    expect(source).toContain("Use only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.");
-    expect(source).toContain("Record Office Payment");
+    expect(source).toContain("Saving immediately updates this invoice&apos;s paid amount and open balance.");
+    expect(source).toContain("Record Received Payment");
+    expect(source).toContain("Check # / Reference");
+    expect(source).toContain("payment.received_reference");
     expect(source).not.toContain("Confirm Payment queue item");
   });
 

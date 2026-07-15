@@ -60,6 +60,10 @@ export type InternalInvoicePaymentRow = {
   stripe_event_id?: string | null;
   stripe_payment_intent_id?: string | null;
   stripe_charged_at?: string | null;
+  qbo_sync_status?: "not_synced" | "pending" | "synced" | "failed" | null;
+  qbo_payment_id?: string | null;
+  qbo_last_synced_at?: string | null;
+  qbo_sync_error?: string | null;
 };
 
 export type InternalInvoiceCollectedPaymentSummary = {
@@ -242,6 +246,10 @@ const INTERNAL_INVOICE_PAYMENT_SELECT = [
   "stripe_event_id",
   "stripe_payment_intent_id",
   "stripe_charged_at",
+  "qbo_sync_status",
+  "qbo_payment_id",
+  "qbo_last_synced_at",
+  "qbo_sync_error",
 ].join(", ");
 
 function normalizePaymentStatus(value: unknown): InternalInvoicePaymentStatus {
@@ -286,6 +294,12 @@ function normalizePaymentRow(row: any): InternalInvoicePaymentRow {
     stripe_event_id: String(row?.stripe_event_id ?? "").trim() || null,
     stripe_payment_intent_id: String(row?.stripe_payment_intent_id ?? "").trim() || null,
     stripe_charged_at: String(row?.stripe_charged_at ?? "").trim() || null,
+    qbo_sync_status: ["not_synced", "pending", "synced", "failed"].includes(String(row?.qbo_sync_status ?? ""))
+      ? row.qbo_sync_status
+      : null,
+    qbo_payment_id: String(row?.qbo_payment_id ?? "").trim() || null,
+    qbo_last_synced_at: String(row?.qbo_last_synced_at ?? "").trim() || null,
+    qbo_sync_error: String(row?.qbo_sync_error ?? "").trim() || null,
   };
 }
 

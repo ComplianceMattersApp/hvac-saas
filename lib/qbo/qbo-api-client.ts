@@ -45,6 +45,15 @@ export interface QboInvoiceInput {
   privateNote?: string | null;
 }
 
+export interface QboPaymentInput {
+  customerRef: string;
+  invoiceRef: string;
+  amount: number;
+  txnDate: string;
+  paymentRefNum?: string | null;
+  privateNote?: string | null;
+}
+
 export interface QboSyncedEntity {
   id: string;
   syncToken: string;
@@ -259,4 +268,31 @@ export async function updateQboInvoice(
   const inv = updated?.Invoice;
   if (!inv?.Id) throw new QboApiError(0, "QBO invoice update returned no Id");
   return { id: String(inv.Id), syncToken: String(inv.SyncToken) };
+}
+
+export async function createQboPayment(
+  params: QboRequestBase & { payment: QboPaymentInput },
+): Promise<QboSyncedEntity> {
+  const { accessToken, realmId, baseUrl, payment } = params;
+  const created = await qboFetch({
+    accessToken,
+    realmId,
+    baseUrl,
+    path: "payment",
+    method: "POST",
+    body: {
+      CustomerRef: { value: payment.customerRef },
+      TotalAmt: round2(payment.amount),
+      TxnDate: payment.txnDate,
+      Line: [{
+        Amount: round2(payment.amount),
+        LinkedTxn: [{ TxnId: payment.invoiceRef, TxnType: "Invoice" }],
+      }],
+      ...(payment.paymentRefNum ? { PaymentRefNum: payment.paymentRefNum } : {}),
+      ...(payment.privateNote ? { PrivateNote: payment.privateNote } : {}),
+    },
+  });
+  const paymentRow = created?.Payment;
+  if (!paymentRow?.Id) throw new QboApiError(0, "QBO payment creation returned no Id");
+  return { id: String(paymentRow.Id), syncToken: String(paymentRow.SyncToken ?? "0") };
 }
