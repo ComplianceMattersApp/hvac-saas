@@ -471,7 +471,7 @@ export async function loadFailedPaymentReconciliationItems(params: {
         alertCategory: failureCategory,
         alertSeverity: mapAlertSeverity(failureCategory),
         linkTarget: {
-          invoiceWorkspaceHref: `/jobs/${jobId ?? ""}/invoice`,
+          invoiceWorkspaceHref: `/jobs/${jobId ?? ""}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`,
           customerHref: customerId ? `/customers/${customerId}` : null,
           jobHref: jobId ? `/jobs/${jobId}` : null,
         },

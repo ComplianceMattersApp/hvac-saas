@@ -171,7 +171,9 @@ export default async function FailedPaymentReconciliationPage() {
             </thead>
             <tbody>
               {items.map((item) => {
-                const invoiceWorkspaceHref = item.jobId ? `/jobs/${item.jobId}/invoice` : null;
+                const invoiceWorkspaceHref = item.jobId && item.invoiceId
+                  ? `/jobs/${item.jobId}/invoice?invoice_id=${encodeURIComponent(item.invoiceId)}#invoice-workspace`
+                  : null;
                 const customerHref = item.customerId ? `/customers/${item.customerId}` : null;
                 const jobHref = item.jobId ? `/jobs/${item.jobId}` : null;
 

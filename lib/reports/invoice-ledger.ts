@@ -74,6 +74,7 @@ export type InvoiceLedgerRow = {
   locationDisplay: string;
   jobReference: string;
   jobHref: string | null;
+  invoiceHref: string | null;
   serviceCaseReference: string;
   contractorDisplay: string;
   payerDisplay: string;
@@ -777,6 +778,9 @@ export async function listInvoiceLedgerRows(params: {
         jobId,
       }),
       jobHref: jobId ? `/jobs/${jobId}` : null,
+      invoiceHref: jobId
+        ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`
+        : null,
       serviceCaseReference: shortReference(String(invoice.service_case_id ?? "").trim()),
       contractorDisplay: extractContractorName(job) || "-",
       payerDisplay,

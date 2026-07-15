@@ -468,7 +468,9 @@ export async function listPaymentsRegisterRows(params: {
           invoiceNumber: invoice?.invoice_number,
           invoiceId,
         }),
-        invoiceHref: jobId ? `/jobs/${jobId}/invoice` : null,
+        invoiceHref: jobId
+          ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`
+          : null,
         jobReference: preferredJobReference({
           jobDisplayNumber: jobById.get(jobId)?.job_display_number,
           jobId,
@@ -583,7 +585,9 @@ export async function listCustomerPaymentHistory(params: {
         invoiceNumber: invoice?.invoice_number,
         invoiceId,
       }),
-      invoiceHref: jobId ? `/jobs/${jobId}/invoice` : null,
+      invoiceHref: jobId
+        ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`
+        : null,
       jobReference: preferredJobReference({
         jobDisplayNumber: jobById.get(jobId)?.job_display_number,
         jobId,

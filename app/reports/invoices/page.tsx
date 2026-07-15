@@ -360,8 +360,8 @@ export default async function InvoiceLedgerPage({
                     ledger.rows.map((row) => (
                       <tr key={row.invoiceId} className={reportTableRowClass}>
                         <td className="px-3 py-3">
-                          {row.jobHref ? (
-                            <Link href={row.jobHref} className="font-medium text-blue-700 hover:underline">
+                          {row.invoiceHref ? (
+                            <Link href={row.invoiceHref} className="font-medium text-blue-700 hover:underline">
                               {row.invoiceNumber}
                             </Link>
                           ) : (
