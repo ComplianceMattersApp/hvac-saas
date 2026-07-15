@@ -104,13 +104,25 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Billing details, notes, no-charge resolution, and administrative controls remain available in the full workspace.");
   });
 
+  it("keeps an issued but unsent invoice focused on delivery", () => {
+    expect(source).toContain("const showGuidedIssued = Boolean(");
+    expect(source).toContain("Ready to send");
+    expect(source).toContain("Send the invoice");
+    expect(source).toContain("The charges are issued and locked.");
+    expect(source).toContain("Send Invoice Email");
+    expect(source).toContain("Review {lineItemCount} charge");
+    expect(source).toContain("Other next steps");
+    expect(source).toContain("Collect or Record Payment");
+    expect(source).toContain("Add-on invoices, manual sync, payment history, and administrative controls remain in More Invoice Options.");
+  });
+
   it("shows Create Add-On Invoice only for issued primary invoice with lifecycle authority", () => {
     expect(source).toContain("createSupplementalInternalInvoiceFromForm");
     expect(source).toContain("const canCreateSupplementalDraftFromCurrentInvoice = Boolean(");
     expect(source).toContain("invoice.invoice_kind === \"primary\"");
     expect(source).toContain("invoice.status === \"issued\"");
     expect(source).toContain("&& canManageFinancialInvoiceLifecycle");
-    expect(source).toContain("{supplementalParentInvoiceId && !showPostSendCompletion && !showGuidedDraft ? (");
+    expect(source).toContain("{supplementalParentInvoiceId && !showPostSendCompletion && !showGuidedDraft && !showGuidedIssued ? (");
     expect(source).toContain("Create Add-On Invoice");
     expect(source).toContain("Reason for add-on invoice");
     expect(source).toContain("Customer added warranty, service plan, or additional work.");
