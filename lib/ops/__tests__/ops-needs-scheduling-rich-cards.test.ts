@@ -88,6 +88,19 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(needsSchedulingCardSource).toContain("Last Attempt");
   });
 
+  it("shows contractor context on the collapsed card without duplicating it inside Open & Act", () => {
+    expect(buildNeedsSchedulingSource).toContain(
+      "workspaceContractorName(job) || operationalTenantIdentity.displayName",
+    );
+    expect(needsSchedulingCardSource).toContain(
+      '...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : [])',
+    );
+
+    const expandedAreaStart = needsSchedulingCardSource.indexOf("<QueueCardOpenAndAct>");
+    const expandedAreaSource = needsSchedulingCardSource.slice(expandedAreaStart);
+    expect(expandedAreaSource).not.toContain(">Contractor<");
+  });
+
   it("wires the workspace scheduler to the existing schedule action with current /ops filters preserved", () => {
     expect(opsPageSource).toContain('import { updateJobScheduleFromForm } from "@/lib/actions";');
     expect(needsSchedulingCardSource).toContain("form action={updateJobScheduleFromForm}");

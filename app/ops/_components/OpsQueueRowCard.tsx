@@ -167,14 +167,11 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
         { label: "Reason", value: view.reasonLabel, detail: view.reasonDetail || undefined },
         { label: "Last Action", value: view.lastActionText },
         { label: "Last Attempt", value: view.recentAttemptText },
+        ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
       ]}
     >
       <QueueCardOpenAndAct>
         <div className="space-y-3">
-          <div className="grid gap-1.5">
-            <span className={utilityLabelClass}>Contractor</span>
-            <span className="text-sm font-medium text-slate-700">{view.contractorName}</span>
-          </div>
           <div className="grid gap-1.5">
             <span className={utilityLabelClass}>Phone</span>
             {view.phone ? (
