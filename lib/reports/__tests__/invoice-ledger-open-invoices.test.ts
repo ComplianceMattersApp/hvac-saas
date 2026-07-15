@@ -97,6 +97,8 @@ function invoice(id: string, overrides: Partial<Record<string, unknown>> = {}) {
     total_cents: 10000,
     billing_name: "Acme",
     billing_email: "billing@example.com",
+    bill_to_kind: null,
+    bill_to_contractor_id: null,
     billing_address_line1: null,
     billing_city: null,
     billing_state: null,
@@ -172,5 +174,29 @@ describe("invoice ledger open invoices view", () => {
 
     expect(ledger.rows.map((row) => row.invoiceId)).toEqual(["open-unpaid", "paid", "draft"]);
     expect(ledger.summary.openInvoiceCount).toBe(1);
+  });
+
+  it("separates service customer context from the billed party", async () => {
+    const supabase = makeSupabaseMock({
+      invoices: [invoice("payer", {
+        customer_id: "customer-1",
+        billing_name: "Coaches HVAC",
+        bill_to_kind: "contractor",
+        bill_to_contractor_id: "contractor-1",
+      })],
+      customers: [{ id: "customer-1", full_name: "Sandy Vogtlin", first_name: null, last_name: null }],
+    });
+
+    const ledger = await listInvoiceLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: parseInvoiceLedgerFilters({ view: "all" }),
+    });
+
+    expect(ledger.rows[0]).toMatchObject({
+      customerDisplay: "Sandy Vogtlin",
+      payerDisplay: "Coaches HVAC",
+      payerKindLabel: "Contractor",
+    });
   });
 });

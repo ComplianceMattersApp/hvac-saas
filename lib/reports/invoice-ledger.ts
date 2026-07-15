@@ -76,6 +76,8 @@ export type InvoiceLedgerRow = {
   jobHref: string | null;
   serviceCaseReference: string;
   contractorDisplay: string;
+  payerDisplay: string;
+  payerKindLabel: string;
   invoiceDateDisplay: string;
   issuedDateDisplay: string;
   lastCommunicationDateDisplay: string;
@@ -121,6 +123,8 @@ type InvoiceRow = {
   id: string;
   job_id: string;
   customer_id: string | null;
+  bill_to_kind: string | null;
+  bill_to_contractor_id: string | null;
   location_id: string | null;
   service_case_id: string | null;
   invoice_display_number: string | null;
@@ -303,31 +307,7 @@ function deliveryMoment(delivery: InvoiceDeliverySnapshot | null) {
   return String(delivery?.sentAt ?? delivery?.createdAt ?? "").trim() || null;
 }
 
-async function resolveContractorJobIds(params: {
-  supabase: any;
-  contractorId: string;
-}): Promise<string[] | null> {
-  const contractorId = String(params.contractorId ?? "").trim();
-  if (!contractorId) return null;
-
-  const { data, error } = await params.supabase
-    .from("jobs")
-    .select("id")
-    .eq("contractor_id", contractorId)
-    .is("deleted_at", null);
-
-  if (error) throw error;
-
-  return Array.from(
-    new Set(
-      (data ?? [])
-        .map((row: any) => String(row?.id ?? "").trim())
-        .filter(Boolean),
-    ),
-  );
-}
-
-function applyInvoiceLedgerFilters(query: any, filters: InvoiceLedgerFilters, contractorJobIds: string[] | null) {
+function applyInvoiceLedgerFilters(query: any, filters: InvoiceLedgerFilters) {
   if (filters.view === "open") {
     query = query.eq("status", "issued").is("voided_at", null);
   } else if (filters.status) {
@@ -342,11 +322,10 @@ function applyInvoiceLedgerFilters(query: any, filters: InvoiceLedgerFilters, co
     query = query.eq("source_type", filters.sourceType);
   }
 
-  if (contractorJobIds) {
-    query = query.in(
-      "job_id",
-      contractorJobIds.length ? contractorJobIds : ["00000000-0000-0000-0000-000000000000"],
-    );
+  if (filters.contractorId) {
+    // Financial filter: contractor who owns the receivable, not merely the
+    // contractor operationally associated with the job.
+    query = query.eq("bill_to_contractor_id", filters.contractorId);
   }
 
   if (filters.dateField === "invoice") {
@@ -621,23 +600,14 @@ export async function listInvoiceLedgerRows(params: {
   limit?: number;
 }): Promise<InvoiceLedgerResult> {
   const limit = params.limit ?? INVOICE_LEDGER_PAGE_LIMIT;
-  const contractorJobIds = await resolveContractorJobIds({
-    supabase: params.supabase,
-    contractorId: params.filters.contractorId,
-  });
-
-  if (contractorJobIds && contractorJobIds.length === 0) {
-    return { rows: [], totalCount: 0, truncated: false, summary: buildInvoiceLedgerSummary([]) };
-  }
-
   let query = params.supabase
     .from("internal_invoices")
     .select(
-      "id, job_id, customer_id, location_id, service_case_id, invoice_display_number, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at"
+      "id, job_id, customer_id, bill_to_kind, bill_to_contractor_id, location_id, service_case_id, invoice_display_number, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at"
     )
     .eq("account_owner_user_id", params.accountOwnerUserId);
 
-  query = applyInvoiceLedgerFilters(query, params.filters, contractorJobIds);
+  query = applyInvoiceLedgerFilters(query, params.filters);
 
   const { data, error } = await query.limit(INVOICE_LEDGER_EXPORT_LIMIT + 1);
 
@@ -766,6 +736,15 @@ export async function listInvoiceLedgerRows(params: {
     };
     const amountPaidCents = paymentSummary?.amountPaidCents ?? 0;
     const balanceDueCents = paymentSummary?.balanceDueCents ?? Math.max(0, Number(invoice.total_cents ?? 0) || 0);
+    const billToKind = String(invoice.bill_to_kind ?? "").trim().toLowerCase();
+    const payerDisplay = String(invoice.billing_name ?? "").trim() || "Payer not classified";
+    const payerKindLabel = billToKind === "contractor"
+      ? "Contractor"
+      : billToKind === "customer"
+        ? "Customer"
+        : billToKind === "other"
+          ? "Other"
+          : "Review needed";
 
     // Disposition-aware payment status: a job resolved as externally billed / no
     // charge isn't "Unpaid" — surface the disposition so the column doesn't read
@@ -800,6 +779,8 @@ export async function listInvoiceLedgerRows(params: {
       jobHref: jobId ? `/jobs/${jobId}` : null,
       serviceCaseReference: shortReference(String(invoice.service_case_id ?? "").trim()),
       contractorDisplay: extractContractorName(job) || "-",
+      payerDisplay,
+      payerKindLabel,
       invoiceDateDisplay: formatTimestampDisplay(invoice.invoice_date),
       issuedDateDisplay: formatTimestampDisplay(invoice.issued_at),
       lastCommunicationDateDisplay: formatTimestampDisplay(deliveryMoment(delivery)),
@@ -844,6 +825,8 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     "Job Ref",
     "Service Case Ref",
     "Contractor",
+    "Billed To",
+    "Payer Type",
     "Invoice Date",
     "Issued Date",
     "Last Communication",
@@ -868,6 +851,8 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     row.jobReference,
     row.serviceCaseReference,
     row.contractorDisplay,
+    row.payerDisplay,
+    row.payerKindLabel,
     row.invoiceDateDisplay,
     row.issuedDateDisplay,
     row.lastCommunicationDateDisplay,

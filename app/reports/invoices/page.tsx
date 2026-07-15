@@ -272,7 +272,7 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className={reportLabelClass}>Contractor</span>
+                <span className={reportLabelClass}>Billed-to contractor</span>
                 <select name="contractor" defaultValue={filters.contractorId} className={reportControlClass}>
                   <option value="">All contractors</option>
                   {filterOptions.contractors.map((contractor) => (
@@ -331,6 +331,7 @@ export default async function InvoiceLedgerPage({
                     <th className="px-3 py-3">Invoice</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-3 py-3">Customer</th>
+                    <th className="px-3 py-3">Billed To</th>
                     <th className="px-3 py-3">Job</th>
                     <th className="px-3 py-3">Invoice Date</th>
                     <th className="px-3 py-3">Issued</th>
@@ -348,7 +349,7 @@ export default async function InvoiceLedgerPage({
                 <tbody>
                   {ledger.rows.length === 0 ? (
                     <tr>
-                      <td colSpan={15} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={16} className="px-4 py-12 text-center text-sm text-slate-500">
                         <div className="mx-auto max-w-md space-y-2">
                           <div className="font-semibold text-slate-700">{emptyTitle}</div>
                           <div className="text-xs leading-5 text-slate-500">{emptyBody}</div>
@@ -369,6 +370,10 @@ export default async function InvoiceLedgerPage({
                         </td>
                         <td className="px-3 py-3 text-slate-700">{row.invoiceStatusLabel}</td>
                         <td className="px-3 py-3 text-slate-700">{row.customerDisplay}</td>
+                        <td className="px-3 py-3 text-slate-700">
+                          <div className="font-medium text-slate-900">{row.payerDisplay}</div>
+                          <div className="text-xs text-slate-500">{row.payerKindLabel}</div>
+                        </td>
                         <td className="px-3 py-3">
                           {row.jobHref ? (
                             <Link href={row.jobHref} className="font-mono text-xs text-blue-700 hover:underline">{row.jobReference}</Link>

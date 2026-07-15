@@ -414,7 +414,7 @@ async function resolveSupplementalParentInvoiceContext(params: {
     const { data, error } = await params.supabase
       .from('internal_invoices')
       .select(
-        'id, account_owner_user_id, job_id, customer_id, location_id, service_case_id, invoice_kind, original_internal_invoice_id, supplemental_reason, invoice_number, status, source_type, total_cents, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip',
+        'id, account_owner_user_id, job_id, customer_id, bill_to_kind, bill_to_contractor_id, location_id, service_case_id, invoice_kind, original_internal_invoice_id, supplemental_reason, invoice_number, status, source_type, total_cents, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip',
       )
       .eq('id', parentInvoiceId)
       .eq('account_owner_user_id', params.accountOwnerUserId)
@@ -428,7 +428,7 @@ async function resolveSupplementalParentInvoiceContext(params: {
   const { data, error } = await params.supabase
     .from('internal_invoices')
     .select(
-      'id, account_owner_user_id, job_id, customer_id, location_id, service_case_id, invoice_kind, original_internal_invoice_id, supplemental_reason, invoice_number, status, source_type, total_cents, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip',
+      'id, account_owner_user_id, job_id, customer_id, bill_to_kind, bill_to_contractor_id, location_id, service_case_id, invoice_kind, original_internal_invoice_id, supplemental_reason, invoice_number, status, source_type, total_cents, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip',
     )
     .eq('job_id', fallbackJobId)
     .eq('account_owner_user_id', params.accountOwnerUserId)
@@ -1389,6 +1389,8 @@ export async function updateInvoiceBillToFromForm(formData: FormData) {
     .from('internal_invoices')
     .update({
       ...draftBilling,
+      bill_to_kind: requested,
+      bill_to_contractor_id: requested === 'contractor' ? context.job.contractor_id : null,
       updated_by_user_id: context.userId,
       updated_at: new Date().toISOString(),
     })
@@ -1431,6 +1433,11 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
     account_owner_user_id: context.internalUser.account_owner_user_id,
     job_id: context.jobId,
     customer_id: context.job.customer_id ?? null,
+    bill_to_kind: String(context.job.billing_recipient ?? '').trim().toLowerCase() || 'customer',
+    bill_to_contractor_id:
+      String(context.job.billing_recipient ?? '').trim().toLowerCase() === 'contractor'
+        ? context.job.contractor_id ?? null
+        : null,
     location_id: context.job.location_id ?? null,
     service_case_id: context.job.service_case_id ?? null,
     invoice_number: buildInternalInvoiceNumber(),
@@ -1578,6 +1585,8 @@ export async function createSupplementalInternalInvoiceFromForm(formData: FormDa
     account_owner_user_id: internalUser.account_owner_user_id,
     job_id: String(parentInvoice.job_id ?? '').trim() || jobId,
     customer_id: parentInvoice.customer_id ?? null,
+    bill_to_kind: parentInvoice.bill_to_kind ?? null,
+    bill_to_contractor_id: parentInvoice.bill_to_contractor_id ?? null,
     location_id: parentInvoice.location_id ?? null,
     service_case_id: parentInvoice.service_case_id ?? null,
     invoice_kind: 'supplemental',

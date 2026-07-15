@@ -7,6 +7,7 @@ export const INTERNAL_INVOICE_KINDS = ["primary", "supplemental"] as const;
 export type InternalInvoiceStatus = (typeof INTERNAL_INVOICE_STATUSES)[number];
 export type InternalInvoiceItemType = (typeof INTERNAL_INVOICE_ITEM_TYPES)[number];
 export type InternalInvoiceKind = (typeof INTERNAL_INVOICE_KINDS)[number];
+export type InternalInvoiceBillToKind = "customer" | "contractor" | "other";
 
 export type InternalInvoiceLineItemRecord = {
   id: string;
@@ -34,6 +35,8 @@ export type InternalInvoiceRecord = {
   account_owner_user_id: string;
   job_id: string;
   customer_id: string | null;
+  bill_to_kind: InternalInvoiceBillToKind | null;
+  bill_to_contractor_id: string | null;
   location_id: string | null;
   service_case_id: string | null;
   invoice_kind: InternalInvoiceKind;
@@ -78,6 +81,9 @@ export type InternalInvoiceFamilySummaryRecord = {
   amount_paid_cents: number;
   balance_due_cents: number;
   supplemental_reason: string | null;
+  bill_to_kind: InternalInvoiceBillToKind | null;
+  bill_to_contractor_id: string | null;
+  billing_name: string | null;
   original_internal_invoice_id: string | null;
   created_at: string;
 };
@@ -87,6 +93,8 @@ const INTERNAL_INVOICE_SELECT = [
   "account_owner_user_id",
   "job_id",
   "customer_id",
+  "bill_to_kind",
+  "bill_to_contractor_id",
   "location_id",
   "service_case_id",
   "invoice_kind",
@@ -419,6 +427,9 @@ export async function resolveInternalInvoiceFamilySummaryByJobId(params: {
         amount_paid_cents: Number(paymentSummary.amountPaidCents ?? 0) || 0,
         balance_due_cents: Number(paymentSummary.balanceDueCents ?? 0) || 0,
         supplemental_reason: invoice.supplemental_reason,
+        bill_to_kind: invoice.bill_to_kind,
+        bill_to_contractor_id: invoice.bill_to_contractor_id,
+        billing_name: invoice.billing_name,
         original_internal_invoice_id: invoice.original_internal_invoice_id,
         created_at: invoice.created_at,
       } satisfies InternalInvoiceFamilySummaryRecord;

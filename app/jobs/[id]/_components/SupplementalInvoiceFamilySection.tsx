@@ -9,6 +9,8 @@ export type SupplementalInvoiceFamilyItem = {
   totalCents: number;
   balanceDueCents: number;
   supplementalReason: string | null;
+  billingName?: string | null;
+  billToKind?: "customer" | "contractor" | "other" | null;
   workspaceHref?: string | null;
   isSelected?: boolean;
 };
@@ -78,6 +80,11 @@ export default function SupplementalInvoiceFamilySection(
                     })}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-600">
+                    {invoice.billingName ? (
+                      <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-800">
+                        Billed to {invoice.billingName}
+                      </span>
+                    ) : null}
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
                       {formatInvoiceStatus(invoice.status)}
                     </span>

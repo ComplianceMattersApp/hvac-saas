@@ -144,6 +144,7 @@ describe("FieldBillingSummary", () => {
         invoiceDisplayNumber: "2050",
         totalCents: 25000,
         lineItemCount: 3,
+        billingName: "Coaches HVAC",
       },
       paymentSummary: {
         amountPaidCents: 5000,
@@ -156,6 +157,7 @@ describe("FieldBillingSummary", () => {
     expect(html).not.toContain("Supplemental invoices");
     expect(html).not.toContain("Create Supplemental Invoice");
     expect(html).not.toContain("Add follow-up charge");
+    expect(html).toContain("Billed to Coaches HVAC");
   });
 
   it("renders supplemental invoices as a read-only section with status total balance and reason", () => {
@@ -176,7 +178,9 @@ describe("FieldBillingSummary", () => {
           totalCents: 4500,
           balanceDueCents: 4500,
           supplementalReason: "forgotten_charge",
-          workspaceHref: "/jobs/job-1/invoice#supplemental-invoices",
+          billingName: "Sandy Customer",
+          billToKind: "customer",
+          workspaceHref: "/jobs/job-1/invoice?invoice_id=inv-supp-1#invoice-workspace",
         },
         {
           id: "inv-supp-2",
@@ -201,6 +205,8 @@ describe("FieldBillingSummary", () => {
     expect(html).toContain("Balance $45.00");
     expect(html).toContain("Balance $5.00");
     expect(html).toContain("Reason: Forgotten Charge");
+    expect(html).toContain("Billed to Sandy Customer");
+    expect(html).toContain("invoice_id=inv-supp-1");
     expect(html).toContain("Open invoice workspace");
     expect(html).not.toContain("Create Supplemental Invoice");
     expect(html).not.toContain("Collect Payment");

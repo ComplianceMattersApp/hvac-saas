@@ -90,6 +90,7 @@ import {
 import RoleContactsCard from "@/components/RoleContactsCard";
 import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/lib/reports/payments-register";
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
+import { resolveCustomerAssociatedInvoiceBalances } from "@/lib/business/customer-invoice-balance";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
 import {
@@ -1226,6 +1227,9 @@ export default async function CustomerDetailPage(props: {
 
   // Payment History: load only for authorized financial viewers
   let customerPaymentHistory: CustomerPaymentHistoryRow[] = [];
+  let customerOpenBalanceCents = 0;
+  let associatedInvoiceCount = 0;
+  let legacyPayerReviewCount = 0;
   let canViewPaymentHistory = false;
   let canManageBillingPeriods = false;
   let canManageSavedPaymentMethodSetup = false;
@@ -1247,12 +1251,25 @@ export default async function CustomerDetailPage(props: {
       isTemplateAdmin = iu.role === "admin";
 
       if (canViewPaymentHistory) {
-        customerPaymentHistory = await listCustomerPaymentHistory({
-          supabase,
-          accountOwnerUserId: visibilityScope.accountOwnerUserId,
-          customerId,
-          limit: 50,
-        });
+        const [paymentHistory, invoiceBalances] = await Promise.all([
+          listCustomerPaymentHistory({
+            supabase,
+            accountOwnerUserId: visibilityScope.accountOwnerUserId,
+            customerId,
+            limit: 50,
+          }),
+          resolveCustomerAssociatedInvoiceBalances({
+            supabase,
+            accountOwnerUserId: visibilityScope.accountOwnerUserId,
+            customerId,
+            customerName: customerDisplayName(customer),
+            customerEmail: customer.email,
+          }),
+        ]);
+        customerPaymentHistory = paymentHistory;
+        customerOpenBalanceCents = invoiceBalances.customerOpenBalanceCents;
+        associatedInvoiceCount = invoiceBalances.associatedInvoices.length;
+        legacyPayerReviewCount = invoiceBalances.associatedInvoices.filter((invoice) => invoice.payerIdentityNeedsReview).length;
       }
 
       if (canManageSavedPaymentMethodSetup) {
@@ -1297,6 +1314,9 @@ export default async function CustomerDetailPage(props: {
     } catch {
       // Fail safely if read fails
       customerPaymentHistory = [];
+      customerOpenBalanceCents = 0;
+      associatedInvoiceCount = 0;
+      legacyPayerReviewCount = 0;
       canViewPaymentHistory = false;
       canManageSavedPaymentMethodSetup = false;
       customerSavedPaymentMethods = [];
@@ -1918,8 +1938,8 @@ export default async function CustomerDetailPage(props: {
                     }`}
                   >
                     {canViewPaymentHistory
-                      ? failedPaymentAttentionCount > 0
-                        ? "Payment attention"
+                      ? customerOpenBalanceCents > 0
+                        ? (customerOpenBalanceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })
                         : "No open balance"
                       : "Limited"}
                   </span>
@@ -1966,6 +1986,22 @@ export default async function CustomerDetailPage(props: {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Customer Balance</div>
+                <div className="mt-1 text-base font-semibold text-slate-900">
+                  {canViewPaymentHistory
+                    ? (customerOpenBalanceCents / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })
+                    : "Limited"}
+                </div>
+                <p className="mt-1 text-xs text-slate-600">
+                  {associatedInvoiceCount} associated invoice{associatedInvoiceCount === 1 ? "" : "s"}; only invoices billed to this customer affect this balance.
+                </p>
+                {legacyPayerReviewCount > 0 ? (
+                  <p className="mt-1 text-xs font-medium text-amber-700">
+                    {legacyPayerReviewCount} older invoice{legacyPayerReviewCount === 1 ? " needs" : "s need"} payer review.
+                  </p>
+                ) : null}
+              </div>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Payment Attention</div>
                 <div className="mt-1 text-base font-semibold text-slate-900">

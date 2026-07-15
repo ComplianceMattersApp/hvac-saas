@@ -2550,6 +2550,7 @@ export default async function JobDetailPage({
         invoiceDisplayNumber: internalInvoiceTruth.invoice_display_number,
         totalCents: Number(internalInvoiceTruth.total_cents ?? 0) || 0,
         lineItemCount: Number(internalInvoiceTruth.line_item_count ?? 0) || 0,
+        billingName: internalInvoiceTruth.billing_name,
       }
     : null;
   const fieldBillingLatestVoidedInvoiceSnapshot = fieldBillingSummaryData.latestVoidedInternalInvoice
@@ -2570,7 +2571,9 @@ export default async function JobDetailPage({
     totalCents: Number(invoice.total_cents ?? 0) || 0,
     balanceDueCents: Number(invoice.balance_due_cents ?? 0) || 0,
     supplementalReason: invoice.supplemental_reason,
-    workspaceHref: `/jobs/${job.id}/invoice#supplemental-invoices`,
+    billingName: invoice.billing_name,
+    billToKind: invoice.bill_to_kind,
+    workspaceHref: `/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(invoice.id)}#invoice-workspace`,
   }));
   const fieldChargeProposalPricebookItems = visitScopePricebookTemplates
     .filter((item) => {

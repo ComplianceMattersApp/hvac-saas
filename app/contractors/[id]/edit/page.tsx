@@ -139,6 +139,12 @@ export default async function EditContractorPage({
 
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href={`/reports/invoices?contractor=${encodeURIComponent(id)}`}
+              className="inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-900 shadow-sm transition hover:bg-blue-100"
+            >
+              View billed invoices
+            </Link>
+            <Link
               href="/ops/admin/contractors"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >

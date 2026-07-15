@@ -21,6 +21,7 @@ type FieldBillingInvoiceSnapshot = {
   invoiceDisplayNumber?: string | null;
   totalCents: number;
   lineItemCount: number;
+  billingName?: string | null;
 };
 
 type FieldBillingPaymentSummary = {
@@ -255,6 +256,11 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+        {invoiceForMetrics?.billingName ? (
+          <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-800">
+            Billed to {invoiceForMetrics.billingName}
+          </span>
+        ) : null}
         <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
           {invoiceForMetrics?.lineItemCount ?? 0} line{(invoiceForMetrics?.lineItemCount ?? 0) === 1 ? "" : "s"}
         </span>
