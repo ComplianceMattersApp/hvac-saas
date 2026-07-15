@@ -11,6 +11,7 @@ const BANNER_COPY: Record<string, string> = {
   // schedule
   schedule_saved: "Schedule saved.",
   schedule_required: "A full schedule (date + arrival window) is required before marking on the way.",
+  active_reschedule_confirmation_required: "Confirm the active-visit reset before changing this appointment.",
   // notes
   note_added: "Note saved.",
   note_already_added: "Note already saved — duplicate skipped.",

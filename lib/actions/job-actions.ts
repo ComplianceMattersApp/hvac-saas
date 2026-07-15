@@ -5883,13 +5883,26 @@ export async function reassignAndRescheduleJobFromForm(formData: FormData) {
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
-  const { data: priorAssignmentRows, error: priorAssignmentErr } = await supabase
-    .from("job_assignments")
-    .select("user_id")
-    .eq("job_id", jobId)
-    .eq("is_active", true);
+  const [priorAssignmentsResult, priorJobResult] = await Promise.all([
+    supabase.from("job_assignments").select("user_id").eq("job_id", jobId).eq("is_active", true),
+    supabase.from("jobs").select("status, scheduled_date, window_start, window_end").eq("id", jobId).single(),
+  ]);
+  const { data: priorAssignmentRows, error: priorAssignmentErr } = priorAssignmentsResult;
+  const { data: priorJob, error: priorJobErr } = priorJobResult;
 
   if (priorAssignmentErr) throw priorAssignmentErr;
+  if (priorJobErr) throw priorJobErr;
+
+  const priorLifecycleStatus = String(priorJob?.status ?? "").trim().toLowerCase();
+  const isActiveFieldLifecycle = ["on_the_way", "in_process", "in_progress"].includes(priorLifecycleStatus);
+  const didScheduleChange =
+    normalizeScheduleValue(priorJob?.scheduled_date) !== normalizeScheduleValue(scheduledDate) ||
+    normalizeScheduleValue(priorJob?.window_start) !== normalizeScheduleValue(windowStart) ||
+    normalizeScheduleValue(priorJob?.window_end) !== normalizeScheduleValue(windowEnd);
+  const resetActiveLifecycle = isActiveFieldLifecycle && didScheduleChange;
+  if (resetActiveLifecycle && String(formData.get("confirm_active_reschedule") || "").trim() !== "1") {
+    throw new Error("Confirm the active-visit reset before changing this appointment.");
+  }
 
   const scheduleResult = await applyJobScheduleUpdate({
     jobId,
@@ -5897,6 +5910,7 @@ export async function reassignAndRescheduleJobFromForm(formData: FormData) {
     windowStart,
     windowEnd,
     unscheduleRequested: false,
+    resetActiveLifecycle,
   });
 
   if (mode === "reassign") {
@@ -5964,6 +5978,8 @@ export async function reassignAndRescheduleJobFromForm(formData: FormData) {
       reassignment_mode: mode,
       target_user_id: targetUserId || null,
       ops_eval_failed: scheduleResult.opsEvalFailed,
+      active_lifecycle_reset: resetActiveLifecycle,
+      active_lifecycle_before: resetActiveLifecycle ? priorLifecycleStatus : null,
       next: { scheduled_date: scheduledDate, window_start: windowStart, window_end: windowEnd },
     },
     userId: actorUserId,
@@ -11002,19 +11018,20 @@ async function applyJobScheduleUpdate(params: {
   windowStart: string | null;
   windowEnd: string | null;
   unscheduleRequested: boolean;
+  resetActiveLifecycle?: boolean;
   extraFields?: Record<string, unknown>;
 }): Promise<{
   opsEvalFailed: boolean;
   nextLifecycleStatus: "open" | undefined;
   nextOnTheWayAt: null | undefined;
 }> {
-  const { jobId, scheduledDate, windowStart, windowEnd, unscheduleRequested, extraFields } = params;
+  const { jobId, scheduledDate, windowStart, windowEnd, unscheduleRequested, resetActiveLifecycle, extraFields } = params;
 
   const isUnscheduledAfterSave = !scheduledDate && !windowStart && !windowEnd;
   const nextLifecycleStatus: "open" | undefined =
-    unscheduleRequested && isUnscheduledAfterSave ? "open" : undefined;
+    resetActiveLifecycle || (unscheduleRequested && isUnscheduledAfterSave) ? "open" : undefined;
   const nextOnTheWayAt: null | undefined =
-    unscheduleRequested && isUnscheduledAfterSave ? null : undefined;
+    resetActiveLifecycle || (unscheduleRequested && isUnscheduledAfterSave) ? null : undefined;
 
   await updateJob({
     id: jobId,
@@ -11086,7 +11103,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const { data: before, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "scheduled_date, window_start, window_end, ops_status, job_type, status, field_complete, permit_number, jurisdiction, permit_date, pending_info_reason, follow_up_date, next_action_note, action_required_by"
+      "scheduled_date, window_start, window_end, ops_status, job_type, status, on_the_way_at, field_complete, permit_number, jurisdiction, permit_date, pending_info_reason, follow_up_date, next_action_note, action_required_by"
     )
     .eq("id", id)
     .single();
@@ -11155,6 +11172,15 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     normalizeScheduleValue(before?.window_start) !== normalizeScheduleValue(window_start) ||
     normalizeScheduleValue(before?.window_end) !== normalizeScheduleValue(window_end);
 
+  const activeLifecycleStatus = String(before?.status ?? "").trim().toLowerCase();
+  const isActiveFieldLifecycle = ["on_the_way", "in_process", "in_progress"].includes(activeLifecycleStatus);
+  const resetActiveLifecycle = isActiveFieldLifecycle && didScheduleFieldsChange;
+  const activeRescheduleConfirmed = String(formData.get("confirm_active_reschedule") || "").trim() === "1";
+
+  if (resetActiveLifecycle && !activeRescheduleConfirmed) {
+    return finishScheduleTarget("active_reschedule_confirmation_required");
+  }
+
   const normalizedSchedulePrevious = {
     scheduled_date: before?.scheduled_date ?? null,
     window_start: before?.window_start ?? null,
@@ -11182,6 +11208,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     windowStart: window_start,
     windowEnd: window_end,
     unscheduleRequested,
+    resetActiveLifecycle,
     extraFields: { permit_number, jurisdiction, permit_date },
   });
 
@@ -11280,6 +11307,8 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         jurisdiction,
         permit_date,
       },
+      active_lifecycle_reset: resetActiveLifecycle,
+      active_lifecycle_before: resetActiveLifecycle ? activeLifecycleStatus : null,
     },
     userId: actingUserId,
   });

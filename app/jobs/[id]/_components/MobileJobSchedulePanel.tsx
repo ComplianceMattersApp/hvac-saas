@@ -1,4 +1,5 @@
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
+import ActiveRescheduleWarning from "@/components/jobs/ActiveRescheduleWarning";
 
 type MobileJobSchedulePanelProps = Record<string, any>;
 
@@ -30,6 +31,7 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
       <input type="hidden" name="permit_number" value={job.permit_number ?? ""} />
       <input type="hidden" name="jurisdiction" value={(job as any).jurisdiction ?? ""} />
       <input type="hidden" name="permit_date" value={(job as any).permit_date ?? ""} />
+      <ActiveRescheduleWarning status={job.status} />
 
       <div className="space-y-1">
         <label className="text-sm font-semibold text-slate-700">Scheduled Date</label>

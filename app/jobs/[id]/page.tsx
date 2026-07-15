@@ -156,6 +156,7 @@ import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
 import ChangeServiceLocationForm from "./_components/ChangeServiceLocationForm";
+import ActiveRescheduleWarning from "@/components/jobs/ActiveRescheduleWarning";
 import {
   hasDirectInvoiceDraftMutationAccess,
   hasInvoiceIssueAccess,
@@ -5628,6 +5629,10 @@ const showCorrectionReviewResolution =
         />
       )}
 
+      {banner === "active_reschedule_confirmation_required" && (
+        <FlashBanner type="warning" message="Confirm the active-visit reset before changing this appointment." />
+      )}
+
       {banner === "status_updated" && (
         <FlashBanner
           type="success"
@@ -7103,6 +7108,7 @@ const showCorrectionReviewResolution =
                 <form action={updateJobScheduleFromForm} className="space-y-4">
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#edit-job`} />
+                  <ActiveRescheduleWarning status={job.status} />
                   <input type="hidden" name="permit_number" value={job.permit_number ?? ""} />
                   <input type="hidden" name="jurisdiction" value={(job as any).jurisdiction ?? ""} />
                   <input type="hidden" name="permit_date" value={(job as any).permit_date ?? ""} />

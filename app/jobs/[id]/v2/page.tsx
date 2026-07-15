@@ -3639,6 +3639,7 @@ export default async function JobDetailV2Page({
                 scheduledDate={String(job.scheduled_date ?? "")}
                 windowStart={String(job.window_start ?? "")}
                 windowEnd={String(job.window_end ?? "")}
+                status={String(job.status ?? "")}
                 action={updateJobScheduleFromForm}
               />
             ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && (billingState.internalInvoicePanelEnabled || canShowInvoiceButton) ? (

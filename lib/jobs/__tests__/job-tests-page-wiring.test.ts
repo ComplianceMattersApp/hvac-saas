@@ -593,6 +593,15 @@ describe("job detail field operations board layout", () => {
     expect(mobileScheduleSlice).not.toContain('className="group relative self-start overflow-hidden');
   });
 
+  it("requires an explicit active-visit reset acknowledgement in Job Detail schedule forms", () => {
+    const warningSource = readFileSync(resolve(__dirname, "../../../components/jobs/ActiveRescheduleWarning.tsx"), "utf8");
+    expect(warningSource).toContain('name="confirm_active_reschedule"');
+    expect(warningSource).toContain("returns it to Scheduled");
+    expect(mobileJobSchedulePanelSource).toContain("<ActiveRescheduleWarning status={job.status} />");
+    expect(jobPageSource).toContain("<ActiveRescheduleWarning status={job.status} />");
+    expect(jobPageSource).toContain("active_reschedule_confirmation_required");
+  });
+
   it("keeps job title, visit reason, work summary, and intake notes bound to distinct fields", () => {
     expect(mobileJobDetailCurrentSource).toContain("<MobileJobWorkScopePanel {...props} />");
     expect(mobileJobWorkScopePanelSource).toContain("Visit Reason");

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
+import ActiveRescheduleWarning from "@/components/jobs/ActiveRescheduleWarning";
 
 type SchedulePanelProps = {
   jobId: string;
@@ -10,6 +11,7 @@ type SchedulePanelProps = {
   windowStart: string | null;
   windowEnd: string | null;
   action: (formData: FormData) => Promise<void>;
+  status: string | null;
 };
 
 function SaveButton() {
@@ -68,6 +70,7 @@ export default function SchedulePanel({
   windowStart,
   windowEnd,
   action,
+  status,
 }: SchedulePanelProps) {
   const [open, setOpen] = useState(false);
   const hasSchedule = Boolean(scheduledDate);
@@ -154,6 +157,7 @@ export default function SchedulePanel({
       <form action={action} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         <input type="hidden" name="id" value={jobId} />
         <input type="hidden" name="return_to" value={returnTo} />
+        <ActiveRescheduleWarning status={status} />
 
         <div>
           <label

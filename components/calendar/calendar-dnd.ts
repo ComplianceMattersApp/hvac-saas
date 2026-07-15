@@ -7,6 +7,7 @@ export type DraggedJobPayload = {
   assigneeSummary?: string | null;
   hasNoTechAssigned?: boolean;
   originColumnKey?: string | null;
+  lifecycleStatus?: string | null;
 };
 
 export const DISPATCH_GRID_START_MINUTES = 6 * 60;
@@ -48,6 +49,7 @@ export function buildDragPayload(args: {
   assigneeSummary?: string | null;
   hasNoTechAssigned?: boolean;
   originColumnKey?: string | null;
+  lifecycleStatus?: string | null;
 }): DraggedJobPayload {
   return {
     jobId: String(args.jobId ?? "").trim(),
@@ -58,6 +60,7 @@ export function buildDragPayload(args: {
     assigneeSummary: String(args.assigneeSummary ?? "").trim() || null,
     hasNoTechAssigned: Boolean(args.hasNoTechAssigned),
     originColumnKey: String(args.originColumnKey ?? "").trim() || null,
+    lifecycleStatus: String(args.lifecycleStatus ?? "").trim() || null,
   };
 }
 
@@ -93,6 +96,7 @@ export function extractDraggedJobPayloadFromDataTransfer(transfer: DataTransfer)
           assigneeSummary: String(parsed.assigneeSummary ?? "").trim() || null,
           hasNoTechAssigned: parsed.hasNoTechAssigned === true,
           originColumnKey: String(parsed.originColumnKey ?? "").trim() || null,
+          lifecycleStatus: String(parsed.lifecycleStatus ?? "").trim() || null,
         };
       }
     } catch {

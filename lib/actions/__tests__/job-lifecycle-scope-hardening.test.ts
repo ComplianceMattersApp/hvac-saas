@@ -825,6 +825,47 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     );
   });
 
+  it.each(["on_the_way", "in_process", "in_progress"])(
+    "requires explicit confirmation before rescheduling active lifecycle %s",
+    async (status) => {
+      const { supabase, jobsUpdates, jobEvents } = makeSchedulePreservationFixture({
+        status,
+        on_the_way_at: "2026-04-20T15:00:00.000Z",
+      });
+      createClientMock.mockResolvedValue(supabase);
+      loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+      const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+      await updateJobScheduleFromForm(buildScheduleOnlyFormData());
+      expect(jobsUpdates).toHaveLength(0);
+      expect(jobEvents).toHaveLength(0);
+    },
+  );
+
+  it("returns a confirmed active reschedule to scheduled posture while preserving history", async () => {
+    const { supabase, jobsUpdates, jobEvents } = makeSchedulePreservationFixture({
+      status: "on_the_way",
+      on_the_way_at: "2026-04-20T15:00:00.000Z",
+    });
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    const formData = buildScheduleOnlyFormData();
+    formData.set("confirm_active_reschedule", "1");
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+
+    await updateJobScheduleFromForm(formData);
+    expect(jobsUpdates[0]).toEqual(expect.objectContaining({ status: "open", on_the_way_at: null }));
+    expect(jobEvents[0]).toEqual(expect.objectContaining({
+      event_type: "schedule_updated",
+      meta: expect.objectContaining({
+        active_lifecycle_reset: true,
+        active_lifecycle_before: "on_the_way",
+        before: expect.objectContaining({ status: "on_the_way" }),
+        after: expect.objectContaining({ status: "open", on_the_way_at: null }),
+      }),
+    }));
+  });
+
   it("preserves permit fields when blank unschedule form omits permit inputs", async () => {
     const { supabase, jobsUpdates, jobEvents } = makeSchedulePreservationFixture();
     createClientMock.mockResolvedValue(supabase);

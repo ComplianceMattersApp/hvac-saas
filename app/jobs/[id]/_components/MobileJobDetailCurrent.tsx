@@ -481,6 +481,10 @@ export default function MobileJobDetailCurrent(props: MobileJobDetailCurrentProp
             <FlashBanner type="success" message={`${surfaceProfile.labels.workItems} saved.`} />
           ) : null}
 
+          {banner === "active_reschedule_confirmation_required" ? (
+            <FlashBanner type="warning" message="Confirm the active-visit reset before changing this appointment." />
+          ) : null}
+
           {banner === "job_title_saved" ? <FlashBanner type="success" message="Job title saved." /> : null}
           {banner === "job_title_already_saved" ? <FlashBanner type="warning" message="Job title was already up to date." /> : null}
           {banner === "job_title_required" ? <FlashBanner type="warning" message="Job title is required." /> : null}

@@ -21,6 +21,7 @@ import {
   parseCalendarSelectedUserIds,
 } from './calendar-filtering';
 import SubmitButton from '@/components/SubmitButton';
+import ActiveRescheduleWarning from '@/components/jobs/ActiveRescheduleWarning';
 import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm, updateCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
 import {
   assignJobAssigneeFromForm,
@@ -666,6 +667,7 @@ function DetailPanel(props: {
           <form action={updateJobScheduleFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={returnTo} />
+            <ActiveRescheduleWarning status={job.status} />
             <label className="grid gap-1 text-xs font-semibold text-slate-600">
               Date
               <input type="date" name="scheduled_date" defaultValue={prefillDate ?? job.scheduled_date ?? ''} className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900" />
@@ -689,6 +691,7 @@ function DetailPanel(props: {
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="return_to" value={returnTo} />
               <input type="hidden" name="unschedule" value="1" />
+              <ActiveRescheduleWarning status={job.status} />
               <SubmitButton className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-red-200 hover:text-red-700" loadingText="Removing...">
                 Unschedule
               </SubmitButton>

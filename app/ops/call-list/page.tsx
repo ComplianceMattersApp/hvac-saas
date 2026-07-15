@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { updateJobScheduleFromForm } from "@/lib/actions";
+import ActiveRescheduleWarning from "@/components/jobs/ActiveRescheduleWarning";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
 import { jobAddressLine as addressLine } from "@/lib/ops/focused-queues";
@@ -295,6 +296,7 @@ export default async function CallListPage({
                           </span>
                         </summary>
                         <form action={updateJobScheduleFromForm} className="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
+                          <ActiveRescheduleWarning status={j?.status} />
                           <input type="hidden" name="job_id" value={jobId} />
                           <input type="hidden" name="permit_number" value={String(j?.permit_number ?? "")} />
                           <input type="hidden" name="jurisdiction" value={String(j?.jurisdiction ?? "")} />

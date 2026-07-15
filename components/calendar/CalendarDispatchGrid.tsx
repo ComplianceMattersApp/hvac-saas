@@ -56,6 +56,7 @@ type PendingReassignDrop = {
   city: string;
   assigneeSummary: string | null;
   hasNoTechAssigned: boolean;
+  lifecycleStatus: string | null;
 };
 
 type PendingUnassignDrop = {
@@ -67,6 +68,7 @@ type PendingUnassignDrop = {
   end: number;
   title: string;
   city: string;
+  lifecycleStatus: string | null;
 };
 
 type GridItem = {
@@ -438,7 +440,10 @@ export default function CalendarDispatchGrid(props: Props) {
     city?: string | null;
     assigneeSummary?: string | null;
     hasNoTechAssigned?: boolean;
+    lifecycleStatus?: string | null;
   }) {
+    const isActive = ["on_my_way", "on_the_way", "in_progress", "in_process"].includes(String(args.lifecycleStatus ?? ""));
+    if (isActive && !window.confirm("This visit is already active. Moving it will return it to Scheduled so On the Way and Start Work can be completed again. Existing activity remains in history. Continue?")) return;
     const payload = new FormData();
     payload.set("job_id", args.jobId);
     payload.set("scheduled_date", date);
@@ -446,6 +451,7 @@ export default function CalendarDispatchGrid(props: Props) {
     payload.set("window_end", args.windowEnd);
     payload.set("return_to", dropReturnTo);
     payload.set("no_redirect", "1");
+    if (isActive) payload.set("confirm_active_reschedule", "1");
 
     setOptimisticDrop({
       jobId: args.jobId,
@@ -477,6 +483,8 @@ export default function CalendarDispatchGrid(props: Props) {
   function submitReassignDrop(mode: "reassign" | "add") {
     if (!pendingReassignDrop) return;
     const drop = pendingReassignDrop;
+    const isActive = ["on_my_way", "on_the_way", "in_progress", "in_process"].includes(String(drop.lifecycleStatus ?? ""));
+    if (isActive && !window.confirm("This visit is already active. Moving it will return it to Scheduled so field progress can restart. Existing activity remains in history. Continue?")) return;
 
     const payload = new FormData();
     payload.set("job_id", drop.jobId);
@@ -487,6 +495,7 @@ export default function CalendarDispatchGrid(props: Props) {
     payload.set("window_end", drop.windowEnd);
     payload.set("return_to", dropReturnTo);
     payload.set("no_redirect", "1");
+    if (isActive) payload.set("confirm_active_reschedule", "1");
 
     setPendingReassignDrop(null);
     setOptimisticDrop({
@@ -520,6 +529,8 @@ export default function CalendarDispatchGrid(props: Props) {
   function submitUnassignDrop() {
     if (!pendingUnassignDrop) return;
     const drop = pendingUnassignDrop;
+    const isActive = ["on_my_way", "on_the_way", "in_progress", "in_process"].includes(String(drop.lifecycleStatus ?? ""));
+    if (isActive && !window.confirm("This visit is already active. Moving it will return it to Scheduled so field progress can restart. Existing activity remains in history. Continue?")) return;
 
     const payload = new FormData();
     payload.set("job_id", drop.jobId);
@@ -529,6 +540,7 @@ export default function CalendarDispatchGrid(props: Props) {
     payload.set("window_end", drop.windowEnd);
     payload.set("return_to", dropReturnTo);
     payload.set("no_redirect", "1");
+    if (isActive) payload.set("confirm_active_reschedule", "1");
 
     setPendingUnassignDrop(null);
     setOptimisticDrop({
@@ -707,6 +719,7 @@ export default function CalendarDispatchGrid(props: Props) {
                     end: nextEnd,
                     title: String(payload.title ?? "").trim() || `Job ${payload.jobId.slice(0, 8)}`,
                     city: String(payload.city ?? "").trim() || "",
+                    lifecycleStatus: payload.lifecycleStatus ?? null,
                   });
                   return;
                 }
@@ -725,6 +738,7 @@ export default function CalendarDispatchGrid(props: Props) {
                   city: String(payload.city ?? "").trim() || "",
                   assigneeSummary: String(payload.assigneeSummary ?? "").trim() || null,
                   hasNoTechAssigned: payload.hasNoTechAssigned === true,
+                  lifecycleStatus: payload.lifecycleStatus ?? null,
                 });
                 return;
               }
@@ -739,6 +753,7 @@ export default function CalendarDispatchGrid(props: Props) {
                 city: payload.city,
                 assigneeSummary: payload.assigneeSummary,
                 hasNoTechAssigned: payload.hasNoTechAssigned,
+                lifecycleStatus: payload.lifecycleStatus,
               });
             }}
           >
@@ -911,6 +926,7 @@ export default function CalendarDispatchGrid(props: Props) {
                         assigneeSummary,
                         hasNoTechAssigned: !job.assignments || job.assignments.length === 0,
                         originColumnKey: row.columnKey,
+                        lifecycleStatus: lifecycle,
                       });
                       event.dataTransfer.setData("application/x-cm-job", serializeDragPayload(payload));
                       event.dataTransfer.setData("application/x-cm-job-id", payload.jobId);
