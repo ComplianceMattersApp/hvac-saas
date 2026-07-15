@@ -80,6 +80,7 @@ import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-pro
 import { buildJobBillingStateReadModel, formatJobBillingDispositionLabel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { isEccPermitNeededBlocker, isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
+import { buildComplianceWorkSummary } from "@/lib/jobs/compliance-work-summary";
 import { formatEccOpsStatusLabel, isEccJobType as isEccWorkflowJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
   resolveInternalInvoiceEmailDeliveries,
@@ -3426,6 +3427,12 @@ const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : []
 const equipmentCount = equipmentItems.length;
 const eccRuns = Array.isArray(job.ecc_test_runs) ? job.ecc_test_runs : [];
 const eccRunCount = eccRuns.length;
+const complianceWorkSummary = buildComplianceWorkSummary({
+  equipmentCount,
+  eccRuns,
+  hasValidPermit: isValidEccPermitNumber(job.permit_number),
+  permitNeeded: isEccPermitNeededActive,
+});
 const latestEccRun = eccRuns.reduce((latest: any | null, run: any) => {
   if (!latest) return run;
   const latestMs = toTimestampMs(String(latest?.updated_at ?? latest?.created_at ?? ""));
@@ -3786,6 +3793,7 @@ const showCorrectionReviewResolution =
           permitJurisdiction={permitJurisdiction}
           permitNumber={permitNumber}
           permitSummaryLabel={permitSummaryLabel}
+          complianceWorkSummary={complianceWorkSummary}
           PhoneIcon={PhoneIcon}
           primaryButtonClass={primaryButtonClass}
           primaryCloseoutMessage={primaryCloseoutMessage}

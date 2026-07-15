@@ -57,6 +57,7 @@ import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { buildEquipmentIdentityLabel } from "@/lib/utils/equipment-summary";
+import { buildComplianceWorkSummary } from "@/lib/jobs/compliance-work-summary";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { displayTimeLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
@@ -891,6 +892,12 @@ export default async function JobDetailV2Page({
     ...equipment,
     has_label_photo_evidence: equipmentIdsWithLabelPhoto.has(String(equipment.id)),
   }));
+  const complianceWorkSummary = buildComplianceWorkSummary({
+    equipmentCount: equipmentRows.length,
+    eccRuns,
+    hasValidPermit: isValidEccPermitNumber(job.permit_number),
+    permitNeeded: !isValidEccPermitNumber(job.permit_number),
+  });
 
   // return URL for actions
   const returnTo = `/jobs/${jobId}/v2`;
@@ -2881,13 +2888,23 @@ export default async function JobDetailV2Page({
             >
               {[
                 {
+                  label: "Equipment",
+                  value: complianceWorkSummary.equipment,
+                  isOk: equipmentRows.length > 0,
+                },
+                {
                   label: "Permit number",
-                  value: isValidEccPermitNumber(job.permit_number) ? String(job.permit_number) : "Missing",
+                  value: complianceWorkSummary.permit,
                   isOk: isValidEccPermitNumber(job.permit_number),
                 },
                 {
                   label: "Tests complete",
-                  value: completedEccRuns > 0 ? `${completedEccRuns} run${completedEccRuns !== 1 ? "s" : ""}` : "0 runs",
+                  value: complianceWorkSummary.tests,
+                  isOk: completedEccRuns > 0,
+                },
+                {
+                  label: "Completion report",
+                  value: complianceWorkSummary.completionReport,
                   isOk: completedEccRuns > 0,
                 },
                 {

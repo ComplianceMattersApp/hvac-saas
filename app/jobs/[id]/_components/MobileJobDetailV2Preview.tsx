@@ -372,6 +372,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     permitJurisdiction,
     permitNumber,
     permitSummaryLabel,
+    complianceWorkSummary,
     PhoneIcon,
     primaryButtonClass,
     primaryCloseoutMessage,
@@ -875,14 +876,14 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <span className="block font-semibold text-navy">Equipment</span>
                     <span className="block text-sm text-slate-600">Manage equipment and furnace details</span>
                   </span>
-                  <span className={previewPillClass}>Open</span>
+                  <span className={previewPillClass}>{complianceWorkSummary?.equipment || "Open"}</span>
                 </Link>
                 <Link href={`/jobs/${job.id}/tests`} className={previewRowClass}>
                   <span className={previewRowTextClass}>
                     <span className="block font-semibold text-navy">ECC Tests</span>
                     <span className="block text-sm text-slate-600">Open test workflow</span>
                   </span>
-                  <span className={previewPillClass}>Open</span>
+                  <span className={previewPillClass}>{complianceWorkSummary?.tests || "Open"}</span>
                 </Link>
                 <details id="mobile-permit-info" className="group/permit">
                   <summary className="cursor-pointer list-none">
@@ -893,7 +894,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                           {isEccPermitNeededActive ? "Permit needed before closeout" : "Review permit details and actions"}
                         </span>
                       </span>
-                      <span className={previewPillClass}>Open</span>
+                      <span className={previewPillClass}>{complianceWorkSummary?.permit || "Open"}</span>
                     </div>
                   </summary>
                   <div className="px-3 pb-3">
@@ -983,7 +984,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <span className="block font-semibold text-slate-950">Completion Report</span>
                     <span className="block text-sm text-slate-600">Review test results and photo evidence</span>
                   </span>
-                  <span className={previewPillClass}>Open</span>
+                  <span className={previewPillClass}>{complianceWorkSummary?.completionReport || "Open"}</span>
                 </Link>
               </>
             ) : (

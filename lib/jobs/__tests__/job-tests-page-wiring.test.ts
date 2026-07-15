@@ -641,6 +641,19 @@ describe("job detail field operations board layout", () => {
     expect(mobileJobDetailCurrentSource).toContain('`Attachments · ${attachmentCountMeta}`');
   });
 
+  it("shows shared truthful Compliance Work signals instead of static Open pills", () => {
+    const mobileV2Source = readFileSync(
+      resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx"),
+      "utf8",
+    );
+    expect(jobPageSource).toContain("buildComplianceWorkSummary({");
+    expect(jobPageSource).toContain("complianceWorkSummary={complianceWorkSummary}");
+    expect(mobileV2Source).toContain("complianceWorkSummary?.equipment");
+    expect(mobileV2Source).toContain("complianceWorkSummary?.tests");
+    expect(mobileV2Source).toContain("complianceWorkSummary?.permit");
+    expect(mobileV2Source).toContain("complianceWorkSummary?.completionReport");
+  });
+
   it("does not duplicate intake note in right notes card and keeps honest empty-state copy", () => {
     const jobNotesCardStart = jobPageSource.indexOf('id="internal-notes"');
     const jobNotesCardEnd = jobPageSource.indexOf('id="next-service-action"', jobNotesCardStart);

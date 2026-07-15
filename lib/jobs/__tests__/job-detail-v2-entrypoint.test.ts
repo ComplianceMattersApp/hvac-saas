@@ -27,9 +27,8 @@ describe("job detail V2 entrypoint", () => {
     expect(legacyJobDetailSource).not.toContain("function buildV2JobDetailRedirectPath");
     expect(legacyJobDetailSource).not.toContain("redirect(buildV2JobDetailRedirectPath(jobId, sp));");
     expect(legacyJobDetailSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
-    expect(legacyJobDetailSource).toContain("const MobileJobDetailMobileComponent = forceCurrentMobileLayout");
-    expect(legacyJobDetailSource).toContain("? MobileJobDetailCurrent");
-    expect(legacyJobDetailSource).toContain(": MobileJobDetailV2Preview");
+    expect(legacyJobDetailSource).toContain("const MobileJobDetailMobileComponent = MobileJobDetailV2Preview;");
+    expect(legacyJobDetailSource).not.toContain("forceCurrentMobileLayout");
     expect(legacyJobDetailSource).toContain("const forceCurrentDesktopLayout =");
     expect(legacyJobDetailSource).toContain('desktopLayoutMode === "current"');
     expect(legacyJobDetailSource).toContain('desktopLayoutMode === "classic"');
