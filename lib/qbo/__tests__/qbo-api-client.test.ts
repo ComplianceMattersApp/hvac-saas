@@ -4,6 +4,7 @@ import {
   QboApiError,
   createQboInvoice,
   createQboPayment,
+  findQboInvoiceByDocNumber,
   findOrCreateQboCustomer,
 } from "@/lib/qbo/qbo-api-client";
 
@@ -131,6 +132,23 @@ describe("qbo-api-client", () => {
     expect(body.CustomerRef).toEqual({ value: "55" });
     expect(body.Line[0].SalesItemLineDetail.ItemRef).toEqual({ value: "7" });
     expect(body.Line[0].Amount).toBe(100);
+  });
+
+  it("findQboInvoiceByDocNumber returns an exact existing invoice", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { QueryResponse: { Invoice: [{ Id: "1727", SyncToken: "4" }] } } },
+    ]);
+
+    const result = await findQboInvoiceByDocNumber({ ...base, docNumber: "2001" });
+
+    expect(result).toEqual({ id: "1727", syncToken: "4" });
+    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requestUrl.searchParams.get("query")).toBe("select Id, SyncToken from Invoice where DocNumber = '2001'");
+  });
+
+  it("findQboInvoiceByDocNumber returns null when the number is available", async () => {
+    mockFetchSequence([{ status: 200, body: { QueryResponse: {} } }]);
+    await expect(findQboInvoiceByDocNumber({ ...base, docNumber: "2001" })).resolves.toBeNull();
   });
 
   it("throws QboApiError with the fault message on a non-2xx response", async () => {

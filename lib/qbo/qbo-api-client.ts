@@ -59,6 +59,26 @@ export interface QboSyncedEntity {
   syncToken: string;
 }
 
+export async function findQboInvoiceByDocNumber(
+  params: QboRequestBase & { docNumber: string },
+): Promise<QboSyncedEntity | null> {
+  const { accessToken, realmId, baseUrl, docNumber } = params;
+  const normalizedDocNumber = docNumber.trim();
+  if (!normalizedDocNumber) return null;
+
+  const found = await qboFetch({
+    accessToken,
+    realmId,
+    baseUrl,
+    path: "query",
+    method: "GET",
+    query: `select Id, SyncToken from Invoice where DocNumber = '${escapeQboQueryValue(normalizedDocNumber)}'`,
+  });
+  const existing = found?.QueryResponse?.Invoice?.[0];
+  if (!existing?.Id) return null;
+  return { id: String(existing.Id), syncToken: String(existing.SyncToken ?? "0") };
+}
+
 interface QboRequestBase {
   accessToken: string;
   realmId: string;

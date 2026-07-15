@@ -6,6 +6,7 @@ const {
   getQboConnectionForAccount,
   findOrCreateQboServicesItem,
   findOrCreateQboCustomer,
+  findQboInvoiceByDocNumber,
   createQboInvoice,
   updateQboInvoice,
 } = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const {
   getQboConnectionForAccount: vi.fn(),
   findOrCreateQboServicesItem: vi.fn(),
   findOrCreateQboCustomer: vi.fn(),
+  findQboInvoiceByDocNumber: vi.fn(),
   createQboInvoice: vi.fn(),
   updateQboInvoice: vi.fn(),
 }));
@@ -25,6 +27,7 @@ vi.mock("@/lib/qbo/qbo-connection", () => ({
 vi.mock("@/lib/qbo/qbo-api-client", () => ({
   findOrCreateQboServicesItem,
   findOrCreateQboCustomer,
+  findQboInvoiceByDocNumber,
   createQboInvoice,
   updateQboInvoice,
 }));
@@ -67,6 +70,7 @@ beforeEach(() => {
   recordQboConnectionSyncOutcome.mockResolvedValue(undefined);
   findOrCreateQboServicesItem.mockResolvedValue("7");
   findOrCreateQboCustomer.mockResolvedValue({ id: "C1", syncToken: "0" });
+  findQboInvoiceByDocNumber.mockResolvedValue(null);
   createQboInvoice.mockResolvedValue({ id: "Q1", syncToken: "0" });
   updateQboInvoice.mockResolvedValue({ id: "Q9", syncToken: "6" });
 });
@@ -143,9 +147,40 @@ describe("syncInvoiceToQbo", () => {
     const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv3" });
     expect(result.status).toBe("synced");
     expect(createQboInvoice).not.toHaveBeenCalled();
+    expect(findQboInvoiceByDocNumber).not.toHaveBeenCalled();
     expect(updateQboInvoice).toHaveBeenCalledWith(
       expect.objectContaining({ qboInvoiceId: "Q9", syncToken: "5" }),
     );
+  });
+
+  it("blocks creation when QBO already has the proposed invoice number", async () => {
+    findQboInvoiceByDocNumber.mockResolvedValueOnce({ id: "Q-existing", syncToken: "2" });
+    const { builder, updates } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-conflict",
+          status: "issued",
+          account_owner_user_id: "acc",
+          job_id: null,
+          customer_id: null,
+          billing_name: "Cust",
+          invoice_display_number: 2001,
+          invoice_date: "2026-07-10",
+          qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: {
+        list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 50, line_subtotal: 50, sort_order: 1 }],
+      },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-conflict" });
+
+    expect(result).toMatchObject({ status: "error" });
+    expect(result.error).toContain("already has invoice number 2001");
+    expect(createQboInvoice).not.toHaveBeenCalled();
+    expect(updateQboInvoice).not.toHaveBeenCalled();
+    expect((updates.internal_invoices ?? []).some((payload) => payload.qbo_sync_status === "error")).toBe(true);
   });
 
   it("records an error (without throwing) when the QBO API fails", async () => {

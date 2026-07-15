@@ -2,6 +2,7 @@ import { getQboBaseUrl } from "./qbo-env";
 import { getQboConnectionForAccount, getValidQboAccessToken, recordQboConnectionSyncOutcome } from "./qbo-connection";
 import {
   createQboInvoice,
+  findQboInvoiceByDocNumber,
   findOrCreateQboCustomer,
   findOrCreateQboServicesItem,
   updateQboInvoice,
@@ -204,6 +205,17 @@ async function syncSingleInvoiceWithContext(
 
     let synced;
     if (!invoiceRow.qbo_invoice_id) {
+      const existingQboInvoice = await findQboInvoiceByDocNumber({
+        accessToken,
+        realmId,
+        baseUrl,
+        docNumber: invoiceInput.docNumber,
+      });
+      if (existingQboInvoice) {
+        throw new Error(
+          `QuickBooks already has invoice number ${invoiceInput.docNumber}. This app invoice was not created or linked; resolve the number conflict before retrying.`,
+        );
+      }
       synced = await createQboInvoice({
         accessToken,
         realmId,
