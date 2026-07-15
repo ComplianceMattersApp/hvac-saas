@@ -1353,6 +1353,38 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(invoiceUpdates[0].total_cents).toBe(25100);
   });
 
+  it('adds a selected Pricebook item with the submitted price and invoice details in one step', async () => {
+    const pricebookItem = {
+      id: 'pb-1',
+      account_owner_user_id: 'owner-1',
+      item_name: 'Compressor Replacement',
+      item_type: 'service',
+      category: 'HVAC - Repair',
+      default_description: 'Replace failed compressor',
+      default_unit_price: 125.5,
+      unit_label: 'each',
+      is_active: true,
+    };
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({ pricebookItem });
+    createClientMock.mockResolvedValue(supabase);
+    const { addInternalInvoiceLineItemFromPricebookForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemFromPricebookForm(pricebookLineFormData({
+      quantity: '3.00',
+      unit_price: '140.00',
+      description_snapshot: 'Replace compressor and confirm startup amperage',
+    }))).rejects.toThrow('banner=internal_invoice_pricebook_line_item_added');
+
+    expect(insertedLineItems[0]).toEqual(expect.objectContaining({
+      source_pricebook_item_id: 'pb-1',
+      quantity: '3.00',
+      unit_price: '140.00',
+      line_subtotal: '420.00',
+      description_snapshot: 'Replace compressor and confirm startup amperage',
+    }));
+    expect(invoiceUpdates[0].total_cents).toBe(42000);
+  });
+
   it('denies cross-account or missing scoped pricebook item', async () => {
     const { supabase, insertedLineItems } = makeSupabaseFixture({ pricebookItem: null });
     createClientMock.mockResolvedValue(supabase);

@@ -2287,7 +2287,11 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
 
   let unitPriceCents = 0;
   try {
-    unitPriceCents = parseNonNegativeMoneyNumberToCents(pricebookItem.default_unit_price, 'Unit price');
+    const submittedUnitPrice = getTrimmedString(formData.get('unit_price'));
+    const effectiveUnitPrice = capabilities.can_edit_invoice_line_price && submittedUnitPrice
+      ? submittedUnitPrice
+      : pricebookItem.default_unit_price;
+    unitPriceCents = parseNonNegativeMoneyNumberToCents(effectiveUnitPrice, 'Unit price');
   } catch {
     return resolveSmallMutationResult({
       jobId: context.jobId,
@@ -2309,7 +2313,10 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
       source_kind: 'pricebook',
       source_pricebook_item_id: String(pricebookItem.id),
       item_name_snapshot: getTrimmedString(pricebookItem.item_name),
-      description_snapshot: getOptionalText(pricebookItem.default_description),
+      description_snapshot:
+        capabilities.can_edit_invoice_line_description && formData.has('description_snapshot')
+          ? getOptionalText(formData.get('description_snapshot'))
+          : getOptionalText(pricebookItem.default_description),
       item_type_snapshot: normalizeInternalInvoiceItemType(pricebookItem.item_type),
       category_snapshot: getOptionalText(pricebookItem.category),
       unit_label_snapshot: getOptionalText(pricebookItem.unit_label),

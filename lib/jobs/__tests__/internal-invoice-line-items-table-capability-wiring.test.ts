@@ -71,7 +71,8 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).toContain('placeholder="Search Pricebook services..."');
     expect(source).toContain("Search Pricebook");
     expect(source).toContain("Manual Charge");
-    expect(source).toContain("disabled={!selectedPricebookItemId}");
+    expect(source).toContain("Finish this charge");
+    expect(source).toContain("Add Finished Charge");
     expect(source).toContain("setSelectedPricebookItemId('');");
     expect(source).toContain("setIsAddFormOpen(false);");
     expect(source).toContain("Add Charge");
@@ -153,12 +154,13 @@ describe("internal invoice line items table capability wiring", () => {
     expect(pricebookFormSlice).toContain('name="invoice_id" value={selectedInvoiceId}');
     expect(pricebookFormSlice).toContain('name="tab" value={tab}');
     expect(pricebookFormSlice).toContain('type="search"');
-    expect(pricebookFormSlice).toContain('name="pricebook_item_id" value={selectedPricebookItemId}');
+    expect(pricebookFormSlice).toContain('name="pricebook_item_id" value={selectedPricebookItem.id}');
     expect(pricebookFormSlice).toContain('name="quantity"');
     expect(pricebookFormSlice).toContain('defaultValue="1.00"');
-    expect(pricebookFormSlice).toContain("disabled={!selectedPricebookItemId}");
+    expect(pricebookFormSlice).toContain('name="unit_price"');
+    expect(pricebookFormSlice).toContain('name="description_snapshot"');
+    expect(pricebookFormSlice).toContain("Add Finished Charge");
     expect(source).toContain("Cancel");
-    expect(pricebookFormSlice).toContain("Add Pricebook Charge");
   });
 
   it("keeps manual charge entry wired to the manual invoice action fields", () => {

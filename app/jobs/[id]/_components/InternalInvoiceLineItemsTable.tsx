@@ -1333,7 +1333,7 @@ export default function InternalInvoiceLineItemsTable({
                   <input type="hidden" name="tab" value={tab} />
                   <div className="text-sm font-semibold text-slate-950">Search Pricebook</div>
                   <div className="mt-1 text-xs leading-5 text-slate-500">
-                    Type to find a service or charge, then add it with the saved Pricebook description and price.
+                    Select a service, confirm its quantity, price, and details, then add the finished charge once.
                   </div>
                   <label htmlFor="invoice_pricebook_search" className={`${workspaceFieldLabelClass} mt-4`}>
                     Search service or charge
@@ -1389,35 +1389,29 @@ export default function InternalInvoiceLineItemsTable({
                     </div>
                   )}
 
-                  <input type="hidden" name="pricebook_item_id" value={selectedPricebookItemId} />
-                  <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                    <div>
-                      <label htmlFor="invoice_pricebook_quantity" className={workspaceFieldLabelClass}>
-                        Quantity
-                      </label>
-                      <input
-                        id="invoice_pricebook_quantity"
-                        name="quantity"
-                        inputMode="decimal"
-                        defaultValue="1.00"
-                        required
-                        className={workspaceInputClass}
-                      />
-                    </div>
-                    <SubmitButton
-                      loadingText="Adding..."
-                      className={`${primaryButtonClass} w-full sm:w-auto`}
-                      disabled={!selectedPricebookItemId}
-                    >
-                      Add Pricebook Charge
-                    </SubmitButton>
-                  </div>
-
                   {selectedPricebookItem ? (
-                    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2.5 text-xs leading-5 text-blue-950">
-                      Selected: <span className="font-semibold">{selectedPricebookItem.item_name}</span>
+                    <div key={selectedPricebookItem.id} className="mt-4 rounded-xl border border-blue-200 bg-blue-50/55 p-3.5">
+                      <input type="hidden" name="pricebook_item_id" value={selectedPricebookItem.id} />
+                      <div className="text-sm font-semibold text-blue-950">Finish this charge</div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="invoice_pricebook_quantity" className={workspaceFieldLabelClass}>Quantity</label>
+                          <input id="invoice_pricebook_quantity" name="quantity" inputMode="decimal" defaultValue="1.00" required className={workspaceInputClass} disabled={!canEditQuantity} />
+                        </div>
+                        <div>
+                          <label htmlFor="invoice_pricebook_unit_price" className={workspaceFieldLabelClass}>Unit Price</label>
+                          <input id="invoice_pricebook_unit_price" name="unit_price" inputMode="decimal" defaultValue={formatDecimalInput(selectedPricebookItem.default_unit_price)} required className={workspaceInputClass} disabled={!canEditPrice} />
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <label htmlFor="invoice_pricebook_description" className={workspaceFieldLabelClass}>Invoice Details</label>
+                        <textarea id="invoice_pricebook_description" name="description_snapshot" rows={3} defaultValue={selectedPricebookItem.default_description ?? ''} className={workspaceInputClass} disabled={!canEditDescription} />
+                      </div>
+                      <SubmitButton loadingText="Adding..." className={`${primaryButtonClass} mt-3 w-full`}>Add Finished Charge</SubmitButton>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">Select a Pricebook item to review and add it.</div>
+                  )}
                 </form>
               ) : null}
 
