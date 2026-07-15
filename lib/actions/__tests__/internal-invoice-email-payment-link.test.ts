@@ -12,6 +12,7 @@ const resolveOperationalTenantIdentityMock = vi.fn();
 const sendEmailMock = vi.fn();
 const resolveNotificationAccountOwnerUserIdMock = vi.fn();
 const createTenantInvoicePaymentLinkMock = vi.fn();
+const resolveInvoiceCollectedPaymentLedgerMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
@@ -76,6 +77,8 @@ vi.mock('@/lib/notifications/account-owner', () => ({
 vi.mock('@/lib/business/internal-invoice-payments', () => ({
   createTenantInvoicePaymentLink: (...args: unknown[]) =>
     createTenantInvoicePaymentLinkMock(...args),
+  resolveInvoiceCollectedPaymentLedger: (...args: unknown[]) =>
+    resolveInvoiceCollectedPaymentLedgerMock(...args),
 }));
 
 vi.mock('@/lib/actions/job-actions', () => ({
@@ -349,6 +352,45 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
       connectedAccountId: 'acct_123',
       balanceDueCents: 9900,
     });
+    resolveInvoiceCollectedPaymentLedgerMock.mockResolvedValue({
+      rows: [],
+      summary: {
+        invoiceId: 'inv-1',
+        invoiceTotalCents: 9900,
+        amountPaidCents: 0,
+        balanceDueCents: 9900,
+        paymentStatus: 'unpaid',
+      },
+    });
+  });
+
+  it('renders paid status and a zero balance for a fully paid invoice email', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInvoiceCollectedPaymentLedgerMock.mockResolvedValueOnce({
+      rows: [{ id: 'payment-1', payment_status: 'recorded', amount_cents: 9900 }],
+      summary: {
+        invoiceId: 'inv-1',
+        invoiceTotalCents: 9900,
+        amountPaidCents: 9900,
+        balanceDueCents: 0,
+        paymentStatus: 'paid',
+      },
+    });
+    createTenantInvoicePaymentLinkMock.mockRejectedValueOnce(new Error('Invoice balance must be greater than zero'));
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData())).rejects.toThrow('banner=internal_invoice_email_sent');
+
+    const sent = sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string };
+    expect(sent.html).toContain('>Paid<');
+    expect(sent.html).toContain('Amount Paid');
+    expect(sent.html).toContain('$99.00');
+    expect(sent.html).toContain('Balance Due');
+    expect(sent.html).toContain('$0.00');
+    expect(sent.html).not.toContain('>Pay Invoice<');
+    expect(sent.text).toContain('Status: Paid');
+    expect(sent.text).toContain('Balance Due: $0.00');
   });
 
   it('includes pay invoice link when checkout session is eligible', async () => {

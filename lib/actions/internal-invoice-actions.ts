@@ -38,6 +38,7 @@ import {
 import {
   createTenantInvoicePaymentLink,
   expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice,
+  resolveInvoiceCollectedPaymentLedger,
 } from '@/lib/business/internal-invoice-payments';
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
 import {
@@ -742,9 +743,15 @@ function buildInternalInvoiceEmailBody(args: {
   jobTitle: string | null;
   serviceLocation: string | null;
   customerName: string | null;
+  amountPaidCents: number;
+  balanceDueCents: number;
+  paymentStatus: 'unpaid' | 'partial' | 'paid';
 }) {
   const lineItems = args.invoice.line_items ?? [];
   const totalDisplay = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
+  const amountPaidDisplay = formatCurrencyFromCents(args.amountPaidCents);
+  const balanceDueDisplay = formatCurrencyFromCents(args.balanceDueCents);
+  const statusDisplay = args.paymentStatus === 'paid' ? 'Paid' : args.paymentStatus === 'partial' ? 'Partially Paid' : 'Issued';
   const safeLogoUrl = resolveSafeEmailLogoUrl(args.companyLogoUrl);
   const companyName = String(args.businessName ?? '').trim() || 'Compliance Matters';
   const recipientName = String(args.greetingName ?? args.invoice.billing_name ?? '').trim() || 'there';
@@ -844,11 +851,12 @@ function buildInternalInvoiceEmailBody(args: {
                     </tr>
                     <tr>
                       <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Status</td>
-                      <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">Issued</td>
+                      <td align="right" style="padding: 8px 12px; font-size: 13px; color: ${args.paymentStatus === 'paid' ? '#047857' : '#0f172a'}; font-weight: 700;">${statusDisplay}</td>
                     </tr>
+                    ${args.amountPaidCents > 0 ? `<tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Amount Paid</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #047857; font-weight: 700;">${amountPaidDisplay}</td></tr>` : ''}
                     <tr>
-                      <td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 700; border-top: 1px solid #dbe4f0;">Total Due</td>
-                      <td align="right" style="padding: 10px 12px; font-size: 16px; color: #0b3b87; font-weight: 800; border-top: 1px solid #dbe4f0;">${total}</td>
+                      <td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 700; border-top: 1px solid #dbe4f0;">Balance Due</td>
+                      <td align="right" style="padding: 10px 12px; font-size: 16px; color: ${args.paymentStatus === 'paid' ? '#047857' : '#0b3b87'}; font-weight: 800; border-top: 1px solid #dbe4f0;">${balanceDueDisplay}</td>
                     </tr>
                   </table>
                 </td>
@@ -903,6 +911,9 @@ function buildInternalInvoiceEmailText(args: {
   jobTitle: string | null;
   serviceLocation: string | null;
   customerName: string | null;
+  amountPaidCents: number;
+  balanceDueCents: number;
+  paymentStatus: 'unpaid' | 'partial' | 'paid';
 }) {
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: args.invoice.invoice_display_number,
@@ -915,6 +926,9 @@ function buildInternalInvoiceEmailText(args: {
   const serviceLocation = String(args.serviceLocation ?? '').trim() || 'Service location unavailable';
   const customerName = String(args.customerName ?? '').trim() || 'Customer unavailable';
   const total = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
+  const amountPaid = formatCurrencyFromCents(args.amountPaidCents);
+  const balanceDue = formatCurrencyFromCents(args.balanceDueCents);
+  const status = args.paymentStatus === 'paid' ? 'Paid' : args.paymentStatus === 'partial' ? 'Partially Paid' : 'Issued';
   const paymentUrl = String(args.paymentUrl ?? '').trim();
   const contactLine = buildContactLine({
     businessName: args.businessName,
@@ -942,8 +956,10 @@ function buildInternalInvoiceEmailText(args: {
     'INVOICE SUMMARY',
     `Invoice: ${invoiceReference}`,
     `Invoice Date: ${invoiceDate}`,
-    'Status: Issued',
+    `Status: ${status}`,
     `Total: ${total}`,
+    ...(args.amountPaidCents > 0 ? [`Amount Paid: ${amountPaid}`] : []),
+    `Balance Due: ${balanceDue}`,
     ...(paymentUrl
       ? [
           '',
@@ -2879,6 +2895,12 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     jobId: context.jobId,
     invoice,
   });
+  const paymentLedger = await resolveInvoiceCollectedPaymentLedger(
+    context.internalUser.account_owner_user_id,
+    invoice.id,
+    context.supabase,
+  );
+  const paymentSummary = paymentLedger.summary;
 
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: invoice.invoice_display_number,
@@ -2897,6 +2919,9 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
     customerName: serviceCustomerName,
+    amountPaidCents: paymentSummary.amountPaidCents,
+    balanceDueCents: paymentSummary.balanceDueCents,
+    paymentStatus: paymentSummary.paymentStatus,
   });
   const text = buildInternalInvoiceEmailText({
     businessName: tenantIdentity.displayName,
@@ -2908,6 +2933,9 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
     customerName: serviceCustomerName,
+    amountPaidCents: paymentSummary.amountPaidCents,
+    balanceDueCents: paymentSummary.balanceDueCents,
+    paymentStatus: paymentSummary.paymentStatus,
   });
 
   return { subject, html, text, paymentUrl };

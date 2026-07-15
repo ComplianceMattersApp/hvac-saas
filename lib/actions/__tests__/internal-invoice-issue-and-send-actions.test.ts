@@ -81,6 +81,16 @@ vi.mock('@/lib/notifications/account-owner', () => ({
 
 vi.mock('@/lib/business/internal-invoice-payments', () => ({
   createTenantInvoicePaymentLink: (...args: unknown[]) => createTenantInvoicePaymentLinkMock(...args),
+  resolveInvoiceCollectedPaymentLedger: vi.fn(async () => ({
+    rows: [],
+    summary: {
+      invoiceId: 'inv-1',
+      invoiceTotalCents: 25000,
+      amountPaidCents: 0,
+      balanceDueCents: 25000,
+      paymentStatus: 'unpaid',
+    },
+  })),
 }));
 
 vi.mock('@/lib/actions/job-actions', () => ({

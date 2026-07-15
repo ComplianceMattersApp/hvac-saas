@@ -4,6 +4,7 @@ import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-bo
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
 import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveInternalInvoiceById, resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
+import { resolveInvoiceCollectedPaymentLedger } from "@/lib/business/internal-invoice-payments";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
@@ -127,6 +128,18 @@ export default async function InternalInvoicePrintPage({
     : await resolveInternalInvoiceByJobId({ supabase, jobId });
   if (!invoice?.id) notFound();
 
+  const paymentLedger = await resolveInvoiceCollectedPaymentLedger(
+    internalUser.account_owner_user_id,
+    invoice.id,
+    supabase,
+  );
+  const paymentSummary = paymentLedger.summary;
+  const customerFacingStatus = paymentSummary.paymentStatus === "paid"
+    ? "Paid"
+    : paymentSummary.paymentStatus === "partial"
+      ? "Partially Paid"
+      : formatInvoiceStatus(invoice.status);
+
   const tenantIdentity = await resolveOperationalTenantIdentity({
     accountOwnerUserId: internalUser.account_owner_user_id,
     supabase,
@@ -195,11 +208,17 @@ export default async function InternalInvoicePrintPage({
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <dt>Status</dt>
-                  <dd className="font-semibold text-slate-900">{formatInvoiceStatus(invoice.status)}</dd>
+                  <dd className={`font-semibold ${paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : "text-slate-900"}`}>{customerFacingStatus}</dd>
                 </div>
+                {paymentSummary.amountPaidCents > 0 ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt>Amount Paid</dt>
+                    <dd className="font-semibold text-emerald-700">{formatCurrencyFromCents(paymentSummary.amountPaidCents)}</dd>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between gap-4 border-t border-slate-200 pt-2 text-base print:border-slate-300">
-                  <dt className="font-semibold text-slate-900">Total Due</dt>
-                  <dd className="font-bold text-slate-950">{formatCurrencyFromCents(invoice.total_cents)}</dd>
+                  <dt className="font-semibold text-slate-900">Balance Due</dt>
+                  <dd className={`font-bold ${paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : "text-slate-950"}`}>{formatCurrencyFromCents(paymentSummary.balanceDueCents)}</dd>
                 </div>
               </dl>
             </div>
@@ -289,8 +308,8 @@ export default async function InternalInvoicePrintPage({
             )}
             </div>
             <div className="flex items-center justify-end gap-6 border-t border-slate-200 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-900 print:border-slate-300 print:bg-white">
-              <span>Total Due</span>
-              <span>{formatCurrencyFromCents(invoice.total_cents)}</span>
+              <span>{paymentSummary.paymentStatus === "paid" ? "Paid in Full" : "Balance Due"}</span>
+              <span className={paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : undefined}>{formatCurrencyFromCents(paymentSummary.balanceDueCents)}</span>
             </div>
           </div>
 

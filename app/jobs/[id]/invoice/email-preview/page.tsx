@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { loadInternalInvoiceCustomerEmailPreview } from "@/lib/actions/internal-invoice-actions";
+import CustomerEmailFrame from "./CustomerEmailFrame";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -58,7 +59,7 @@ export default async function InternalInvoiceCustomerEmailPreviewPage({
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
             Exact email body
           </div>
-          <div dangerouslySetInnerHTML={{ __html: preview.html }} />
+          <CustomerEmailFrame html={preview.html} title={`${preview.invoiceReference} customer email`} />
         </section>
       </div>
     </main>
