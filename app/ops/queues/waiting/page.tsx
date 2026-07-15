@@ -11,6 +11,7 @@ import {
 } from "@/lib/ops/focused-queues";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
+import { buildRetestContinuationParentIds, excludeHistoricalRetestParents } from "@/lib/ops/retest-queue-exclusivity";
 
 const waitingSelect =
   "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, created_at";
@@ -28,18 +29,31 @@ export default async function OpsWaitingQueuePage() {
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .select(waitingSelect)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .neq("ops_status", "closed")
-    .in("ops_status", [...WAITING_QUEUE_STATUSES])
-    .order("created_at", { ascending: true });
+  const [{ data, error }, continuationRowsRes] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select(waitingSelect)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .neq("ops_status", "closed")
+      .in("ops_status", [...WAITING_QUEUE_STATUSES])
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("jobs")
+      .select("parent_job_id")
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("job_type", "ecc")
+      .not("parent_job_id", "is", null),
+  ]);
 
   if (error) throw error;
+  if (continuationRowsRes.error) throw continuationRowsRes.error;
 
-  const candidateRows = buildWaitingQueueRows((data ?? []) as any[]);
+  const candidateRows = buildWaitingQueueRows(excludeHistoricalRetestParents(
+    (data ?? []) as any[],
+    buildRetestContinuationParentIds(continuationRowsRes.data),
+  ));
   const rowJobIds = candidateRows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
 
   const { data: statusEvents, error: statusEventsError } = rowJobIds.length

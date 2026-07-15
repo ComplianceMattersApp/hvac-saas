@@ -211,7 +211,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("const selectedWorkspaceSection =");
     expect(opsPageSource).toContain("selectedWorkspaceSection.previewRows.map");
     expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
-    expect(opsPageSource).toContain("return sortOpsBoardRows(queueRes.data ?? [], boardSort);");
+    expect(opsPageSource).toContain("return sortOpsBoardRows(currentRows, boardSort);");
     expect(opsPageSource).not.toContain("visibleWorkspaceSections.map((section)");
   });
 
@@ -219,7 +219,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("function filterRowsByContractorFocus(rows: any[])");
     expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows)");
     expect(opsPageSource).toContain("contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)");
-    expect(opsPageSource).toContain("return sortOpsBoardRows(queueRes.data ?? [], boardSort);");
+    expect(opsPageSource).toContain("return sortOpsBoardRows(currentRows, boardSort);");
     expect(opsPageSource).toContain("workspaceContractorName(job)");
     expect(opsPageSource).toContain('href: `/jobs/${jobId}?tab=ops`');
     expect(opsRowCardSource).toContain("Open Job");

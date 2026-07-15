@@ -9,6 +9,7 @@ import {
   getExceptionQueueDisplayLabel,
 } from "@/lib/ops/focused-queues";
 import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
+import { buildRetestContinuationParentIds, excludeHistoricalRetestParents } from "@/lib/ops/retest-queue-exclusivity";
 
 const exceptionSelect =
   "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, created_at";
@@ -56,18 +57,31 @@ export default async function OpsExceptionsQueuePage() {
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
-  const { data, error } = await supabase
-    .from("jobs")
-    .select(exceptionSelect)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .neq("ops_status", "closed")
-    .in("ops_status", [...EXCEPTION_QUEUE_STATUSES])
-    .order("created_at", { ascending: true });
+  const [{ data, error }, continuationRowsRes] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select(exceptionSelect)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .neq("ops_status", "closed")
+      .in("ops_status", [...EXCEPTION_QUEUE_STATUSES])
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("jobs")
+      .select("parent_job_id")
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("job_type", "ecc")
+      .not("parent_job_id", "is", null),
+  ]);
 
   if (error) throw error;
+  if (continuationRowsRes.error) throw continuationRowsRes.error;
 
-  const rows = buildExceptionQueueRows((data ?? []) as any[]);
+  const rows = buildExceptionQueueRows(excludeHistoricalRetestParents(
+    (data ?? []) as any[],
+    buildRetestContinuationParentIds(continuationRowsRes.data),
+  ));
   const rowJobIds = rows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
 
   const [statusEventsRes, failedRunsRes] = await Promise.all([

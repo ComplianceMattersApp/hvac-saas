@@ -112,6 +112,11 @@ import {
 } from "@/lib/ops/contractor-intake-queue";
 import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/permit-request-attachments-read-model";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
+import {
+  buildRetestContinuationParentIds,
+  countCurrentExceptionStatuses,
+  excludeHistoricalRetestParents,
+} from "@/lib/ops/retest-queue-exclusivity";
 
 
 type ContractorFocusOption = {
@@ -718,10 +723,19 @@ export default async function OpsPage({
     const pendingInfoCountQ = opsStatusCountQuery("pending_info");
     const onHoldCountQ = opsStatusCountQuery("on_hold");
     const waitingStatusCountQ = opsStatusCountQuery("waiting");
-    const pendingOfficeReviewCountQ = opsStatusCountQuery("pending_office_review");
-    const failedCountQ = opsStatusCountQuery("failed");
-    const retestNeededCountQ = opsStatusCountQuery("retest_needed");
-    const problemCountQ = opsStatusCountQuery("problem");
+    const exceptionStatusRowsQ = supabase
+      .from("jobs")
+      .select("id, ops_status")
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
+    const retestContinuationRowsQ = supabase
+      .from("jobs")
+      .select("parent_job_id")
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("job_type", "ecc")
+      .not("parent_job_id", "is", null);
     const followUpReminderCountQ = supabase
       .from("jobs")
       .select("id", { count: "exact", head: true })
@@ -764,10 +778,8 @@ export default async function OpsPage({
       pendingInfoCountRes,
       onHoldCountRes,
       waitingStatusCountRes,
-      pendingOfficeReviewCountRes,
-      failedCountRes,
-      retestNeededCountRes,
-      problemCountRes,
+      exceptionStatusRowsRes,
+      retestContinuationRowsRes,
       followUpReminderCountRes,
       fieldWorkCountRes,
       scheduledOpenRowsRes,
@@ -781,10 +793,8 @@ export default async function OpsPage({
       pendingInfoCountQ,
       onHoldCountQ,
       waitingStatusCountQ,
-      pendingOfficeReviewCountQ,
-      failedCountQ,
-      retestNeededCountQ,
-      problemCountQ,
+      exceptionStatusRowsQ,
+      retestContinuationRowsQ,
       followUpReminderCountQ,
       fieldWorkCountQ,
       scheduledOpenRowsQ,
@@ -810,24 +820,27 @@ export default async function OpsPage({
     if (pendingInfoCountRes.error) throw pendingInfoCountRes.error;
     if (onHoldCountRes.error) throw onHoldCountRes.error;
     if (waitingStatusCountRes.error) throw waitingStatusCountRes.error;
-    if (pendingOfficeReviewCountRes.error) throw pendingOfficeReviewCountRes.error;
-    if (failedCountRes.error) throw failedCountRes.error;
-    if (retestNeededCountRes.error) throw retestNeededCountRes.error;
-    if (problemCountRes.error) throw problemCountRes.error;
+    if (exceptionStatusRowsRes.error) throw exceptionStatusRowsRes.error;
+    if (retestContinuationRowsRes.error) throw retestContinuationRowsRes.error;
     if (followUpReminderCountRes.error) throw followUpReminderCountRes.error;
     if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
     if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
     if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
 
+    const retestContinuationParentIds = buildRetestContinuationParentIds(retestContinuationRowsRes.data);
+    const currentExceptionCounts = countCurrentExceptionStatuses(
+      exceptionStatusRowsRes.data ?? [],
+      retestContinuationParentIds,
+    );
     const countsWs = new Map<string, number>([
       ["need_to_schedule", needToScheduleCountRes.count ?? 0],
       ["pending_info", pendingInfoCountRes.count ?? 0],
       ["on_hold", onHoldCountRes.count ?? 0],
       ["waiting", waitingStatusCountRes.count ?? 0],
-      ["pending_office_review", pendingOfficeReviewCountRes.count ?? 0],
-      ["failed", failedCountRes.count ?? 0],
-      ["retest_needed", retestNeededCountRes.count ?? 0],
-      ["problem", problemCountRes.count ?? 0],
+      ["pending_office_review", currentExceptionCounts.get("pending_office_review") ?? 0],
+      ["failed", currentExceptionCounts.get("failed") ?? 0],
+      ["retest_needed", currentExceptionCounts.get("retest_needed") ?? 0],
+      ["problem", currentExceptionCounts.get("problem") ?? 0],
       ["follow_ups", followUpReminderCountRes.count ?? 0],
     ]);
 
@@ -1073,7 +1086,10 @@ export default async function OpsPage({
 
       const queueRes = await queueQ;
       if (queueRes.error) throw queueRes.error;
-      return sortOpsBoardRows(queueRes.data ?? [], boardSort);
+      const currentRows = workspaceKey === "exceptions" || workspaceKey === "waiting"
+        ? excludeHistoricalRetestParents(queueRes.data ?? [], retestContinuationParentIds)
+        : queueRes.data ?? [];
+      return sortOpsBoardRows(currentRows, boardSort);
     }
 
     const workspacePreviewEntries = await Promise.all(
