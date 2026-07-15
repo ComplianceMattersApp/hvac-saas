@@ -421,6 +421,27 @@ describe("createTenantInvoiceCheckoutSession", () => {
     expect(firstCall[1]).toEqual(expect.objectContaining({ stripeAccount: "acct_connected_1" }));
   });
 
+  it("allows checkout after the invoice workflow is marked complete", async () => {
+    const fixture = buildSupabaseFixture({
+      jobInvoiceComplete: true,
+      jobBillingDisposition: null,
+    });
+    const createMock = vi.fn(async () => ({ id: "cs_test_closed_out", url: "https://checkout.stripe.com/c/pay/cs_test_closed_out" }));
+
+    await expect(
+      createTenantInvoiceCheckoutSession({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        stripe: { checkout: { sessions: { create: createMock } } } as any,
+        appUrl: "http://localhost:3000",
+      }),
+    ).resolves.toEqual(expect.objectContaining({ checkoutSessionId: "cs_test_closed_out" }));
+
+    expect(createMock).toHaveBeenCalledTimes(1);
+  });
+
   it("externally billed resolved jobs block checkout session creation", async () => {
     const fixture = buildSupabaseFixture({
       jobInvoiceComplete: true,
@@ -478,6 +499,27 @@ describe("createTenantInvoicePaymentLink", () => {
       lastSyncedAt: "2026-05-19T00:00:00.000Z",
       isReady: true,
     });
+  });
+
+  it("creates a payment link after the invoice workflow is marked complete", async () => {
+    const fixture = buildSupabaseFixture({
+      jobInvoiceComplete: true,
+      jobBillingDisposition: null,
+    });
+
+    await expect(
+      createTenantInvoicePaymentLink({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        appUrl: "https://app.example",
+        signingSecret: "test-secret",
+      }),
+    ).resolves.toEqual(expect.objectContaining({
+      paymentLinkUrl: expect.stringMatching(/^https:\/\/app\.example\/payments\/invoice\//),
+      balanceDueCents: 10000,
+    }));
   });
 
   it("creates an app-controlled signed payment URL without creating a Stripe Checkout Session", async () => {

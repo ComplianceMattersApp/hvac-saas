@@ -214,14 +214,17 @@ export async function resolveJobBlocksOnlineInvoicePayment(params: {
 
   const { data, error } = await params.supabase
     .from("jobs")
-    .select("id, invoice_complete, billing_disposition")
+    .select("id, billing_disposition")
     .eq("id", jobId)
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
 
   if (error || !data?.id) return false;
 
-  return Boolean(data.invoice_complete) || Boolean(normalizeJobBillingDisposition(data.billing_disposition));
+  // `invoice_complete` means the invoice workflow has been closed out/issued. It
+  // does not mean the invoice was paid. Only an explicit non-online billing
+  // disposition should prevent the customer from paying an issued balance.
+  return Boolean(normalizeJobBillingDisposition(data.billing_disposition));
 }
 
 const INTERNAL_INVOICE_PAYMENT_SELECT = [
