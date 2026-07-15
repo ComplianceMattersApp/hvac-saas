@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
 import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
-import { resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
+import { resolveInternalInvoiceById, resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
@@ -44,10 +44,14 @@ function formatInvoiceStatus(status?: string | null) {
 
 export default async function InternalInvoicePrintPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id: jobId } = await params;
+  const requestedInvoiceIdValue = (searchParams ? await searchParams : {})?.invoice_id;
+  const requestedInvoiceId = String(Array.isArray(requestedInvoiceIdValue) ? requestedInvoiceIdValue[0] : requestedInvoiceIdValue ?? "").trim();
   const supabase = await createClient();
 
   const {
@@ -110,7 +114,17 @@ export default async function InternalInvoicePrintPage({
   if (jobErr) throw jobErr;
   if (!job?.id) notFound();
 
-  const invoice = await resolveInternalInvoiceByJobId({ supabase, jobId });
+  const requestedInvoice = requestedInvoiceId
+    ? await resolveInternalInvoiceById({ supabase, invoiceId: requestedInvoiceId })
+    : null;
+  const canUseRequestedInvoice = Boolean(
+    requestedInvoice
+    && requestedInvoice.job_id === jobId
+    && requestedInvoice.account_owner_user_id === internalUser.account_owner_user_id,
+  );
+  const invoice = canUseRequestedInvoice
+    ? requestedInvoice
+    : await resolveInternalInvoiceByJobId({ supabase, jobId });
   if (!invoice?.id) notFound();
 
   const tenantIdentity = await resolveOperationalTenantIdentity({
@@ -142,17 +156,17 @@ export default async function InternalInvoicePrintPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 bg-slate-50/40 p-4 text-slate-900 sm:p-6 print:max-w-none print:bg-white print:p-0">
-      <PrintToolbar backHref={`/jobs/${jobId}/invoice`} />
+      <PrintToolbar backHref={`/jobs/${jobId}/invoice${invoice ? `?invoice_id=${encodeURIComponent(invoice.id)}` : ""}#invoice-workspace`} />
 
       <section className="overflow-hidden rounded-2xl border border-slate-300/80 bg-white shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] print:rounded-none print:border-slate-300 print:shadow-none">
         <div className="border-b border-slate-200/90 bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,0.98))] px-6 py-5 print:px-4 print:py-4">
-          <div className="flex items-start justify-between gap-6">
+          <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between sm:gap-6 print:flex-row print:justify-between">
             <div className="min-w-0">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800">Invoice</div>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 print:text-2xl">{invoiceReference}</h1>
               <p className="mt-2 text-sm text-slate-600">{job.title || "Service visit"}</p>
             </div>
-            <div className="flex min-w-[9rem] shrink-0 justify-end text-right">
+            <div className="flex min-w-0 shrink-0 justify-start text-left sm:min-w-[9rem] sm:justify-end sm:text-right print:min-w-[9rem] print:justify-end print:text-right">
               {hasLogo ? (
                 <img
                   src={String(tenantIdentity.logoUrl)}
@@ -209,6 +223,38 @@ export default async function InternalInvoicePrintPage({
           </div>
 
           <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 print:rounded-none print:border-slate-300">
+            <div className="divide-y divide-slate-200 md:hidden print:hidden">
+              {invoice.line_items.length === 0 ? (
+                <div className="px-4 py-4 text-sm text-slate-600">No billed line items were recorded.</div>
+              ) : invoice.line_items.map((lineItem, index) => (
+                <article key={lineItem.id} className="bg-white px-4 py-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Line {index + 1}</div>
+                  <div className="mt-1 font-semibold text-slate-950">{lineItem.item_name_snapshot}</div>
+                  {lineItem.description_snapshot ? (
+                    <div className="mt-1 text-sm leading-5 text-slate-600">{lineItem.description_snapshot}</div>
+                  ) : null}
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div className="col-span-2">
+                      <dt className="text-xs text-slate-500">Service Location</dt>
+                      <dd className="mt-0.5 break-words text-slate-800">{serviceLocationLabel || "Service location unavailable"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-500">Quantity</dt>
+                      <dd className="mt-0.5 font-medium text-slate-900">{Number(lineItem.quantity ?? 0).toFixed(2)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-500">Unit Price</dt>
+                      <dd className="mt-0.5 font-medium text-slate-900">{formatCurrencyFromAmount(lineItem.unit_price)}</dd>
+                    </div>
+                    <div className="col-span-2 border-t border-slate-100 pt-2">
+                      <dt className="text-xs text-slate-500">Subtotal</dt>
+                      <dd className="mt-0.5 text-base font-semibold text-slate-950">{formatCurrencyFromAmount(lineItem.line_subtotal)}</dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+            <div className="hidden md:block print:block">
             <div className="grid grid-cols-[minmax(0,1.65fr)_minmax(0,1.35fr)_minmax(0,0.9fr)_minmax(4.5rem,0.5fr)_minmax(6.5rem,0.65fr)_minmax(6.5rem,0.65fr)] gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 print:border-slate-300 print:bg-white">
               <div>Description</div>
               <div>Service Location</div>
@@ -241,6 +287,7 @@ export default async function InternalInvoicePrintPage({
                 ))}
               </div>
             )}
+            </div>
             <div className="flex items-center justify-end gap-6 border-t border-slate-200 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-900 print:border-slate-300 print:bg-white">
               <span>Total Due</span>
               <span>{formatCurrencyFromCents(invoice.total_cents)}</span>

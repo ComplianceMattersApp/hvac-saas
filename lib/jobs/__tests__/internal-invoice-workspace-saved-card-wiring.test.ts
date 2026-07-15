@@ -76,6 +76,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("workspaceHref: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(familyInvoice.id)}#invoice-workspace`");
     expect(source).toContain("selectedInvoiceId={invoice.id}");
     expect(source).toContain("<input type=\"hidden\" name=\"invoice_id\" value={invoice.id} />");
+    expect(source).toContain("/invoice/print?invoice_id=${encodeURIComponent(invoice.id)}");
   });
 
   it("shows Create Add-On Invoice only for issued primary invoice with lifecycle authority", () => {

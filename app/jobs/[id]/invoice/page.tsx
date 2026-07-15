@@ -920,7 +920,7 @@ export default async function InternalInvoiceWorkspacePage({
             </Link>
             {invoice ? (
               <Link
-                href={`/jobs/${jobId}/invoice/print`}
+                href={`/jobs/${jobId}/invoice/print?invoice_id=${encodeURIComponent(invoice.id)}`}
                 target="_blank"
                 rel="noreferrer"
                 className={secondaryButtonClass}

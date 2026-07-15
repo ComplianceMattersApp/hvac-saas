@@ -28,10 +28,26 @@ describe("internal invoice print reference wiring", () => {
   });
 
   it("uses a compact header with the logo or company mark across from the invoice title", () => {
-    expect(source).toContain("flex items-start justify-between gap-6");
-    expect(source).toContain("justify-end text-right");
+    expect(source).toContain("sm:flex-row sm:justify-between");
+    expect(source).toContain("sm:justify-end sm:text-right");
     expect(source).toContain('alt={tenantIdentity.displayName}');
     expect(source).toContain("max-h-16 max-w-[180px]");
+  });
+
+  it("uses readable mobile line-item cards while preserving the desktop and print table", () => {
+    expect(source).toContain("md:hidden print:hidden");
+    expect(source).toContain("hidden md:block print:block");
+    expect(source).toContain("<article key={lineItem.id}");
+    expect(source).toContain("Quantity");
+    expect(source).toContain("break-words");
+  });
+
+  it("prints the specifically selected primary or add-on invoice", () => {
+    expect(source).toContain("requestedInvoiceIdValue");
+    expect(source).toContain("resolveInternalInvoiceById");
+    expect(source).toContain("requestedInvoice.job_id === jobId");
+    expect(source).toContain("requestedInvoice.account_owner_user_id === internalUser.account_owner_user_id");
+    expect(source).toContain("invoice_id=${encodeURIComponent(invoice.id)}");
   });
 
   it("formats billing contact details on separate lines without slash-separated contact copy", () => {
