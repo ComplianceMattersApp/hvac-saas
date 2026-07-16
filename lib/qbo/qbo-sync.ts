@@ -56,6 +56,21 @@ function nonEmpty(value: unknown): string | null {
   return s.length > 0 ? s : null;
 }
 
+function resolveJobContext(customerRow: any | null, jobRow: any | null): string | null {
+  const customerName =
+    nonEmpty(customerRow?.full_name) ??
+    nonEmpty([customerRow?.first_name, customerRow?.last_name].filter(Boolean).join(" ")) ??
+    nonEmpty([jobRow?.customer_first_name, jobRow?.customer_last_name].filter(Boolean).join(" "));
+  const jobNumber = nonEmpty(jobRow?.job_display_number);
+  const serviceAddress = nonEmpty(jobRow?.job_address);
+  const parts = [
+    customerName ? `Customer: ${customerName}` : null,
+    jobNumber ? `Job #${jobNumber}` : null,
+    serviceAddress,
+  ].filter((part): part is string => Boolean(part));
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 async function updateInvoiceSyncFields(
   supabase: any,
   invoiceId: string,
@@ -98,6 +113,7 @@ function buildInvoiceInput(
   invoiceRow: any,
   lineItems: any[],
   customerRef: string,
+  jobContext: string | null,
 ): QboInvoiceInput {
   return {
     docNumber: String(invoiceRow.invoice_display_number ?? invoiceRow.invoice_number ?? ""),
@@ -107,8 +123,10 @@ function buildInvoiceInput(
       const quantity = toNumber(line.quantity);
       const unitPrice = toNumber(line.unit_price);
       const amount = line.line_subtotal != null ? toNumber(line.line_subtotal) : quantity * unitPrice;
+      const serviceDescription =
+        nonEmpty(line.description_snapshot) ?? String(line.item_name_snapshot ?? "Services");
       return {
-        description: nonEmpty(line.description_snapshot) ?? String(line.item_name_snapshot ?? "Services"),
+        description: jobContext ? `${jobContext}\n${serviceDescription}` : serviceDescription,
         amount,
         quantity,
         unitPrice,
@@ -148,12 +166,16 @@ async function syncSingleInvoiceWithContext(
     }
 
     // Eligibility: skip work the job resolved without a collectible platform invoice.
+    let jobRow: any | null = null;
     if (invoiceRow.job_id) {
-      const { data: jobRow } = await supabase
+      const { data } = await supabase
         .from("jobs")
-        .select("billing_disposition")
+        .select(
+          "billing_disposition, job_display_number, job_address, customer_first_name, customer_last_name",
+        )
         .eq("id", invoiceRow.job_id)
         .maybeSingle();
+      jobRow = data ?? null;
       if (jobRow?.billing_disposition) {
         await updateInvoiceSyncFields(supabase, invoiceId, {
           qbo_sync_status: "skipped",
@@ -201,7 +223,12 @@ async function syncSingleInvoiceWithContext(
       customer: customerInput,
     });
 
-    const invoiceInput = buildInvoiceInput(invoiceRow, lineItems, qboCustomer.id);
+    const invoiceInput = buildInvoiceInput(
+      invoiceRow,
+      lineItems,
+      qboCustomer.id,
+      resolveJobContext(customerRow, jobRow),
+    );
 
     let synced;
     if (!invoiceRow.qbo_invoice_id) {

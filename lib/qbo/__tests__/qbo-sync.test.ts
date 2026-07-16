@@ -231,13 +231,60 @@ describe("bill-to-aware QBO customer mapping", () => {
           billing_email: "ap@sm.example", invoice_display_number: 3001, invoice_date: "2026-07-14", qbo_invoice_id: null,
         },
       },
-      jobs: { single: { billing_disposition: null } },
+      jobs: {
+        single: {
+          billing_disposition: null,
+          job_display_number: "1301",
+          job_address: "876 Rutledge Dr, Lodi CA 95242",
+        },
+      },
       customers: { single: { full_name: "Beck Raintree" } },
       internal_invoice_line_items: lines,
     });
     await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-c" });
     expect(findOrCreateQboCustomer).toHaveBeenCalledWith(
       expect.objectContaining({ customer: expect.objectContaining({ displayName: "Service Master, Inc." }) }),
+    );
+    expect(createQboInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoice: expect.objectContaining({
+          lines: [
+            expect.objectContaining({
+              description:
+                "Customer: Beck Raintree · Job #1301 · 876 Rutledge Dr, Lodi CA 95242\nDuct",
+            }),
+          ],
+        }),
+      }),
+    );
+  });
+
+  it("falls back to the job customer snapshot when no live customer is available", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-context", status: "issued", account_owner_user_id: "acc", job_id: "job-context",
+          customer_id: null, billing_name: "Simi Heating and Air", invoice_display_number: 3003,
+          invoice_date: "2026-07-16", qbo_invoice_id: null,
+        },
+      },
+      jobs: {
+        single: {
+          billing_disposition: null, customer_first_name: "Sandra", customer_last_name: "Meeks",
+          job_display_number: "1302", job_address: "123 Main St, Lodi CA",
+        },
+      },
+      internal_invoice_line_items: lines,
+    });
+    await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-context" });
+    expect(createQboInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoice: expect.objectContaining({
+          lines: [expect.objectContaining({
+            description: "Customer: Sandra Meeks · Job #1302 · 123 Main St, Lodi CA\nDuct",
+          })],
+        }),
+      }),
     );
   });
 
