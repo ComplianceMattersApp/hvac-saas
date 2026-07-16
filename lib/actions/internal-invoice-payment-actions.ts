@@ -24,6 +24,7 @@ import {
 } from '@/lib/business/internal-invoice-payments';
 import { upsertInvoicePaymentAllocationForPaymentRow } from '@/lib/business/payment-allocations';
 import { autoSyncRecordedPaymentToQbo } from '@/lib/qbo/qbo-payment-auto-sync';
+import { deliverInternalPaymentReceivedEmail } from '@/lib/payments/payment-received-email';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import {
   type TenantInvoiceCheckoutSessionActionState,
@@ -422,6 +423,15 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     accountOwnerUserId: internalUser.account_owner_user_id,
     paymentId: paymentTruth.paymentId,
   });
+
+  try {
+    await deliverInternalPaymentReceivedEmail({ paymentId: paymentTruth.paymentId });
+  } catch (error) {
+    console.warn('Payment received email failed after manual payment truth was recorded', {
+      paymentId: paymentTruth.paymentId,
+      message: error instanceof Error ? error.message : 'unknown_error',
+    });
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/invoice`);

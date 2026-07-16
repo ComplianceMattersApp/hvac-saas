@@ -17,6 +17,11 @@ const revalidatePathMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const resolveFieldBillingCapabilitiesMock = vi.fn();
 const loadFieldBillingExplicitCapabilitiesForUserMock = vi.fn();
+const deliverInternalPaymentReceivedEmailMock = vi.fn(async (_args: unknown) => ({ sent: true }));
+
+vi.mock('@/lib/payments/payment-received-email', () => ({
+  deliverInternalPaymentReceivedEmail: (args: unknown) => deliverInternalPaymentReceivedEmailMock(args),
+}));
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {

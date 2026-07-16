@@ -14,6 +14,19 @@ import {
 } from "@/lib/business/tenant-invoice-stripe-webhooks";
 import { recordTenantSavedPaymentMethodSetupFromCheckoutSession } from "@/lib/business/tenant-saved-payment-method-setups";
 import { createAdminClient } from "@/lib/supabase/server";
+import { deliverInternalPaymentReceivedEmail } from "@/lib/payments/payment-received-email";
+
+async function notifyNewRecordedPayment(result: { recorded: boolean; paymentId?: string }) {
+  if (!result.recorded || !result.paymentId) return;
+  try {
+    await deliverInternalPaymentReceivedEmail({ paymentId: result.paymentId });
+  } catch (error) {
+    console.warn("Payment received email failed after Stripe payment truth was recorded", {
+      paymentId: result.paymentId,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+  }
+}
 
 const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.completed",
@@ -72,12 +85,13 @@ export async function POST(request: Request) {
         : "";
 
       if (session.mode === "payment") {
-        await recordTenantInvoicePaymentFromCheckoutSession({
+        const paymentResult = await recordTenantInvoicePaymentFromCheckoutSession({
           session,
           eventId: event.id,
           connectedAccountId,
           stripe,
         });
+        await notifyNewRecordedPayment(paymentResult);
 
         return NextResponse.json({ received: true });
       }
@@ -148,11 +162,12 @@ export async function POST(request: Request) {
         : "";
 
       if (invoiceId) {
-        await recordTenantInvoicePaymentFromStripeCharge({
+        const paymentResult = await recordTenantInvoicePaymentFromStripeCharge({
           charge,
           eventId: event.id,
           connectedAccountId,
         });
+        await notifyNewRecordedPayment(paymentResult);
       }
     }
 

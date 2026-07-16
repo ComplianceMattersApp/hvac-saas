@@ -5,6 +5,11 @@ const mockRecordTenantInvoicePaymentFailureFromStripeCharge = vi.fn();
 const mockRecordTenantInvoicePaymentFromCheckoutSession = vi.fn();
 const mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession = vi.fn();
 const mockCreateAdminClient = vi.fn(() => ({ from: vi.fn() }));
+const mockDeliverInternalPaymentReceivedEmail = vi.fn(async () => ({ sent: true }));
+
+vi.mock('@/lib/payments/payment-received-email', () => ({
+  deliverInternalPaymentReceivedEmail: mockDeliverInternalPaymentReceivedEmail,
+}));
 
 vi.mock('@/lib/business/tenant-invoice-stripe-webhooks', () => ({
   recordTenantInvoicePaymentFromCheckoutSession: mockRecordTenantInvoicePaymentFromCheckoutSession,
