@@ -168,7 +168,6 @@ export default async function NewJobPage(props: {
     if (accountOwnerUserId && internalUserRow?.is_active !== false) {
       const assignableUsers = await getAssignableInternalUsers({ supabase, accountOwnerUserId });
       technicians = assignableUsers
-        .filter((staff) => staff.role === "tech")
         .map((staff) => ({ user_id: staff.user_id, display_name: staff.display_name }));
 
       const { data: pricebookRows, error: pricebookRowsErr } = await supabase

@@ -1164,7 +1164,7 @@ const [billingRecipient, setBillingRecipient] = useState<
     : null;
   const selectedTechnicianName = technicians.find((technician) => technician.user_id === assignedUserId)?.display_name ?? "";
   const confirmationTechnicianLine = selectedTechnicianName
-    ? `Assigned tech: ${selectedTechnicianName}`
+    ? `Assigned team member: ${selectedTechnicianName}`
     : null;
   const confirmationSecondaryDetails = [
     confirmationWorkItemsLine,
@@ -3332,7 +3332,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
                   <div className="space-y-1.5 border-t border-slate-200 pt-3">
                     <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="assigned-user-id">
-                      Assign Technician (optional)
+                      Assign Team Member (optional)
                     </label>
                     <select
                       id="assigned-user-id"
@@ -3349,7 +3349,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       ))}
                     </select>
                     <p className="text-[11px] leading-5 text-slate-500">
-                      Assign the primary field technician now, or leave the job unassigned for dispatch.
+                      Assign the primary person now, or leave the job unassigned for dispatch.
                     </p>
                   </div>
 
