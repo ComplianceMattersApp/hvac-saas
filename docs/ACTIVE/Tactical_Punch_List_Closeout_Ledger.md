@@ -5,6 +5,16 @@ Scope: minor fixes, low-risk polish, small regressions, tactical performance fix
 
 Authority: governed by [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). [`docs/PROJECT_TRUTH.md`](../PROJECT_TRUTH.md) owns current product truth; this ledger is tactical evidence and should not be treated as a model spec.
 
+## July 2026 Contractor Experience and Payment Communications Closeout
+
+Status: CLOSED in code on `main`; normal post-deploy operator smoke remains tracked in the prelaunch checklist.
+
+- Commits: `b0060596` public invoice payment; `7ed4799d` contractor management; `84e0435c` internal payment-received email; `bfd30a55` internal contractor financial history; `6107dc0e` contractor invoice center.
+- Validation at slice close: public payment lane 73 focused tests plus TypeScript; contractor management 12 tests plus TypeScript; payment communications 83 tests plus TypeScript; internal contractor history 13 tests plus TypeScript; contractor invoice center 14 authorization/payment tests plus TypeScript.
+- Migration `20260716090000_internal_payment_email_deliveries.sql` was owner-confirmed applied before the payment-communications commit reached `main`.
+- Durable boundaries: payment truth remains recorded rows/active allocations; Stripe collection remains webhook-confirmed; email failure cannot roll back payment; contractor invoice visibility requires frozen contractor billing identity and never job assignment; QBO remains downstream.
+- Full operator map and remaining exclusions: [Contractor_Payment_Communications_Closeout_2026-07.md](./Contractor_Payment_Communications_Closeout_2026-07.md).
+
 ## July 2026 Field Ops Queue Regression Guardrails
 
 Status: CLOSED for the July 15, 2026 implementation slices merged to `main`.

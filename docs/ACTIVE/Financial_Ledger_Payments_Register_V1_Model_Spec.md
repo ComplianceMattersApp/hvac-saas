@@ -10,6 +10,10 @@ This spec owns durable Financial Ledger / Payments Register source-of-truth cont
 
 Duplicated closeout sections may be shortened against the evidence ledger when the durable model contract remains clear in this spec. Do not remove payment invariants, allocation truth, failed-payment handling, or invoice paid/balance projection contracts from this spec.
 
+## July 2026 Runtime Consumer Note
+
+This model remains authoritative for payment truth. Current runtime consumers now include signed invoice-specific guest Stripe payment, manual/off-platform payment recording, Stripe webhook dual-write, QBO downstream sync, internal payment-received email, internal contractor financial history, and the strictly contractor-billed portal invoice center. These consumers do not change the invariants below: only recorded payment/allocation truth counts; communication and portal views are projections; QBO is downstream; failed/pending/reversed rows are not collected money. Older deferred lists in phase-closeout prose are historical to those phases and do not override this current posture.
+
 ## Financial Trust Lane Settlement Boundary Note
 
 - Deposits / Payout Reconciliation V1 is documented in [Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md).
@@ -445,7 +449,7 @@ Each slice should preserve webhook-only truth for Stripe-collected payments and 
 
 Related active docs:
 
-- [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md)
+- [PROJECT_TRUTH.md](../PROJECT_TRUTH.md)
 - [Compliance_Matters_Payments_Roadmap.md](./Compliance_Matters_Payments_Roadmap.md)
 - [Compliance_Matters_Business_Layer_Roadmap.md](./Compliance_Matters_Business_Layer_Roadmap.md)
 - [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md)

@@ -2,7 +2,7 @@
 
 Status: ACTIVE planning packet  
 Mode: Documentation/planning only  
-Authority: Subordinate to Active Spine and existing ACTIVE runbooks/roadmaps  
+Authority: Subordinate to `docs/PROJECT_TRUTH.md` and the current roadmap
 Date: 2026-05-08
 
 ## Documentation Authority Note
@@ -10,15 +10,24 @@ Date: 2026-05-08
 - Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md).
 - This roadmap owns strategic sequencing, deferred/gated lanes, unlock criteria, and roadmap order.
 - It should not store full implementation closeouts, smoke evidence, tactical polish logs, or repeated model contracts.
-- Current product truth belongs in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md).
+- Current product truth belongs in [PROJECT_TRUTH.md](../PROJECT_TRUTH.md); the former Active Spine is retired.
 - Launch-readiness gates belong in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md).
 - Minor tactical fixes and low-risk polish closeouts should be recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), not expanded here unless they change roadmap sequencing.
 - The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
 
+## July 2026 Contractor Billing / Guest Payment Closeout
+
+- Guest invoice payment, internal payment-received communication, internal contractor financial history, and the strictly contractor-billed portal invoice center are complete in current scope.
+- "Public payment portal" references below must now be read narrowly: signed invoice-specific guest payment is implemented; a broad customer account portal remains deferred.
+- "Receipt messaging" references below must distinguish the implemented internal payment-received operational email from a future customer receipt program.
+- "Contractor portal exposure" references below are superseded only for issued invoices actually billed to the authenticated contractor. Customer-billed invoices, unrelated work, internal notes, QBO state, and staff financial records remain excluded.
+- Saved-card contractor self-service remains deferred even though internal saved-method capabilities exist elsewhere.
+- Full operator map, boundaries, commits, and smoke checklist: [Contractor_Payment_Communications_Closeout_2026-07.md](./Contractor_Payment_Communications_Closeout_2026-07.md).
+
 ## June 2026 Access / Portal / Location / Workflow Polish Closeout
 
 - Status: CLOSED for current implementation lanes.
-- Current-state truth remains summarized in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md).
+- Current-state truth is owned by [PROJECT_TRUTH.md](../PROJECT_TRUTH.md).
 - Customer/location boundaries are governed by [source-of-truth-strategy.md](./source-of-truth-strategy.md).
 - ECC retest and guided-workflow boundaries are governed by [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md) and [Guided_Workflow_Maturation_Closeout.md](./Guided_Workflow_Maturation_Closeout.md).
 - Recent tactical polish and minor-fix closeouts are recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
@@ -58,7 +67,7 @@ Date: 2026-05-08
 
 ## Payment Roadmap Gates and Deferred Expansion
 
-- Payment/deposits current truth is summarized in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md); detailed model/evidence belongs in [Compliance_Matters_Payments_Roadmap.md](./Compliance_Matters_Payments_Roadmap.md), [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md), [Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md), and [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
+- Payment/deposits current truth is summarized in [PROJECT_TRUTH.md](../PROJECT_TRUTH.md); detailed model/evidence belongs in [Compliance_Matters_Payments_Roadmap.md](./Compliance_Matters_Payments_Roadmap.md), [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md), [Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md), and [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
 - Roadmap-relevant closed foundations: platform-fee handling, manual saved-card charge, scheduled-autopay attempt/attention visibility, failed-payment reconciliation visibility, and deposits reporting foundation.
 - Roadmap-relevant gates: controlled production money-flow/deposits proof, explicit approval before deeper Payments V2 expansion, and separate decisions for refunds, disputes, ACH, customer self-service payment flows, automated customer failed-payment messaging, broader QBO/accounting sync, and deeper recurring-billing automation.
 - Payment guardrails remain unchanged: webhook-confirmed payment truth drives invoice paid/balance; failed payments remain non-collected; payment outcomes do not mutate service visits or next-due dates; saved-method/autopay attempts remain attempt/attention truth; financial actions remain Owner/Admin/Billing-gated.

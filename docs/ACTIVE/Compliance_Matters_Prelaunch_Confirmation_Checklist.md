@@ -1,8 +1,33 @@
 ﻿# Compliance Matters Software â€” Pre-Launch Confirmation Checklist
 
 **Status:** ACTIVE PRE-LAUNCH PLANNING SUPPORT DOC  
-**Authority:** Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md`  
+**Authority:** Subordinate to `docs/PROJECT_TRUTH.md`
 **Purpose:** Keep final launch enablements, hardening items, and rollout confirmations visible so they do not fall off the agenda while core development continues.
+
+---
+
+## July 2026 Contractor Billing and Payment Communications Production Check
+
+Current shipped posture:
+
+- Signed invoice-specific payment links are public and do not require signup.
+- Contractor-billed and customer-billed invoices use the same secure Stripe payment-link rail.
+- Internal payment-received email follows durable manual or webhook-confirmed payment truth and is deduplicated by payment plus recipient.
+- Internal contractor financial history is staff-only.
+- Contractor portal invoice access is limited to issued invoices frozen as billed to the authenticated contractor; job association grants nothing.
+
+Post-deploy confirmation:
+
+- [ ] Open an emailed signed payment link in a signed-out/private browser and confirm no login redirect.
+- [ ] Confirm invoice review shows only company, invoice, billing recipient, total, paid, and balance data.
+- [ ] Cancel Checkout and confirm no collected payment; return remains public-safe.
+- [ ] Complete one controlled Stripe payment and confirm one recorded payment, allocation parity, paid/balance projection, and one internal payment-received email.
+- [ ] Record one controlled manual/check payment and confirm payment truth survives even if email delivery is unavailable.
+- [ ] Sign in as a contractor with a contractor-billed issued invoice and confirm `/portal/invoices`, detail, print, and payment access.
+- [ ] Confirm that same contractor cannot access a customer-billed invoice, another contractor's invoice, a draft invoice, or an invoice found only through job assignment.
+- [ ] Confirm QBO status remains downstream and is not implied by payment or email success.
+
+Detailed closeout: [Contractor_Payment_Communications_Closeout_2026-07.md](./Contractor_Payment_Communications_Closeout_2026-07.md).
 
 ---
 
@@ -10,18 +35,18 @@
 
 This is a **launch-readiness checklist**, not the operational source of truth.
 
-If any item here conflicts with the active spine, the spine wins.
+If any item here conflicts with `docs/PROJECT_TRUTH.md`, project truth wins.
 
 Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). This checklist owns launch gates, operator readiness, and runbook-gated launch confirmations only. Do not add full implementation closeouts, tactical polish logs, roadmap backlog detail, or repeated model contracts here.
 
-Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for current product truth, [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for deferred/growth sequencing, and [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md) for recent low-risk tactical fixes that support launch readiness. The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
+Use [PROJECT_TRUTH.md](../PROJECT_TRUTH.md) for current product truth, [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for deferred/growth sequencing, and [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md) for recent low-risk tactical fixes that support launch readiness. The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
 
 ---
 
 ## 1.1 Recent access / portal / location / workflow closeout confirmations
 
 - Current launch baseline confirms the recent access, portal, customer/location, ECC retest, equipment-intake, signup/reactivation, and device-setup polish lanes are closed for current scope.
-- Canonical current-state details live in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md), with domain boundaries in [source-of-truth-strategy.md](./source-of-truth-strategy.md), [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md), and [Guided_Workflow_Maturation_Closeout.md](./Guided_Workflow_Maturation_Closeout.md).
+- Canonical current-state details live in [PROJECT_TRUTH.md](../PROJECT_TRUTH.md), with domain boundaries in [source-of-truth-strategy.md](./source-of-truth-strategy.md), [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md), and [Guided_Workflow_Maturation_Closeout.md](./Guided_Workflow_Maturation_Closeout.md).
 - Tactical minor-fix/polish evidence lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
 - This checklist should track only launch gates and operator readiness; parked/deferred items remain in the roadmap unless they become launch blockers.
 

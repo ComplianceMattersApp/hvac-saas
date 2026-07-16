@@ -15,6 +15,15 @@ Purpose: Where the build currently stands and what work is safe to continue. An 
 - Every lane inherits the standing constraints in [PROJECT_TRUTH.md](./PROJECT_TRUTH.md). Where a lane lists **Guardrails**, those are the specific do-not-cross lines for that lane on top of the standing constraints.
 - Update this file at lane close: move the lane to "Recently closed lanes," collapse it to one line, and push detail to the ledgers.
 
+### Recently closed — Contractor experience and payment communications (July 2026)
+
+- **Status: Closed in code; production operator smoke remains the normal post-deploy confirmation.** Public signed invoice payment no longer requires signup; payers receive a limited review step before Stripe and a public-safe return experience.
+- Contractor management is profile-centered: searchable compact directory, dedicated internal profile, billing/QBO identity, access administration, lifecycle controls, associated work, and contractor-billed invoice/payment/delivery history.
+- Internal payment-received email is wired after durable manual or Stripe-recorded payment truth with database dedupe and failure isolation.
+- Contractor portal invoice center is live at `/portal/invoices` and is authorized only by frozen contractor billing identity, never job assignment. Detail, printable view, and payment entry points repeat the same scope check.
+- Remaining closeout is documentation and production smoke evidence only. Deferred payment expansion remains ACH, refunds/disputes, contractor saved-card self-service, and broader recurring automation.
+- Operator map and smoke checklist: [Contractor_Payment_Communications_Closeout_2026-07.md](./ACTIVE/Contractor_Payment_Communications_Closeout_2026-07.md).
+
 ### Standing constraints (apply to every lane)
 
 These hold in every session regardless of which lane is active. They restate the load-bearing rules from [PROJECT_TRUTH.md](./PROJECT_TRUTH.md):

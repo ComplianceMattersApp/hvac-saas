@@ -11,6 +11,23 @@ This document absorbs the locked (`§§1–20`) content of the retired `Active S
 
 ---
 
+## July 2026 Contractor Billing and Payment Communications Lock
+
+The following is current runtime truth and supersedes older future/deferred wording in this document:
+
+- Tenant invoice payment acceptance is live through Stripe connected-account Checkout. Stripe webhook-confirmed `internal_invoice_payments` rows remain collected-money truth; opening a link, creating Checkout, or returning from Checkout never marks an invoice paid.
+- Signed `/payments/invoice/{token}` links are intentionally public and require no account. They expose only limited invoice/payment summary data, revalidate issued status and current balance, and create Checkout only after an explicit payer action.
+- Manual/off-platform payments and Stripe-confirmed payments share the same payment register and allocation truth. Failed, pending, and reversed rows do not count as collected money.
+- Internal payment-received email is live after durable recorded payment truth. Delivery is best-effort, uniquely claimed by payment and recipient, and never rolls back payment truth. The configured business support email is the first recipient; the account-owner profile email is fallback.
+- Internal contractor profiles show contractor-associated jobs separately from invoices whose frozen billing recipient is that contractor. Job assignment never proves payment responsibility.
+- Authenticated contractor portal users may access only issued invoices with `bill_to_kind = contractor` and a matching `bill_to_contractor_id`. List, detail, printable view, and payment-link creation repeat that boundary. Customer/homeowner-billed invoices and unrelated work remain invisible.
+- QBO is implemented as optional downstream accounting synchronization and never overrides EveryStep invoice, payment, job, or closeout truth.
+- Still deferred: customer portal/client hub, ACH, refunds/disputes, contractor saved-card self-service, and broader recurring-payment automation.
+
+Closeout and operator paths: [Contractor_Payment_Communications_Closeout_2026-07.md](./ACTIVE/Contractor_Payment_Communications_Closeout_2026-07.md).
+
+---
+
 ## 1. Product Identity
 
 Product name: EveryStep JobWorks
@@ -538,52 +555,52 @@ Stability: `equipment_role` is currently editable for correction. Changing role 
 
 ## 19. Payments Module (Locked Direction)
 
-The platform is payment-ready by design, not yet payment-active. Detailed payment sequencing and evidence live in the payment specs: [ACTIVE/Compliance_Matters_Payments_Roadmap.md](./ACTIVE/Compliance_Matters_Payments_Roadmap.md), [ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md](./ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md), [ACTIVE/Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./ACTIVE/Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md), [ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
+The platform is payment-active for manual/off-platform payment recording and Stripe connected-account invoice Checkout. Detailed payment sequencing and evidence live in the payment specs: [ACTIVE/Compliance_Matters_Payments_Roadmap.md](./ACTIVE/Compliance_Matters_Payments_Roadmap.md), [ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md](./ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md), [ACTIVE/Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./ACTIVE/Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md), [ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
 
 ### 19.2 Core payment direction (locked)
-The platform is payment-ready by design; not yet payment-active; the architecture supports future live payments without requiring redesign.
+The platform supports live invoice collection through Stripe and durable manual/off-platform payment recording. Future payment rails and features must extend the existing register, allocation, and webhook-confirmed truth model without redesigning it.
 
 ### 19.3 Ownership model (locked)
 - EveryStep JobWorks = operational source of truth for payment visibility, payment-related workflow state, and operational tracking.
-- Stripe = implemented rail for platform account subscription onboarding; future preferred rail for tenant customer payment acceptance and money movement.
-- QBO (optional future) = accounting integration seam only.
+- Stripe = implemented rail for platform subscription onboarding and tenant invoice payment acceptance through connected-account Checkout.
+- QBO = implemented but owner/Intuit-gated optional downstream accounting synchronization; never operational or payment truth.
 
 Operational payment state, accounting sync, and payment execution are separate layers and must remain separate in the architecture.
 
 ### 19.4 QBO rule (locked)
-QuickBooks Online must not be the required foundation for payment architecture. QBO is optional, downstream, accounting-oriented, a future sync/integration seam. QBO is not the required basis for payment acceptance, the payment rail, the required merchant setup, or a prerequisite for core product usage.
+QuickBooks Online must not be the required foundation for payment architecture. QBO is optional, downstream, accounting-oriented synchronization. QBO is not the required basis for payment acceptance, the payment rail, the required merchant setup, or a prerequisite for core product usage.
 
 ### 19.5 Stripe rule (locked)
-Stripe is the preferred future payment rail. Future customer payment execution should follow a Stripe-first path; processor-backed payment handling must not depend on QBO adoption; future contractor payout/onboarding complexity should live at the payment-rail layer, not in accounting logic. Platform subscription onboarding V1 is implemented (admin checkout, portal access, webhook entitlement sync) and must not be treated as tenant customer invoice payment execution; tenant Pay Now/Charge Card/invoice checkout/refunds/disputes/payout execution remains deferred. Keep Stripe implementation additive.
+Stripe is the implemented payment rail for platform subscription onboarding and tenant invoice Checkout. Processor-backed payment handling does not depend on QBO; verified Stripe webhook outcomes create payment truth. Signed invoice-specific guest payment is implemented, while refunds, disputes, ACH, payouts, broad customer portal self-service, and contractor saved-card self-service remain deferred. Keep future Stripe expansion additive and preserve payment/register idempotency.
 
 ### 19.6 Current live behavior
-Supported now: payment tracking · payment status visibility · amount due/paid visibility where implemented · manual/external payment reference tracking · operational awareness of payment state. Not yet supported: live card acceptance · ACH · saved payment methods · processor-led refunds · dispute/chargeback handling · contractor payout onboarding · customer self-serve payment checkout.
+Supported now: payment tracking; payment status and amount due/paid visibility; manual/external payment recording; Stripe invoice Checkout; signed invoice-specific guest payment; webhook-confirmed payment truth; and operational payment-received email. Not yet supported: ACH; saved payment methods; processor-led refunds; dispute/chargeback handling; contractor payout onboarding; or a broad customer payment portal beyond signed invoice links.
 
 ### 19.7 Payment foundation requirements
 - **19.7.1 Data-model rule:** the payment domain must be built to represent payment status, amount due, amount paid, balance due, payment method type, processor name, processor reference, recorded/paid date, refund status, refund amount, failure/error note, and sync status — without requiring all execution flows to exist now.
-- **19.7.2 Processor abstraction rule:** payment tracking must remain processor-agnostic at the domain level. Do not hardcode payment logic around QBO-specific objects, accounting-only assumptions, or one-off manual patterns that would block future Stripe rollout. The layer must allow manual/off-platform recorded payments now, Stripe execution later, and optional QBO sync later.
+- **19.7.2 Processor abstraction rule:** payment tracking must remain processor-agnostic at the domain level. Do not hardcode payment logic around QBO-specific objects, accounting-only assumptions, or one-off manual patterns that would block payment-rail expansion. The layer supports manual/off-platform recorded payments and Stripe execution now, with optional downstream QBO synchronization.
 - **19.7.3 Event rule:** payment-related operational changes should be event-capable from the start (`invoice_sent`, `payment_recorded`, `payment_partially_paid`, `payment_marked_paid`, `payment_marked_failed`, `refund_recorded`, `payment_sync_failed`). If payment state materially affects operations, history, or accountability, it should be event-backed.
-- **19.7.4 UI rule:** current UI must reflect tracking truth only. Allowed language: Payment Status, Amount Paid, Balance Due, Payment Recorded, External Payment Reference. Disallowed until live processing exists: Pay Now, Collect Card, Charge Card, Process Refund, Card on File. The UI must not imply live processor-backed payment functionality before it is actually implemented.
+- **19.7.4 UI rule:** current UI must reflect recorded and processor-confirmed truth only. Payment Status, Amount Paid, Balance Due, Payment Recorded, External Payment Reference, and invoice-specific Pay Now language are allowed where the live Stripe flow is available. Process Refund, Card on File, ACH, or similar language remains disallowed until the corresponding functionality exists.
 
 ### 19.8 Platform-fee rule (locked)
-Future Stripe-based acceptance should support a small **configurable** platform fee: the architecture should allow the platform to retain a modest fee later; the fee must be configurable, not hardcoded as an aggressive monetization model; do not make payment monetization the centerpiece of the current build.
+Stripe-based acceptance may support a small **configurable** platform fee later: the architecture should allow the platform to retain a modest fee; the fee must be configurable, not hardcoded as an aggressive monetization model; do not make payment monetization the centerpiece of the current build.
 
 ### 19.9 Roadmap phase framework (locked layering)
-- **P0 — Tracking only (current live state):** payment visibility, status tracking, operational awareness, manual/external reference support.
-- **P1 — Payment-ready foundation:** payment domain model, payment fields, processor-agnostic architecture, event-ready transitions, UI wording boundaries, future Stripe seam, optional future QBO sync seam, support for a later configurable platform fee.
-- **P2 — Customer payment acceptance (later):** customer pays invoice online; outcome writes back; state updates automatically; simple Stripe-first path; no payout complexity unless required. Platform subscription billing execution is a separate platform-billing track and must not be conflated with tenant invoice billed/collected tracking truth.
+- **P0 — Tracking foundation (complete):** payment visibility, status tracking, operational awareness, and manual/external reference support.
+- **P1 — Payment-ready foundation (complete):** payment domain model, processor-agnostic architecture, event-ready transitions, UI wording boundaries, Stripe seam, optional downstream QBO seam, and support for a later configurable platform fee.
+- **P2 — Invoice payment acceptance (complete for current scope):** a payer can pay an issued invoice through signed guest access and Stripe Checkout; webhook-confirmed outcomes write back and update state automatically. Platform subscription billing remains a separate platform-billing track.
 - **P3 — Contractor/platform payout layer (later):** only after customer acceptance is stable — contractor onboarding, payout rules, recipient ownership logic, refund/dispute responsibility, optional platform-fee activation.
-- **P4 — Optional QBO sync (later):** accounting convenience only; QBO sync must remain optional and downstream.
+- **P4 — Optional QBO sync (implemented and gated):** accounting convenience only; QBO sync remains optional and downstream.
 
 > (Current phase status and the P1 completed-slice evidence live in [CURRENT_ROADMAP.md](./CURRENT_ROADMAP.md) and the payment evidence ledgers, not here.)
 
 ### 19.10 Launch rule (locked)
-Lack of live payment acceptance does not automatically block launch — payment tracking still supports operations, the system can manage invoice/payment visibility, and payment execution is a later convenience/collection layer.
+Live payment acceptance is available but is not required for every invoice or tenant workflow. Manual/off-platform recording remains supported, and a Stripe or QBO outage must not erase operational invoice/payment visibility.
 
 ### 19.11 Non-negotiables
 - do not require QBO for payment architecture
 - do not couple payment readiness to accounting adoption
-- do not imply live payment acceptance before it exists
+- do not imply unsupported payment capabilities beyond the live invoice-specific Stripe flow
 - do not hardcode around QBO-specific payment structures
 - do not overbuild payout complexity too early
 - do support a future small configurable platform fee

@@ -10,6 +10,10 @@ This spec owns durable Payments V2 / Service Plan Billing source-of-truth contra
 
 Duplicated closeout sections may be shortened against the evidence ledger when the durable model contract remains clear in this spec. Do not remove billing-period contracts, payment identity/dedupe boundaries, saved-method attempt truth, or service-plan invoice relationship contracts from this spec.
 
+## July 2026 Scope Clarification
+
+Invoice-specific guest payment and a contractor accounts-payable invoice center are implemented consumers of normal internal invoice/payment truth. They are not a broad customer portal, do not alter service-plan billing-period rules, and do not authorize contractor saved-card self-service or recurring automation. Internal payment-received operational email is implemented; automated customer receipt programs remain separate. Older phase statements saying no portal/payment-link/receipt behavior changed remain true for those historical phases but are not current global product status.
+
 ## Payment / Autopay Closeout Evidence Summary
 
 Historical closeout proof for Phase 6F-C manual saved-card charge, Phase 6G scheduled-autopay attempt smoke, Phase 6H failed-autopay attention/retry, and Phase 6I failed-payment reconciliation visibility is preserved in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md).
