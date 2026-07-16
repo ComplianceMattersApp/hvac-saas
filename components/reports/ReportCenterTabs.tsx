@@ -12,7 +12,8 @@ type ReportCenterKey =
   | "payments"
   | "deposits"
   | "failed-payments"
-  | "payment-reconciliation";
+  | "payment-reconciliation"
+  | "attention";
 
 type Props = {
   current: ReportCenterKey;
@@ -72,6 +73,9 @@ export default function ReportCenterTabs({ current, showDeposits = false }: Prop
       </ReportLink>
       <ReportLink href="/reports/payments" current={current} active="payments">
         Payments Received
+      </ReportLink>
+      <ReportLink href="/reports/attention" current={current} active="attention">
+        Needs Attention
       </ReportLink>
 
       <details className="relative">
