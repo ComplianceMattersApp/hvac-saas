@@ -14,6 +14,7 @@ import {
 } from "@/lib/business/product-mode-defaults";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { resolveScopedMaintenanceAgreementJobPrefill } from "@/lib/maintenance-agreements/read-model";
+import { getAssignableInternalUsers } from "@/lib/staffing/human-layer";
 
 type ExistingCustomerRow = {
   id: string;
@@ -121,6 +122,7 @@ export default async function NewJobPage(props: {
   let contractors: Array<{ id: string; name: string }> = [];
   let productMode: ProductMode = "hybrid";
   let accountOwnerUserId: string | null = null;
+  let technicians: Array<{ user_id: string; display_name: string }> = [];
   let pricebookTemplateItems: Array<{
     id: string;
     item_name: string;
@@ -164,6 +166,11 @@ export default async function NewJobPage(props: {
       productMode = resolvedProductMode;
     }
     if (accountOwnerUserId && internalUserRow?.is_active !== false) {
+      const assignableUsers = await getAssignableInternalUsers({ supabase, accountOwnerUserId });
+      technicians = assignableUsers
+        .filter((staff) => staff.role === "tech")
+        .map((staff) => ({ user_id: staff.user_id, display_name: staff.display_name }));
+
       const { data: pricebookRows, error: pricebookRowsErr } = await supabase
         .from("pricebook_items")
         .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
@@ -342,6 +349,7 @@ export default async function NewJobPage(props: {
   return (
     <NewJobForm
       contractors={contractors}
+      technicians={technicians}
       existingCustomer={existingCustomer}
       locations={customerLocations}
       customerLookupRows={customerLookupRows}

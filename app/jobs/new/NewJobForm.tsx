@@ -40,6 +40,7 @@ import {
 } from "@/lib/utils/equipment-display";
 
 type Contractor = { id: string; name: string };
+type Technician = { user_id: string; display_name: string };
 
 type ExistingCustomer = {
   id: string;
@@ -144,6 +145,7 @@ type NewJobDraft = {
   windowEnd?: string;
   scheduledDate?: string;
   contractorId?: string;
+  assignedUserId?: string;
   jobType?: "ecc" | "service";
   serviceCaseKind?: "reactive" | "callback" | "warranty" | "maintenance";
   serviceVisitType?:
@@ -422,6 +424,7 @@ function readValidDraft(): NewJobDraft | null {
 
 export default function NewJobForm({
   contractors,
+  technicians = [],
   existingCustomer,
   locations = [],
   customerLookupRows = [],
@@ -440,6 +443,7 @@ export default function NewJobForm({
   initialCreateNewCustomer = false,
 }: {
   contractors: Contractor[];
+  technicians?: Technician[];
   existingCustomer?: ExistingCustomer | null;
   locations?: LocationRow[];
   customerLookupRows?: CustomerLookupRow[];
@@ -523,6 +527,7 @@ export default function NewJobForm({
 
   // Contractor selection (internal/admin only). Contractor users are auto-tied.
  const [contractorId, setContractorId] = useState<string>(() => myContractor?.id ?? "");
+  const [assignedUserId, setAssignedUserId] = useState("");
 
   const defaultJobType: "ecc" | "service" = resolveDefaultJobTypeForNewJobForm({
     contractorId: myContractor?.id,
@@ -1151,11 +1156,23 @@ const [billingRecipient, setBillingRecipient] = useState<
   const confirmationProjectTypeLine = jobType === "ecc" && projectType
     ? `Project type: ${projectType.replaceAll("_", " ")}`
     : null;
+  const selectedContractorName = myContractor?.name
+    ?? contractors.find((contractor) => contractor.id === contractorId)?.name
+    ?? "";
+  const confirmationContractorLine = selectedContractorName
+    ? `Contractor: ${selectedContractorName}`
+    : null;
+  const selectedTechnicianName = technicians.find((technician) => technician.user_id === assignedUserId)?.display_name ?? "";
+  const confirmationTechnicianLine = selectedTechnicianName
+    ? `Assigned tech: ${selectedTechnicianName}`
+    : null;
   const confirmationSecondaryDetails = [
     confirmationWorkItemsLine,
     confirmationBillingLine,
     confirmationSiteContactLine,
     confirmationProjectTypeLine,
+    confirmationContractorLine,
+    confirmationTechnicianLine,
   ].filter((line): line is string => Boolean(line));
 
   const equipmentJson = useMemo(() => {
@@ -1203,6 +1220,7 @@ const [billingRecipient, setBillingRecipient] = useState<
         windowEnd,
         scheduledDate,
         contractorId,
+        assignedUserId,
         jobType,
         serviceCaseKind,
         serviceVisitType,
@@ -1266,6 +1284,7 @@ const [billingRecipient, setBillingRecipient] = useState<
     setWindowEnd(d.windowEnd ?? "");
     setScheduledDate(d.scheduledDate ?? "");
     setContractorId(isHvacServiceInternalMode ? "" : (d.contractorId ?? ""));
+    setAssignedUserId(d.assignedUserId ?? "");
     setJobType(
       resolveRestoredDraftJobType({
         draftJobType: d.jobType,
@@ -2832,36 +2851,45 @@ const [billingRecipient, setBillingRecipient] = useState<
               ) : null}
 
               {surfaceProfile.surfaces.permits ? (
-              <div className={`${guidedSectionInsetClass} space-y-3`}>
-                <label className="block text-sm font-medium text-slate-900">Permit Information</label>
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-slate-900">Permit Number</label>
-                  <input
-                    type="text"
-                    name="permit_number"
-                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
-                  />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <details className={`${guidedSectionInsetClass} group`}>
+                <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                  {renderSupportingSectionHeader({
+                    icon: <FileText className="h-4 w-4" aria-hidden="true" />,
+                    title: "+ Permit",
+                    description: "Add permit information when it is already available.",
+                    trailing: <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />,
+                  })}
+                </summary>
+                <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
                   <div className="space-y-1">
-                    <label className="block text-sm font-medium text-slate-900">Jurisdiction</label>
+                    <label className="block text-sm font-medium text-slate-900">Permit Number</label>
                     <input
                       type="text"
-                      name="jurisdiction"
-                      placeholder="City or county permit office"
+                      name="permit_number"
                       className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="block text-sm font-medium text-slate-900">Permit Date</label>
-                    <input
-                      type="date"
-                      name="permit_date"
-                      className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
-                    />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-slate-900">Jurisdiction</label>
+                      <input
+                        type="text"
+                        name="jurisdiction"
+                        placeholder="City or county permit office"
+                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-slate-900">Permit Date</label>
+                      <input
+                        type="date"
+                        name="permit_date"
+                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              </details>
               ) : null}
             </div>
           </section>
@@ -3300,6 +3328,29 @@ const [billingRecipient, setBillingRecipient] = useState<
                       <option value="12:00-14:00">12:00-14:00</option>
                       <option value="14:00-16:00">14:00-16:00</option>
                     </select>
+                  </div>
+
+                  <div className="space-y-1.5 border-t border-slate-200 pt-3">
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="assigned-user-id">
+                      Assign Technician (optional)
+                    </label>
+                    <select
+                      id="assigned-user-id"
+                      name="assigned_user_id"
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                      value={assignedUserId}
+                      onChange={(event) => setAssignedUserId(event.target.value)}
+                    >
+                      <option value="">Unassigned</option>
+                      {technicians.map((technician) => (
+                        <option key={technician.user_id} value={technician.user_id}>
+                          {technician.display_name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] leading-5 text-slate-500">
+                      Assign the primary field technician now, or leave the job unassigned for dispatch.
+                    </p>
                   </div>
 
                   {isServicePlanQuickScheduleMode ? (

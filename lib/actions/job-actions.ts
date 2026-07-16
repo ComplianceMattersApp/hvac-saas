@@ -8322,6 +8322,7 @@ let jobType: "ecc" | "service" = relationshipJobType;
     typeof contractorIdRaw === "string" && contractorIdRaw.trim()
       ? contractorIdRaw.trim()
       : null;
+  const assignedUserId = String(formData.get("assigned_user_id") || "").trim();
 
   const title = String(formData.get("title") || "").trim();
   const postedCity = String(formData.get("city") || "").trim();
@@ -8535,6 +8536,14 @@ if (!canonicalOwnerUserId) {
     isContractorUser,
     canonicalOwnerUserId: String(canonicalOwnerUserId ?? ""),
   });
+
+  if (!isContractorUser && assignedUserId) {
+    await assertAssignableInternalUser({
+      supabase,
+      userId: assignedUserId,
+      accountOwnerUserId: canonicalOwnerUserId,
+    });
+  }
 
   if (contractorIdFinal) {
     const activeContractor = await loadScopedActiveInternalContractorForMutation({
@@ -9284,6 +9293,24 @@ async function postCreate(createdJobId: string, metaSource: string) {
   });
 
   await logIntakeSubmitted(createdJobId);
+
+  if (assignedUserId && userId) {
+    await addJobAssignment({
+      supabase,
+      jobId: createdJobId,
+      userId: assignedUserId,
+      assignedBy: userId,
+      accountOwnerUserId: canonicalOwnerUserId,
+      isPrimary: true,
+    });
+    await notifyJobAssignmentCreated({
+      supabase,
+      jobId: createdJobId,
+      accountOwnerUserId: canonicalOwnerUserId,
+      actorUserId: userId,
+      recipientUserId: assignedUserId,
+    });
+  }
 
   if (scheduled_date) {
     await insertJobEvent({
