@@ -11,6 +11,7 @@ export type AttentionItem = {
   occurredAt: string | null;
   href: string;
   actionLabel: string;
+  paymentId?: string | null;
 };
 
 function clean(value: unknown) { return String(value ?? "").trim(); }
@@ -56,6 +57,7 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       detail: clean(payment.qbo_sync_error) || "Collected payment has not posted to QuickBooks.",
       truth: `Money is collected in EveryStep. QuickBooks still shows the invoice open.`, occurredAt: clean(payment.paid_at) || null,
       href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`, actionLabel: "Retry payment sync",
+      paymentId: clean(payment.id),
     });
   }
   for (const invoice of invoiceErrorResult.data ?? []) {

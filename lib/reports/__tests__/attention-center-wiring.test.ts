@@ -33,5 +33,7 @@ describe("Needs Attention center", () => {
     expect(page).toContain("Reconnect QuickBooks");
     expect(model).toContain("Retry payment sync");
     expect(model).toContain("Inspect Stripe session");
+    expect(page).toContain("syncAttentionPaymentToQboFromForm");
+    expect(page).toContain("Retry from hub");
   });
 });

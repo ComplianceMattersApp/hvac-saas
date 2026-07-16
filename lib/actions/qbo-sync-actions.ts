@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireInternalRole } from "@/lib/auth/internal-user";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { getQboConnectionForAccount } from "@/lib/qbo/qbo-connection";
 import { syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
@@ -71,12 +71,27 @@ export async function syncSinglePaymentToQboFromForm(formData: FormData): Promis
   });
   if (!connection) redirect(href("internal_invoice_qbo_not_connected"));
   const result = await syncPaymentToQbo({
-    supabase,
+    supabase: createAdminClient(),
     accountOwnerUserId: internalUser.account_owner_user_id,
     paymentId,
   });
   revalidatePath(`/jobs/${jobId}/invoice`);
   redirect(href(result.status === "synced" ? "internal_invoice_payment_qbo_synced" : "internal_invoice_payment_qbo_sync_failed"));
+}
+
+export async function syncAttentionPaymentToQboFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalRole("admin", { supabase });
+  const paymentId = String(formData.get("payment_id") ?? "").trim();
+  if (!paymentId || !getQboAvailability().available) redirect("/reports/attention?sync=failed");
+  const result = await syncPaymentToQbo({
+    supabase: createAdminClient(),
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    paymentId,
+  });
+  revalidatePath("/reports/attention");
+  revalidatePath("/reports/payments");
+  redirect(`/reports/attention?sync=${result.status === "synced" ? "complete" : "failed"}`);
 }
 
 export async function syncAllPendingInvoicesToQboFromForm(

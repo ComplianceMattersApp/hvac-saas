@@ -11,7 +11,8 @@ export type QboPaymentSyncResult = {
 };
 
 async function updatePaymentSyncFields(supabase: any, paymentId: string, patch: Record<string, unknown>) {
-  await supabase.from("internal_invoice_payments").update(patch).eq("id", paymentId);
+  const { error } = await supabase.from("internal_invoice_payments").update(patch).eq("id", paymentId);
+  if (error) throw new Error(`Failed to persist QBO payment sync status: ${error.message ?? "unknown error"}`);
 }
 
 export async function syncPaymentToQbo(params: {
