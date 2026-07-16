@@ -128,10 +128,14 @@ async function qboFetch(opts: {
 
   if (!response.ok) {
     const faultError = json?.Fault?.Error?.[0];
+    const faultMessage = String(faultError?.Message ?? "").trim();
+    const faultDetail = String(faultError?.Detail ?? "").trim();
+    const combinedFault = faultMessage && faultDetail && faultDetail !== faultMessage
+      ? `${faultMessage}: ${faultDetail}`
+      : faultDetail || faultMessage;
     const message =
-      faultError?.Message ??
-      faultError?.Detail ??
-      (text && text.length <= 500 ? text : response.statusText) ??
+      combinedFault ||
+      (text && text.length <= 500 ? text : response.statusText) ||
       `QBO request failed (${response.status})`;
     throw new QboApiError(response.status, message, json?.Fault);
   }

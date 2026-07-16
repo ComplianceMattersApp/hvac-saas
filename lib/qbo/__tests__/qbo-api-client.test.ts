@@ -169,6 +169,16 @@ describe("qbo-api-client", () => {
     ).rejects.toMatchObject({ name: "QboApiError", status: 400, message: "Invalid invoice" });
   });
 
+  it("preserves Intuit validation detail when the headline is generic", async () => {
+    mockFetchSequence([{ status: 400, body: { Fault: { Error: [{ Message: "A business validation error has occurred", Detail: "The payment amount cannot exceed the invoice balance." }] } } }]);
+    await expect(createQboPayment({
+      ...base,
+      payment: { customerRef: "C1", invoiceRef: "I1", amount: 350, txnDate: "2026-07-16" },
+    })).rejects.toMatchObject({
+      message: "A business validation error has occurred: The payment amount cannot exceed the invoice balance.",
+    });
+  });
+
   it("QboApiError is an Error subclass", () => {
     const err = new QboApiError(500, "boom");
     expect(err).toBeInstanceOf(Error);
