@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createQboPayment, getValidQboAccessToken, syncInvoiceToQbo } = vi.hoisted(() => ({
+const { createQboPayment, getQboInvoicePaymentContext, getValidQboAccessToken, syncInvoiceToQbo } = vi.hoisted(() => ({
   createQboPayment: vi.fn(),
+  getQboInvoicePaymentContext: vi.fn(),
   getValidQboAccessToken: vi.fn(),
   syncInvoiceToQbo: vi.fn(),
 }));
 
-vi.mock("@/lib/qbo/qbo-api-client", () => ({ createQboPayment }));
+vi.mock("@/lib/qbo/qbo-api-client", () => ({ createQboPayment, getQboInvoicePaymentContext }));
 vi.mock("@/lib/qbo/qbo-connection", () => ({ getValidQboAccessToken }));
 vi.mock("@/lib/qbo/qbo-env", () => ({ getQboBaseUrl: () => "https://sandbox.example.com" }));
 vi.mock("@/lib/qbo/qbo-sync", () => ({ syncInvoiceToQbo }));
@@ -37,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getValidQboAccessToken.mockResolvedValue({ accessToken: "AT", realmId: "R" });
   createQboPayment.mockResolvedValue({ id: "QP1", syncToken: "0" });
+  getQboInvoicePaymentContext.mockResolvedValue({ id: "QI1", customerRef: "QC1", balance: 720, totalAmount: 720 });
 });
 
 describe("syncPaymentToQbo", () => {
@@ -83,5 +85,12 @@ describe("syncPaymentToQbo", () => {
     expect(result).toMatchObject({ status: "error", error: expect.stringContaining("Reconnect QuickBooks") });
     expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "failed" }));
     expect(createQboPayment).not.toHaveBeenCalled();
+  });
+
+  it("uses the invoice's current QBO customer reference instead of stale local mapping", async () => {
+    getQboInvoicePaymentContext.mockResolvedValueOnce({ id: "QI1", customerRef: "QC-CURRENT", balance: 720, totalAmount: 720 });
+    const { supabase } = makeSupabase({ payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000 }, invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC-STALE" } });
+    await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+    expect(createQboPayment).toHaveBeenCalledWith(expect.objectContaining({ payment: expect.objectContaining({ customerRef: "QC-CURRENT" }) }));
   });
 });

@@ -6,6 +6,7 @@ import {
   createQboPayment,
   findQboInvoiceByDocNumber,
   findOrCreateQboCustomer,
+  getQboInvoicePaymentContext,
 } from "@/lib/qbo/qbo-api-client";
 
 function mockFetchSequence(responses: Array<{ status: number; body: unknown }>) {
@@ -149,6 +150,11 @@ describe("qbo-api-client", () => {
   it("findQboInvoiceByDocNumber returns null when the number is available", async () => {
     mockFetchSequence([{ status: 200, body: { QueryResponse: {} } }]);
     await expect(findQboInvoiceByDocNumber({ ...base, docNumber: "2001" })).resolves.toBeNull();
+  });
+
+  it("loads the current QBO invoice customer and open balance before payment", async () => {
+    mockFetchSequence([{ status: 200, body: { QueryResponse: { Invoice: [{ Id: "4520", CustomerRef: { value: "315" }, Balance: 410, TotalAmt: 410 }] } } }]);
+    await expect(getQboInvoicePaymentContext({ ...base, invoiceId: "4520" })).resolves.toEqual({ id: "4520", customerRef: "315", balance: 410, totalAmount: 410 });
   });
 
   it("throws QboApiError with the fault message on a non-2xx response", async () => {

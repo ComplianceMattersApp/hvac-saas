@@ -59,6 +59,36 @@ export interface QboSyncedEntity {
   syncToken: string;
 }
 
+export type QboInvoicePaymentContext = {
+  id: string;
+  customerRef: string;
+  balance: number;
+  totalAmount: number;
+};
+
+export async function getQboInvoicePaymentContext(
+  params: QboRequestBase & { invoiceId: string },
+): Promise<QboInvoicePaymentContext | null> {
+  const invoiceId = String(params.invoiceId ?? "").trim();
+  if (!invoiceId) return null;
+  const found = await qboFetch({
+    accessToken: params.accessToken,
+    realmId: params.realmId,
+    baseUrl: params.baseUrl,
+    path: "query",
+    method: "GET",
+    query: `select * from Invoice where Id = '${escapeQboQueryValue(invoiceId)}'`,
+  });
+  const invoice = found?.QueryResponse?.Invoice?.[0];
+  if (!invoice?.Id) return null;
+  return {
+    id: String(invoice.Id),
+    customerRef: String(invoice.CustomerRef?.value ?? "").trim(),
+    balance: Number(invoice.Balance ?? 0),
+    totalAmount: Number(invoice.TotalAmt ?? 0),
+  };
+}
+
 export async function findQboInvoiceByDocNumber(
   params: QboRequestBase & { docNumber: string },
 ): Promise<QboSyncedEntity | null> {

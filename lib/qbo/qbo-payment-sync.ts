@@ -1,4 +1,4 @@
-import { createQboPayment } from "./qbo-api-client";
+import { createQboPayment, getQboInvoicePaymentContext } from "./qbo-api-client";
 import { getValidQboAccessToken } from "./qbo-connection";
 import { getQboBaseUrl } from "./qbo-env";
 import { syncInvoiceToQbo } from "./qbo-sync";
@@ -82,6 +82,19 @@ export async function syncPaymentToQbo(params: {
       throw new Error("QBO invoice or customer reference is unavailable");
     }
 
+    const qboInvoice = await getQboInvoicePaymentContext({
+      accessToken: token.accessToken,
+      realmId: token.realmId,
+      baseUrl: getQboBaseUrl(),
+      invoiceId: String(invoice.qbo_invoice_id),
+    });
+    if (!qboInvoice?.id) throw new Error(`QuickBooks invoice ${invoice.qbo_invoice_id} no longer exists.`);
+    if (!qboInvoice.customerRef) throw new Error(`QuickBooks invoice ${invoice.qbo_invoice_id} has no customer reference.`);
+    const paymentAmount = Number(payment.amount_cents ?? 0) / 100;
+    if (qboInvoice.balance + 0.005 < paymentAmount) {
+      throw new Error(`QuickBooks invoice ${qboInvoice.id} has an open balance of $${qboInvoice.balance.toFixed(2)}, less than this $${paymentAmount.toFixed(2)} payment.`);
+    }
+
     await updatePaymentSyncFields(supabase, paymentId, {
       qbo_sync_status: "pending",
       qbo_sync_error: null,
@@ -91,9 +104,9 @@ export async function syncPaymentToQbo(params: {
       realmId: token.realmId,
       baseUrl: getQboBaseUrl(),
       payment: {
-        customerRef: String(invoice.qbo_customer_id),
+        customerRef: qboInvoice.customerRef,
         invoiceRef: String(invoice.qbo_invoice_id),
-        amount: Number(payment.amount_cents ?? 0) / 100,
+        amount: paymentAmount,
         txnDate: String(payment.paid_at ?? payment.created_at ?? new Date().toISOString()).slice(0, 10),
         paymentRefNum: normalizeQboPaymentRefNum(payment.received_reference),
         privateNote: [String(payment.notes ?? "").trim(), String(payment.received_reference ?? "").trim() ? `EveryStep payment reference: ${String(payment.received_reference).trim()}` : ""].filter(Boolean).join(" · ") || null,
