@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { createHash } from "crypto";
 
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
@@ -19,8 +20,6 @@ function redirectClearingState(request: NextRequest, path: string): NextResponse
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
-    console.error("[qbo/callback] incoming url:", request.url);
-
     const url = new URL(request.url);
     const stateParam = url.searchParams.get("state");
     const code = url.searchParams.get("code");
@@ -63,13 +62,30 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       return redirectClearingState(request, FAILURE_PATH);
     }
 
-    // Exchange the authorization code for tokens (+ realmId).
-    const tokens = await exchangeQboAuthCode(request.url);
-
     // Resolve the calling account. The Supabase session cookie rides along on
     // this top-level GET (SameSite=Lax), so we can scope the connection.
     const supabase = await createClient();
     const { internalUser } = await requireInternalRole("admin", { supabase });
+
+    // The cookie comparison protects against CSRF. The atomic database consume
+    // also makes the state single-use across concurrent server instances, so a
+    // duplicated callback cannot exchange Intuit's one-time code twice and
+    // invalidate the newly issued refresh token.
+    const stateHash = createHash("sha256").update(stateParam).digest("hex");
+    const { data: consumed, error: consumeError } = await supabase.rpc(
+      "consume_qbo_oauth_attempt",
+      {
+        p_account_owner_user_id: internalUser.account_owner_user_id,
+        p_state_hash: stateHash,
+      },
+    );
+    if (consumeError || !consumed) {
+      console.error("[qbo/callback] FAILURE: authorization state was expired or already consumed");
+      return redirectClearingState(request, FAILURE_PATH);
+    }
+
+    // Exchange only after the one-time attempt has been atomically claimed.
+    const tokens = await exchangeQboAuthCode(request.url);
 
     // Persist via the admin client (service role) — token writes never depend on RLS timing.
     const admin = createAdminClient();

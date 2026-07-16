@@ -7,7 +7,8 @@ const requireInternalRole = vi.fn(async () => ({
 }));
 vi.mock("@/lib/auth/internal-user", () => ({ requireInternalRole }));
 
-const createClient = vi.fn(async () => ({}));
+const rpc = vi.fn(async () => ({ data: true, error: null }));
+const createClient = vi.fn(async () => ({ rpc }));
 const createAdminClient = vi.fn(() => ({}));
 vi.mock("@/lib/supabase/server", () => ({ createClient, createAdminClient }));
 
@@ -39,6 +40,7 @@ async function callGet(request: NextRequest) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rpc.mockResolvedValue({ data: true, error: null });
 });
 
 describe("GET /api/qbo/callback", () => {
@@ -47,11 +49,25 @@ describe("GET /api/qbo/callback", () => {
       makeRequest({ code: "abc", state: "STATE123", cookieState: "STATE123" }),
     );
     expect(exchangeQboAuthCode).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith(
+      "consume_qbo_oauth_attempt",
+      expect.objectContaining({ p_account_owner_user_id: "acc" }),
+    );
     expect(upsertQboConnection).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "acc", realmId: "realm-1" }),
     );
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("notice=qbo_connected");
+  });
+
+  it("does not exchange a duplicate or expired authorization attempt", async () => {
+    rpc.mockResolvedValueOnce({ data: false, error: null });
+    const response = await callGet(
+      makeRequest({ code: "abc", state: "STATE123", cookieState: "STATE123" }),
+    );
+    expect(exchangeQboAuthCode).not.toHaveBeenCalled();
+    expect(upsertQboConnection).not.toHaveBeenCalled();
+    expect(response.headers.get("location")).toContain("notice=qbo_connect_failed");
   });
 
   it("redirects to failure when the state does not match the cookie", async () => {

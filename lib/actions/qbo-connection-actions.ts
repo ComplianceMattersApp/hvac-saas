@@ -1,6 +1,6 @@
 "use server";
 
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -31,7 +31,7 @@ export async function initiateQboOAuthFromForm(
   let authorizationUrl: string;
   try {
     const supabase = await createClient();
-    await requireInternalRole("admin", { supabase });
+    const { internalUser } = await requireInternalRole("admin", { supabase });
 
     const availability = getQboAvailability();
     if (!availability.available) {
@@ -39,6 +39,15 @@ export async function initiateQboOAuthFromForm(
     }
 
     const state = randomBytes(32).toString("hex");
+    const stateHash = createHash("sha256").update(state).digest("hex");
+    const { error: attemptError } = await supabase.rpc("register_qbo_oauth_attempt", {
+      p_account_owner_user_id: internalUser.account_owner_user_id,
+      p_state_hash: stateHash,
+      p_ttl_seconds: 600,
+    });
+    if (attemptError) {
+      throw new Error(`Failed to register QuickBooks authorization: ${attemptError.message}`);
+    }
     const jar = await cookies();
     jar.set(STATE_COOKIE, state, {
       httpOnly: true,
