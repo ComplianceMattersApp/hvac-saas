@@ -1,0 +1,14 @@
+import { notFound } from "next/navigation";
+import { loadContractorBilledInvoice } from "@/lib/portal/contractor-invoice-center";
+
+function money(cents: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100); }
+
+export default async function ContractorInvoicePrintPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const detail = await loadContractorBilledInvoice({ invoiceId: id });
+  if (!detail) notFound();
+  const { invoice, lineItems, summary } = detail;
+  const reference = String(invoice.invoice_display_number || invoice.invoice_number || invoice.id);
+  const address = [invoice.billing_address_line1, invoice.billing_address_line2, [invoice.billing_city, invoice.billing_state, invoice.billing_zip].filter(Boolean).join(" ")].filter(Boolean);
+  return <main className="mx-auto max-w-4xl bg-white p-6 text-slate-950 print:p-0"><div className="flex items-start justify-between border-b border-slate-300 pb-5"><div><div className="text-sm font-semibold uppercase tracking-wide text-slate-500">Invoice</div><h1 className="mt-1 text-3xl font-semibold">#{reference}</h1></div><div className="print:hidden text-sm text-slate-500">Use your browser’s Print / Save PDF command</div></div><section className="mt-6 grid gap-6 sm:grid-cols-2"><div><div className="text-xs font-semibold uppercase text-slate-500">Billed to</div><div className="mt-2 font-semibold">{invoice.billing_name}</div>{address.map((line: string) => <div key={line} className="text-sm text-slate-600">{line}</div>)}</div><div className="sm:text-right"><div className="text-xs font-semibold uppercase text-slate-500">Balance due</div><div className="mt-2 text-2xl font-semibold">{money(summary.balanceDueCents)}</div></div></section><section className="mt-8 divide-y divide-slate-200 border-y border-slate-300">{lineItems.map((item: any) => <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_70px_110px] gap-3 py-4 text-sm"><div><div className="font-semibold">{item.item_name_snapshot}</div>{item.description_snapshot ? <div className="mt-1 text-xs text-slate-500">{item.description_snapshot}</div> : null}</div><div className="text-right">{Number(item.quantity)}</div><div className="text-right font-semibold">{money(Number(item.line_subtotal))}</div></div>)}</section><section className="ml-auto mt-6 max-w-sm space-y-2 text-sm"><div className="flex justify-between"><span>Total</span><strong>{money(summary.invoiceTotalCents)}</strong></div><div className="flex justify-between"><span>Paid</span><strong>{money(summary.amountPaidCents)}</strong></div><div className="flex justify-between border-t border-slate-300 pt-2 text-base"><span>Balance due</span><strong>{money(summary.balanceDueCents)}</strong></div></section></main>;
+}

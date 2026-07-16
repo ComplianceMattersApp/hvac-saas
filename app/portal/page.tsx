@@ -502,6 +502,9 @@ export default async function PortalPage({
           </div>
 
           <div className="flex flex-col items-start gap-2 lg:items-end">
+            <Link href="/portal/invoices" className={portalSecondaryButtonClass}>
+              Billing invoices
+            </Link>
             <Link
               href="/jobs/new?context=portal"
               className={portalPrimaryButtonClass}
