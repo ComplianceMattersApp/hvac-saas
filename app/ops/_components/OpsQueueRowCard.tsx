@@ -5,7 +5,6 @@ import QueueCard, { type QueueCardStateChip, type QueueCardTone } from "@/compon
 import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
 import { updateJobScheduleFromForm } from "@/lib/actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
-import { markInvoiceCompleteFromForm } from "@/lib/actions/job-ops-actions";
 import {
   rejectFieldPaymentCollectionReportFromForm,
   verifyFieldPaymentCollectionReportFromForm,
@@ -72,9 +71,6 @@ export type CloseoutRowView = {
   scheduledText: string;
   assignmentSummary: string;
   nextStepText: string;
-  phone: string;
-  canMarkExternalInvoiceSent: boolean;
-  returnToHref: string;
 };
 
 export type FollowUpRowView = {
@@ -272,9 +268,6 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
 }
 
 function CloseoutCard({ view }: { view: CloseoutRowView }) {
-  const phoneHref = telHref(view.phone);
-  const textHref = smsHref(view.phone);
-
   return (
     <QueueCard
       key={view.jobId}
@@ -296,49 +289,20 @@ function CloseoutCard({ view }: { view: CloseoutRowView }) {
         ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
       ]}
     >
-      <QueueCardOpenAndAct>
-        <div className="space-y-3">
-          {view.scheduledText ? (
-            <div className="grid gap-1.5">
-              <span className={utilityLabelClass}>Scheduled</span>
-              <span className={chipClass}>{view.scheduledText}</span>
-            </div>
-          ) : null}
-          <div className="grid gap-1.5">
-            <span className={utilityLabelClass}>Assignment</span>
-            <span className={chipClass}>{view.assignmentSummary}</span>
-          </div>
-          <div className="grid gap-1.5">
-            <span className={utilityLabelClass}>Next Step</span>
-            <p className="text-sm leading-5 text-slate-700">{view.nextStepText}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Link href={view.href} className={primaryActionClass}>
-              View Job
-            </Link>
-            {phoneHref ? (
-              <a href={phoneHref} className={inlineActionClass}>
-                Call
-              </a>
-            ) : null}
-            {textHref ? (
-              <a href={textHref} className={inlineActionClass}>
-                Open SMS App
-              </a>
-            ) : null}
-            {view.canMarkExternalInvoiceSent ? (
-              <form action={markInvoiceCompleteFromForm}>
-                <input type="hidden" name="job_id" value={view.jobId} />
-                <input type="hidden" name="return_to" value={view.returnToHref} />
-                <input type="hidden" name="success_notice" value="external_billing_complete" />
-                <button type="submit" className={inlineActionClass}>
-                  External Billing Complete
-                </button>
-              </form>
-            ) : null}
-          </div>
+      <div className="mt-2 grid grid-cols-1 gap-2 border-t border-slate-200 pt-2 sm:grid-cols-3">
+        <div className="min-w-0">
+          <div className={utilityLabelClass}>Scheduled</div>
+          <div className="mt-0.5 truncate text-[12.5px] text-slate-800">{view.scheduledText || "Not scheduled"}</div>
         </div>
-      </QueueCardOpenAndAct>
+        <div className="min-w-0">
+          <div className={utilityLabelClass}>Assignment</div>
+          <div className="mt-0.5 truncate text-[12.5px] text-slate-800">{view.assignmentSummary}</div>
+        </div>
+        <div className="min-w-0">
+          <div className={utilityLabelClass}>Next Step</div>
+          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-800">{view.nextStepText}</div>
+        </div>
+      </div>
     </QueueCard>
   );
 }

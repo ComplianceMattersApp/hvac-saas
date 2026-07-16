@@ -146,14 +146,13 @@ describe("/ops Closeout rich cards", () => {
     expect(activeQueueRowsSource).toContain("buildCloseoutRowView(job, visibleReason)");
   });
 
-  it("uses closeout projection and billing truth before showing External Billing Complete", () => {
+  it("uses closeout projection for the compact next step without inline mutation actions", () => {
     expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
     expect(opsPageSource).toContain("const selectedWorkspaceCloseoutProjectionByJob");
     expect(buildCloseoutSource).toContain("selectedWorkspaceCloseoutProjectionByJob.get(jobId) ?? job");
-    expect(buildCloseoutSource).toContain("canShowExternalInvoiceSentAction");
-    expect(closeoutCardSource).toContain("form action={markInvoiceCompleteFromForm}");
-    expect(closeoutCardSource).toContain("External Billing Complete");
-    expect(buildCloseoutSource).toContain("returnToHref: `${activeWorkspaceBaseHref}#ops-workspace-closeout-job-${jobId}`");
+    expect(buildCloseoutSource).toContain("getCloseoutQueueNextStepLabel(projection)");
+    expect(closeoutCardSource).not.toContain("form action={markInvoiceCompleteFromForm}");
+    expect(closeoutCardSource).not.toContain("External Billing Complete");
   });
 
   it("does not promote deep invoice or payment workspace mutations into closeout job cards", () => {

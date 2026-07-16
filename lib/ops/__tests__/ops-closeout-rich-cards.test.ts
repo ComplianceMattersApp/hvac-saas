@@ -66,12 +66,15 @@ describe("/ops Closeout rich card contractor visibility", () => {
     expect(closeoutCardSource).toContain('variant="closeout-rich"');
   });
 
-  it("does not duplicate contractor inside the expandable closeout action area", () => {
-    const expandedAreaStart = closeoutCardSource.indexOf("<QueueCardOpenAndAct>");
-    const expandedAreaSource = expandedAreaStart > -1 ? closeoutCardSource.slice(expandedAreaStart) : "";
-
-    expect(expandedAreaSource).toContain("<QueueCardOpenAndAct>");
-    expect(expandedAreaSource).not.toContain(">Contractor<");
+  it("uses a compact closeout summary row without an expandable action area", () => {
+    expect(closeoutCardSource).not.toContain("<QueueCardOpenAndAct>");
+    expect(closeoutCardSource).toContain("sm:grid-cols-3");
+    expect(closeoutCardSource).toContain(">Scheduled<");
+    expect(closeoutCardSource).toContain(">Assignment<");
+    expect(closeoutCardSource).toContain(">Next Step<");
+    expect(closeoutCardSource).not.toContain(">View Job<");
+    expect(closeoutCardSource).not.toContain(">Call<");
+    expect(closeoutCardSource).not.toContain("Open SMS App");
   });
 
   it("omits contractor metadata quietly when the closeout job has no contractor", () => {

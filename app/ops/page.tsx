@@ -56,7 +56,6 @@ import {
   resolveLifecycleDaysAgingLabel,
 } from "@/lib/utils/lifecycle-aging";
 import {
-  canShowExternalInvoiceSentAction,
   listCloseoutQueueJobs,
 } from "@/lib/ops/closeout-queue";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
@@ -1452,10 +1451,6 @@ export default async function OpsPage({
       const jobId = String(job?.id ?? "").trim();
       const projection = selectedWorkspaceCloseoutProjectionByJob.get(jobId) ?? job;
       const needs = getCloseoutNeeds(projection);
-      const canMarkExternalInvoiceSent = canShowExternalInvoiceSentAction({
-        needsInvoice: needs.needsInvoice,
-        billingState: projection?.billingState ?? null,
-      });
       const assignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
       const closeoutStateChips = deriveOpsQueueStateChips(visibleReason.label, assignmentSummary);
       const needsLabel =
@@ -1486,9 +1481,6 @@ export default async function OpsPage({
         scheduledText: job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "",
         assignmentSummary,
         nextStepText: getCloseoutQueueNextStepLabel(projection),
-        phone: String(job?.customer_phone ?? "").trim(),
-        canMarkExternalInvoiceSent,
-        returnToHref: `${activeWorkspaceBaseHref}#ops-workspace-closeout-job-${jobId}`,
       };
     }
 
