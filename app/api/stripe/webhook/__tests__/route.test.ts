@@ -6,6 +6,11 @@ const mockRecordTenantInvoicePaymentFromCheckoutSession = vi.fn();
 const mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession = vi.fn();
 const mockCreateAdminClient = vi.fn(() => ({ from: vi.fn() }));
 const mockDeliverInternalPaymentReceivedEmail = vi.fn(async () => ({ sent: true }));
+const mockAutoSyncRecordedPaymentToQbo = vi.fn(async () => undefined);
+
+vi.mock('@/lib/qbo/qbo-payment-auto-sync', () => ({
+  autoSyncRecordedPaymentToQbo: mockAutoSyncRecordedPaymentToQbo,
+}));
 
 vi.mock('@/lib/payments/payment-received-email', () => ({
   deliverInternalPaymentReceivedEmail: mockDeliverInternalPaymentReceivedEmail,
@@ -96,6 +101,12 @@ describe('Stripe webhook route — charge events', () => {
         connectedAccountId: 'acct_connected_9',
       }),
     );
+    expect(mockAutoSyncRecordedPaymentToQbo).toHaveBeenCalledWith({
+      paymentId: 'payment-checkout-1',
+    });
+    expect(mockDeliverInternalPaymentReceivedEmail).toHaveBeenCalledWith({
+      paymentId: 'payment-checkout-1',
+    });
   });
 
   it('acknowledges payment-mode checkout.session.completed with missing metadata without throwing', async () => {
@@ -121,6 +132,7 @@ describe('Stripe webhook route — charge events', () => {
 
     expect(response.status).toBe(200);
     expect(mockRecordTenantInvoicePaymentFromCheckoutSession).toHaveBeenCalledTimes(1);
+    expect(mockAutoSyncRecordedPaymentToQbo).not.toHaveBeenCalled();
   });
 
   it('routes setup-mode checkout.session.completed to saved-method setup recorder', async () => {
@@ -190,6 +202,7 @@ describe('Stripe webhook route — charge events', () => {
         connectedAccountId: 'acct_connected_1',
       }),
     );
+    expect(mockAutoSyncRecordedPaymentToQbo).toHaveBeenCalledWith({ paymentId: 'payment-1' });
   });
 
   it('acknowledges charge.succeeded when payment identity is already recorded', async () => {
@@ -219,6 +232,38 @@ describe('Stripe webhook route — charge events', () => {
 
     expect(response.status).toBe(200);
     expect(mockRecordTenantInvoicePaymentFromStripeCharge).toHaveBeenCalledTimes(1);
+    expect(mockAutoSyncRecordedPaymentToQbo).not.toHaveBeenCalled();
+  });
+
+  it('keeps Stripe webhook acknowledgement independent from QBO sync failure', async () => {
+    mockRecordTenantInvoicePaymentFromStripeCharge.mockResolvedValue({
+      recorded: true,
+      paymentId: 'payment-qbo-failure',
+    });
+    mockAutoSyncRecordedPaymentToQbo.mockRejectedValueOnce(new Error('QBO unavailable'));
+
+    const response = await postWebhook({
+      id: 'evt_qbo_failure',
+      account: 'acct_connected_1',
+      type: 'charge.succeeded',
+      data: {
+        object: {
+          id: 'ch_qbo_failure',
+          amount: 10000,
+          created: 1747756800,
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            job_id: 'job-1',
+          },
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockDeliverInternalPaymentReceivedEmail).toHaveBeenCalledWith({
+      paymentId: 'payment-qbo-failure',
+    });
   });
 
   it('ignores charge.succeeded without invoice_id (platform subscription preservation)', async () => {

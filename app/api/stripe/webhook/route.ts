@@ -15,9 +15,18 @@ import {
 import { recordTenantSavedPaymentMethodSetupFromCheckoutSession } from "@/lib/business/tenant-saved-payment-method-setups";
 import { createAdminClient } from "@/lib/supabase/server";
 import { deliverInternalPaymentReceivedEmail } from "@/lib/payments/payment-received-email";
+import { autoSyncRecordedPaymentToQbo } from "@/lib/qbo/qbo-payment-auto-sync";
 
 async function notifyNewRecordedPayment(result: { recorded: boolean; paymentId?: string }) {
   if (!result.recorded || !result.paymentId) return;
+  try {
+    await autoSyncRecordedPaymentToQbo({ paymentId: result.paymentId });
+  } catch (error) {
+    console.warn("QBO payment sync failed after Stripe payment truth was recorded", {
+      paymentId: result.paymentId,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+  }
   try {
     await deliverInternalPaymentReceivedEmail({ paymentId: result.paymentId });
   } catch (error) {

@@ -3,14 +3,26 @@ import { getQboAvailability } from "./qbo-env";
 import { syncPaymentToQbo } from "./qbo-payment-sync";
 
 export async function autoSyncRecordedPaymentToQbo(params: {
-  accountOwnerUserId: string;
+  accountOwnerUserId?: string | null;
   paymentId: string;
 }): Promise<void> {
   try {
     if (!getQboAvailability().available) return;
+    const admin = createAdminClient();
+    let accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+    if (!accountOwnerUserId) {
+      const { data: payment, error } = await admin
+        .from("internal_invoice_payments")
+        .select("account_owner_user_id")
+        .eq("id", params.paymentId)
+        .maybeSingle();
+      if (error || !payment?.account_owner_user_id) return;
+      accountOwnerUserId = String(payment.account_owner_user_id).trim();
+    }
+    if (!accountOwnerUserId) return;
     await syncPaymentToQbo({
-      supabase: createAdminClient(),
-      accountOwnerUserId: params.accountOwnerUserId,
+      supabase: admin,
+      accountOwnerUserId,
       paymentId: params.paymentId,
     });
   } catch {
