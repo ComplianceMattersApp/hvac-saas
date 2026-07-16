@@ -5,6 +5,7 @@ import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-bo
 import { loadScopedInternalAttachmentJobForMutation } from "@/lib/auth/internal-attachment-scope";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
+import { getContractorSharedAttachmentIds } from "@/lib/jobs/attachment-share-state";
 
 import JobAttachmentsInternal from "../_components/JobAttachmentsInternal";
 
@@ -134,6 +135,18 @@ export default async function JobAttachmentsPage({
     .limit(500);
 
   if (attachmentErr) throw new Error(attachmentErr.message);
+
+  const { data: shareEvents, error: shareEventsErr } = await supabase
+    .from("job_events")
+    .select("event_type, meta")
+    .eq("job_id", jobId)
+    .eq("event_type", "public_note")
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (shareEventsErr) throw new Error(shareEventsErr.message);
+
+  const initialSharedAttachmentIds = getContractorSharedAttachmentIds(shareEvents ?? []);
 
   const attachmentAdmin = createAdminClient();
 
@@ -284,6 +297,7 @@ export default async function JobAttachmentsPage({
         initialItems={attachmentItems}
         attachmentInputMode={isRefrigerantChargePhotoContext ? "images" : "all"}
         attachmentEvidenceContext={attachmentEvidenceContext}
+        initialSharedAttachmentIds={initialSharedAttachmentIds}
       />
     </div>
   );

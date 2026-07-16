@@ -86,12 +86,14 @@ export default function JobAttachmentsInternal({
   attachmentInputMode = "all",
   attachmentEvidenceContext,
   summary,
+  initialSharedAttachmentIds = [],
 }: {
   jobId: string;
   initialItems: Item[];
   attachmentInputMode?: "all" | "images";
   attachmentEvidenceContext?: string | null;
   summary?: AttachmentReviewSummary;
+  initialSharedAttachmentIds?: string[];
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -111,7 +113,7 @@ export default function JobAttachmentsInternal({
     () => new Set()
   );
   const [sharedAttachmentIds, setSharedAttachmentIds] = useState<Set<string>>(
-    () => new Set()
+    () => new Set(initialSharedAttachmentIds)
   );
 
   const isImageCaptureMode = attachmentInputMode === "images";
@@ -606,7 +608,7 @@ export default function JobAttachmentsInternal({
                           className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                         >
                           {isShared
-                            ? "Shared ✓"
+                            ? "Shared with Contractor ✓"
                             : sharingId === a.id
                             ? "Sharing..."
                             : "Share to Contractor"}

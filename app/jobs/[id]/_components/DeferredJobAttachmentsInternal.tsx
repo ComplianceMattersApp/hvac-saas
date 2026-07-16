@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signScopedInternalJobDetailAttachments } from "@/lib/actions/internal-job-detail-read-boundary";
 import { buildAttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
+import { getContractorSharedAttachmentIds } from "@/lib/jobs/attachment-share-state";
 
 import JobAttachmentsInternal from "./JobAttachmentsInternal";
 
@@ -36,6 +37,7 @@ export default async function DeferredJobAttachmentsInternal({
       "contractor_correction_submission",
       "attachment_added",
       "retest_ready_requested",
+      "public_note",
     ])
     .order("created_at", { ascending: false })
     .limit(300);
@@ -62,12 +64,15 @@ export default async function DeferredJobAttachmentsInternal({
     events: (reviewEvents ?? []) as Array<{ event_type: string | null; created_at: string | null; meta: unknown }>,
     visibleAttachmentIds,
   });
+  const initialSharedAttachmentIds = getContractorSharedAttachmentIds(reviewEvents ?? [])
+    .filter((id) => visibleAttachmentIds.has(id));
 
   return (
     <JobAttachmentsInternal
       jobId={jobId}
       initialItems={signedAttachmentResult.items}
       summary={summary}
+      initialSharedAttachmentIds={initialSharedAttachmentIds}
     />
   );
 }
