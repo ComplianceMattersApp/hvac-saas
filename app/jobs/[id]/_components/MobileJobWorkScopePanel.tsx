@@ -19,6 +19,11 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
     visitScopePricebookTemplates,
     visitScopeSummary,
   } = props;
+  const normalizedStatus = String(job?.status ?? "").trim().toLowerCase();
+  const normalizedOpsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+  const showWorkSummary = Boolean(
+    job?.field_complete || normalizedStatus === "completed" || normalizedOpsStatus === "closed",
+  );
 
   return (
     <>
@@ -128,21 +133,27 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
         </div>
       ) : null}
 
-      {visitScopeSummary || isInternalUser ? (
-        <details className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+      {showWorkSummary && (visitScopeSummary || isInternalUser) ? (
+        <details className="group rounded-xl border border-slate-200 bg-white px-3 py-2.5">
           <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
             Work Summary
           </summary>
-          <div className="mt-2 whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-base leading-6 text-slate-700">
+          <p className="mt-1 text-sm leading-5 text-slate-500 group-open:hidden">
+            A brief breakdown of what happened, what was found, and what work was completed.
+          </p>
+          <div className="mt-2 whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-base leading-6 text-slate-700 group-open:hidden">
             {visitScopeSummary || "No work summary saved yet."}
           </div>
           {isInternalUser ? (
-            <form action={updateJobVisitScopeFromForm} className="mt-3 border-t border-slate-200 pt-3">
+            <form action={updateJobVisitScopeFromForm} className="mt-3 hidden border-t border-slate-200 pt-3 group-open:block">
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="tab" value={tab} />
               <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} />
               <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
               <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Work Summary</label>
+              <p className="mt-1 text-sm leading-5 text-slate-500">
+                Briefly describe what happened, what you found, and what work was completed.
+              </p>
               <textarea name="visit_scope_summary" defaultValue={visitScopeSummary ?? ""} rows={3} maxLength={600} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm" />
               <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} mt-3`}>Save Work Summary</SubmitButton>
             </form>

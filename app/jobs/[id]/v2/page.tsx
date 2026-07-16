@@ -961,7 +961,7 @@ export default async function JobDetailV2Page({
   const navItems: NavItem[] = [
     { id: "brief", label: "Job Brief" },
     { id: "people", label: "People & Place" },
-    { id: "notes", label: "Job Memory" },
+    { id: "notes", label: "Notes" },
     { id: "field", label: "Field & Finish" },
     { id: "equipment", label: "Equipment" },
     { id: "billing", label: "Work & Billing" },
@@ -1584,7 +1584,7 @@ export default async function JobDetailV2Page({
           </div>
         </section>
 
-        {/* ── JOB MEMORY (notes hub) ────────────────────────────────────────── */}
+        {/* ── NOTES ─────────────────────────────────────────────────────────── */}
         <section
           id="notes"
           data-jobsection="notes"
@@ -1598,7 +1598,7 @@ export default async function JobDetailV2Page({
               marginBottom: "18px",
             }}
           >
-            <div style={S.sectionLabel}>Job Memory</div>
+            <div style={S.sectionLabel}>Notes</div>
             <a
               href="#records"
               style={{

@@ -755,6 +755,15 @@ describe("job detail field operations board layout", () => {
     expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
   });
 
+  it("only offers the mobile Work Summary at completion and edits it in place", () => {
+    expect(mobileJobWorkScopePanelSource).toContain('const showWorkSummary = Boolean(');
+    expect(mobileJobWorkScopePanelSource).toContain('job?.field_complete || normalizedStatus === "completed" || normalizedOpsStatus === "closed"');
+    expect(mobileJobWorkScopePanelSource).toContain('{showWorkSummary && (visitScopeSummary || isInternalUser) ? (');
+    expect(mobileJobWorkScopePanelSource).toContain('group-open:hidden');
+    expect(mobileJobWorkScopePanelSource).toContain('group-open:block');
+    expect(mobileJobWorkScopePanelSource).toContain('A brief breakdown of what happened, what was found, and what work was completed.');
+  });
+
   it("removes the mobile Tools jump button while preserving lower tools", () => {
     const mobileWorkScopeStart = mobileJobWorkScopePanelSource.indexOf('id="mobile-work-scope"');
     const mobileNotesStart = mobileJobWorkScopePanelSource.indexOf("<MobileJobWorkScopeBody", mobileWorkScopeStart);

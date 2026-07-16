@@ -554,7 +554,10 @@ export default function MobileJobDetailV2Preview(props: any) {
     }))
     .filter((item: any) => item.title)
     .slice(0, 3);
-  const serviceWorkSummary = String(visitScopeSummary || "").trim();
+  const showWorkSummary = Boolean(
+    isFieldComplete || normalizedStatus === "completed" || normalizedOpsStatus === "closed",
+  );
+  const serviceWorkSummary = showWorkSummary ? String(visitScopeSummary || "").trim() : "";
   const showServiceWorkLane = isEcc ? companionServiceItems.length > 0 : Boolean(hasVisitScopeDefined || serviceWorkSummary);
   const showEccWorkScopeLane = isEcc && !showServiceWorkLane && Boolean(hasVisitScopeDefined || serviceWorkSummary);
   const showEccReviewSummary = isEcc && showLinkedRetestCreated;
