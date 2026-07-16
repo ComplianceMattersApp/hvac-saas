@@ -66,4 +66,16 @@ describe("syncPaymentToQbo", () => {
     expect(result.status).toBe("synced");
     expect(createQboPayment).not.toHaveBeenCalled();
   });
+
+  it("persists a retryable failure when the QBO connection is unavailable", async () => {
+    getValidQboAccessToken.mockResolvedValueOnce(null);
+    const { supabase, updates } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 35000 },
+      invoice: null,
+    });
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+    expect(result).toMatchObject({ status: "error", error: expect.stringContaining("Reconnect QuickBooks") });
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "failed" }));
+    expect(createQboPayment).not.toHaveBeenCalled();
+  });
 });

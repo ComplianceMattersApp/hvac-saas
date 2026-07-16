@@ -74,6 +74,13 @@ describe("autoSyncRecordedPaymentToQbo", () => {
     await expect(autoSyncRecordedPaymentToQbo({
       accountOwnerUserId: "owner-1",
       paymentId: "pay-1",
-    })).resolves.toBeUndefined();
+    })).resolves.toBeNull();
+  });
+
+  it("returns the downstream outcome so callers can report incomplete sync", async () => {
+    createAdminClient.mockReturnValue(adminWithPaymentOwner(null));
+    syncPaymentToQbo.mockResolvedValueOnce({ paymentId: "pay-1", status: "error", error: "Reconnect QuickBooks" });
+    await expect(autoSyncRecordedPaymentToQbo({ accountOwnerUserId: "owner-1", paymentId: "pay-1" }))
+      .resolves.toMatchObject({ status: "error" });
   });
 });

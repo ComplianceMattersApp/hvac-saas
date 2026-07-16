@@ -62,7 +62,10 @@ export async function repairVerifiedStripePendingPayment(params: {
 
   let qboSynced = true;
   let receiptSent = true;
-  try { await (params.syncQbo ?? autoSyncRecordedPaymentToQbo)({ paymentId: result.paymentId }); } catch { qboSynced = false; }
+  try {
+    const qboResult = await (params.syncQbo ?? autoSyncRecordedPaymentToQbo)({ paymentId: result.paymentId });
+    qboSynced = qboResult?.status === "synced";
+  } catch { qboSynced = false; }
   try { await (params.sendReceipt ?? deliverInternalPaymentReceivedEmail)({ paymentId: result.paymentId }); } catch { receiptSent = false; }
   return { repaired: true, paymentId: result.paymentId, qboSynced, receiptSent } as const;
 }

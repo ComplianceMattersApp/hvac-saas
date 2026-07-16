@@ -37,7 +37,11 @@ export async function syncPaymentToQbo(params: {
     }
 
     const token = await getValidQboAccessToken({ supabase, accountOwnerUserId });
-    if (!token) return { paymentId, status: "skipped", error: "No QBO connection" };
+    if (!token) {
+      const message = "QuickBooks is not connected. Reconnect QuickBooks, then retry this payment.";
+      await updatePaymentSyncFields(supabase, paymentId, { qbo_sync_status: "failed", qbo_sync_error: message });
+      return { paymentId, status: "error", error: message };
+    }
 
     let { data: invoice, error: invoiceError } = await supabase
       .from("internal_invoices")

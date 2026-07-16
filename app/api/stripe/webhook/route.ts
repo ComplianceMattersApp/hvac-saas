@@ -20,7 +20,14 @@ import { autoSyncRecordedPaymentToQbo } from "@/lib/qbo/qbo-payment-auto-sync";
 async function notifyNewRecordedPayment(result: { recorded: boolean; paymentId?: string }) {
   if (!result.recorded || !result.paymentId) return;
   try {
-    await autoSyncRecordedPaymentToQbo({ paymentId: result.paymentId });
+    const qboResult = await autoSyncRecordedPaymentToQbo({ paymentId: result.paymentId });
+    if (qboResult && qboResult.status !== "synced") {
+      console.warn("QBO payment sync did not complete after Stripe payment truth was recorded", {
+        paymentId: result.paymentId,
+        status: qboResult.status,
+        message: qboResult.error ?? "unknown_error",
+      });
+    }
   } catch (error) {
     console.warn("QBO payment sync failed after Stripe payment truth was recorded", {
       paymentId: result.paymentId,

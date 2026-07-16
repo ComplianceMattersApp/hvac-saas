@@ -1819,7 +1819,7 @@ export default async function InternalInvoiceWorkspacePage({
                             <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800">
                               QuickBooks pending
                             </span>
-                          ) : payment.qbo_sync_status === "failed" ? (
+                          ) : payment.qbo_sync_status === "failed" || payment.qbo_sync_status === "not_synced" ? (
                             <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-rose-800">
                               QuickBooks needs attention
                             </span>
@@ -1835,7 +1835,7 @@ export default async function InternalInvoiceWorkspacePage({
                         {payment.qbo_sync_status === "failed" && payment.qbo_sync_error ? (
                           <div className="mt-1 text-xs leading-5 text-rose-700">QuickBooks: {payment.qbo_sync_error}</div>
                         ) : null}
-                        {getQboAvailability().available && payment.qbo_sync_status === "failed" ? (
+                        {getQboAvailability().available && (payment.qbo_sync_status === "failed" || payment.qbo_sync_status === "not_synced") ? (
                           <form action={syncSinglePaymentToQboFromForm} className="mt-2">
                             <input type="hidden" name="job_id" value={jobId} />
                             <input type="hidden" name="invoice_id" value={invoice.id} />

@@ -31,7 +31,7 @@ describe("repairVerifiedStripePendingPayment", () => {
 
   it("settles one exactly matched paid session through the webhook truth path", async () => {
     const stripe: any = { checkout: { sessions: { retrieve: vi.fn(async () => session("cs_paid")) } }, events: { list: vi.fn(async () => ({ data: [{ id: "evt_real_1", data: { object: session("cs_paid") } }] })) } };
-    const syncQbo = vi.fn(); const sendReceipt = vi.fn();
+    const syncQbo = vi.fn(async () => ({ paymentId: "11111111-1111-4111-8111-111111111111", status: "synced" as const })); const sendReceipt = vi.fn();
     const result = await repairVerifiedStripePendingPayment({ admin: admin([{ id: "11111111-1111-4111-8111-111111111111", amount_cents: 41000, stripe_checkout_session_id: "cs_paid" }]), stripe, accountOwnerUserId: "owner-1", paymentId: "11111111-1111-4111-8111-111111111111", syncQbo, sendReceipt });
     expect(result).toMatchObject({ repaired: true, qboSynced: true, receiptSent: true });
     expect(recordMock).toHaveBeenCalledWith(expect.objectContaining({ eventId: "evt_real_1", connectedAccountId: "acct_1" }));
