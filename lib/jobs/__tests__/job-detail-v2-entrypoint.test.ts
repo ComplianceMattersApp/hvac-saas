@@ -50,6 +50,14 @@ describe("job detail V2 entrypoint", () => {
     expect(v2JobDetailSource).not.toContain("redirect(`/jobs/${jobId}`");
   });
 
+  it("only shows the Desktop V2 Work Summary after field completion", () => {
+    expect(v2JobDetailSource).toContain(
+      'const showWorkSummary = fieldComplete || status === "completed" || opsStatus === "closed";',
+    );
+    expect(v2JobDetailSource).toContain("{showWorkSummary ? (");
+    expect(v2JobDetailSource).toContain("Work Summary is a post-visit record");
+  });
+
   it("throws Desktop V2 contractor shadow membership read failures", () => {
     expect(v2JobDetailSource).toContain("const { data: shadowMembership, error: shadowMembershipError } = await supabase");
     expect(v2JobDetailSource).toContain("if (shadowMembershipError) throw shadowMembershipError;");

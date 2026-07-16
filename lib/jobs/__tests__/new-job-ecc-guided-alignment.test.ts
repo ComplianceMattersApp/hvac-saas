@@ -42,6 +42,8 @@ describe("/jobs/new ECC-only guided alignment", () => {
 
   it("preserves ECC lightweight scope language instead of forcing service scope", () => {
     expect(visitScopeBuilderSource).toContain('ECC test work is tracked separately. Add work items only if this visit includes additional service work.');
-    expect(visitScopeBuilderSource).toContain('More options');
+    expect(formSource).toContain('hideEccTripContext');
+    expect(visitScopeBuilderSource).toContain('jobType === "ecc" && hideEccTripContext');
+    expect(visitScopeBuilderSource).toContain('hideEccTripContext && jobType === "ecc" ? "" : summary');
   });
 });

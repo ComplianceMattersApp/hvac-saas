@@ -590,6 +590,7 @@ export default async function JobDetailV2Page({
   const isEnRoute = status === "on_the_way";
   const visitStarted = isFieldActive || isEnRoute;
   const isTerminal = fieldComplete || status === "completed" || status === "cancelled";
+  const showWorkSummary = fieldComplete || status === "completed" || opsStatus === "closed";
   const hasScheduledAppointment = Boolean(job.scheduled_date || job.window_start || job.window_end);
   const hasFullSchedule = Boolean(job.scheduled_date && job.window_start && job.window_end);
   const scheduledAppointmentDateText = formatBusinessDateUS(job.scheduled_date);
@@ -1255,7 +1256,8 @@ export default async function JobDetailV2Page({
               </div>
             </div>
           </div>
-          {/* full-width Work Summary */}
+          {/* Work Summary is a post-visit record, not an intake or active-job note. */}
+          {showWorkSummary ? (
           <div
             style={{
               marginTop: "20px",
@@ -1315,6 +1317,7 @@ export default async function JobDetailV2Page({
               </div>
             </form>
           </div>
+          ) : null}
         </section>
 
         {/* ── PEOPLE & PLACE ────────────────────────────────────────────────── */}

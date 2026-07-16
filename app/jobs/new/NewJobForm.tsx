@@ -3155,6 +3155,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                             serviceVisitType={serviceVisitType}
                             pricebookTemplateItems={pricebookTemplateItems}
                             resetKey={visitScopeResetKey}
+                            hideEccTripContext
                             onSummaryChange={setVisitScopeSummary}
                             onItemsChange={setVisitScopeItems}
                           />
@@ -3168,6 +3169,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                         serviceVisitType={serviceVisitType}
                         pricebookTemplateItems={pricebookTemplateItems}
                         resetKey={visitScopeResetKey}
+                        hideEccTripContext
                         onSummaryChange={setVisitScopeSummary}
                         onItemsChange={setVisitScopeItems}
                       />

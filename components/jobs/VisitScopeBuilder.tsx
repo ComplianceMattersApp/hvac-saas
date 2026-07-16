@@ -35,6 +35,7 @@ type Props = {
   itemsName?: string;
   resetKey?: string | number;
   hideSummaryField?: boolean;
+  hideEccTripContext?: boolean;
   hideInitialSelectedItems?: boolean;
   onSummaryChange?: (value: string) => void;
   onItemsChange?: (items: VisitScopeDraftItem[]) => void;
@@ -206,6 +207,7 @@ export default function VisitScopeBuilder({
   itemsName = "visit_scope_items_json",
   resetKey,
   hideSummaryField = false,
+  hideEccTripContext = false,
   hideInitialSelectedItems = false,
   onSummaryChange,
   onItemsChange,
@@ -521,8 +523,8 @@ export default function VisitScopeBuilder({
   return (
     <div className="space-y-4">
       <>
-      {hideSummaryField ? (
-        <input type="hidden" name={summaryName} value={summary} />
+      {hideSummaryField || (jobType === "ecc" && hideEccTripContext) ? (
+        <input type="hidden" name={summaryName} value={hideEccTripContext && jobType === "ecc" ? "" : summary} />
       ) : jobType === "service" ? (
         <div className="space-y-1">
           <label className="block text-sm font-medium text-slate-900">
