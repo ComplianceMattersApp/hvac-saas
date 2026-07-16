@@ -1884,40 +1884,61 @@ const [billingRecipient, setBillingRecipient] = useState<
         {/* Identity-tied contractor */}
         {myContractor?.id ? (
           <>
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700" aria-hidden="true" />
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Submitting as</div>
-                <div className="text-sm font-semibold text-slate-900">{myContractor.name}</div>
+            <section className={guidedSectionShellClass}>
+              {renderGuidedSectionIntro({
+                icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
+                title: "Contractor",
+                description: "The company responsible for this intake.",
+                summary: myContractor.name,
+                tone: "complete",
+              })}
+              <div className={guidedSectionBodyClass}>
+                <div className={`${guidedSectionInsetClass} flex items-center gap-3`}>
+                  <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-hidden="true">
+                    <BriefcaseBusiness className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Submitting as</div>
+                    <div className="text-sm font-semibold text-slate-900">{myContractor.name}</div>
+                  </div>
+                </div>
               </div>
-            </div>
+            </section>
             <input type="hidden" name="contractor_id" value={myContractor.id} />
           </>
         ) : !isHvacServiceInternalMode ? (
-          <div className="rounded-xl border border-slate-200/80 bg-white p-4 space-y-2">
-            <label className="block text-sm font-medium text-slate-900">Contractor (optional)</label>
-            <select
-              name="contractor_id"
-              className="w-full rounded-md border border-slate-300 bg-white p-2"
-              value={contractorId}
-              onChange={(e) => {
-                const v = e.target.value;
-                setContractorId(v);
-                // Let server decide default, but keep UI sensible
-                if (modeSafeJobType !== "service") {
-                  if (v && billingRecipient === "customer") setBillingRecipient("contractor");
-                  if (!v && billingRecipient === "contractor") setBillingRecipient("customer");
-                }
-              }}
-            >
-              <option value="">- None -</option>
-              {contractors.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <section className={guidedSectionShellClass}>
+            {renderGuidedSectionIntro({
+              icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
+              title: "Contractor",
+              description: "Select the responsible contractor when this job belongs to one.",
+              summary: selectedContractorName || "No contractor selected.",
+              tone: contractorId ? "complete" : "pending",
+            })}
+            <div className={guidedSectionBodyClass}>
+              <div className={`${guidedSectionInsetClass} space-y-2`}>
+                <label className="block text-sm font-medium text-slate-900">Contractor (optional)</label>
+                <select
+                  name="contractor_id"
+                  className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                  value={contractorId}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setContractorId(v);
+                    if (modeSafeJobType !== "service") {
+                      if (v && billingRecipient === "customer") setBillingRecipient("contractor");
+                      if (!v && billingRecipient === "contractor") setBillingRecipient("customer");
+                    }
+                  }}
+                >
+                  <option value="">No contractor</option>
+                  {contractors.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
         ) : (
           <input type="hidden" name="contractor_id" value="" />
         )}
@@ -3267,13 +3288,14 @@ const [billingRecipient, setBillingRecipient] = useState<
 
             {/* Scheduling - internal/staff only; hidden for contractor and customer intake */}
             {!isContractorMode && (
+              <>
               <section className={`${isServicePlanQuickScheduleMode ? "order-1" : "order-2"} ${isInternalMode ? guidedSectionShellClass : "space-y-3"}`}>
                 {isInternalMode ? renderGuidedSectionIntro({
                   icon: <CalendarClock className="h-4 w-4" aria-hidden="true" />,
                   title: "Schedule",
                   description: isServicePlanQuickScheduleMode
                     ? "Pick a date and window first. Included Service Plan work stays in the background."
-                    : "Schedule the visit if needed, then confirm who gets billed later.",
+                    : "Set the visit date, time window, and primary assignment.",
                   summary: scheduleSectionSummary,
                   tone: scheduleSectionTone,
                 }) : (
@@ -3372,14 +3394,26 @@ const [billingRecipient, setBillingRecipient] = useState<
                   ) : null}
                 </div>
 
+                </div>
+              </section>
+
                 {isInternalMode ? (
+                  <section className={`${isServicePlanQuickScheduleMode ? "order-2" : "order-3"} ${guidedSectionShellClass}`}>
+                    {renderGuidedSectionIntro({
+                      icon: <FileText className="h-4 w-4" aria-hidden="true" />,
+                      title: "Billing",
+                      description: "Choose who should receive billing for this job.",
+                      summary: confirmationBillingLine || "Default billing recipient.",
+                      tone: "pending",
+                    })}
+                    <div className={guidedSectionBodyClass}>
                   <div className={`${guidedSectionInsetClass} space-y-3`}>
-                    <label className="block text-sm font-medium text-slate-900">Billing / Paperwork Recipient</label>
+                    <label className="block text-sm font-medium text-slate-900">Billing Recipient</label>
 
                     {modeSafeJobType === "service" ? (
                       <>
                         <p className="text-xs leading-5 text-slate-600">
-                          Billing and paperwork default to the responsible account.
+                          Billing defaults to the responsible account.
                         </p>
                         <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900">
                           <input
@@ -3400,7 +3434,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                               }
                             }}
                           />
-                          Different billing/paperwork recipient?
+                          Different billing recipient?
                         </label>
 
                         <input
@@ -3412,7 +3446,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                         {billingRecipientDifferent ? (
                           <div className="mt-2 space-y-2 rounded-xl bg-white p-3 ring-1 ring-slate-200/80">
                             <div className="text-xs text-slate-600">
-                              Use this only when invoices or paperwork should go somewhere other than the responsible account.
+                              Use this only when invoices should go somewhere other than the responsible account.
                             </div>
 
                             <input
@@ -3590,9 +3624,10 @@ const [billingRecipient, setBillingRecipient] = useState<
                       </>
                     )}
                   </div>
+                    </div>
+                  </section>
                 ) : null}
-                </div>
-              </section>
+              </>
             )}
 
             {/* Billing Recipient */}

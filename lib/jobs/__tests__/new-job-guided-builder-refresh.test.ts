@@ -50,12 +50,14 @@ describe("/jobs/new guided builder refresh", () => {
     expect(formSource).not.toContain('name="intake_request_source"');
   });
 
-  it("folds internal billing controls into the guided Schedule section", () => {
+  it("keeps internal Billing in its own guided section after Schedule", () => {
     expect(formSource).toContain('title: "Schedule"');
-    expect(formSource).toContain("Schedule the visit if needed, then confirm who gets billed later.");
-    expect(formSource).toContain("Billing / Paperwork Recipient");
-    expect(formSource).toContain("Different billing/paperwork recipient?");
-    expect(formSource).toContain("Billing and paperwork default to the responsible account.");
+    expect(formSource).toContain("Set the visit date, time window, and primary assignment.");
+    expect(formSource).toContain('title: "Billing"');
+    expect(formSource).toContain("Choose who should receive billing for this job.");
+    expect(formSource).toContain("Billing Recipient");
+    expect(formSource).toContain("Different billing recipient?");
+    expect(formSource).not.toContain("Billing / Paperwork Recipient");
   });
 
   it("keeps site/access contact toggle collapsed by default", () => {
