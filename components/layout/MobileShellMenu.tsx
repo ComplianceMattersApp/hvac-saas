@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ClipboardList, FileText, Home, Menu as MenuIcon, Settings, UserRound, X } from "lucide-react";
+import { AlertTriangle, Bell, BriefcaseBusiness, CalendarDays, ClipboardList, FileText, Home, Menu as MenuIcon, Settings, UserRound, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import LogoutButton from "@/components/auth/LogoutButton";
@@ -18,6 +18,9 @@ type Props = {
   hasPortalAccess: boolean;
   unreadNotificationCount: number;
   unreadNotificationBadgeLabel: string;
+  attentionCount: number;
+  attentionBadgeLabel: string;
+  canViewFinancialAttention: boolean;
   primaryJobCtaLabel: string;
 };
 
@@ -53,6 +56,9 @@ export default function MobileShellMenu({
   hasPortalAccess,
   unreadNotificationCount,
   unreadNotificationBadgeLabel,
+  attentionCount,
+  attentionBadgeLabel,
+  canViewFinancialAttention,
   primaryJobCtaLabel,
 }: Props) {
   const pathname = usePathname() || "/";
@@ -105,6 +111,7 @@ export default function MobileShellMenu({
   const servicePlansActive = isActivePath(pathname, "/service-plans");
   const estimatesActive = isActivePath(pathname, "/estimates");
   const reportsActive = isActivePath(pathname, "/reports");
+  const attentionActive = isActivePath(pathname, "/reports/attention");
   const notificationsActive = isActivePath(pathname, "/ops/notifications");
   const adminActive = isActivePath(pathname, "/ops/admin");
   const accountActive = isActivePath(pathname, "/account");
@@ -253,6 +260,11 @@ export default function MobileShellMenu({
                     </Link>
                   </>
                 ) : null}
+                {canViewFinancialAttention ? <Link href="/reports/attention" onClick={closeMenu} className={mobileMenuItemClass(attentionActive)}>
+                  <AlertTriangle className={itemIconClass(attentionActive)} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">Needs Attention</span>
+                  {attentionCount > 0 ? <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-1.5 text-[11px] font-semibold text-rose-700">{attentionBadgeLabel}</span> : null}
+                </Link> : null}
 
                 <div className={sectionLabelClass()}>Account</div>
                 <div className="grid grid-cols-2 gap-1">

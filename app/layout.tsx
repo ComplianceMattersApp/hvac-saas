@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { Bell } from "lucide-react";
+import { AlertTriangle, Bell } from "lucide-react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
@@ -22,6 +22,7 @@ import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-wor
 import { shouldShowPortalMenuItem } from "@/lib/portal/partner-work-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
+import { countAttentionCenterItems } from "@/lib/reports/attention-center-count";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -100,6 +101,8 @@ export default async function RootLayout({
   let productMode: ProductMode = "hybrid";
   const hasExistingPortalAccess = access.hasExistingPortalAccess;
   let permitWorkflowEnabled = false;
+  let attentionCount = 0;
+  let canViewFinancialAttention = false;
 
   if (access.preferredLandingContext === "portal") {
     homeHref = "/portal";
@@ -112,7 +115,9 @@ export default async function RootLayout({
     permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(accountOwnerUserId);
 
     // Independent reads — resolve concurrently instead of serially.
-    const [badgeCount, resolvedProductMode] = await Promise.all([
+    const role = String(access.internalUser.role ?? "").toLowerCase();
+    canViewFinancialAttention = user?.id === accountOwnerUserId || role === "admin" || role === "billing";
+    const [badgeCount, resolvedProductMode, resolvedAttentionCount] = await Promise.all([
       getInternalUnreadNotificationBadgeCount({
         supabase,
         accountOwnerUserId,
@@ -121,10 +126,12 @@ export default async function RootLayout({
         supabase,
         accountOwnerUserId,
       }),
+      canViewFinancialAttention ? countAttentionCenterItems({ supabase, accountOwnerUserId }) : Promise.resolve(0),
     ]);
 
     unreadNotificationCount = badgeCount;
     productMode = resolvedProductMode;
+    attentionCount = resolvedAttentionCount;
   }
 
   const profileFullName = await profileFullNamePromise;
@@ -238,6 +245,7 @@ export default async function RootLayout({
   });
   const accountLabel = accountDisplayName;
   const unreadNotificationBadgeLabel = unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount);
+  const attentionBadgeLabel = attentionCount > 99 ? "99+" : String(attentionCount);
   return (
     <html lang="en">
       <body
@@ -302,6 +310,13 @@ export default async function RootLayout({
                       {showPortalMenuItem ? (
                         <ShellNavLink href="/portal">Compliance Matters Portal</ShellNavLink>
                       ) : null}
+                      {canViewFinancialAttention ? (
+                        <ShellNavLink href="/reports/attention" className="relative gap-1.5" aria-label={`Needs Attention${attentionCount > 0 ? `, ${attentionCount} open` : ""}`}>
+                          <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                          <span>Attention</span>
+                          {attentionCount > 0 ? <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-rose-200 bg-rose-50 px-1 text-[10px] font-bold text-rose-700">{attentionBadgeLabel}</span> : null}
+                        </ShellNavLink>
+                      ) : null}
                       <ShellMoreMenu items={moreMenuItems} />
                     </nav>
                   </div>
@@ -353,6 +368,9 @@ export default async function RootLayout({
                       hasPortalAccess={showPortalMenuItem}
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
+                      attentionCount={attentionCount}
+                      attentionBadgeLabel={attentionBadgeLabel}
+                      canViewFinancialAttention={canViewFinancialAttention}
                       primaryJobCtaLabel={primaryJobCtaLabel}
                       servicePlansEnabled={servicePlansEnabled}
                     />
