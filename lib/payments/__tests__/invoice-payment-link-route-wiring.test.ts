@@ -14,6 +14,10 @@ const emailSource = readFileSync(
   resolve(__dirname, "../../actions/internal-invoice-actions.ts"),
   "utf8",
 );
+const publicActionSource = readFileSync(
+  resolve(__dirname, "../../actions/public-invoice-payment-actions.ts"),
+  "utf8",
+);
 
 describe("invoice payment link stale-state route wiring", () => {
   it("uses app-controlled payment links for reusable copied and emailed invoice links", () => {
@@ -34,14 +38,26 @@ describe("invoice payment link stale-state route wiring", () => {
     const externalDispositionIndex = routeSource.indexOf("resolveJobBlocksOnlineInvoicePayment");
     const paidMessageIndex = routeSource.indexOf('state="paid"');
     const changedMessageIndex = routeSource.indexOf('state="changed"');
-    const checkoutIndex = routeSource.indexOf("createTenantInvoiceCheckoutSession", changedMessageIndex);
+    const checkoutIndex = publicActionSource.indexOf("createTenantInvoiceCheckoutSession");
 
     expect(externalDispositionIndex).toBeGreaterThanOrEqual(0);
     expect(balanceCheckIndex).toBeGreaterThanOrEqual(0);
     expect(paidMessageIndex).toBeGreaterThan(externalDispositionIndex);
     expect(paidMessageIndex).toBeGreaterThan(balanceCheckIndex);
     expect(changedMessageIndex).toBeGreaterThan(balanceCheckIndex);
-    expect(checkoutIndex).toBeGreaterThan(changedMessageIndex);
+    expect(checkoutIndex).toBeGreaterThanOrEqual(0);
+    expect(publicActionSource).toContain("resolveInvoiceCollectedPaymentSummary");
+  });
+
+  it("renders a limited review step and creates checkout only from the explicit public action", () => {
+    expect(routeSource).toContain("Secure invoice payment");
+    expect(routeSource).toContain("Invoice total");
+    expect(routeSource).toContain("Payments received");
+    expect(routeSource).toContain("Balance due");
+    expect(routeSource).toContain("beginPublicInvoiceCheckout");
+    expect(routeSource).not.toContain("createTenantInvoiceCheckoutSession");
+    expect(publicActionSource).toContain("verifyTenantInvoicePaymentLinkToken");
+    expect(publicActionSource).toContain("paymentLinkToken: token");
   });
 
   it("renders friendly stale-state customer copy", () => {

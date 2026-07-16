@@ -107,12 +107,15 @@ function buildPublicTenantInvoiceCheckoutReturnPath(params: {
   status: "success" | "cancelled";
   jobId: string;
   invoiceId: string;
+  paymentLinkToken?: string | null;
 }) {
   const search = new URLSearchParams({
     status: params.status,
     job_id: params.jobId,
     invoice_id: params.invoiceId,
   });
+  const paymentLinkToken = String(params.paymentLinkToken ?? "").trim();
+  if (paymentLinkToken) search.set("payment_token", paymentLinkToken);
   return `/payments/checkout-complete?${search.toString()}`;
 }
 
@@ -544,6 +547,7 @@ export async function createTenantInvoiceCheckoutSession(params: {
   supabase: any;
   stripe?: Stripe;
   appUrl?: string | null;
+  paymentLinkToken?: string | null;
 }) : Promise<TenantInvoiceCheckoutSessionResult> {
   const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
   const jobId = String(params.jobId ?? "").trim();
@@ -638,11 +642,13 @@ export async function createTenantInvoiceCheckoutSession(params: {
         status: "success",
         jobId,
         invoiceId,
+        paymentLinkToken: params.paymentLinkToken,
       })}`,
       cancel_url: `${appUrl}${buildPublicTenantInvoiceCheckoutReturnPath({
         status: "cancelled",
         jobId,
         invoiceId,
+        paymentLinkToken: params.paymentLinkToken,
       })}`,
       metadata: checkoutMetadata,
       payment_intent_data: paymentIntentData,

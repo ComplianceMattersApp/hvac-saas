@@ -55,16 +55,36 @@ describe("checkout complete view model", () => {
       {
         label: "Team sign in",
         href: "/login",
-        variant: "primary",
+        variant: "secondary",
       },
     ]);
-    expect(viewModel.secondaryBody).toBe("Return to the invoice or job to see the latest payment status.");
+    expect(viewModel.secondaryBody).toContain("processor verification");
+  });
+
+  it("returns a public payer to the signed invoice without exposing internal links", () => {
+    const viewModel = resolveCheckoutCompleteViewModel({
+      status: "cancelled",
+      jobId: "12345678-1234-4234-9234-1234567890ab",
+      invoiceId: "22345678-1234-4234-9234-2234567890ab",
+      paymentToken: "signed.token",
+      isInternalUser: false,
+    });
+
+    expect(viewModel.actions).toEqual([{
+      label: "Return to invoice",
+      href: "/payments/invoice/signed.token",
+      variant: "primary",
+    }]);
+    expect(viewModel.actions.some((action) => action.href.startsWith("/jobs/"))).toBe(false);
+    expect(viewModel.secondaryBody).toContain("No charge was made");
   });
 });
 
 describe("checkout complete page wiring", () => {
   it("renders internal return actions and does not wire payment truth writes", () => {
     expect(pageSource).toContain("resolveCheckoutCompleteViewModel");
+    expect(pageSource).toContain("supabase.auth.getUser()");
+    expect(pageSource).not.toContain("hasInternalContext = isUuid");
     expect(pageSource).toContain("secondaryBody");
     expect(pageSource).not.toContain("Refresh payment status");
     expect(helperSource).toContain("Return to invoice");

@@ -33,10 +33,12 @@ export function resolveCheckoutCompleteViewModel(params: {
   jobId?: string | string[] | undefined;
   invoiceId?: string | string[] | undefined;
   isInternalUser: boolean;
+  paymentToken?: string | string[] | undefined;
 }): CheckoutCompleteViewModel {
   const status = normalizeStatus(clean(params.status).toLowerCase());
   const jobId = clean(params.jobId);
   const invoiceId = clean(params.invoiceId);
+  const paymentToken = clean(params.paymentToken);
   const hasJobContext = isUuid(jobId);
   const hasInvoiceContext = isUuid(invoiceId);
   const hasInternalContext = params.isInternalUser && (hasJobContext || hasInvoiceContext);
@@ -52,11 +54,18 @@ export function resolveCheckoutCompleteViewModel(params: {
       : "Return to the invoice or job to see the latest payment status.";
 
   if (!hasInternalContext) {
+    const publicInvoiceHref = paymentToken
+      ? `/payments/invoice/${encodeURIComponent(paymentToken)}`
+      : null;
     return {
       heading,
       body,
-      secondaryBody,
-      actions: [{ label: "Team sign in", href: "/login", variant: "primary" }],
+      secondaryBody: status === "cancelled"
+        ? "No charge was made. Return to the invoice whenever you are ready."
+        : "Payment status is confirmed after secure processor verification. It may take a moment to update.",
+      actions: publicInvoiceHref
+        ? [{ label: "Return to invoice", href: publicInvoiceHref, variant: "primary" }]
+        : [{ label: "Team sign in", href: "/login", variant: "secondary" }],
     };
   }
 

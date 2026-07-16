@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { resolveCheckoutCompleteViewModel } from "@/lib/payments/checkout-complete";
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
+import { createClient } from "@/lib/supabase/server";
 
 export default async function CheckoutCompletePage({
   searchParams,
@@ -13,13 +10,16 @@ export default async function CheckoutCompletePage({
   const sp = await searchParams;
   const jobId = String(Array.isArray(sp.job_id) ? sp.job_id[0] ?? "" : sp.job_id ?? "").trim();
   const invoiceId = String(Array.isArray(sp.invoice_id) ? sp.invoice_id[0] ?? "" : sp.invoice_id ?? "").trim();
-  const hasInternalContext = isUuid(jobId) || isUuid(invoiceId);
+  const paymentToken = String(Array.isArray(sp.payment_token) ? sp.payment_token[0] ?? "" : sp.payment_token ?? "").trim();
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
   const viewModel = resolveCheckoutCompleteViewModel({
     status: String(sp.status ?? "success"),
     jobId,
     invoiceId,
-    isInternalUser: hasInternalContext,
+    isInternalUser: Boolean(user?.id),
+    paymentToken,
   });
 
   return (

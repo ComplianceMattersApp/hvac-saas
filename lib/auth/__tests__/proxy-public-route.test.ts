@@ -23,6 +23,12 @@ describe("isUnauthedPublicRoute", () => {
     expect(isUnauthedPublicRoute("/payments/checkout-complete?status=success")).toBe(true);
   });
 
+  it("allows signed public invoice payment routes without auth", () => {
+    expect(isUnauthedPublicRoute("/payments/invoice/signed-token")).toBe(true);
+    expect(isUnauthedPublicRoute("/payments/invoice/signed-token.with-parts")).toBe(true);
+    expect(isUnauthedPublicRoute("/payments/invoice")).toBe(false);
+  });
+
   it("allows the privacy and terms pages without auth", () => {
     expect(isUnauthedPublicRoute("/privacy")).toBe(true);
     expect(isUnauthedPublicRoute("/terms")).toBe(true);
