@@ -571,10 +571,10 @@ Operational payment state, accounting sync, and payment execution are separate l
 QuickBooks Online must not be the required foundation for payment architecture. QBO is optional, downstream, accounting-oriented synchronization. QBO is not the required basis for payment acceptance, the payment rail, the required merchant setup, or a prerequisite for core product usage.
 
 ### 19.5 Stripe rule (locked)
-Stripe is the implemented payment rail for platform subscription onboarding and tenant invoice Checkout. Processor-backed payment handling does not depend on QBO; verified Stripe webhook outcomes create payment truth. Signed invoice-specific guest payment is implemented, while refunds, disputes, ACH, payouts, broad customer portal self-service, and contractor saved-card self-service remain deferred. Keep future Stripe expansion additive and preserve payment/register idempotency.
+Stripe is the implemented payment rail for platform subscription onboarding and tenant invoice Checkout. Processor-backed payment handling does not depend on QBO; verified Stripe webhook outcomes create payment truth. Signed invoice-specific guest payment is implemented, while refunds, disputes, ACH, broad customer portal self-service, and contractor saved-card self-service remain deferred. Keep future Stripe expansion additive and preserve payment/register idempotency.
 
 ### 19.6 Current live behavior
-Supported now: payment tracking; payment status and amount due/paid visibility; manual/external payment recording; Stripe invoice Checkout; signed invoice-specific guest payment; webhook-confirmed payment truth; and operational payment-received email. Not yet supported: ACH; saved payment methods; processor-led refunds; dispute/chargeback handling; contractor payout onboarding; or a broad customer payment portal beyond signed invoice links.
+Supported now: payment tracking; payment status and amount due/paid visibility; manual/external payment recording; Stripe invoice Checkout; signed invoice-specific guest payment; webhook-confirmed payment truth; and operational payment-received email. Not yet supported: ACH; saved payment methods; processor-led refunds; dispute/chargeback handling; or a broad customer payment portal beyond signed invoice links.
 
 ### 19.7 Payment foundation requirements
 - **19.7.1 Data-model rule:** the payment domain must be built to represent payment status, amount due, amount paid, balance due, payment method type, processor name, processor reference, recorded/paid date, refund status, refund amount, failure/error note, and sync status — without requiring all execution flows to exist now.
@@ -589,7 +589,6 @@ Stripe-based acceptance may support a small **configurable** platform fee later:
 - **P0 — Tracking foundation (complete):** payment visibility, status tracking, operational awareness, and manual/external reference support.
 - **P1 — Payment-ready foundation (complete):** payment domain model, processor-agnostic architecture, event-ready transitions, UI wording boundaries, Stripe seam, optional downstream QBO seam, and support for a later configurable platform fee.
 - **P2 — Invoice payment acceptance (complete for current scope):** a payer can pay an issued invoice through signed guest access and Stripe Checkout; webhook-confirmed outcomes write back and update state automatically. Platform subscription billing remains a separate platform-billing track.
-- **P3 — Contractor/platform payout layer (later):** only after customer acceptance is stable — contractor onboarding, payout rules, recipient ownership logic, refund/dispute responsibility, optional platform-fee activation.
 - **P4 — Optional QBO sync (implemented and gated):** accounting convenience only; QBO sync remains optional and downstream.
 
 > (Current phase status and the P1 completed-slice evidence live in [CURRENT_ROADMAP.md](./CURRENT_ROADMAP.md) and the payment evidence ledgers, not here.)
@@ -602,7 +601,7 @@ Live payment acceptance is available but is not required for every invoice or te
 - do not couple payment readiness to accounting adoption
 - do not imply unsupported payment capabilities beyond the live invoice-specific Stripe flow
 - do not hardcode around QBO-specific payment structures
-- do not overbuild payout complexity too early
+- do not introduce marketplace-style contractor disbursement or pass-through money movement
 - do support a future small configurable platform fee
 - do keep payment execution additive to the operational core, not disruptive to it
 

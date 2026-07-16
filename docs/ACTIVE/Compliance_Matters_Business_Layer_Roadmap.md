@@ -3556,7 +3556,7 @@ It should support at least:
 - delivery/error note if available
 - honest attempt tracking rather than fake guaranteed-delivery claims
 
-This seam must not be read as introducing Stripe checkout, live card/ACH collection, refunds/disputes, contractor payouts, QBO sync, or any other live payment-execution behavior.
+This seam must not be read as introducing Stripe checkout, live card/ACH collection, refunds/disputes, QBO sync, or any other live payment-execution behavior.
 
 ### v1 statuses
 - draft

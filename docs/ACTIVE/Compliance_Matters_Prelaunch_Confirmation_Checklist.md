@@ -226,7 +226,7 @@ Use [PROJECT_TRUTH.md](../PROJECT_TRUTH.md) for current product truth, [Release_
 - `.env.local` remains local-only.
 - Local Stripe CLI webhook secret is not the same as deployed/live webhook secret.
 - Keep this priority separate from tenant customer invoice payments V1, which is complete for the current intended scope.
-- Future tenant payment add-ons remain deferred unless explicitly pulled forward, including saved cards beyond current approved flows, partial payments, customer self-service portal, refunds, disputes, payouts, ACH, QBO sync, and broader payment automation.
+- Future tenant payment add-ons remain deferred unless explicitly pulled forward, including saved cards beyond current approved flows, partial payments, customer self-service portal, refunds, disputes, ACH, QBO sync, and broader payment automation.
 
 ### 2.3.3 Completed production-shipped cleanup sequence confirmation
 - Completed production-shipped UI/regression cleanup batch is confirmed for launch-readiness posture.
@@ -752,7 +752,7 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Verified: UI button integrates cleanly with existing invoice workspace without disrupting manual payment workflow.
 - Deferred: customer payment link distribution.
 - Deferred: payment success/failure email notifications.
-- Deferred: no customer portal, no saved payment methods, no partial payments, no refunds/disputes, no payout execution.
+- Deferred: no customer portal, no saved payment methods, no partial payments, and no refunds/disputes.
 - Confirmed: no local payment row inserted during session creation (webhook-only truth maintained).
 - Confirmed: no production Supabase mutations during checkout session creation.
 - Confirmed: no new Stripe API calls beyond checkout.sessions.create (existing Stripe client used).

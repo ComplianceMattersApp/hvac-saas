@@ -219,7 +219,6 @@ Stripe is the preferred future payment rail.
 When real payment acceptance is introduced later:
 - customer payment execution should be processor-led
 - processor-specific logic should fit a Stripe-first path
-- contractor payout/onboarding complexity should be handled at the payment-rail layer, not forced into accounting logic
 
 ### Current implementation rule
 Platform subscription billing for account onboarding is implemented as Stripe Platform Subscription V1 and has passed live production smoke for platform account subscriptions.  
@@ -894,7 +893,6 @@ Not supported now:
 - ACH collection
 - saved payment methods
 - refunds through processor
-- contractor payout onboarding
 - chargeback/dispute tooling
 - processor-driven customer checkout
 
@@ -1000,7 +998,6 @@ Not supported now:
 - Refunds / disputes through processor
 - Automatic retry on checkout failures
 - Payment success/failure email to customer
-- Payout/contract payment execution
 - Multiple concurrent checkouts per invoice
 
 ---
@@ -1462,14 +1459,13 @@ Completed P1 foundation work (V1):
 - Closeout test coverage now directly guards production payment-column mapping and CSV projection behavior.
 
 Locked clarification:
-Invoice send/resend/tracking in this phase is allowed only as a billing communication seam attached to the invoice record. It is not live payment execution, not Stripe checkout, not card/ACH collection, not refund/dispute handling, not contractor payout flow, and not QBO-led billing.
+Invoice send/resend/tracking in this phase is allowed only as a billing communication seam attached to the invoice record. It is not live payment execution, not Stripe checkout, not card/ACH collection, not refund/dispute handling, and not QBO-led billing.
 
 Invoice email content/design polish may continue later as refinement work, but that refinement does not change the payment-ready architecture or convert this seam into payment execution.
 
 Does **not** include:
 - customer checkout
 - processor onboarding
-- contractor payouts
 - saved cards
 - refunds through processor
 
@@ -1525,24 +1521,12 @@ Recommended first scope for tenant customer/work payments:
 - invoice payment status and balance due update automatically
 - partial and full payment outcomes are supported
 - minimal processor-led implementation
-- no contractor payout complexity unless explicitly required
 
 Deferred-later scope within/after P2:
 - refunds/disputes handling remains later
 - processor payment-failure recovery workflows remain later
 - optional small configurable platform fee remains a future capability
 - QBO remains optional/downstream only and must not gate tenant payment execution
-
-### Phase P3 — Contractor/platform payout layer (later)
-Only after customer payment acceptance is stable.
-
-Includes:
-- contractor payment onboarding
-- payout ownership model
-- payout visibility
-- refund/dispute responsibility rules
-- merchant-of-record / recipient logic
-- optional platform fee logic if desired
 
 ### Phase P2A / 3A — Payment Reversal / Correction Foundation (closed)
 
@@ -1630,7 +1614,6 @@ Not as:
 - Do not require QBO for core product use
 - Do not couple payment acceptance to accounting adoption
 - Do not let payment features distort the operational source-of-truth model
-- Do not expand into payout complexity until customer payment acceptance is stable
 - Keep payments additive, not disruptive
 
 ---
