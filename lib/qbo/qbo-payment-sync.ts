@@ -10,6 +10,13 @@ export type QboPaymentSyncResult = {
   error?: string;
 };
 
+export function normalizeQboPaymentRefNum(value: unknown): string | null {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return null;
+  if (normalized.length <= 21) return normalized;
+  return `ES-${normalized.slice(-18)}`;
+}
+
 async function updatePaymentSyncFields(supabase: any, paymentId: string, patch: Record<string, unknown>) {
   const { error } = await supabase.from("internal_invoice_payments").update(patch).eq("id", paymentId);
   if (error) throw new Error(`Failed to persist QBO payment sync status: ${error.message ?? "unknown error"}`);
@@ -88,8 +95,8 @@ export async function syncPaymentToQbo(params: {
         invoiceRef: String(invoice.qbo_invoice_id),
         amount: Number(payment.amount_cents ?? 0) / 100,
         txnDate: String(payment.paid_at ?? payment.created_at ?? new Date().toISOString()).slice(0, 10),
-        paymentRefNum: String(payment.received_reference ?? "").trim() || null,
-        privateNote: String(payment.notes ?? "").trim() || null,
+        paymentRefNum: normalizeQboPaymentRefNum(payment.received_reference),
+        privateNote: [String(payment.notes ?? "").trim(), String(payment.received_reference ?? "").trim() ? `EveryStep payment reference: ${String(payment.received_reference).trim()}` : ""].filter(Boolean).join(" · ") || null,
       },
     });
     await updatePaymentSyncFields(supabase, paymentId, {
