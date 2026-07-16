@@ -19,7 +19,7 @@ import {
 import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
 
-type SearchParams = Promise<{ notice?: string }>;
+type SearchParams = Promise<{ notice?: string; q?: string; lifecycle?: string }>;
 
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invite_sent: { tone: "success", message: "Contractor user invite sent." },
@@ -72,6 +72,8 @@ export default async function AdminContractorsPage({
 }) {
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
+  const query = String(sp.q ?? "").trim().toLowerCase();
+  const lifecycleFilter = String(sp.lifecycle ?? "active").trim().toLowerCase();
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
   const admin = createAdminClient();
@@ -231,10 +233,14 @@ export default async function AdminContractorsPage({
     pendingInvitesByContractor.set(contractorId, list);
   }
 
-  const activeContractors = contractorRows.filter(
+  const matchingContractors = contractorRows.filter((row: any) => {
+    if (!query) return true;
+    return `${String(row?.name ?? "")} ${String(row?.email ?? "")}`.toLowerCase().includes(query);
+  });
+  const activeContractors = matchingContractors.filter(
     (row: any) => String(row?.lifecycle_state ?? "active").trim().toLowerCase() !== "archived",
   );
-  const archivedContractors = contractorRows.filter(
+  const archivedContractors = matchingContractors.filter(
     (row: any) => String(row?.lifecycle_state ?? "active").trim().toLowerCase() === "archived",
   );
 
@@ -324,9 +330,9 @@ export default async function AdminContractorsPage({
             </div>
           </div>
 
-          <details className="rounded-lg" open={!isArchived}>
+          <details className="hidden">
             <summary className={`cursor-pointer list-none rounded-lg px-1 py-2 text-sm font-medium ${detailsSummaryTone}`}>
-              Access and invites
+              Quick administration
             </summary>
 
             <div className={`space-y-4 border-t pt-3 ${detailsDividerTone}`}>
@@ -601,6 +607,24 @@ export default async function AdminContractorsPage({
         </form>
       </div>
 
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <form action="/ops/admin/contractors" method="get" className="grid gap-3 sm:grid-cols-[minmax(0,1fr),180px,auto] sm:items-end">
+          <label className="space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Find a contractor</span>
+            <input name="q" defaultValue={String(sp.q ?? "")} placeholder="Search company or email" className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100" />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Status</span>
+            <select name="lifecycle" defaultValue={lifecycleFilter} className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100">
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+              <option value="all">All</option>
+            </select>
+          </label>
+          <button type="submit" className="inline-flex min-h-10 items-center justify-center rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Search</button>
+        </form>
+      </section>
+
       <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800">
@@ -618,7 +642,7 @@ export default async function AdminContractorsPage({
         </div>
 
         <div className="mt-5 space-y-8">
-          <section className="space-y-3">
+          <section className={`space-y-3 ${lifecycleFilter === "archived" ? "hidden" : ""}`}>
             <div className="space-y-1">
               <h2 className="text-lg font-semibold tracking-[-0.02em] text-sky-950">Active contractors</h2>
               <p className="text-sm leading-6 text-slate-600">
@@ -635,7 +659,7 @@ export default async function AdminContractorsPage({
             )}
           </section>
 
-          <section className="space-y-3">
+          <section className={`space-y-3 ${lifecycleFilter === "active" ? "hidden" : ""}`}>
             <div className="space-y-1">
               <h2 className="text-lg font-semibold tracking-[-0.02em] text-amber-900">Archived contractors</h2>
               <p className="text-sm leading-6 text-slate-600">

@@ -11,6 +11,11 @@ import {
   unarchiveContractorFromForm,
   updateContractorFromForm,
 } from "@/lib/actions/contractor-actions";
+import {
+  inviteContractorUserFromForm,
+  resendContractorInviteFromForm,
+  sendPasswordResetFromForm,
+} from "@/lib/actions/admin-user-actions";
 
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   contractor_created_invite_sent: { tone: "success", message: "Contractor created and invite sent." },
@@ -18,6 +23,11 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   contractor_created_invite_failed: { tone: "warn", message: "Contractor created, but invite could not be sent." },
   contractor_archived: { tone: "warn", message: "Contractor archived. New invites, assignment, and portal participation are disabled until unarchived." },
   contractor_unarchived: { tone: "success", message: "Contractor unarchived and restored to active eligibility." },
+  invite_sent: { tone: "success", message: "Contractor user invitation sent." },
+  invite_resent: { tone: "success", message: "Contractor user invitation resent." },
+  invite_failed: { tone: "error", message: "The invitation could not be sent. Please try again." },
+  password_reset_sent: { tone: "success", message: "Password reset email sent." },
+  password_reset_failed: { tone: "error", message: "Password reset email could not be sent." },
 };
 
 function noticeClass(tone: "success" | "warn" | "error") {
@@ -46,11 +56,13 @@ export default async function EditContractorPage({
 
   if (!user || userErr) redirect("/login");
 
+  let internalRole = "office";
   try {
-    await requireInternalRole(["admin", "office"], {
+    const authz = await requireInternalRole(["admin", "office"], {
       supabase,
       userId: user.id,
     });
+    internalRole = String((authz.internalUser as any)?.role ?? "office").trim().toLowerCase();
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect("/ops");
@@ -62,7 +74,7 @@ export default async function EditContractorPage({
   const { data: contractor, error } = await supabase
     .from("contractors")
     .select(
-      "id, name, phone, email, notes, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, lifecycle_state, archived_at, archived_reason"
+      "id, name, phone, email, notes, billing_name, billing_email, billing_phone, billing_contact_name, billing_contact_email, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, billing_country, qbo_customer_name, lifecycle_state, archived_at, archived_reason"
     )
     .eq("id", id)
     .maybeSingle();
@@ -73,22 +85,32 @@ export default async function EditContractorPage({
   const isArchived = lifecycleState === "archived";
   const contractorName = String(contractor.name ?? "Unnamed contractor").trim() || "Unnamed contractor";
 
-  const { count: linkedUsersCount, error: linkedUsersErr } = await supabase
+  const { data: linkedUsers, count: linkedUsersCount, error: linkedUsersErr } = await supabase
     .from("contractor_users")
-    .select("user_id", { count: "exact", head: true })
+    .select("user_id, created_at", { count: "exact" })
     .eq("contractor_id", id);
 
   if (linkedUsersErr) throw linkedUsersErr;
 
   const { data: openInvites, error: openInvitesErr } = await supabase
     .from("contractor_invites")
-    .select("id, email, status, created_at")
+    .select("id, email, status, created_at, last_sent_at, sent_count")
     .eq("contractor_id", id)
     .in("status", ["pending", "invited"])
     .order("created_at", { ascending: false })
     .limit(5);
 
   if (openInvitesErr) throw openInvitesErr;
+
+  const isAdmin = internalRole === "admin";
+  const linkedUserIds = isAdmin
+    ? (linkedUsers ?? []).map((row: any) => String(row.user_id ?? "").trim()).filter(Boolean)
+    : [];
+  const { data: linkedProfiles, error: linkedProfilesErr } = linkedUserIds.length > 0
+    ? await supabase.from("profiles").select("id, full_name, email").in("id", linkedUserIds)
+    : { data: [], error: null };
+  if (linkedProfilesErr) throw linkedProfilesErr;
+  const profileById = new Map((linkedProfiles ?? []).map((profile: any) => [String(profile.id), profile]));
 
   const pendingInviteCount = openInvites?.length ?? 0;
   const recentInviteTimestamp =
@@ -202,6 +224,64 @@ export default async function EditContractorPage({
                   ? "This contractor is archived. New invites and portal participation are blocked until restored."
                   : "This contractor is active. Invite and portal participation follow normal active-state checks."}
               </div>
+
+              {isAdmin ? (
+                <div className="space-y-4 border-t border-slate-200 pt-4">
+                  <form action={inviteContractorUserFromForm} className="space-y-2">
+                    <input type="hidden" name="contractor_id" value={id} />
+                    <input type="hidden" name="return_to" value={`/contractors/${id}/edit`} />
+                    <label className="block text-xs font-semibold text-slate-700">Invite a contractor user</label>
+                    <input name="email" type="email" required disabled={isArchived} placeholder="user@contractor.com" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100" />
+                    <button type="submit" disabled={isArchived} className="inline-flex rounded-lg bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Send setup link</button>
+                  </form>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-950">Open invitations</h3>
+                    {openInvites?.length ? (
+                      <div className="mt-2 divide-y divide-slate-200 rounded-xl border border-slate-200">
+                        {openInvites.map((invite: any) => (
+                          <div key={invite.id} className="flex flex-col gap-2 p-3">
+                            <div className="text-sm font-medium text-slate-900">{invite.email}</div>
+                            <div className="text-xs text-slate-500">{invite.last_sent_at ? `Last sent ${new Date(invite.last_sent_at).toLocaleString()}` : "Waiting for acceptance"}</div>
+                            <form action={resendContractorInviteFromForm}>
+                              <input type="hidden" name="contractor_id" value={id} />
+                              <input type="hidden" name="email" value={invite.email} />
+                              <input type="hidden" name="return_to" value={`/contractors/${id}/edit`} />
+                              <button type="submit" disabled={isArchived} className="text-xs font-semibold text-blue-700 disabled:text-slate-400">Resend invitation</button>
+                            </form>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="mt-2 text-xs text-slate-500">No open invitations.</p>}
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-950">Linked members</h3>
+                    {linkedUsers?.length ? (
+                      <div className="mt-2 divide-y divide-slate-200 rounded-xl border border-slate-200">
+                        {linkedUsers.map((membership: any) => {
+                          const profile: any = profileById.get(String(membership.user_id));
+                          return (
+                            <div key={membership.user_id} className="p-3">
+                              <div className="text-sm font-medium text-slate-900">{String(profile?.full_name ?? "").trim() || "Contractor member"}</div>
+                              <div className="text-xs text-slate-500">{String(profile?.email ?? "").trim() || "No profile email"}</div>
+                              {profile?.email ? (
+                                <form action={sendPasswordResetFromForm} className="mt-2">
+                                  <input type="hidden" name="email" value={profile.email} />
+                                  <input type="hidden" name="return_to" value={`/contractors/${id}/edit`} />
+                                  <button type="submit" disabled={isArchived} className="text-xs font-semibold text-blue-700 disabled:text-slate-400">Send password reset</button>
+                                </form>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : <p className="mt-2 text-xs text-slate-500">No linked members yet.</p>}
+                  </div>
+                </div>
+              ) : (
+                <p className="border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500">An administrator manages invitations and account recovery. Office users can update contractor and billing details.</p>
+              )}
             </div>
           </section>
 
