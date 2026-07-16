@@ -73,7 +73,8 @@ describe("failed payment reconciliation queue page wiring", () => {
   });
 
   it("does not call Stripe", () => {
-    expect(queuePageSource).not.toContain("stripe");
+    expect(queuePageSource).not.toContain("inspectStaleStripePendingPayments");
+    expect(queuePageSource).not.toContain("getStripeServerClient");
   });
 
   it("does not mutate payment/allocation/invoice/visit/next_due_date records", () => {

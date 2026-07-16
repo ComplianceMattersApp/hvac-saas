@@ -210,6 +210,7 @@ export default async function FailedPaymentReconciliationPage() {
 
       <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm shadow-slate-950/5">
         This queue does not contact Stripe or change invoices, payments, visits, or follow-up dates.
+        <div className="mt-2"><Link href="/reports/stripe-reconciliation" className="font-semibold text-blue-700 hover:underline">Inspect stale Stripe pending sessions (read-only)</Link></div>
       </section>
     </div>
   );
