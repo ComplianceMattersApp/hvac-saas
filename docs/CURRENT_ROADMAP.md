@@ -51,14 +51,18 @@ EveryStep JobWorks is core-complete and live-use proven; the phase is **post-com
 
 A structured competitive review (HouseCall Pro, FieldProMax, Jobber, ServiceTitan) confirmed the primary gap is **field-invoicing friction and commercial packaging clarity**, not missing features. EveryStep's truth model and ECC differentiation are stronger; the gap to close is UX speed and commercial completeness perception.
 
-Milestone position: service model buildout (milestone 1) is closed; billing/invoice workflow (milestone 2) is complete enough to move forward; reporting/analytics (milestone 3) is substantially complete; Payments P1 foundation is closed at the current baseline. Current product focus is the maturation lanes below.
+Milestone position: service model buildout (milestone 1) is closed; billing/invoice workflow is in its owner-designated final proof and communication closeout; reporting/analytics (milestone 3) is substantially complete; Payments P1 foundation is closed at the current baseline. Current product focus is the maturation lanes below.
 
 ### Immediate next moves (quick reference)
+
+1. **Invoice Work Final Closeout is the owner-designated next lane.** Contractor saved-card self-service was explicitly pulled forward first; then run the production truth sweep, close delivery/customer-receipt communication, and perform the final field/desk exception pass. Plan: [Invoice_Work_Final_Closeout_Plan_2026-07.md](./ACTIVE/Invoice_Work_Final_Closeout_Plan_2026-07.md).
+2. **Do not pull the remaining Payments V2 expansion into invoice closeout.** ACH, refunds/disputes, broad customer portal history, and broader recurring automation remain separate later lanes.
+3. Resume **Lane 4 (SMS to Toggle-Ready)** after invoice closeout unless the owner explicitly reorders it again.
 
 If you are starting a session and just need the shortest answer to "what now?":
 
 1. **Owner smoke** the two Merged-awaiting-smoke tracks in live prod (ECC/HERS Work-Sharing; Company Profile Console) — nothing new should start on top of them until smoked.
-2. **Lane 4 (SMS to Toggle-Ready)** is the designated next build lane — continue the locked slice sequence toward flip-the-flag readiness (webhook/signature validation next).
+2. **Lane 4 (SMS to Toggle-Ready)** remains the next non-invoice build lane after the owner-designated invoice closeout pass.
 3. **PERF Slice 3** and the **Documentation consolidation Phase 2+** are safe, well-scoped parallel work that does not touch product runtime behavior.
 
 Anything not in the Active lanes list is deferred or runbook-gated — do not start it without an explicit owner decision.
@@ -67,7 +71,15 @@ Anything not in the Active lanes list is deferred or runbook-gated — do not st
 
 ## Active lanes
 
-### Lane 4 — SMS to Toggle-Ready ◀ NEXT ACTIVE LANE
+### Invoice Work Final Closeout ◀ NEXT ACTIVE LANE
+
+- **Status:** Active. Contractor saved-card C0-A foundation is the first owner-directed slice.
+- **Scope:** C0 contractor saved-card self-service; I1 production proof; I2 delivery and customer payment-receipt closeout; I3 final field/desk guided-action, add-on/duplicate, responsive, and exception acceptance.
+- **Next safe slice:** apply and validate the additive C0-A contractor-owned saved-method migration, then implement hosted setup/webhook completion as C0-B.
+- **Closure boundary:** ACH, refunds/disputes, broad customer portal history, and recurring-payment expansion remain separate Payments V2 lanes and do not block invoice closure.
+- **Plan:** [Invoice_Work_Final_Closeout_Plan_2026-07.md](./ACTIVE/Invoice_Work_Final_Closeout_Plan_2026-07.md).
+
+### Lane 4 — SMS to Toggle-Ready ◀ NEXT NON-INVOICE LANE
 - **Status:** Spec-complete, implementation in progress. The `SMS_*` spec family is locked:
   - Twilio / provider readiness
   - sender identity + provider configuration

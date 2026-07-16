@@ -22,7 +22,8 @@ The following is current runtime truth and supersedes older future/deferred word
 - Internal contractor profiles show contractor-associated jobs separately from invoices whose frozen billing recipient is that contractor. Job assignment never proves payment responsibility.
 - Authenticated contractor portal users may access only issued invoices with `bill_to_kind = contractor` and a matching `bill_to_contractor_id`. List, detail, printable view, and payment-link creation repeat that boundary. Customer/homeowner-billed invoices and unrelated work remain invisible.
 - QBO is implemented as optional downstream accounting synchronization and never overrides EveryStep invoice, payment, job, or closeout truth.
-- Still deferred: customer portal/client hub, ACH, refunds/disputes, contractor saved-card self-service, and broader recurring-payment automation.
+- Contractor saved-card self-service was explicitly pulled into active implementation on July 16, 2026. Its locked boundary is contractor-owned identity and explicit setup/use; it must never attach a contractor card to the homeowner customer or imply autopay consent.
+- Still deferred: customer portal/client hub, ACH, refunds/disputes, and broader recurring-payment automation.
 
 Closeout and operator paths: [Contractor_Payment_Communications_Closeout_2026-07.md](./ACTIVE/Contractor_Payment_Communications_Closeout_2026-07.md).
 
@@ -571,7 +572,7 @@ Operational payment state, accounting sync, and payment execution are separate l
 QuickBooks Online must not be the required foundation for payment architecture. QBO is optional, downstream, accounting-oriented synchronization. QBO is not the required basis for payment acceptance, the payment rail, the required merchant setup, or a prerequisite for core product usage.
 
 ### 19.5 Stripe rule (locked)
-Stripe is the implemented payment rail for platform subscription onboarding and tenant invoice Checkout. Processor-backed payment handling does not depend on QBO; verified Stripe webhook outcomes create payment truth. Signed invoice-specific guest payment is implemented, while refunds, disputes, ACH, broad customer portal self-service, and contractor saved-card self-service remain deferred. Keep future Stripe expansion additive and preserve payment/register idempotency.
+Stripe is the implemented payment rail for platform subscription onboarding and tenant invoice Checkout. Processor-backed payment handling does not depend on QBO; verified Stripe webhook outcomes create payment truth. Signed invoice-specific guest payment is implemented, and contractor-owned saved-card self-service is the active next expansion. Refunds, disputes, ACH, and broad customer portal self-service remain deferred. Keep future Stripe expansion additive and preserve payment/register idempotency.
 
 ### 19.6 Current live behavior
 Supported now: payment tracking; payment status and amount due/paid visibility; manual/external payment recording; Stripe invoice Checkout; signed invoice-specific guest payment; webhook-confirmed payment truth; and operational payment-received email. Not yet supported: ACH; saved payment methods; processor-led refunds; dispute/chargeback handling; or a broad customer payment portal beyond signed invoice links.
