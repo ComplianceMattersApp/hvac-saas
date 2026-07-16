@@ -56,8 +56,13 @@ export async function refreshQboTokens(
   refreshToken: string,
 ): Promise<Omit<QboTokenSet, "realmId">> {
   const client = createQboOAuthClient();
-  client.setToken({ refresh_token: refreshToken });
-  const response = await client.refresh();
+  // `refresh()` validates expiry metadata on the SDK's in-memory Token object.
+  // We intentionally persist only the encrypted token string, not the SDK's
+  // `x_refresh_token_expires_in` metadata, so reconstructing a partial Token and
+  // calling `refresh()` makes the SDK reject a valid token before contacting
+  // Intuit. `refreshUsingToken()` is the supported path for a persisted token
+  // string and sends it directly to Intuit's refresh endpoint.
+  const response = await client.refreshUsingToken(refreshToken);
   const token = response.getJson();
   return {
     accessToken: token.access_token,

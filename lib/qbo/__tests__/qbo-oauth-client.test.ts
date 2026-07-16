@@ -11,16 +11,14 @@ const createToken = vi.fn(async () => ({
     expires_in: 3600,
   }),
 }));
-const refresh = vi.fn(async () => ({
+const refreshUsingToken = vi.fn(async () => ({
   getJson: () => ({ access_token: "at2", refresh_token: "rt2", expires_in: 3600 }),
 }));
-const setToken = vi.fn();
 
 class MockOAuthClient {
   authorizeUri = authorizeUri;
   createToken = createToken;
-  refresh = refresh;
-  setToken = setToken;
+  refreshUsingToken = refreshUsingToken;
   static scopes = { Accounting: "com.intuit.quickbooks.accounting" };
   constructor(_config: unknown) {}
 }
@@ -59,11 +57,11 @@ describe("qbo-oauth-client", () => {
     expect(result.expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("refreshQboTokens sets the stored refresh token then refreshes", async () => {
+  it("refreshQboTokens refreshes directly from the persisted token string", async () => {
     const { refreshQboTokens } = await import("@/lib/qbo/qbo-oauth-client");
     const result = await refreshQboTokens("rt");
-    expect(setToken).toHaveBeenCalledWith({ refresh_token: "rt" });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refreshUsingToken).toHaveBeenCalledWith("rt");
+    expect(refreshUsingToken).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ accessToken: "at2", refreshToken: "rt2" });
   });
 });
