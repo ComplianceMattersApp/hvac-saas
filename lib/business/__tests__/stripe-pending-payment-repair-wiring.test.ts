@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const repair = readFileSync(resolve(__dirname, "../stripe-pending-payment-repair.ts"), "utf8");
 const action = readFileSync(resolve(__dirname, "../../actions/stripe-pending-payment-repair-actions.ts"), "utf8");
 const page = readFileSync(resolve(__dirname, "../../../app/reports/stripe-reconciliation/page.tsx"), "utf8");
+const cleanup = readFileSync(resolve(__dirname, "../stripe-abandoned-session-cleanup.ts"), "utf8");
 
 describe("Stripe pending-payment repair safety wiring", () => {
   it("requires financial lifecycle authority and explicit confirmation", () => {
@@ -37,5 +38,14 @@ describe("Stripe pending-payment repair safety wiring", () => {
   it("does not expose bulk repair", () => {
     expect(page).not.toContain("Repair all");
     expect(page).toContain("Repair this payment");
+  });
+
+  it("closes only verified open sessions after another payment was recorded", () => {
+    expect(cleanup).toContain('payment_status", "recorded"');
+    expect(cleanup).toContain('session.status !== "open"');
+    expect(cleanup).toContain("checkout.sessions.expire");
+    expect(cleanup.indexOf("checkout.sessions.expire")).toBeLessThan(cleanup.indexOf('.update({ payment_status: "failed"'));
+    expect(page).toContain("Close abandoned session");
+    expect(page).not.toContain("Close all abandoned");
   });
 });
