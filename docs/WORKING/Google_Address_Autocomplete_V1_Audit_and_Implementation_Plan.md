@@ -1,6 +1,6 @@
 # Google Address Autocomplete V1 — Audit and Implementation Plan
 
-Status: Phase A approved; Slice B authorized; Slices C-G approval-gated
+Status: Phase A and Slice B approved; Slice C complete and awaiting owner review; Slices D-G approval-gated
 
 Branch: `feature/google-address-autocomplete-v1`
 
@@ -16,6 +16,7 @@ Scope: repository and documentation audit only; no product, schema, environment,
 - Separate customer, contractor, invoice, paperwork-recipient, and business billing/mailing addresses are excluded from V1. V1 is limited to physical/service-location entry surfaces.
 - Preview deployments default to manual address entry when no separately restricted preview key is configured.
 - Slice B shared non-wired foundation is authorized. Slices C-G, production form wiring, environment configuration, and Google Cloud changes remain approval-gated.
+- Slice B was subsequently approved and Slice C internal `/jobs/new` pilot was authorized. Customer/location, contractor, estimate, environment, production, and Cloud work remain gated.
 
 ## Executive verdict
 
@@ -300,6 +301,7 @@ The owner approved `PlaceAutocompleteElement`, the adjacent-assistant pattern, `
 | --- | --- | --- | --- | --- | --- |
 | Phase A audit | Approved | This document only | Static repository searches; official Google documentation review; whitespace validation passed | Cloud configuration cannot be verified locally; unrelated untracked `.claude/` directory predates branch and remains untouched | Slice B authorized |
 | Slice B | Complete, awaiting owner review | `lib/addresses/google-place-address.ts`; `lib/google-maps/load-places-library.ts`; `components/addresses/GoogleAddressAutocomplete.tsx`; focused parser/loader tests; this document | 37 targeted tests passed across 5 files; targeted ESLint passed; `npx.cmd tsc --noEmit` passed; staged `git diff --check` passed; no browser smoke claimed | Widget presentation and real-key behavior cannot be evaluated until an approved route pilot and restricted development key exist | Stop at Slice C approval gate |
+| Slice C | Complete, awaiting owner review | `app/jobs/new/NewJobForm.tsx`; `lib/jobs/new-job-address-autocomplete.ts`; `lib/jobs/__tests__/new-job-address-autocomplete-wiring.test.ts`; this document | Foundation/pilot tests passed; typecheck passed; targeted ESLint passed with one pre-existing warning; broader intake run passed 16/17 files and 122/124 tests with two proven baseline-stale Step 5 assertions; browser smoke not available | No installed Playwright/Puppeteer runtime and no approved restricted browser key; widget presentation/provider behavior remains pending | Stop at Slice D approval gate |
 
 ## Slice B closeout — shared non-wired foundation
 
@@ -338,3 +340,53 @@ Slice B implements the approved foundation without importing or rendering it fro
 After explicit owner approval, change only `app/jobs/new/NewJobForm.tsx` to import the shared assistant and render it for **internal mode only** when the user is entering a new service location (new customer/new location or existing customer/new location). Its callback will update the existing controlled setters for Address Line 1, city, state, and ZIP. Address Line 2 will remain untouched; `suggestedUnit` may be shown as an explicit optional hint but will not be applied automatically. Existing saved-location selection, customer reuse, input names, validation, `createJobFromForm`, contractor mode, and submission behavior remain unchanged.
 
 Add `lib/jobs/__tests__/new-job-address-autocomplete-wiring.test.ts` to protect internal-only placement, both new-location branches, unchanged canonical field names/action, Address Line 2 behavior, and absence from contractor mode. Run the new foundation/wiring tests, existing new-job intake and reuse tests, typecheck, diff check, then desktop/mobile browser smoke with manual-only, missing-key, selection/edit, keyboard, overflow, hydration, console, and duplicate-loader checks. Do not begin this work without Slice C authorization.
+
+## Slice C closeout — internal `/jobs/new` pilot
+
+### Eligible modes and placement
+
+The adjacent assistant is imported only by `app/jobs/new/NewJobForm.tsx` and renders in two internal manual-entry states:
+
+1. Internal new customer plus its required new service location.
+2. Internal existing customer with `locationMode === "new"`.
+
+It does not render for saved-location reuse, no-customer/finder state, contractor mode, estimates, callbacks/returns, billing addresses, customer profile, or standalone location pages. Each eligible branch places it immediately after the optional location nickname and before the existing Address Line 1 input. Copy is: “Start typing an address to fill the fields below, or enter it manually.” Existing address inputs remain visible, required, controlled, editable, and authoritative.
+
+### Controlled-field integration
+
+- One application-owned `applyAutocompleteSelection` handler passes current field state and the parsed selection to `mergeSelectedServiceAddress`.
+- Only non-empty selected Address Line 1, city, state, and ZIP values replace current values. Missing components preserve current non-empty values.
+- Address Line 2 is included in the merge contract for regression protection but has no setter call in the selection handler, so selection cannot overwrite it.
+- The handler does not submit, call `createJobFromForm`, call any server action, alter customer/location IDs, invoke duplicate matching early, or persist Google/provider data.
+- Visibility is enforced by `shouldShowInternalAddressAutocomplete`, using internal mode plus the explicit new-location state. It is conditional React rendering rather than CSS hiding.
+
+### Missing-key and loader behavior
+
+With no `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`, mounting returns the foundation's `missing_key` state without inserting a script or issuing a Google request. The assistant shows a non-blocking manual-entry message and all original fields remain functional. Changing between new and existing location modes unmounts/remounts the assistant while the module singleton retains duplicate-load protection.
+
+No environment file or deployed variable was changed. `GOOGLE_MAPS_API_KEY` remains untouched.
+
+### Validation and smoke status
+
+- Slice B parser/loader plus new wiring tests: 3 files / 19 tests passed.
+- New wiring plus relationship-intake tests: 2 files / 10 tests passed.
+- Broader new-job, defaults/product-mode, reuse, internal intake, and contractor regression run: 16 files passed; 122 tests passed. `new-job-step5-simplification.test.ts` had two unrelated stale source-string assertions. Both expected strings are absent from the approved `e1dcebc4` baseline, and `components/jobs/VisitScopeBuilder.tsx` has no Slice C diff.
+- `npx.cmd tsc --noEmit` passed.
+- Targeted ESLint passed with zero errors and one pre-existing unused `Camera` import warning in `NewJobForm.tsx`.
+- Final staged `git diff --check` passed.
+- No browser smoke is claimed. The workspace has no installed Playwright, `@playwright/test`, or Puppeteer runtime, and no approved restricted development browser key was configured. Therefore missing-key browser layout/console/hydration smoke and real-provider keyboard/mobile/attribution smoke remain pending an available browser harness; automated missing-key, single-flight, failure, visibility, merge, and server-boundary behavior is covered.
+
+### Pilot verdict and known limitations
+
+`PlaceAutocompleteElement` remains the recommended direction based on the clean controlled-state integration, failure isolation, and absence of route-wide/global loading. Final acceptance for wider rollout remains conditional on actual browser smoke for Shadow DOM presentation, mobile width, Google-supported primary-type behavior, keyboard/screen-reader interaction, attribution, and one-script behavior with a restricted key.
+
+### Exact proposed Slice D plan (not authorized)
+
+After explicit approval, add the assistant only to physical/service-location entry surfaces:
+
+- `app/customers/new/page.tsx`: optional initial service location, using a small client island while retaining `createCustomerOnlyFromForm` and current input names/optional semantics.
+- `app/customers/[id]/page.tsx`: internal Add Location and Edit Service Address disclosures, retaining `addCustomerServiceLocationFromForm`, `updateLocationServiceAddressFromForm`, duplicate detection, explicit location IDs, and billing-sync safeguards.
+- `app/locations/[id]/page.tsx`: reuse the same edit-address client island and existing update action rather than implement a separate provider path.
+- Add focused UI wiring tests plus existing `customer-service-locations.test.ts` and `location-service-address-actions.test.ts` regressions.
+
+Do not include customer billing fields, contractor billing fields, contractor intake, estimates, business addresses, schema, environment, Cloud, database, provider, or production changes. Slice D is not approved by this closeout.

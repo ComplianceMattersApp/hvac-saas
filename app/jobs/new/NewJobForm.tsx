@@ -32,6 +32,12 @@ import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
+import GoogleAddressAutocomplete from "@/components/addresses/GoogleAddressAutocomplete";
+import type { SelectedServiceAddress } from "@/lib/addresses/google-place-address";
+import {
+  mergeSelectedServiceAddress,
+  shouldShowInternalAddressAutocomplete,
+} from "@/lib/jobs/new-job-address-autocomplete";
 import {
   EQUIPMENT_ROLE_OPTIONS,
   equipmentRoleLabel,
@@ -882,6 +888,12 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   const isNewLocation =
     isInternalMode && selectedCustomerId && !createNewCustomer && locationMode === "new";
+  const showInternalAddressAutocomplete = shouldShowInternalAddressAutocomplete({
+    isInternalMode,
+    createNewCustomer,
+    selectedCustomerId,
+    locationMode,
+  });
 
   const hasContextSingleLocation = isCustomerContextInternalMode && selectedCustomerLocations.length === 1;
   useEffect(() => {
@@ -906,6 +918,23 @@ const [billingRecipient, setBillingRecipient] = useState<
       return selectedCustomerLocations.some((location) => location.id === current) ? current : "";
     });
   }, [isCustomerContextInternalMode, selectedCustomerLocations]);
+
+  function applyAutocompleteSelection(selected: SelectedServiceAddress) {
+    const merged = mergeSelectedServiceAddress(
+      {
+        addressLine1: newLocationAddressLine1,
+        addressLine2: newLocationAddressLine2,
+        city: newLocationCity,
+        state: newLocationState,
+        zip: newLocationZip,
+      },
+      selected,
+    );
+    setNewLocationAddressLine1(merged.addressLine1);
+    setNewLocationCity(merged.city);
+    setNewLocationState(merged.state);
+    setNewLocationZip(merged.zip);
+  }
 
   function onQuickWindowChange(value: string) {
     if (!value) return;
@@ -2377,6 +2406,12 @@ const [billingRecipient, setBillingRecipient] = useState<
                           value={newLocationNickname}
                           onChange={(e) => setNewLocationNickname(e.target.value)}
                         />
+                        {showInternalAddressAutocomplete ? (
+                          <GoogleAddressAutocomplete
+                            label="Start typing an address to fill the fields below, or enter it manually."
+                            onAddressSelected={applyAutocompleteSelection}
+                          />
+                        ) : null}
                         <input
                           className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
                           name="address_line1"
@@ -2497,6 +2532,12 @@ const [billingRecipient, setBillingRecipient] = useState<
                     value={newLocationNickname}
                     onChange={(e) => setNewLocationNickname(e.target.value)}
                   />
+                  {showInternalAddressAutocomplete ? (
+                    <GoogleAddressAutocomplete
+                      label="Start typing an address to fill the fields below, or enter it manually."
+                      onAddressSelected={applyAutocompleteSelection}
+                    />
+                  ) : null}
                   <input
                     className="w-full rounded-md border border-slate-300 bg-white p-2"
                     name="address_line1"
