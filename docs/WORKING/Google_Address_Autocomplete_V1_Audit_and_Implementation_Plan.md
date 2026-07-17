@@ -299,4 +299,42 @@ The owner approved `PlaceAutocompleteElement`, the adjacent-assistant pattern, `
 | Slice | Status | Files changed | Validation/smoke | Known issues | Next action |
 | --- | --- | --- | --- | --- | --- |
 | Phase A audit | Approved | This document only | Static repository searches; official Google documentation review; whitespace validation passed | Cloud configuration cannot be verified locally; unrelated untracked `.claude/` directory predates branch and remains untouched | Slice B authorized |
-| Slice B | Authorized, not started | None | None | Production forms and Slices C-G remain gated | Implement shared non-wired foundation only |
+| Slice B | Complete, awaiting owner review | `lib/addresses/google-place-address.ts`; `lib/google-maps/load-places-library.ts`; `components/addresses/GoogleAddressAutocomplete.tsx`; focused parser/loader tests; this document | 37 targeted tests passed across 5 files; targeted ESLint passed; `npx.cmd tsc --noEmit` passed; staged `git diff --check` passed; no browser smoke claimed | Widget presentation and real-key behavior cannot be evaluated until an approved route pilot and restricted development key exist | Stop at Slice C approval gate |
+
+## Slice B closeout — shared non-wired foundation
+
+Slice B implements the approved foundation without importing or rendering it from any production route.
+
+### Technical approach
+
+- `load-places-library.ts` is client-callable but SSR-safe: it checks for a configured browser key and browser globals before DOM access.
+- A loader factory owns one promise per instance; the exported application loader is a module singleton. Concurrent callers share the same Places import and one script ID prevents duplicate script injection.
+- The loader adds the official Maps JavaScript script only on demand, then calls `google.maps.importLibrary("places")`. It requests no global Places payload from a layout or unrelated route.
+- Missing `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` returns `missing_key`. Missing browser globals, script failure, missing library API, and import rejection return typed unavailable states rather than throwing into a consuming form.
+- The loader reads only the approved `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` convention. No environment file, real key, or environment configuration was added; `GOOGLE_MAPS_API_KEY` remains unchanged.
+- `google-place-address.ts` converts the minimum browser-safe component shape to `addressLine1`, `city`, `state`, `zip`, and a separate `suggestedUnit`. It stores no Place object, prediction, Place ID, coordinates, or raw payload.
+- City precedence is locality, postal town, first-level sublocality, then administrative-area level 2. State uses short text and uppercase. ZIP suffix becomes ZIP+4. Missing components produce safe empty/partial strings.
+- `preserveAddressLine2` makes the protection contract explicit: an existing line 2 remains unchanged and a provider subpremise stays separate until a future consuming form intentionally offers it.
+- `GoogleAddressAutocomplete.tsx` is a visually neutral client component with a selected-address callback. It requests only `addressComponents`, restricts intent to US street/premise/subpremise results, never submits a form, and has no action/database/provider write path.
+
+### Validation completed
+
+- `npx.cmd vitest run lib/addresses/__tests__/google-place-address.test.ts lib/google-maps/__tests__/load-places-library.test.ts lib/jobs/__tests__/job-location-preview.test.ts lib/actions/__tests__/location-service-address-actions.test.ts lib/actions/__tests__/customer-service-locations.test.ts` — passed, 5 files / 37 tests.
+- `npx.cmd tsc --noEmit` — passed.
+- Targeted ESLint for all new TypeScript/TSX files — passed.
+- Staged `git diff --check` — passed.
+- Code review confirmed the assistant has no production-route import, loader execution is mount/call driven, key values are absent, `GOOGLE_MAPS_API_KEY` is unchanged, and no package dependency was added.
+- Browser smoke was not performed or claimed because no route is wired in Slice B.
+
+### Deviations and limitations
+
+- No third-party or type-only dependency was necessary; minimal Google-facing interfaces are local to the loader boundary.
+- The audited file plan was followed. The loader uses Google's direct async Maps JavaScript bootstrap followed by dynamic `importLibrary("places")`, avoiding an npm loader dependency.
+- Real widget styling, keyboard/mobile behavior in EveryStep, and accepted Google result types remain pilot acceptance items for Slice C because the component is intentionally not route-mounted and no key was configured.
+- Slices C-G remain unapproved. No environment, Cloud Console, schema, data, provider, or production change occurred.
+
+### Exact proposed Slice C pilot
+
+After explicit owner approval, change only `app/jobs/new/NewJobForm.tsx` to import the shared assistant and render it for **internal mode only** when the user is entering a new service location (new customer/new location or existing customer/new location). Its callback will update the existing controlled setters for Address Line 1, city, state, and ZIP. Address Line 2 will remain untouched; `suggestedUnit` may be shown as an explicit optional hint but will not be applied automatically. Existing saved-location selection, customer reuse, input names, validation, `createJobFromForm`, contractor mode, and submission behavior remain unchanged.
+
+Add `lib/jobs/__tests__/new-job-address-autocomplete-wiring.test.ts` to protect internal-only placement, both new-location branches, unchanged canonical field names/action, Address Line 2 behavior, and absence from contractor mode. Run the new foundation/wiring tests, existing new-job intake and reuse tests, typecheck, diff check, then desktop/mobile browser smoke with manual-only, missing-key, selection/edit, keyboard, overflow, hydration, console, and duplicate-loader checks. Do not begin this work without Slice C authorization.
