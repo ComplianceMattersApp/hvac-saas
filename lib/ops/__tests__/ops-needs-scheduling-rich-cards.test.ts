@@ -88,7 +88,7 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(needsSchedulingCardSource).toContain("Last Attempt");
   });
 
-  it("shows contractor context on the collapsed card without duplicating it inside Open & Act", () => {
+  it("shows contractor context without duplicating it in the action area", () => {
     expect(buildNeedsSchedulingSource).toContain(
       "workspaceContractorName(job) || operationalTenantIdentity.displayName",
     );
@@ -96,15 +96,13 @@ describe("/ops Needs Scheduling rich cards", () => {
       '...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : [])',
     );
 
-    const expandedAreaStart = needsSchedulingCardSource.indexOf("<QueueCardOpenAndAct>");
-    const expandedAreaSource = needsSchedulingCardSource.slice(expandedAreaStart);
-    expect(expandedAreaSource).not.toContain(">Contractor<");
+    expect(needsSchedulingCardSource).not.toContain("Open & Act");
   });
 
   it("wires the workspace scheduler to the existing schedule action with current /ops filters preserved", () => {
     expect(opsPageSource).toContain('import { updateJobScheduleFromForm } from "@/lib/actions";');
     expect(needsSchedulingCardSource).toContain("form action={updateJobScheduleFromForm}");
-    expect(needsSchedulingCardSource).toContain("<QueueCardOpenAndAct>");
+    expect(needsSchedulingCardSource).toContain("headerContent={");
     expect(needsSchedulingCardSource).toContain('name="scheduled_date"');
     expect(needsSchedulingCardSource).toContain('name="window_start"');
     expect(needsSchedulingCardSource).toContain('name="window_end"');
@@ -125,7 +123,7 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(needsSchedulingCardSource).toContain('name="method" value="text"');
     expect(needsSchedulingCardSource).toContain("contact_attempt_logged_call");
     expect(needsSchedulingCardSource).toContain("contact_attempt_logged_text");
-    expect(needsSchedulingCardSource).toContain("Open SMS App");
+    expect(needsSchedulingCardSource).toContain(">Text<");
   });
 
   it("preserves compact workspace card rendering for queues that have not been promoted", () => {

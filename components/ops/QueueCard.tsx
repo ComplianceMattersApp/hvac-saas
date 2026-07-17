@@ -24,6 +24,8 @@ export type QueueCardProps = {
   tags: QueueCardTag[];
   actionLabel?: string;
   tagsColumns?: 1 | 2 | 4;
+  /** Priority content rendered directly below the card header and before metadata tags. */
+  headerContent?: ReactNode;
   children?: ReactNode;
   /** Overrides the tone derived from `variant` for the left status spine and default chip coloring. */
   tone?: QueueCardTone;
@@ -89,6 +91,7 @@ export default function QueueCard({
   tags,
   actionLabel = "Open Job",
   tagsColumns = 1,
+  headerContent,
   children,
   tone,
   stateChips,
@@ -140,6 +143,8 @@ export default function QueueCard({
           ) : null}
         </div>
       </div>
+
+      {headerContent ? <div className="mt-2">{headerContent}</div> : null}
 
       {quote ? (
         <div className="mt-1.5 rounded-lg border border-rose-100 bg-rose-50/70 px-2.5 py-1.5 text-[12.5px] italic leading-5 text-rose-900">

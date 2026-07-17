@@ -159,6 +159,31 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
       ageLabel={view.ageLabel}
       ageDays={view.ageDays}
       tagsColumns={4}
+      headerContent={
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+          <div className="min-w-0">
+            <div className={utilityLabelClass}>Phone</div>
+            {view.phone ? (
+              phoneHref || textHref ? (
+                <a
+                  href={phoneHref || textHref}
+                  className="mt-0.5 block truncate text-[14px] font-semibold text-slate-900 hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  {view.phone}
+                </a>
+              ) : (
+                <span className="mt-0.5 block text-[14px] font-semibold text-slate-900">{view.phone}</span>
+              )
+            ) : (
+              <span className="mt-0.5 block text-[12.5px] text-slate-400">No phone on file</span>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {phoneHref ? <a href={phoneHref} className={compactContactActionClass}>Call</a> : null}
+            {textHref ? <a href={textHref} className={compactContactActionClass}>Text</a> : null}
+          </div>
+        </div>
+      }
       tags={[
         { label: "Reason", value: view.reasonLabel, detail: view.reasonDetail || undefined },
         { label: "Last Action", value: view.lastActionText },
@@ -166,54 +191,22 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
         ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
       ]}
     >
-      <QueueCardOpenAndAct>
-        <div className="space-y-3">
-          <div className="grid gap-1.5">
-            <span className={utilityLabelClass}>Phone</span>
-            {view.phone ? (
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                {phoneHref || textHref ? (
-                  <a
-                    href={phoneHref || textHref}
-                    className="text-sm font-semibold text-slate-800 transition-colors hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                  >
-                    {view.phone}
-                  </a>
-                ) : (
-                  <span className="text-sm font-medium text-slate-800">{view.phone}</span>
-                )}
-                <div className="flex items-center gap-1.5">
-                  {phoneHref ? (
-                    <a href={phoneHref} className={compactContactActionClass}>
-                      Call
-                    </a>
-                  ) : null}
-                  {textHref ? (
-                    <a href={textHref} className={compactContactActionClass}>
-                      Open SMS App
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            ) : (
-              <span className="text-sm text-slate-400">No phone on file</span>
-            )}
-          </div>
-          <div className="grid gap-1.5">
+      <div className="mt-2 space-y-2 border-t border-slate-200 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className={utilityLabelClass}>Schedule</span>
             <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
               {view.scheduleWindowText ? `${view.scheduleDateText} / ${view.scheduleWindowText}` : view.scheduleDateText}
             </span>
           </div>
 
-          <form action={updateJobScheduleFromForm} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
+          <form action={updateJobScheduleFromForm} className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
             <input type="hidden" name="job_id" value={view.jobId} />
             <input type="hidden" name="permit_number" value={view.permitNumber} />
             <input type="hidden" name="jurisdiction" value={view.jurisdiction} />
             <input type="hidden" name="permit_date" value={view.permitDate} />
             <input type="hidden" name="return_to" value={view.returnToHref} />
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 Date
                 <input type="date" name="scheduled_date" defaultValue={view.scheduledDateRaw} className={scheduleFieldClass} />
@@ -238,7 +231,7 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
             </div>
           </form>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2">
             <form action={logCustomerContactAttemptFromForm}>
               <input type="hidden" name="job_id" value={view.jobId} />
               <input type="hidden" name="method" value="call" />
@@ -260,9 +253,8 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
               </button>
             </form>
           </div>
-          <p className="text-[11px] text-slate-500">Logs communication attempts only; does not confirm carrier delivery.</p>
-        </div>
-      </QueueCardOpenAndAct>
+          <p className="text-[10.5px] text-slate-500">Contact logs record attempts only; they do not confirm carrier delivery.</p>
+      </div>
     </QueueCard>
   );
 }
