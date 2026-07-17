@@ -33,7 +33,7 @@ const WORKSPACE_SELECT =
 const QUEUE_LABELS: Record<OpsExportQueueKey, string> = {
   need_to_schedule: "Needs Scheduling",
   field_work: "Field Work",
-  without_tech: "Without Tech",
+  without_tech: "Needs Assignment",
   waiting: "Waiting / Pending Info",
   exceptions: "Exceptions",
   closeout: "Closeout & Review",
@@ -159,7 +159,7 @@ function visibleReasonForJob(job: ExportJob, queueKey: OpsExportQueueKey, failur
       if (lifecycle === "in_progress") return "In progress";
       return "Scheduled field work";
     }
-    if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+    if (queueKey === "without_tech") return "Scheduled without an active assignee";
     if (failureDetail) return failureDetail;
     return getOpsQueueCardStatusReason(job);
   };

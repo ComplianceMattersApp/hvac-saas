@@ -589,6 +589,10 @@ describe("focused ops queue pages", () => {
     expect(withoutTechQueuePageSource).toContain("No coverage gaps right now.");
     expect(withoutTechQueuePageSource).toContain("Return to Operations");
     expect(withoutTechQueuePageSource).toContain('href="/ops"');
+    expect(withoutTechQueuePageSource).toContain("Needs Assignment");
+    expect(withoutTechQueuePageSource).toContain("buildScheduledWithoutTechSnapshot");
+    expect(withoutTechQueuePageSource).toContain('.eq("status", "open")');
+    expect(withoutTechQueuePageSource).toContain('.eq("ops_status", "scheduled")');
   });
 
   it("field My Work uses the scheduled/actionable contract and no unscheduled section", () => {

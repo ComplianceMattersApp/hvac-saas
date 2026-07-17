@@ -643,7 +643,7 @@ export default async function OpsPage({
       if (lifecycle === "in_progress") return "In progress";
       return "Scheduled field work";
     }
-    if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+    if (queueKey === "without_tech") return "Scheduled without an active assignee";
     if (specificFailureReason) return specificFailureReason;
     return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
   }
@@ -908,7 +908,7 @@ export default async function OpsPage({
       },
       {
         key: "without_tech",
-        label: "Without Tech",
+        label: "Needs Assignment",
         count: scheduledWithoutTechSnapshot.count,
         href: `/ops${buildQueryString({ bucket: "without_tech", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
       },

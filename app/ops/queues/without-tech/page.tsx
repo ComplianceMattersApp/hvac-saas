@@ -3,14 +3,15 @@ import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
-  buildWithoutTechQueueRows,
   customerLocationLabel,
   formatOpsStatusLabel,
 } from "@/lib/ops/focused-queues";
-import { displayWindowLA, formatBusinessDateUS, startOfTodayUtcIsoLA } from "@/lib/utils/schedule-la";
+import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
+import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
+import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 const withoutTechSelect =
-  "id, title, status, ops_status, scheduled_date, window_start, window_end, customer_first_name, customer_last_name, city, job_address, created_at";
+  "id, account_owner_user_id, title, status, ops_status, scheduled_date, window_start, window_end, customer_first_name, customer_last_name, city, job_address, created_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
@@ -24,17 +25,6 @@ function scheduleLabel(job: any): string {
   return windowLabel ? `${dateLabel} • ${windowLabel}` : dateLabel;
 }
 
-function buildAssignmentMap(rows: Array<any>): Record<string, Array<any>> {
-  const map: Record<string, Array<any>> = {};
-  for (const row of rows) {
-    const jobId = String(row?.job_id ?? "").trim();
-    if (!jobId) continue;
-    if (!Array.isArray(map[jobId])) map[jobId] = [];
-    map[jobId].push(row);
-  }
-  return map;
-}
-
 export default async function OpsWithoutTechQueuePage() {
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
@@ -44,37 +34,30 @@ export default async function OpsWithoutTechQueuePage() {
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
-  const today = startOfTodayUtcIsoLA();
-
   const { data, error } = await supabase
     .from("jobs")
     .select(withoutTechSelect)
     .is("deleted_at", null)
-    .eq("scheduled_date", today)
+    .eq("status", "open")
+    .eq("ops_status", "scheduled")
     .order("scheduled_date", { ascending: true })
-    .order("window_start", { ascending: true });
+    .order("window_start", { ascending: true })
+    .limit(500);
 
   if (error) throw error;
 
-  const allScheduled = (data ?? []) as any[];
-  const jobIds = allScheduled.map((job) => String(job?.id ?? "").trim()).filter(Boolean);
-
-  const { data: assignmentRows, error: assignmentError } = jobIds.length
-    ? await supabase
-        .from("job_assignments")
-        .select("job_id, user_id, is_primary, is_active")
-        .eq("is_active", true)
-        .in("job_id", jobIds)
-    : { data: [], error: null };
-
-  if (assignmentError) throw assignmentError;
-
-  const rows = buildWithoutTechQueueRows({
-    jobs: allScheduled,
-    assignmentDisplayMap: buildAssignmentMap(assignmentRows ?? []),
+  const scheduledJobs = (data ?? []) as any[];
+  const jobIds = scheduledJobs.map((job) => String(job?.id ?? "").trim()).filter(Boolean);
+  const assignmentDisplayMap = jobIds.length
+    ? await getActiveJobAssignmentDisplayMap({ supabase, jobIds })
+    : {};
+  const snapshot = buildScheduledWithoutTechSnapshot({
+    jobs: scheduledJobs,
+    assignmentDisplayMap,
     accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
-    today,
+    previewLimit: 500,
   });
+  const rows = snapshot.preview;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -87,13 +70,13 @@ export default async function OpsWithoutTechQueuePage() {
             <span aria-hidden="true">&larr;</span> Back to Operations
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Without Tech</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Needs Assignment</h1>
             <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
               Coverage Gaps
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-600">
-            Scheduled open work that is missing an active technician assignment. {" "}
+            Scheduled open work that is missing an active team assignment. {" "}
             <span className="font-semibold text-slate-800">{rows.length}</span>{" "}
             {rows.length === 1 ? "item" : "items"}
           </p>
@@ -103,7 +86,7 @@ export default async function OpsWithoutTechQueuePage() {
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
           <p className="text-sm font-medium text-slate-500">No coverage gaps right now.</p>
-          <p className="mt-1 text-xs text-slate-400">All scheduled open jobs currently have active technician assignments.</p>
+          <p className="mt-1 text-xs text-slate-400">All scheduled open jobs currently have active team assignments.</p>
           <Link
             href="/ops"
             className="mt-4 inline-flex rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
