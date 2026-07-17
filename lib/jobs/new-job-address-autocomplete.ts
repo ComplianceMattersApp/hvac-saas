@@ -1,12 +1,10 @@
-import type { SelectedServiceAddress } from "@/lib/addresses/google-place-address";
+import {
+  mergeSelectedServiceAddressFields,
+  type SelectedServiceAddress,
+  type ServiceAddressFieldValues,
+} from "@/lib/addresses/google-place-address";
 
-export type NewJobServiceAddressFields = {
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  zip: string;
-};
+export type NewJobServiceAddressFields = ServiceAddressFieldValues;
 
 export function shouldShowInternalAddressAutocomplete(input: {
   isInternalMode: boolean;
@@ -24,11 +22,5 @@ export function mergeSelectedServiceAddress(
   current: NewJobServiceAddressFields,
   selected: SelectedServiceAddress,
 ): NewJobServiceAddressFields {
-  return {
-    addressLine1: selected.addressLine1 || current.addressLine1,
-    addressLine2: current.addressLine2,
-    city: selected.city || current.city,
-    state: selected.state || current.state,
-    zip: selected.zip || current.zip,
-  };
+  return mergeSelectedServiceAddressFields(current, selected);
 }

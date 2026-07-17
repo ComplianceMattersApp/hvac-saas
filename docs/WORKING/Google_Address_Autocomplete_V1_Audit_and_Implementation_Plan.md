@@ -1,6 +1,6 @@
 # Google Address Autocomplete V1 — Audit and Implementation Plan
 
-Status: Phase A and Slice B approved; Slice C complete and awaiting owner review; Slices D-G approval-gated
+Status: Phase A-Slice C approved; Slice D in progress (D1 complete); Slices E-G approval-gated
 
 Branch: `feature/google-address-autocomplete-v1`
 
@@ -17,6 +17,7 @@ Scope: repository and documentation audit only; no product, schema, environment,
 - Preview deployments default to manual address entry when no separately restricted preview key is configured.
 - Slice B shared non-wired foundation is authorized. Slices C-G, production form wiring, environment configuration, and Google Cloud changes remain approval-gated.
 - Slice B was subsequently approved and Slice C internal `/jobs/new` pilot was authorized. Customer/location, contractor, estimate, environment, production, and Cloud work remain gated.
+- Slice C was subsequently approved and Slice D customer/canonical-location surfaces were authorized. Slice D1 shared client island is complete; route wiring is proceeding in separately validated sub-slices.
 
 ## Executive verdict
 
@@ -302,6 +303,7 @@ The owner approved `PlaceAutocompleteElement`, the adjacent-assistant pattern, `
 | Phase A audit | Approved | This document only | Static repository searches; official Google documentation review; whitespace validation passed | Cloud configuration cannot be verified locally; unrelated untracked `.claude/` directory predates branch and remains untouched | Slice B authorized |
 | Slice B | Complete, awaiting owner review | `lib/addresses/google-place-address.ts`; `lib/google-maps/load-places-library.ts`; `components/addresses/GoogleAddressAutocomplete.tsx`; focused parser/loader tests; this document | 37 targeted tests passed across 5 files; targeted ESLint passed; `npx.cmd tsc --noEmit` passed; staged `git diff --check` passed; no browser smoke claimed | Widget presentation and real-key behavior cannot be evaluated until an approved route pilot and restricted development key exist | Stop at Slice C approval gate |
 | Slice C | Complete, awaiting owner review | `app/jobs/new/NewJobForm.tsx`; `lib/jobs/new-job-address-autocomplete.ts`; `lib/jobs/__tests__/new-job-address-autocomplete-wiring.test.ts`; this document | Foundation/pilot tests passed; typecheck passed; targeted ESLint passed with one pre-existing warning; broader intake run passed 16/17 files and 122/124 tests with two proven baseline-stale Step 5 assertions; browser smoke not available | No installed Playwright/Puppeteer runtime and no approved restricted browser key; widget presentation/provider behavior remains pending | Stop at Slice D approval gate |
+| Slice D1 | Complete | `components/addresses/ServiceLocationAddressFields.tsx`; shared address merge helper/tests; new-job adapter reuse; this document | 4 files / 23 tests passed; typecheck and targeted ESLint passed | `/customers/new` has no existing Address Line 2 contract, so D2 will intentionally set `showAddressLine2={false}` rather than expand its action | Wire D2 creation surfaces |
 
 ## Slice B closeout — shared non-wired foundation
 
@@ -390,3 +392,18 @@ After explicit approval, add the assistant only to physical/service-location ent
 - Add focused UI wiring tests plus existing `customer-service-locations.test.ts` and `location-service-address-actions.test.ts` regressions.
 
 Do not include customer billing fields, contractor billing fields, contractor intake, estimates, business addresses, schema, environment, Cloud, database, provider, or production changes. Slice D is not approved by this closeout.
+
+## Slice D target audit and progress
+
+### Audited form contracts
+
+- `/customers/new` is a server-rendered native form using `createCustomerOnlyFromForm`. Its optional location currently posts `address_line1`, `city`, `state`, and `zip`; all are optional at the UI and the action creates a location only when line 1, city, and ZIP are present. It has no Address Line 2 input/read, so Slice D will not invent one.
+- Customer profile Add Location is a server-rendered native form using `addCustomerServiceLocationFromForm`. It posts hidden `customer_id`, required `address_line1`, `city`, `state`, `zip`, optional `address_line2`, and separate nickname/label/notes. The action retains same-customer normalized duplicate reuse and existing redirect/revalidation behavior.
+- Customer profile Edit Service Address and `/locations/[id]` are two server-rendered presentations of the same canonical `updateLocationServiceAddressFromForm` action. Both post an explicit `location_id`; the profile also posts `return_customer_id`. Existing values are uncontrolled defaults. The action updates only the explicit scoped location and conditionally keeps a blank or previously matching customer billing address aligned; it does not bulk-rewrite completed job, estimate, or invoice snapshots.
+- The standalone location route retains the warning that correcting a saved location is distinct from job reassignment and does not bulk-rewrite completed job snapshots.
+
+### D1 shared client island
+
+`ServiceLocationAddressFields` owns only the five editable address values inside an existing native form. It preserves the canonical names `address_line1`, `address_line2` (when supported), `city`, `state`, and `zip`, accepts existing initial values and required/optional posture, and keeps every input editable. Selection uses the shared pure merge helper, applies only non-empty provider values, and always preserves Address Line 2. The island has no form action, submit, ID, duplicate detection, provider persistence, or server behavior. It supports white/compact customer-profile presentation and muted standalone-location presentation without converting parent forms or routes to client components.
+
+D1 validation: Slice B/Slice C/shared-island tests passed (4 files / 23 tests), `npx.cmd tsc --noEmit` passed, and targeted ESLint passed. No dependency, route, environment, schema, data, provider, production, contractor, estimate, or billing-address change was made.

@@ -60,6 +60,14 @@ export type EditableServiceAddress = SelectedServiceAddress & {
   addressLine2: string;
 };
 
+export type ServiceAddressFieldValues = {
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  zip: string;
+};
+
 /**
  * Converts a Google selection into the existing editable form contract.
  * A provider-suggested unit is deliberately kept separate: Address Line 2
@@ -73,5 +81,19 @@ export function preserveAddressLine2(
   return {
     ...selection,
     addressLine2: existingAddressLine2,
+  };
+}
+
+/** Applies only non-empty selected values to the existing editable fields. */
+export function mergeSelectedServiceAddressFields(
+  current: ServiceAddressFieldValues,
+  selected: SelectedServiceAddress,
+): ServiceAddressFieldValues {
+  return {
+    addressLine1: selected.addressLine1 || current.addressLine1,
+    addressLine2: current.addressLine2,
+    city: selected.city || current.city,
+    state: selected.state || current.state,
+    zip: selected.zip || current.zip,
   };
 }
