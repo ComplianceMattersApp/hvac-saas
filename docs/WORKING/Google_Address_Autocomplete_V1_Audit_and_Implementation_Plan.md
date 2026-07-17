@@ -1,6 +1,6 @@
 # Google Address Autocomplete V1 — Audit and Implementation Plan
 
-Status: Phase A-Slice C approved; Slice D in progress (D1 complete); Slices E-G approval-gated
+Status: Phase A-Slice D complete; Slice E-G approval-gated
 
 Branch: `feature/google-address-autocomplete-v1`
 
@@ -305,6 +305,7 @@ The owner approved `PlaceAutocompleteElement`, the adjacent-assistant pattern, `
 | Slice C | Complete, awaiting owner review | `app/jobs/new/NewJobForm.tsx`; `lib/jobs/new-job-address-autocomplete.ts`; `lib/jobs/__tests__/new-job-address-autocomplete-wiring.test.ts`; this document | Foundation/pilot tests passed; typecheck passed; targeted ESLint passed with one pre-existing warning; broader intake run passed 16/17 files and 122/124 tests with two proven baseline-stale Step 5 assertions; browser smoke not available | No installed Playwright/Puppeteer runtime and no approved restricted browser key; widget presentation/provider behavior remains pending | Stop at Slice D approval gate |
 | Slice D1 | Complete | `components/addresses/ServiceLocationAddressFields.tsx`; shared address merge helper/tests; new-job adapter reuse; this document | 4 files / 23 tests passed; typecheck and targeted ESLint passed | `/customers/new` has no existing Address Line 2 contract, so D2 will intentionally set `showAddressLine2={false}` rather than expand its action | Wire D2 creation surfaces |
 | Slice D2 | Complete | `app/customers/new/page.tsx`; Customer Profile Add Location in `app/customers/[id]/page.tsx`; creation wiring tests; shared island state-length parity; this document | 6 files / 36 tests passed; typecheck passed; targeted changed-file ESLint passed except two unrelated pre-existing quote-escape errors elsewhere in the customer profile file | Browser smoke unavailable; no Address Line 2 added to `/customers/new` because its action does not support it | Wire D3 edit surfaces |
+| Slice D3 | Complete, awaiting owner review | Customer Profile Edit Service Address in `app/customers/[id]/page.tsx`; `app/locations/[id]/page.tsx`; edit wiring and existing action regression tests; this document | 6 files / 38 focused tests passed; typecheck passed; targeted new-file ESLint passed; final broader regression results recorded below | Browser/provider smoke remains unavailable; full legacy route lint contains pre-existing errors outside the Slice D diff | Stop at Slice E approval gate |
 
 ## Slice B closeout — shared non-wired foundation
 
@@ -416,3 +417,19 @@ D1 validation: Slice B/Slice C/shared-island tests passed (4 files / 23 tests), 
 - The shared state input retains the former two-character state limit.
 
 D2 validation: foundation/island/wiring plus `create-customer-action.test.ts` and `customer-service-locations.test.ts` passed (6 files / 36 tests); typecheck passed. Targeted ESLint passed for the new-customer page, shared island, and new test. Linting the full pre-existing customer profile file reports two unrelated `react/no-unescaped-entities` errors at line 2915, outside the Slice D diff; they were not repaired in this branch.
+
+### D3 canonical location editing
+
+- Customer Profile Edit Service Address now reuses the shared island with the saved line 1, line 2, city, state, and ZIP as initial values. Hidden `location_id` and `return_customer_id`, nickname/label/notes fields, the explicit submit button, and `updateLocationServiceAddressFromForm` remain unchanged.
+- `/locations/[id]` uses the same island with its existing muted presentation. The location ID, correction/snapshot warning, notes, action, and redirect behavior remain unchanged.
+- The existing action regression test now verifies the canonical field names against the extracted shared field component while continuing to verify each route's action and hidden-ID wiring. This is a test adaptation for the approved extraction, not a server-contract change.
+
+The completed Slice D covers every authorized physical/service-location creation and editing candidate. The canonical names remain `address_line1`, `address_line2`, `city`, `state`, and `zip`; `/customers/new` intentionally omits line 2 because its existing action has no line-2 contract. The actions remain `createCustomerOnlyFromForm`, `addCustomerServiceLocationFromForm`, and `updateLocationServiceAddressFromForm`. Existing duplicate reuse, explicit location scoping, conditional billing synchronization, historical snapshot boundaries, redirects, and revalidation remain server-owned and unchanged. Provider selection never submits or persists a Place object, ID, coordinates, prediction, or raw response.
+
+D3 focused validation passed 6 files / 38 tests. The final combined foundation, wiring, customer/location action, new-job boundary, contractor intake/attachment, invoice rendering, and location regression run passed 14 files / 81 tests. `npx.cmd tsc --noEmit` passed. Targeted ESLint for the new test and shared island passed; full-file lint of the pre-existing action regression test reports its existing `no-explicit-any` query mock outside the D3 assertion change. Full-file lint for the legacy location page continues to report pre-existing `no-explicit-any`/unused-variable findings outside the changed address block, and the customer profile retains the two previously recorded quote-escape errors. Browser smoke is not claimed: this workspace still has no installed Playwright/Puppeteer harness and no approved restricted browser key. Automated tests cover missing-key fallback, loader single-flight/failure behavior, route visibility, merge behavior, canonical names, action wiring, and server boundaries; real-provider presentation, keyboard, mobile, attribution, and console/hydration checks remain pending.
+
+### Exact proposed Slice E plan (not authorized)
+
+After explicit owner approval, limit Slice E to contractor proposal/finalization address entry: the contractor branch of `app/jobs/new/NewJobForm.tsx` and the two new-location branches of `GuidedFinalizationWizard.tsx`. Preserve durable-first proposal submission, attachment tokens, `proposed_*` truth, existing-record selection, finalization decisions, canonical creation timing, field names, actions, validation, and redirects. Add focused contractor wiring tests and rerun the existing contractor intake/finalization/attachment regression suites. Do not touch customer/location routes, estimates, billing or business addresses, schema, data, environment files, Google Cloud, deployed configuration, provider settings, or production.
+
+Slice E is not approved. Remaining rollout gates are browser smoke with an approved restricted key/harness, owner review of Slice D, explicit Slice E authorization, and later separate approvals for environment/Cloud/provider/production work.
