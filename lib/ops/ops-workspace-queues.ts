@@ -5,6 +5,7 @@ export type OpsBoardFilterBucket =
   | "all"
   | "pending"
   | "field_work"
+  | "without_tech"
   | "waiting"
   | "exceptions"
   | "closeout"
@@ -15,6 +16,7 @@ export type OpsBoardFilterBucket =
 export type OpsWorkspaceQueueKey =
   | "need_to_schedule"
   | "field_work"
+  | "without_tech"
   | "waiting"
   | "exceptions"
   | "closeout"

@@ -7,6 +7,7 @@ import {
   sortOpsBoardRows,
   type OpsBoardSortKey,
 } from "@/lib/ops/ops-board-sorting";
+import { normalizeOpsWorkspaceHref } from "@/lib/ops/ops-workspace-href";
 import OpsQueueRowCard, { type FieldPaymentReviewRowView, type OpsQueueRowView } from "./OpsQueueRowCard";
 
 export type OpsBoardActiveQueueRow = {
@@ -137,7 +138,7 @@ export default function OpsBoardActiveQueuePanel({
         {chips.map((chip) => (
           <Link
             key={chip.key}
-            href={chip.href}
+            href={normalizeOpsWorkspaceHref(chip.href)}
             aria-current={chip.active ? "page" : undefined}
             className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
               chip.active
@@ -154,7 +155,7 @@ export default function OpsBoardActiveQueuePanel({
         {hiddenTodayChips.map((chip) => (
           <Link
             key={chip.key}
-            href={chip.href}
+            href={normalizeOpsWorkspaceHref(chip.href)}
             className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
               chip.count === 0
                 ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"

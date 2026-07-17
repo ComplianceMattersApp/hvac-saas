@@ -82,4 +82,14 @@ describe("Ops workspace queue product-mode gating", () => {
       }),
     ).toBe("follow_ups");
   });
+
+  it("preserves Needs Assignment as a selectable board bucket", () => {
+    expect(
+      resolveEffectiveOpsBoardBucketFilter({
+        requestedBucket: "without_tech",
+        productMode: "hvac_service",
+        permitRequestsSchemaAvailable: false,
+      }),
+    ).toBe("without_tech");
+  });
 });

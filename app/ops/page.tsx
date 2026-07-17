@@ -134,6 +134,7 @@ function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   if (
     normalized === "pending" ||
     normalized === "field_work" ||
+    normalized === "without_tech" ||
     normalized === "waiting" ||
     normalized === "exceptions" ||
     normalized === "closeout" ||
@@ -963,6 +964,7 @@ export default async function OpsPage({
     const boardBucketWorkspaceKeyMap: Record<Exclude<OpsBoardFilterBucket, "all">, string> = {
       pending: "need_to_schedule",
       field_work: "field_work",
+      without_tech: "without_tech",
       waiting: "waiting",
       exceptions: "exceptions",
       closeout: "closeout",
