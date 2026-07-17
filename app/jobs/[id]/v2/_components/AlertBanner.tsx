@@ -27,6 +27,10 @@ const BANNER_COPY: Record<string, string> = {
   job_title_saved: "Job title saved.",
   job_title_already_saved: "Job title is already up to date.",
   job_title_required: "Job title is required.",
+  visit_reason_saved: "Visit reason saved.",
+  visit_reason_already_saved: "Visit reason is already up to date.",
+  visit_reason_required: "Visit reason is required.",
+  visit_reason_update_failed: "Visit reason could not be saved. Please try again.",
   job_title_update_failed: "Job title could not be saved — please try again.",
   // location
   service_location_updated: "Service location updated.",

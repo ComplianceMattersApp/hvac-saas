@@ -18,6 +18,7 @@ import {
   addPublicNoteFromForm,
   updateJobVisitScopeFromForm,
   updateJobTitleFromForm,
+  updateServiceVisitReasonFromForm,
   changeJobServiceLocationFromForm,
   confirmEccRetestReadyFromForm,
   scheduleRetestNowFromForm,
@@ -91,6 +92,7 @@ import NoteComposer from "./_components/NoteComposer";
 import PermitForm from "./_components/PermitForm";
 import InterruptionHub from "./_components/InterruptionHub";
 import FieldStatusAdvanceForm from "./_components/FieldStatusAdvanceForm";
+import InlineEditableBriefField from "./_components/InlineEditableBriefField";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -1194,26 +1196,26 @@ export default async function JobDetailV2Page({
           <div style={{ ...S.sectionLabel, marginBottom: "20px" }}>Job Brief</div>
           {/* Job Title / Visit Reason / Contractor / Billing */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px 48px" }}>
-            <div>
-              <div style={S.fieldLabel}>Job Title</div>
-              <form action={updateJobTitleFromForm} style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
-                <input type="hidden" name="job_id" value={jobId} />
-                <input type="hidden" name="tab" value="info" />
-                <input type="hidden" name="return_to" value={`${returnTo}#brief`} />
-                <input
-                  name="title"
-                  defaultValue={jobTitleText}
-                  required
-                  maxLength={200}
-                  style={{ width: "100%", minHeight: "38px", borderRadius: "9px", border: "1px solid oklch(0.86 0.008 250)", padding: "8px 10px", font: "inherit" }}
-                />
-                <button type="submit" style={{ ...S.outlineBtn(false), justifySelf: "start" }}>Save Job Title</button>
-              </form>
-            </div>
-            <div>
-              <div style={S.fieldLabel}>Visit Reason</div>
-              <div style={S.fieldValue}>{visitReasonText || "—"}</div>
-            </div>
+            <InlineEditableBriefField
+              label="Job Title"
+              name="title"
+              value={jobTitleText}
+              emptyText="No job title saved yet."
+              jobId={jobId}
+              returnTo={`${returnTo}#brief`}
+              action={updateJobTitleFromForm}
+            />
+            {isServiceJob ? (
+              <InlineEditableBriefField
+                label="Visit Reason"
+                name="service_visit_reason"
+                value={visitReasonText}
+                emptyText="No visit reason saved yet."
+                jobId={jobId}
+                returnTo={`${returnTo}#brief`}
+                action={updateServiceVisitReasonFromForm}
+              />
+            ) : null}
             <div>
               <div style={S.fieldLabel}>Contractor</div>
               <div style={S.fieldValue}>{contractorDisplayName}</div>
@@ -1658,7 +1660,7 @@ export default async function JobDetailV2Page({
           <div
             style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}
           >
-            <div style={S.sectionLabel}>Field &amp; Finish</div>
+            <div style={S.sectionLabel}>Job Status</div>
             <span
               style={{
                 fontFamily: S.mono,

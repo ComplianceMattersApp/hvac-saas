@@ -3100,11 +3100,72 @@ export async function updateJobTitleFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${jobId}`, "page");
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath("/jobs", "page");
   revalidatePath("/ops", "page");
   redirectToJobWithBanner({
     jobId,
     banner: beforeTitle === nextTitle ? "job_title_already_saved" : "job_title_saved",
+    tabRaw,
+    returnToRaw,
+    cacheBust: true,
+  });
+}
+
+export async function updateServiceVisitReasonFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { userId: actingUserId, internalUser } = await requireInternalUser({ supabase });
+  const jobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const nextReason = String(formData.get("service_visit_reason") || "").trim().slice(0, 200);
+
+  if (!jobId || !nextReason) {
+    redirectToJobWithBanner({ jobId, banner: "visit_reason_required", tabRaw, returnToRaw });
+  }
+
+  const beforeJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: "job_type, service_visit_reason",
+  });
+  if (!beforeJob || String(beforeJob.job_type ?? "").trim().toLowerCase() !== "service") {
+    redirectToJobWithBanner({ jobId, banner: "visit_reason_update_failed", tabRaw, returnToRaw });
+  }
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const beforeReason = String(beforeJob.service_visit_reason ?? "").trim();
+  if (beforeReason !== nextReason) {
+    const { error } = await supabase
+      .from("jobs")
+      .update({ service_visit_reason: nextReason })
+      .eq("id", jobId);
+    if (error) {
+      redirectToJobWithBanner({ jobId, banner: "visit_reason_update_failed", tabRaw, returnToRaw });
+    }
+    await insertJobEvent({
+      supabase,
+      jobId,
+      event_type: "ops_update",
+      meta: {
+        source: "job_detail_visit_reason",
+        changes: [{ field: "jobs.service_visit_reason", from: beforeReason || null, to: nextReason }],
+      },
+      userId: actingUserId,
+    });
+  }
+
+  revalidatePath(`/jobs/${jobId}`, "page");
+  revalidatePath(`/jobs/${jobId}/v2`, "page");
+  revalidatePath("/jobs", "page");
+  revalidatePath("/ops", "page");
+  redirectToJobWithBanner({
+    jobId,
+    banner: beforeReason === nextReason ? "visit_reason_already_saved" : "visit_reason_saved",
     tabRaw,
     returnToRaw,
     cacheBust: true,
