@@ -3,8 +3,6 @@
 import Link from "next/link";
 import QueueCard, { type QueueCardStateChip, type QueueCardTone } from "@/components/ops/QueueCard";
 import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
-import { updateJobScheduleFromForm } from "@/lib/actions";
-import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import {
   rejectFieldPaymentCollectionReportFromForm,
   verifyFieldPaymentCollectionReportFromForm,
@@ -16,10 +14,6 @@ const inlineActionClass =
   "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
 const compactContactActionClass =
   "inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
-const inlinePrimaryActionClass =
-  "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
-const scheduleFieldClass =
-  "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
 const primaryActionClass =
   "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
 const chipClass = "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
@@ -190,72 +184,7 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
         { label: "Last Attempt", value: view.recentAttemptText },
         ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
       ]}
-    >
-      <div className="mt-2 space-y-2 border-t border-slate-200 pt-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className={utilityLabelClass}>Schedule</span>
-            <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-              {view.scheduleWindowText ? `${view.scheduleDateText} / ${view.scheduleWindowText}` : view.scheduleDateText}
-            </span>
-          </div>
-
-          <form action={updateJobScheduleFromForm} className="space-y-2 rounded-lg border border-slate-200 bg-white p-2.5">
-            <input type="hidden" name="job_id" value={view.jobId} />
-            <input type="hidden" name="permit_number" value={view.permitNumber} />
-            <input type="hidden" name="jurisdiction" value={view.jurisdiction} />
-            <input type="hidden" name="permit_date" value={view.permitDate} />
-            <input type="hidden" name="return_to" value={view.returnToHref} />
-
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Date
-                <input type="date" name="scheduled_date" defaultValue={view.scheduledDateRaw} className={scheduleFieldClass} />
-              </label>
-              <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Start
-                <input type="time" name="window_start" defaultValue={view.windowStartInput} className={scheduleFieldClass} />
-              </label>
-              <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                End
-                <input type="time" name="window_end" defaultValue={view.windowEndInput} className={scheduleFieldClass} />
-              </label>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button type="submit" className={inlinePrimaryActionClass}>
-                Save Schedule
-              </button>
-              <button type="submit" name="unschedule" value="1" className={inlineActionClass}>
-                Clear
-              </button>
-            </div>
-          </form>
-
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 pt-2">
-            <form action={logCustomerContactAttemptFromForm}>
-              <input type="hidden" name="job_id" value={view.jobId} />
-              <input type="hidden" name="method" value="call" />
-              <input type="hidden" name="result" value="no_answer" />
-              <input type="hidden" name="return_to" value={view.returnToHref} />
-              <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
-              <button type="submit" className={inlineActionClass}>
-                Log Call
-              </button>
-            </form>
-            <form action={logCustomerContactAttemptFromForm}>
-              <input type="hidden" name="job_id" value={view.jobId} />
-              <input type="hidden" name="method" value="text" />
-              <input type="hidden" name="result" value="sent" />
-              <input type="hidden" name="return_to" value={view.returnToHref} />
-              <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
-              <button type="submit" className={inlineActionClass}>
-                Log Text Attempt
-              </button>
-            </form>
-          </div>
-          <p className="text-[10.5px] text-slate-500">Contact logs record attempts only; they do not confirm carrier delivery.</p>
-      </div>
-    </QueueCard>
+    />
   );
 }
 

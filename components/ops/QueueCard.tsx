@@ -40,6 +40,10 @@ export type QueueCardProps = {
 };
 
 function queueCardClassName(variant?: string) {
+  if (variant === "needs-scheduling-rich") {
+    return "rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 shadow-[0_10px_24px_-26px_rgba(15,23,42,0.45)]";
+  }
+
   if (variant === "follow-up-overdue" || variant === "follow-up-due") {
     return "rounded-xl border border-red-300 bg-red-50/80 px-3 py-2 shadow-[0_10px_26px_-24px_rgba(185,28,28,0.65)]";
   }

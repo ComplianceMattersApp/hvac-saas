@@ -99,30 +99,25 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(needsSchedulingCardSource).not.toContain("Open & Act");
   });
 
-  it("wires the workspace scheduler to the existing schedule action with current /ops filters preserved", () => {
+  it("keeps scheduling controls out of the compact card while preserving its job destination", () => {
     expect(opsPageSource).toContain('import { updateJobScheduleFromForm } from "@/lib/actions";');
-    expect(needsSchedulingCardSource).toContain("form action={updateJobScheduleFromForm}");
     expect(needsSchedulingCardSource).toContain("headerContent={");
-    expect(needsSchedulingCardSource).toContain('name="scheduled_date"');
-    expect(needsSchedulingCardSource).toContain('name="window_start"');
-    expect(needsSchedulingCardSource).toContain('name="window_end"');
-    expect(needsSchedulingCardSource).toContain('name="unschedule"');
-    expect(needsSchedulingCardSource).toContain('name="return_to" value={view.returnToHref}');
+    expect(needsSchedulingCardSource).not.toContain("form action={updateJobScheduleFromForm}");
+    expect(needsSchedulingCardSource).not.toContain('name="scheduled_date"');
+    expect(needsSchedulingCardSource).not.toContain("Save Schedule");
     expect(buildNeedsSchedulingSource).toContain("returnToHref: activeWorkspaceHref");
     expect(opsPageSource).toContain("const activeWorkspaceHref");
     expect(opsPageSource).toContain("contractor: contractorScopeFilter");
     expect(opsPageSource).toContain("reason: effectiveBoardReasonFilter");
   });
 
-  it("wires workspace call and text logging to the existing customer contact action", () => {
+  it("keeps direct call and text links but hides contact logging controls", () => {
     expect(opsPageSource).toContain(
       'import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";',
     );
-    expect(needsSchedulingCardSource).toContain("form action={logCustomerContactAttemptFromForm}");
-    expect(needsSchedulingCardSource).toContain('name="method" value="call"');
-    expect(needsSchedulingCardSource).toContain('name="method" value="text"');
-    expect(needsSchedulingCardSource).toContain("contact_attempt_logged_call");
-    expect(needsSchedulingCardSource).toContain("contact_attempt_logged_text");
+    expect(needsSchedulingCardSource).not.toContain("form action={logCustomerContactAttemptFromForm}");
+    expect(needsSchedulingCardSource).not.toContain("Log Call");
+    expect(needsSchedulingCardSource).not.toContain("Log Text Attempt");
     expect(needsSchedulingCardSource).toContain(">Text<");
   });
 
