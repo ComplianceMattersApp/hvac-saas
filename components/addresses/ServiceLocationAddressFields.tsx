@@ -103,6 +103,7 @@ export default function ServiceLocationAddressFields({
             name="state"
             required={required}
             autoComplete="address-level1"
+            maxLength={2}
             value={values.state}
             onChange={(event) => update("state", event.target.value)}
             className={inputClassName}
