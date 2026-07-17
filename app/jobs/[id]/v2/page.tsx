@@ -963,7 +963,7 @@ export default async function JobDetailV2Page({
     { id: "brief", label: "Job Brief" },
     { id: "people", label: "People & Place" },
     { id: "notes", label: "Notes" },
-    { id: "field", label: "Field & Finish" },
+    { id: "field", label: "Job Status" },
     { id: "equipment", label: "Equipment" },
     { id: "billing", label: "Work & Billing" },
     { id: "followup", label: "Follow-Up & Chain" },
