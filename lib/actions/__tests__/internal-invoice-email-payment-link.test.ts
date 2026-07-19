@@ -720,8 +720,13 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
         attempt_kind: 'sent',
         provider_name: 'resend',
         provider_message_id: 'resend-message-2104',
+        pdf_attached: true,
+        attachment_filename: 'Invoice-INV-1.pdf',
+        attachment_mime_type: 'application/pdf',
+        attachment_byte_size: Buffer.byteLength('%PDF-test'),
       }),
     );
+    expect(JSON.stringify(fixture.notificationRows[0]?.payload)).not.toContain('%PDF');
     expect(revalidatePathMock).toHaveBeenCalledWith('/reports/invoices');
   });
 
@@ -756,6 +761,9 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     expect(fixture.notificationRows[0]?.payload).toEqual(expect.objectContaining({
       attempt_kind: 'resent',
       attempt_number: 2,
+      pdf_attached: true,
+      attachment_filename: 'Invoice-INV-1.pdf',
+      attachment_mime_type: 'application/pdf',
     }));
   });
 
@@ -775,6 +783,8 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     expect(fixture.notificationRows[0]?.sent_at).toBeNull();
     expect(fixture.notificationRows[0]?.payload).toEqual(expect.objectContaining({
       error_detail: 'Invoice PDF generation failed.',
+      failure_classification: 'pdf_generation_failed',
+      pdf_attached: false,
     }));
     expect(JSON.stringify(fixture.notificationRows[0])).not.toContain('renderer stack detail');
   });
@@ -802,8 +812,13 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
       expect.objectContaining({
         invoice_id: 'inv-1',
         error_detail: 'Resend API key is not configured',
+        failure_classification: 'provider_delivery_failed',
+        pdf_attached: true,
+        attachment_filename: 'Invoice-INV-1.pdf',
+        attachment_mime_type: 'application/pdf',
       }),
     );
+    expect(JSON.stringify(fixture.notificationRows[0]?.payload)).not.toContain('%PDF');
   });
 
   it('does not attempt checkout session creation for draft invoices', async () => {

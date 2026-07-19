@@ -1,6 +1,6 @@
 # Internal Invoice PDF Delivery V1 — Audit and Implementation Plan
 
-Status: Slice D complete; hard-gated before delivery-history metadata/UI implementation
+Status: Slice E complete; hard-gated before final quality/smoke closeout
 Date: 2026-07-19  
 Scope: Audit and planning only; no application, schema, dependency, environment, or production changes
 
@@ -184,7 +184,7 @@ Existing test conventions to extend include `lib/actions/__tests__/internal-invo
 | B — canonical PDF document foundation | Complete | Shared model, renderer, print reuse, and focused validation complete; stop for owner review |
 | C — download route and workspace action | Complete | Authenticated scoped route, workspace CTA, and focused validation complete |
 | D — send/resend attachment | Complete | Shared delivery helper and provider abstraction now require one current PDF |
-| E — history and observability | Not started | Requires Slice D closeout approval |
+| E — history and observability | Complete | Existing payload metadata and compact backward-compatible UI indicator implemented |
 | F — quality, smoke, docs, closeout | Not started | Requires Slice E closeout approval |
 
 ## 11. Slice A closeout
@@ -332,3 +332,40 @@ Date: 2026-07-19
 - Attachment facts are not yet projected into normalized delivery-history records or shown as `PDF attached`; that is Slice E.
 - Manual provider-backed email/attachment smoke remains part of Slice F and must not send a real customer email without controlled smoke authorization.
 - Stop for owner review. Slice E may add attachment metadata to existing notification/event payloads and a small backward-compatible history indicator after approval.
+
+## 15. Slice E closeout
+
+Date: 2026-07-19
+
+### What changed
+
+- Extended existing `notifications.payload` writes with safe attachment facts: `pdf_attached`, `attachment_filename`, `attachment_mime_type`, and `attachment_byte_size`.
+- Added safe `failure_classification` values for `pdf_generation_failed` and `provider_delivery_failed`.
+- Added the same safe attachment context to existing invoice send/resend/provider-failure job event metadata.
+- Extended `lib/business/internal-invoice-delivery.ts` with backward-compatible normalized attachment fields.
+- Added one compact `PDF attached` indicator to the existing invoice delivery-history card.
+
+### Truth and storage posture
+
+- Successful/queued/provider-attempted deliveries record `pdf_attached: true` only after an attachment was generated and prepared for the provider call.
+- Generation failure records `pdf_attached: false`, a safe failure classification, and no filename/content facts that would imply an attachment existed.
+- Provider failure preserves attachment context because the provider attempt included the generated attachment, while the overall delivery remains failed.
+- No PDF bytes, base64 content, provider payload, signed URL, temporary path, or public URL is stored.
+- Historical notification rows without attachment fields normalize to `pdfAttached: false` and render without the new badge.
+
+### Schema decision
+
+- No schema or migration was needed. Existing JSONB notification/event metadata safely carries the required facts.
+
+### Validation
+
+- Focused/regression Vitest: 7 files, 99 tests passed, including attachment metadata success, resend, generation failure, provider failure, no binary persistence, historical-row compatibility, UI wiring, provider abstraction, renderer, and the 72-test invoice scope-hardening suite.
+- `npx.cmd tsc --noEmit`: passed.
+- Targeted ESLint for the normalized delivery model and new tests: passed. The touched delivery model's prior `any` usage was removed.
+- `git diff --check`: to be recorded immediately before commit.
+
+### Remaining work and next gate
+
+- Slice F remains: consolidated automated validation, controlled local/manual smoke where feasible, final documentation and boundary confirmation.
+- No real customer email or production mutation is authorized by this closeout.
+- Stop for owner review before Slice F.

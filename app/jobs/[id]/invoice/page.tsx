@@ -2207,6 +2207,11 @@ export default async function InternalInvoiceWorkspacePage({
                           {delivery.recipientEmail || "Recipient unavailable"}
                           {delivery.createdAt ? ` • ${formatTimestampDateDisplayLA(delivery.createdAt)}` : ""}
                         </div>
+                        {delivery.pdfAttached ? (
+                          <div className="mt-1 inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-800">
+                            PDF attached
+                          </div>
+                        ) : null}
                         {delivery.status === "failed" && delivery.errorDetail ? (
                           <div className="mt-1 text-xs text-rose-700">{delivery.errorDetail}</div>
                         ) : null}

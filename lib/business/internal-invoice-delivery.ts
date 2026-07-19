@@ -18,6 +18,24 @@ export type InternalInvoiceEmailDeliveryRecord = {
   createdAt: string | null;
   errorDetail: string | null;
   providerMessageId: string | null;
+  pdfAttached: boolean;
+  attachmentFilename: string | null;
+  attachmentMimeType: string | null;
+  attachmentByteSize: number | null;
+  failureClassification: string | null;
+};
+
+type InvoiceDeliveryRow = Record<string, unknown>;
+type InvoiceDeliveryQuery = {
+  select: (columns: string) => InvoiceDeliveryQuery;
+  eq: (column: string, value: unknown) => InvoiceDeliveryQuery;
+  order: (column: string, options: { ascending: boolean }) => Promise<{
+    data: InvoiceDeliveryRow[] | null;
+    error: unknown;
+  }>;
+};
+type InvoiceDeliverySupabase = {
+  from: (table: string) => unknown;
 };
 
 function normalizeAttemptKind(value: unknown): InternalInvoiceEmailAttemptKind {
@@ -40,16 +58,19 @@ function normalizeAttemptNumber(value: unknown, fallback: number) {
   return fallback;
 }
 
-function normalizeInternalInvoiceEmailDeliveryRow(row: any, fallbackAttemptNumber: number): InternalInvoiceEmailDeliveryRecord | null {
-  const id = String(row?.id ?? "").trim();
-  const jobId = String(row?.job_id ?? "").trim();
+function normalizeInternalInvoiceEmailDeliveryRow(rowValue: unknown, fallbackAttemptNumber: number): InternalInvoiceEmailDeliveryRecord | null {
+  const row = rowValue && typeof rowValue === "object" ? rowValue as InvoiceDeliveryRow : {};
+  const id = String(row.id ?? "").trim();
+  const jobId = String(row.job_id ?? "").trim();
 
   if (!id || !jobId) return null;
 
-  const payload = row?.payload ?? {};
+  const payload = row.payload && typeof row.payload === "object"
+    ? row.payload as Record<string, unknown>
+    : {};
 
-  const note = String(row?.body ?? "").trim() || null;
-  const payloadErrorDetail = String(payload?.error_detail ?? "").trim() || null;
+  const note = String(row.body ?? "").trim() || null;
+  const payloadErrorDetail = String(payload.error_detail ?? "").trim() || null;
   const noteErrorDetail = note && note.startsWith("Invoice email delivery failed:")
     ? note.slice("Invoice email delivery failed:".length).trim() || null
     : null;
@@ -57,23 +78,31 @@ function normalizeInternalInvoiceEmailDeliveryRow(row: any, fallbackAttemptNumbe
   return {
     id,
     jobId,
-    invoiceId: String(payload?.invoice_id ?? "").trim() || null,
-    invoiceNumber: String(payload?.invoice_number ?? "").trim() || null,
-    recipientEmail: String(payload?.recipient_email ?? "").trim().toLowerCase() || null,
-    attemptKind: normalizeAttemptKind(payload?.attempt_kind),
-    attemptNumber: normalizeAttemptNumber(payload?.attempt_number, fallbackAttemptNumber),
-    status: normalizeStatus(row?.status),
-    subject: String(row?.subject ?? "").trim() || null,
+    invoiceId: String(payload.invoice_id ?? "").trim() || null,
+    invoiceNumber: String(payload.invoice_number ?? "").trim() || null,
+    recipientEmail: String(payload.recipient_email ?? "").trim().toLowerCase() || null,
+    attemptKind: normalizeAttemptKind(payload.attempt_kind),
+    attemptNumber: normalizeAttemptNumber(payload.attempt_number, fallbackAttemptNumber),
+    status: normalizeStatus(row.status),
+    subject: String(row.subject ?? "").trim() || null,
     note,
-    sentAt: String(row?.sent_at ?? "").trim() || null,
-    createdAt: String(row?.created_at ?? "").trim() || null,
+    sentAt: String(row.sent_at ?? "").trim() || null,
+    createdAt: String(row.created_at ?? "").trim() || null,
     errorDetail: payloadErrorDetail ?? noteErrorDetail,
-    providerMessageId: String(payload?.provider_message_id ?? "").trim() || null,
+    providerMessageId: String(payload.provider_message_id ?? "").trim() || null,
+    pdfAttached: payload.pdf_attached === true,
+    attachmentFilename: String(payload.attachment_filename ?? "").trim() || null,
+    attachmentMimeType: String(payload.attachment_mime_type ?? "").trim() || null,
+    attachmentByteSize: Number.isSafeInteger(Number(payload.attachment_byte_size))
+      && Number(payload.attachment_byte_size) > 0
+      ? Number(payload.attachment_byte_size)
+      : null,
+    failureClassification: String(payload.failure_classification ?? "").trim() || null,
   };
 }
 
 export async function resolveInternalInvoiceEmailDeliveries(params: {
-  supabase: any;
+  supabase: InvoiceDeliverySupabase;
   jobId: string;
   invoiceId?: string | null;
 }) {
@@ -82,8 +111,8 @@ export async function resolveInternalInvoiceEmailDeliveries(params: {
 
   if (!jobId) return [] as InternalInvoiceEmailDeliveryRecord[];
 
-  const { data, error } = await params.supabase
-    .from("notifications")
+  const query = params.supabase.from("notifications") as InvoiceDeliveryQuery;
+  const { data, error } = await query
     .select("id, job_id, subject, body, payload, status, sent_at, created_at")
     .eq("job_id", jobId)
     .eq("channel", "email")
@@ -93,7 +122,7 @@ export async function resolveInternalInvoiceEmailDeliveries(params: {
   if (error) throw error;
 
   return (data ?? [])
-    .map((row: any, index: number) => normalizeInternalInvoiceEmailDeliveryRow(row, (data?.length ?? 0) - index))
+    .map((row, index) => normalizeInternalInvoiceEmailDeliveryRow(row, (data?.length ?? 0) - index))
     .filter((row: InternalInvoiceEmailDeliveryRecord | null): row is InternalInvoiceEmailDeliveryRecord => {
       if (!row) return false;
       if (!invoiceId) return true;

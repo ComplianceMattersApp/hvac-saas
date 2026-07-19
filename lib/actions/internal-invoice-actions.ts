@@ -1042,6 +1042,13 @@ async function insertInternalInvoiceEmailNotification(params: {
   attemptNumber: number;
   status: InternalInvoiceEmailDeliveryStatus;
   errorDetail?: string | null;
+  attachment?: {
+    pdfAttached: boolean;
+    filename?: string | null;
+    mimeType?: string | null;
+    byteSize?: number | null;
+  };
+  failureClassification?: string | null;
 }) {
   const accountOwnerUserId = await resolveNotificationAccountOwnerUserId({
     jobId: params.jobId,
@@ -1062,6 +1069,19 @@ async function insertInternalInvoiceEmailNotification(params: {
 
   const errorDetail = String(params.errorDetail ?? '').trim();
   if (errorDetail) payload.error_detail = errorDetail;
+  if (params.attachment) {
+    payload.pdf_attached = params.attachment.pdfAttached;
+    const attachmentFilename = String(params.attachment.filename ?? '').trim();
+    const attachmentMimeType = String(params.attachment.mimeType ?? '').trim();
+    const attachmentByteSize = Number(params.attachment.byteSize ?? 0);
+    if (attachmentFilename) payload.attachment_filename = attachmentFilename;
+    if (attachmentMimeType) payload.attachment_mime_type = attachmentMimeType;
+    if (Number.isSafeInteger(attachmentByteSize) && attachmentByteSize > 0) {
+      payload.attachment_byte_size = attachmentByteSize;
+    }
+  }
+  const failureClassification = String(params.failureClassification ?? '').trim();
+  if (failureClassification) payload.failure_classification = failureClassification;
 
   const { data, error } = await params.supabase
     .from('notifications')
@@ -1092,6 +1112,7 @@ async function markInternalInvoiceEmailNotification(params: {
   status: 'sent' | 'failed';
   errorDetail?: string | null;
   providerMessageId?: string | null;
+  failureClassification?: string | null;
 }) {
   const { data: existingNotification, error: existingNotificationErr } = await params.supabase
     .from('notifications')
@@ -1121,6 +1142,7 @@ async function markInternalInvoiceEmailNotification(params: {
     patch.payload = {
       ...(existingNotification?.payload ?? {}),
       error_detail: errorDetail,
+      ...(params.failureClassification ? { failure_classification: params.failureClassification } : {}),
     };
   }
 
@@ -2801,6 +2823,8 @@ async function deliverInternalInvoiceEmailForContext(
       attemptNumber,
       status: 'failed',
       errorDetail,
+      attachment: { pdfAttached: false },
+      failureClassification: 'pdf_generation_failed',
     });
     await logInvoiceEvent({
       supabase: context.supabase,
@@ -2829,6 +2853,12 @@ async function deliverInternalInvoiceEmailForContext(
     attemptKind,
     attemptNumber,
     status: 'queued',
+    attachment: {
+      pdfAttached: true,
+      filename: pdfAttachment.filename,
+      mimeType: pdfAttachment.contentType,
+      byteSize: pdfAttachment.content.length,
+    },
   });
 
   let providerMessageId: string | null = null;
@@ -2849,6 +2879,7 @@ async function deliverInternalInvoiceEmailForContext(
       notificationId: queuedDelivery.id,
       status: 'failed',
       errorDetail: errorMessage,
+      failureClassification: 'provider_delivery_failed',
     });
 
     await logInvoiceEvent({
@@ -2862,6 +2893,11 @@ async function deliverInternalInvoiceEmailForContext(
         attempt_kind: attemptKind,
         attempt_number: attemptNumber,
         error_detail: errorMessage,
+        failure_classification: 'provider_delivery_failed',
+        pdf_attached: true,
+        attachment_filename: pdfAttachment.filename,
+        attachment_mime_type: pdfAttachment.contentType,
+        attachment_byte_size: pdfAttachment.content.length,
       },
     });
 
@@ -2885,6 +2921,10 @@ async function deliverInternalInvoiceEmailForContext(
       recipient_email: recipientEmail,
       attempt_kind: attemptKind,
       attempt_number: attemptNumber,
+      pdf_attached: true,
+      attachment_filename: pdfAttachment.filename,
+      attachment_mime_type: pdfAttachment.contentType,
+      attachment_byte_size: pdfAttachment.content.length,
     },
   });
 
