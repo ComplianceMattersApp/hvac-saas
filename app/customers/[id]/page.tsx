@@ -3349,7 +3349,7 @@ export default async function CustomerDetailPage(props: {
         {/* Maintenance Agreements — internal only, visible when ENABLE_MAINTENANCE_AGREEMENTS is on */}
         <WorkspaceTabPanel id="service-plans">
         {isInternalViewer && maintenanceAgreementsEnabled ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+          <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-navy">Maintenance Agreements</h2>
               <p className="mt-0.5 text-sm text-slate-500">

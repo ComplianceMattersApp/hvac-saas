@@ -44,12 +44,28 @@ export function CustomerServicePlanWorkspace({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:items-start">
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-24">
+    <div className="grid min-w-0 max-w-full gap-4 overflow-hidden lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)] lg:items-start">
+      <div className="min-w-0 max-w-full rounded-xl border border-slate-200 bg-slate-50 p-2 lg:sticky lg:top-24">
         <div className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
           Customer plans
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:overflow-visible lg:pb-0">
+
+        <label className="block lg:hidden">
+          <span className="sr-only">Selected service plan</span>
+          <select
+            value={selectedPlan?.id ?? ""}
+            onChange={(event) => selectPlan(event.target.value)}
+            className="min-h-11 w-full max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 shadow-sm"
+          >
+            {plans.map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                {plan.name} — {formatToken(plan.status)}{plan.nextDueDate ? ` — Due ${formatDate(plan.nextDueDate)}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="hidden lg:block lg:space-y-1">
           {plans.map((plan) => {
             const selected = plan.id === selectedPlan?.id;
             const needsAttention = plan.dueState === "overdue" || plan.dueState === "due_today";
@@ -59,7 +75,7 @@ export function CustomerServicePlanWorkspace({
                 type="button"
                 onClick={() => selectPlan(plan.id)}
                 aria-pressed={selected}
-                className={`min-w-[245px] rounded-lg border px-3 py-3 text-left transition lg:min-w-0 lg:w-full ${
+                className={`w-full min-w-0 rounded-lg border px-3 py-3 text-left transition ${
                   selected
                     ? "border-blue-300 bg-white shadow-sm ring-1 ring-blue-100"
                     : "border-transparent bg-transparent hover:border-slate-200 hover:bg-white"
@@ -90,7 +106,7 @@ export function CustomerServicePlanWorkspace({
 
 export function CustomerServicePlanDetail({ id, children }: { id: string; children: ReactNode }) {
   const selectedId = useContext(SelectedPlanContext);
-  return <div hidden={selectedId !== id}>{children}</div>;
+  return <div className="min-w-0 max-w-full overflow-hidden" hidden={selectedId !== id}>{children}</div>;
 }
 
 function formatToken(value: string) {

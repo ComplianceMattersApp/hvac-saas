@@ -145,7 +145,10 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain('title="Billing"');
     expect(customerPageSource).toContain('title="Manage plan"');
     expect(servicePlanWorkspaceSource).toContain("lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]");
-    expect(servicePlanWorkspaceSource).toContain("overflow-x-auto");
+    expect(servicePlanWorkspaceSource).toContain("block lg:hidden");
+    expect(servicePlanWorkspaceSource).toContain("hidden lg:block");
+    expect(servicePlanWorkspaceSource).toContain("min-w-0 max-w-full");
+    expect(servicePlanWorkspaceSource).not.toContain("min-w-[245px]");
     expect(servicePlanWorkspaceSource).toContain("lg:sticky lg:top-24");
     expect(servicePlanWorkspaceSource).toContain('url.searchParams.set("maFocus", id)');
   });
