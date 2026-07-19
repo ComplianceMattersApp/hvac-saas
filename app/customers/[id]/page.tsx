@@ -2627,7 +2627,7 @@ export default async function CustomerDetailPage(props: {
                     className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
                   >
                     <div className="space-y-4 p-4">
-                      <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
                             {address || "No address on file"}
@@ -2645,13 +2645,13 @@ export default async function CustomerDetailPage(props: {
                           ) : null}
                         </div>
 
-                        <div className="flex flex-col items-end gap-1">
-                          {isPrimaryServiceLocation ? (
-                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
-                              Primary service location
-                            </span>
-                          ) : null}
-                          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
+                      <div className="flex w-full flex-row flex-wrap items-center gap-2 sm:w-auto sm:flex-col sm:items-end sm:gap-1">
+                        {isPrimaryServiceLocation ? (
+                          <span className="inline-flex min-h-7 items-center justify-center whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-center text-[11px] font-semibold leading-none text-blue-700">
+                            Primary service location
+                          </span>
+                        ) : null}
+                        <div className="inline-flex min-h-7 items-center justify-center whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-center text-xs leading-none text-slate-600">
                             {jobsByLocationCount.get(locId) ?? 0} active job
                             {(jobsByLocationCount.get(locId) ?? 0) === 1 ? "" : "s"}
                           </div>

@@ -18,6 +18,15 @@ const locationsContactsTabSource =
   customerPageSource.match(/activeWorkspaceTab === "locations-contacts"[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
 
 describe("customer detail relationship hub wiring", () => {
+  it("centers the primary service location badge responsively", () => {
+    expect(customerPageSource).toContain(
+      'className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"',
+    );
+    expect(customerPageSource).toContain(
+      'className="inline-flex min-h-7 items-center justify-center whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-center text-[11px] font-semibold leading-none text-blue-700"',
+    );
+  });
+
   it("uses Customer Workspace header copy and removes legacy Entity Workspace label", () => {
     expect(customerPageSource).toContain("Customer Workspace");
     expect(customerPageSource).not.toContain("Entity Workspace");
