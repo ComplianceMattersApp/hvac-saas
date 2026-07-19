@@ -395,7 +395,7 @@ describe('syncStripePaymentSettlementsForAccount', () => {
 
   it('detects already-synced settlements when present', async () => {
     const ctx = makeSupabase({
-      settlements: [{ id: 'set_1', internal_invoice_payment_id: 'pay-1', sync_status: 'synced' }],
+      settlements: [{ id: 'set_1', internal_invoice_payment_id: 'pay-1', sync_status: 'synced', stripe_payout_id: 'po_1', payout_status: 'paid' } as any],
     });
     readyConnect();
 
@@ -412,6 +412,23 @@ describe('syncStripePaymentSettlementsForAccount', () => {
 
     expect(result.perCodeCounts.already_synced).toBe(1);
     expect(result.details[0]?.settlementId).toBe('set_1');
+  });
+
+  it('allows an existing synced row without a final payout to refresh', async () => {
+    const ctx = makeSupabase({
+      settlements: [{ id: 'set_1', internal_invoice_payment_id: 'pay-1', sync_status: 'synced', stripe_payout_id: null, payout_status: 'pending' } as any],
+    });
+    readyConnect();
+    const helper = vi.fn().mockResolvedValue({ status: 'synced', code: 'synced', reason: 'refreshed', settlementId: 'set_1' });
+    const result = await syncStripePaymentSettlementsForAccount({
+      supabase: ctx.client,
+      stripe: { charges: {}, balanceTransactions: {}, payouts: {} } as any,
+      actorUserId: 'owner-1', internalUser: ownerUser, accountOwnerUserId: 'owner-1',
+      dateFrom: '2026-06-10T00:00:00.000Z', dateTo: '2026-06-10T23:59:59.999Z',
+      dryRun: false, syncPaymentSettlementForPayment: helper as any,
+    });
+    expect(helper).toHaveBeenCalledOnce();
+    expect(result.synced).toBe(1);
   });
 
   it('per-row helper exception does not abort remaining rows', async () => {
@@ -482,16 +499,15 @@ describe('syncStripePaymentSettlementsForAccount', () => {
     );
   });
 
-  it('does not add owner-facing route, report, CSV, cron, or webhook wiring', () => {
+  it('adds only controlled report revalidation, not CSV, cron, or webhook wiring', () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), 'lib/actions/stripe-settlement-sync-actions.ts'),
       'utf8',
     );
 
-    expect(source).not.toContain('/reports/deposits');
+    expect(source).toContain("revalidatePath('/reports/deposits')");
     expect(source).not.toMatch(/csv/i);
     expect(source).not.toMatch(/cron|schedule/i);
     expect(source).not.toMatch(/webhook/i);
-    expect(source).not.toMatch(/revalidatePath/);
   });
 });

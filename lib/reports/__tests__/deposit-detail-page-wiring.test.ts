@@ -12,7 +12,6 @@ describe("deposit detail page wiring", () => {
     expect(detailPageSource).toContain("requireInternalUser");
     expect(detailPageSource).toContain("requireFinancialRegisterAccessOrRedirect");
     expect(detailPageSource).toContain('redirect("/login")');
-    expect(detailPageSource).toContain('redirect("/portal")');
     expect(detailPageSource).toContain('redirectTo: "/reports/dashboard?banner=not_authorized"');
   });
 

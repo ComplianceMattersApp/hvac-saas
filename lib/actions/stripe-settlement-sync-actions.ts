@@ -6,7 +6,8 @@ import { requireInternalUser, type InternalUserRow } from '@/lib/auth/internal-u
 import { syncStripePaymentSettlementForPayment } from '@/lib/business/stripe-payment-settlements';
 import { getStripeServerClient } from '@/lib/business/platform-billing-stripe';
 import { resolveTenantStripeConnectReadiness } from '@/lib/business/tenant-stripe-connect-readiness';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
 
 type SettlementSyncPaymentRow = {
   id: string;
@@ -32,6 +33,8 @@ type ExistingSettlementRow = {
   id: string | null;
   internal_invoice_payment_id: string | null;
   sync_status: string | null;
+  stripe_payout_id: string | null;
+  payout_status: string | null;
 };
 
 export type StripeSettlementSyncRowStatus = 'eligible' | 'synced' | 'skipped' | 'failed';
@@ -57,6 +60,7 @@ export type StripeSettlementSyncSummary = {
   skipped: number;
   failed: number;
   unmatched: number;
+  alreadySynced: number;
   perCodeCounts: Record<string, number>;
   details: StripeSettlementSyncRowDetail[];
 };
@@ -193,8 +197,11 @@ async function loadPaymentRows(params: {
       ].join(', '),
     )
     .eq('account_owner_user_id', params.accountOwnerUserId)
-    .gte('paid_at', params.dateFromIso)
-    .lte('paid_at', params.dateToIso);
+    .or(
+      `and(stripe_charged_at.gte.${params.dateFromIso},stripe_charged_at.lte.${params.dateToIso}),` +
+      `and(paid_at.gte.${params.dateFromIso},paid_at.lte.${params.dateToIso}),` +
+      `and(created_at.gte.${params.dateFromIso},created_at.lte.${params.dateToIso})`,
+    );
 
   const paymentId = clean(params.paymentId);
   if (paymentId) query = query.eq('id', paymentId);
@@ -216,7 +223,7 @@ async function loadExistingSyncedSettlementIds(params: {
 
   const { data, error } = await params.supabase
     .from('stripe_payment_settlements')
-    .select('id, internal_invoice_payment_id, sync_status')
+    .select('id, internal_invoice_payment_id, sync_status, stripe_payout_id, payout_status')
     .eq('account_owner_user_id', params.accountOwnerUserId)
     .in('internal_invoice_payment_id', params.paymentIds);
 
@@ -225,7 +232,7 @@ async function loadExistingSyncedSettlementIds(params: {
   const existingByPaymentId = new Map<string, ExistingSettlementRow>();
   for (const row of (data ?? []) as ExistingSettlementRow[]) {
     const paymentId = clean(row.internal_invoice_payment_id);
-    if (paymentId && clean(row.sync_status).toLowerCase() === 'synced') {
+    if (paymentId) {
       existingByPaymentId.set(paymentId, row);
     }
   }
@@ -261,6 +268,7 @@ export async function syncStripePaymentSettlementsForAccount(
     skipped: 0,
     failed: 0,
     unmatched: 0,
+    alreadySynced: 0,
     perCodeCounts: {},
     details: [],
   };
@@ -379,8 +387,13 @@ export async function syncStripePaymentSettlementsForAccount(
     }
 
     const existing = existingByPaymentId.get(paymentId);
-    if (existing) {
+    const existingIsFinal = existing
+      && clean(existing.sync_status).toLowerCase() === 'synced'
+      && Boolean(clean(existing.stripe_payout_id))
+      && ['paid', 'complete'].includes(clean(existing.payout_status).toLowerCase());
+    if (existingIsFinal) {
       summary.skipped += 1;
+      summary.alreadySynced += 1;
       pushDetail(summary, row, {
         status: 'skipped',
         code: 'already_synced',
@@ -458,22 +471,33 @@ function formString(formData: FormData, key: string) {
 }
 
 export async function syncStripePaymentSettlementsForAccountFromForm(formData: FormData) {
-  const supabase = await createClient();
-  const { userId, internalUser } = await requireInternalUser({ supabase });
+  const authClient = await createClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase: authClient });
+  // The settlement table intentionally has SELECT-only authenticated RLS. After
+  // authority and account scope are proven above, use the server-only admin
+  // client for the explicitly scoped reconciliation read/upsert path.
+  const supabase = createAdminClient();
 
   const dryRun = formString(formData, 'commit') !== '1';
   const stripe = dryRun ? undefined : getStripeServerClient();
+  const dateFrom = formString(formData, 'date_from');
+  const dateTo = formString(formData, 'date_to');
 
-  return syncStripePaymentSettlementsForAccount({
+  const result = await syncStripePaymentSettlementsForAccount({
     supabase,
     stripe,
     actorUserId: userId,
     internalUser,
     accountOwnerUserId: formString(formData, 'account_owner_user_id'),
-    dateFrom: formString(formData, 'date_from'),
-    dateTo: formString(formData, 'date_to'),
+    dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(dateFrom) ? `${dateFrom}T00:00:00.000Z` : dateFrom,
+    dateTo: /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? `${dateTo}T23:59:59.999Z` : dateTo,
     paymentId: formString(formData, 'payment_id') || null,
     chargeId: formString(formData, 'charge_id') || null,
     dryRun,
   });
+  if (!dryRun && result.synced > 0) {
+    revalidatePath('/reports/deposits');
+    revalidatePath('/reports/deposits/[payoutId]', 'page');
+  }
+  return result;
 }

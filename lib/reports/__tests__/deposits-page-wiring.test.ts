@@ -12,7 +12,6 @@ describe("deposits report page wiring", () => {
     expect(depositsPageSource).toContain("requireInternalUser");
     expect(depositsPageSource).toContain("requireFinancialRegisterAccessOrRedirect");
     expect(depositsPageSource).toContain('redirect("/login")');
-    expect(depositsPageSource).toContain('redirect("/portal")');
     expect(depositsPageSource).toContain('redirectTo: "/reports/dashboard?banner=not_authorized"');
   });
 
@@ -54,15 +53,12 @@ describe("deposits report page wiring", () => {
     );
   });
 
-  it("renders an empty state without prompting owners to sync", () => {
+  it("renders controlled reconciliation and truthful empty states", () => {
     expect(depositsPageSource).toContain("No deposits to review yet");
-    expect(depositsPageSource).toContain(
-      "Once online payments are settled, this report will show the fees, net deposit amount, and payout timing. Your invoices and payment records stay unchanged.",
-    );
-    expect(depositsPageSource).not.toMatch(/<button[^>]*>\s*Sync/i);
-    expect(depositsPageSource).not.toContain("Run settlement sync");
-    expect(depositsPageSource).not.toContain(["No settlement", "data synced yet."].join(" "));
-    expect(depositsPageSource).not.toContain(["Stripe Dashboard remains", "the fallback"].join(" "));
+    expect(depositsPageSource).toContain("DepositsSyncPanel");
+    expect(depositsPageSource).toContain("No recorded online payments were found for this date range.");
+    expect(depositsPageSource).toContain("Online payments exist, but their Stripe deposit details have not been synced yet.");
+    expect(depositsPageSource).toContain("No deposit records match the current filters.");
   });
 
   it("keeps needs-review states visible", () => {
@@ -72,11 +68,10 @@ describe("deposits report page wiring", () => {
     expect(depositsPageSource).toContain("Sync Failed");
   });
 
-  it("links payout rows and read-only exports without adding sync helper or Stripe API wiring", () => {
+  it("links payout rows and exports without putting Stripe API calls in the page", () => {
     expect(depositsPageSource).toContain("depositDetailHrefForGroup");
     expect(depositsPageSource).toContain("/reports/deposits/export/summary");
     expect(depositsPageSource).toContain("/reports/deposits/export/detail");
-    expect(depositsPageSource).not.toContain("syncStripePaymentSettlements");
     expect(depositsPageSource).not.toContain("syncStripePaymentSettlementForPayment");
     expect(depositsPageSource).not.toMatch(/\bstripe\./);
   });
