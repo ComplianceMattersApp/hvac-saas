@@ -38,15 +38,24 @@ function makeSupabaseFixture(userId: string | null, contractorId: string | null 
       })),
     },
     from: vi.fn((table: string) => {
-      if (table !== "contractor_users") {
+      if (!["contractor_users", "internal_users", "contractors"].includes(table)) {
         throw new Error(`Unexpected table ${table}`);
       }
 
       const query: any = {
         select: vi.fn(() => query),
         eq: vi.fn(() => query),
+        in: vi.fn(() => query),
+        limit: vi.fn(async () => ({
+          data: table === "contractor_users" && contractorId
+            ? [{ contractor_id: contractorId }]
+            : table === "contractors" && contractorId
+              ? [{ id: contractorId, name: "Portal contractor", lifecycle_state: "active", owner_user_id: "owner-1" }]
+              : [],
+          error: null,
+        })),
         maybeSingle: vi.fn(async () => ({
-          data: contractorId ? { contractor_id: contractorId } : null,
+          data: table === "contractor_users" && contractorId ? { contractor_id: contractorId } : null,
           error: null,
         })),
       };

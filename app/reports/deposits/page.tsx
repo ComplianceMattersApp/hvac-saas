@@ -7,6 +7,7 @@ import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/auth/request-identity";
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
+import DepositsSyncPanel from "@/components/reports/DepositsSyncPanel";
 import {
   ReportFilterPanel,
   ReportPageHeader,
@@ -25,6 +26,7 @@ import {
   getDepositsLedgerSummary,
   type DepositsLedgerPayoutRow,
 } from "@/lib/reports/deposits-ledger";
+import { getDepositsReconciliationStatus } from "@/lib/reports/deposits-reconciliation-status";
 
 export const metadata = {
   title: "Deposits",
@@ -60,6 +62,13 @@ function firstParam(source: SearchParams, key: string) {
 function normalizeDate(value: unknown) {
   const normalized = String(value ?? "").trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
+}
+
+function defaultSyncDates() {
+  const to = new Date();
+  const from = new Date(to);
+  from.setUTCDate(from.getUTCDate() - 30);
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 }
 
 function normalizeOption<T extends ReadonlyArray<{ value: string }>>(value: unknown, options: T) {
@@ -154,9 +163,10 @@ export default async function DepositsReportPage({
   });
 
   const resolvedSearchParams = (searchParams ? await searchParams : {}) ?? {};
+  const defaults = defaultSyncDates();
   const filters = {
-    dateFrom: normalizeDate(firstParam(resolvedSearchParams, "from")),
-    dateTo: normalizeDate(firstParam(resolvedSearchParams, "to")),
+    dateFrom: normalizeDate(firstParam(resolvedSearchParams, "from")) || defaults.from,
+    dateTo: normalizeDate(firstParam(resolvedSearchParams, "to")) || defaults.to,
     payoutStatus: normalizeOption(firstParam(resolvedSearchParams, "payout_status"), PAYOUT_STATUS_OPTIONS),
     syncStatus: normalizeOption(firstParam(resolvedSearchParams, "sync_status"), SYNC_STATUS_OPTIONS),
   };
@@ -175,6 +185,15 @@ export default async function DepositsReportPage({
       syncStatus: filters.syncStatus as any,
     }),
   ]);
+  const reconciliation = await getDepositsReconciliationStatus({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+    payoutStatus: filters.payoutStatus,
+    syncStatus: filters.syncStatus,
+    filteredSettlementRows: depositsLedger.rows.length,
+  });
 
   const hasRows = depositsLedger.rows.length > 0;
   const summary = depositsLedger.summary;
@@ -196,6 +215,23 @@ export default async function DepositsReportPage({
 
       <section className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
         Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing.
+      </section>
+
+      <DepositsSyncPanel
+        accountOwnerUserId={internalUser.account_owner_user_id}
+        dateFrom={filters.dateFrom}
+        dateTo={filters.dateTo}
+      />
+
+      <section className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+        <div className="font-semibold text-slate-900">Reconciliation status</div>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1">
+          <span>{reconciliation.recordedStripePayments} recorded Stripe payments</span>
+          <span>{reconciliation.syncedSettlements} settlement records synced</span>
+          <span>{reconciliation.awaitingSync} awaiting settlement sync</span>
+          <span>{reconciliation.pendingPayout} pending payout</span>
+          <span>{reconciliation.syncFailures} sync failures</span>
+        </div>
       </section>
 
       {depositsLedger.warnings.length > 0 ? (
@@ -310,9 +346,19 @@ export default async function DepositsReportPage({
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-500">
                   <div className="mx-auto max-w-md space-y-2">
-                    <div className="font-semibold text-slate-700">No deposits to review yet</div>
+                    <div className="font-semibold text-slate-700">
+                      {reconciliation.recordedStripePayments === 0
+                        ? "No recorded online payments were found for this date range."
+                        : reconciliation.settlementsInRange > 0
+                          ? "No deposit records match the current filters."
+                          : "Online payments are awaiting Stripe deposit sync."}
+                    </div>
                     <div className="text-xs leading-5 text-slate-500">
-                      Once online payments are settled, this report will show the fees, net deposit amount, and payout timing. Your invoices and payment records stay unchanged.
+                      {reconciliation.recordedStripePayments === 0
+                        ? "Change the date range to review a different period."
+                        : reconciliation.settlementsInRange > 0
+                          ? "Reset the filters to review all settlement records."
+                          : "Online payments exist, but their Stripe deposit details have not been synced yet. Preview the sync above to review what will be imported."}
                     </div>
                   </div>
                 </td>
