@@ -719,7 +719,15 @@ async function safeLoadPriorityCounts(params: {
       base(q).eq("ops_status", "need_to_schedule").neq("status", "cancelled"),
     ),
     safeCount(supabase, "jobs", (q) =>
-      base(q).eq("scheduled_date", today).neq("status", "cancelled"),
+      base(q)
+        .eq("scheduled_date", today)
+        .neq("status", "cancelled")
+        // Keep the headline count wired to the same active-work definition as
+        // Today’s Work. Completed visits are intentionally absent from that
+        // list, so counting them here made the briefing disagree with the card.
+        // Legacy rows may have a null field_complete value; normalizeJob treats
+        // those as incomplete, so the aggregate must include them too.
+        .or("field_complete.eq.false,field_complete.is.null"),
     ),
     safeCount(supabase, "jobs", (q) =>
       base(q).eq("ops_status", "pending_info").neq("status", "cancelled"),
