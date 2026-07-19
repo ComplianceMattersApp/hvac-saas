@@ -2,27 +2,25 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(
-  resolve(__dirname, "../today-read-model.ts"),
-  "utf8",
-);
+const source = readFileSync(resolve(__dirname, "../today-read-model.ts"), "utf8");
 
-describe("Today scheduled-job count wiring", () => {
-  it("counts the same incomplete jobs rendered by Today’s Work", () => {
-    const scheduledCountStart = source.indexOf(
-      'base(q)\n        .eq("scheduled_date", today)',
-    );
+describe("Today Ops queue count wiring", () => {
+  it("uses the Ops field-work date window and active-work filters", () => {
+    expect(source).toContain('.neq("ops_status", "closed")');
+    expect(source).toContain('.eq("field_complete", false)');
+    expect(source).toContain('.gte("scheduled_date", startOfTodayUtcIsoLA())');
+    expect(source).toContain('.lt("scheduled_date", startOfTomorrowUtcIsoLA())');
+  });
 
-    expect(scheduledCountStart).toBeGreaterThan(-1);
+  it("uses the complete Ops waiting and exception status sets", () => {
+    expect(source).toContain('["on_hold", "waiting", "pending_office_review"]');
+    expect(source).toContain('["failed", "retest_needed", "pending_office_review", "problem"]');
+    expect(source).toContain("countCurrentExceptionStatuses(");
+  });
 
-    const scheduledCountQuery = source.slice(
-      scheduledCountStart,
-      scheduledCountStart + 800,
-    );
-
-    expect(scheduledCountQuery).toContain('.neq("status", "cancelled")');
-    expect(scheduledCountQuery).toContain(
-      '.or("field_complete.eq.false,field_complete.is.null")',
-    );
+  it("uses the same assignment and billing projections as Ops", () => {
+    expect(source).toContain("buildScheduledWithoutTechSnapshot({");
+    expect(source).toContain("buildBillingTruthCloseoutProjectionMap({");
+    expect(source).toContain("listCloseoutQueueJobs(");
   });
 });

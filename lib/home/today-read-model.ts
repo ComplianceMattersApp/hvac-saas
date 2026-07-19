@@ -41,6 +41,7 @@ import {
   displayWindowLA,
   formatBusinessDateUS,
   startOfTodayUtcIsoLA,
+  startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
 import {
   buildOpsStatusEnteredAtByJob,
@@ -50,11 +51,14 @@ import {
   getActiveJobAssignmentDisplayMap,
   type ActiveJobAssignmentDisplay,
 } from "@/lib/staffing/human-layer";
-import {
-  hasAnyActiveTechAssignment,
-  isTodayWithoutTechCandidateJob,
-} from "@/lib/ops/without-tech-predicate";
 import { countPendingContractorIntakeQueueRows } from "@/lib/ops/contractor-intake-queue";
+import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
+import {
+  buildRetestContinuationParentIds,
+  countCurrentExceptionStatuses,
+} from "@/lib/ops/retest-queue-exclusivity";
+import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
+import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 
 const OPEN_INVOICES_REPORT_HREF = "/reports/invoices?view=open";
 // -----------------------------------------------------------------------------
@@ -657,48 +661,96 @@ async function safeLoadPriorityCounts(params: {
   closeoutReady: number | null;
   contractorIntake: number | null;
 }> {
-  const { supabase, today } = params;
+  const { supabase } = params;
 
   // jobs is RLS-scoped; no explicit account_owner filter (column does not exist).
   const base = (q: any) => q.is("deleted_at", null);
 
+  // These reads intentionally mirror the predicates used to construct the Ops
+  // workspace tabs. Today is an orientation surface; Ops owns queue truth.
   const scheduledTodayWithoutTechPromise = (async (): Promise<number | null> => {
     try {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, status, field_complete, scheduled_date")
+        .select("id, status, ops_status, scheduled_date, window_start")
         .is("deleted_at", null)
-        .eq("scheduled_date", today)
-        .limit(400);
+        .neq("status", "cancelled")
+        .eq("status", "open")
+        .eq("ops_status", "scheduled")
+        .order("scheduled_date", { ascending: true })
+        .order("window_start", { ascending: true })
+        .limit(50);
 
       if (error) return null;
 
-      const todayIds: string[] = Array.from(new Set((data ?? [])
-        .filter((row: any) => isTodayWithoutTechCandidateJob(row, today))
+      const scheduledIds: string[] = Array.from(new Set((data ?? [])
         .map((row: any) => String(row?.id ?? "").trim())
         .filter(Boolean)));
 
-      if (todayIds.length === 0) return 0;
+      const assignmentDisplayMap = scheduledIds.length
+        ? await getActiveJobAssignmentDisplayMap({ supabase, jobIds: scheduledIds })
+        : {};
 
-      const { data: assignments, error: assignmentError } = await supabase
-        .from("job_assignments")
-        .select("job_id, is_active, deleted_at, removed_at")
-        .in("job_id", todayIds);
+      return buildScheduledWithoutTechSnapshot({
+        jobs: data ?? [],
+        assignmentDisplayMap,
+        previewLimit: 10,
+      }).count;
+    } catch {
+      return null;
+    }
+  })();
 
-      if (assignmentError) return null;
+  const exceptionCountPromise = (async (): Promise<number | null> => {
+    try {
+      const [exceptions, continuations] = await Promise.all([
+        supabase
+          .from("jobs")
+          .select("id, ops_status")
+          .is("deleted_at", null)
+          .neq("status", "cancelled")
+          .in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]),
+        supabase
+          .from("jobs")
+          .select("parent_job_id")
+          .is("deleted_at", null)
+          .neq("status", "cancelled")
+          .eq("job_type", "ecc")
+          .not("parent_job_id", "is", null),
+      ]);
+      if (exceptions.error || continuations.error) return null;
+      const counts = countCurrentExceptionStatuses(
+        exceptions.data ?? [],
+        buildRetestContinuationParentIds(continuations.data),
+      );
+      return ["failed", "retest_needed", "pending_office_review", "problem"]
+        .reduce((total, status) => total + (counts.get(status) ?? 0), 0);
+    } catch {
+      return null;
+    }
+  })();
 
-      const assignmentMap: Record<string, Array<any>> = {};
-      for (const row of assignments ?? []) {
-        const jobId = String(row?.job_id ?? "").trim();
-        if (!jobId) continue;
-        if (!Array.isArray(assignmentMap[jobId])) assignmentMap[jobId] = [];
-        assignmentMap[jobId].push(row);
-      }
-
-      return todayIds.reduce((count: number, id: string) => {
-        const hasActiveAssignment = hasAnyActiveTechAssignment(assignmentMap[id] ?? []);
-        return count + (hasActiveAssignment ? 0 : 1);
-      }, 0);
+  const closeoutCountPromise = (async (): Promise<number | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, created_at, field_complete, job_type, ops_status, pending_info_reason, on_hold_reason, permit_number, invoice_complete, billing_disposition, certs_complete")
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .eq("field_complete", true)
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) return null;
+      const jobs = data ?? [];
+      const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+        supabase,
+        accountOwnerUserId: params.accountOwnerUserId,
+        jobs,
+      });
+      return listCloseoutQueueJobs(
+        jobs,
+        (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
+      ).length;
     } catch {
       return null;
     }
@@ -716,31 +768,26 @@ async function safeLoadPriorityCounts(params: {
   ] = await Promise.all([
     scheduledTodayWithoutTechPromise,
     safeCount(supabase, "jobs", (q) =>
-      base(q).eq("ops_status", "need_to_schedule").neq("status", "cancelled"),
+      base(q).eq("ops_status", "need_to_schedule").eq("status", "open").neq("status", "cancelled"),
     ),
     safeCount(supabase, "jobs", (q) =>
       base(q)
-        .eq("scheduled_date", today)
         .neq("status", "cancelled")
-        // Keep the headline count wired to the same active-work definition as
-        // Today’s Work. Completed visits are intentionally absent from that
-        // list, so counting them here made the briefing disagree with the card.
-        // Legacy rows may have a null field_complete value; normalizeJob treats
-        // those as incomplete, so the aggregate must include them too.
-        .or("field_complete.eq.false,field_complete.is.null"),
+        .neq("ops_status", "closed")
+        .eq("field_complete", false)
+        .gte("scheduled_date", startOfTodayUtcIsoLA())
+        .lt("scheduled_date", startOfTomorrowUtcIsoLA()),
     ),
     safeCount(supabase, "jobs", (q) =>
       base(q).eq("ops_status", "pending_info").neq("status", "cancelled"),
     ),
     safeCount(supabase, "jobs", (q) =>
-      base(q).eq("ops_status", "on_hold").neq("status", "cancelled"),
+      base(q)
+        .in("ops_status", ["on_hold", "waiting", "pending_office_review"])
+        .neq("status", "cancelled"),
     ),
-    safeCount(supabase, "jobs", (q) =>
-      base(q).in("ops_status", ["failed", "retest_needed"]).neq("status", "cancelled"),
-    ),
-    safeCount(supabase, "jobs", (q) =>
-      base(q).in("ops_status", ["invoice_required", "paperwork_required"]).neq("status", "cancelled"),
-    ),
+    exceptionCountPromise,
+    closeoutCountPromise,
     params.role === "admin" || params.role === "office"
       ? countPendingContractorIntakeQueueRows({
           supabase,
