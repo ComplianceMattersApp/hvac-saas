@@ -26,6 +26,15 @@ Current roadmap status:
 - ACH remains deferred.
 - Next roadmap UX lane remains invoice page UX cleanup, followed by customer page IA/UX cleanup.
 
+## Bank Deposit Explanation Runtime Status
+
+- Bank Deposits is the owner-facing supporting schedule for Stripe payout batches; it is not a bank-feed reconciliation authority.
+- Financial users can explicitly preview and commit account/date-scoped settlement refresh from the report. Preview remains no-Stripe/no-write; commit updates settlement truth only.
+- The report exposes an invoice-payment bridge and real Stripe payout grouping with the equation `customer payments - proven processing fees - other proven deductions = expected bank deposit`.
+- Stripe payout status (`waiting`, `scheduled`, `in transit`, `paid`, or needs review) must not be relabeled as bank-feed proof.
+- No manual bank-match/certification state is part of current scope. The bank statement or optional downstream accounting feed remains authoritative for arrival.
+- Future dashboard visuals must consume stable payment/settlement definitions and must not relabel cash collected as accounting revenue without an explicit accounting basis.
+
 ## Saved-Card, Scheduled Autopay, And Failed-Payment Roadmap Status
 
 Historical closeout proof for Phase 6F manual saved-card charge, Phase 6G scheduled-autopay attempts, Phase 6H failed-autopay retry/attention workflow, and Phase 6I failed-payment reconciliation visibility is preserved in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md).

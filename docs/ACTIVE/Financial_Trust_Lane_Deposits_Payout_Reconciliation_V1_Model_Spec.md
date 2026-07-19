@@ -4,6 +4,29 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## July 2026 Current Runtime Supersession — Controlled Sync And Bank-Deposit Explanation
+
+This section records current shipped runtime truth and supersedes older phase-local statements such as `no sync control`, `direct-URL only`, or `no report navigation`. Those statements remain below only as historical evidence of the boundary in effect during their named phase.
+
+- Owner/Admin/Billing users can discover **Bank Deposits** from Reports. Dispatcher, Technician, contractor/portal, inactive, cross-account, and unauthenticated access remains blocked.
+- `/reports/deposits` provides two complementary read-only explanations over settlement truth:
+  - invoice-payment breakdown: invoice/customer, payment date, amount paid, Stripe processing fee, other proven deductions, expected bank amount, deposit date, and plain-language Stripe payout status;
+  - Stripe deposit breakdown: the real Stripe payout group and the explicit support equation `customer payments - proven processing fees - other proven deductions = expected bank deposit`.
+- An invoice may appear more than once when it was paid in installments. Rows are not misleadingly collapsed across separate payment events.
+- Invoice rows link to the app invoice where local context exists; deposit status links to the real payout group detail.
+- Visible navigation uses the simple terms **Invoices**, **Payments**, and **Bank Deposits**. The route remains `/reports/deposits` for compatibility.
+- A controlled **Preview sync** and separate explicit **Sync deposits** action are available only inside the financially authorized Bank Deposits report.
+- Preview mode makes no Stripe calls and writes no settlement rows. Commit mode is explicit and never inferred from preview submission.
+- The server action authenticates and proves financial authority/account scope with the session client, then uses the server-only admin client for the explicitly scoped settlement read/upsert because authenticated RLS intentionally exposes SELECT only.
+- Candidate discovery honors `stripe_charged_at`, then `paid_at`, then `created_at` fallback semantics. Calendar ranges include the complete selected end date.
+- Fully reconciled unchanged payout rows return `already_synced`. Existing pending, failed, in-transit, or no-payout rows may refresh so later Stripe payout attachment is visible.
+- Idempotency remains anchored to Stripe connected-account plus balance-transaction identity. The uniqueness repair is not weakened and no duplicate settlement row is intended.
+- Report diagnostics distinguish recorded Stripe payments, synced settlement records, awaiting sync, pending payout, sync failures, and filters excluding existing records.
+- Query failures fail closed through a clear report-unavailable state and must never masquerade as authoritative `$0.00` totals.
+- Compliance Matters / EveryStep JobWorks provides a **supporting breakdown**, not bank-reconciliation proof. Stripe payout status explains what should reach the bank; the bank statement or connected accounting feed remains authoritative for what actually arrived.
+- No manual `matched to bank`, `reconciled`, or certification state is created by this V1.
+- No invoice paid/balance mutation, payment-row mutation, allocation mutation, charge creation, refund/dispute behavior, or bank-feed behavior is introduced by settlement sync or reporting.
+
 ## Final Closeout - Payments / Deposits Reporting Foundation
 
 Status: CLOSED FOR CURRENT FOUNDATION.
@@ -31,9 +54,9 @@ Closed/confirmed:
 - Unauthorized direct access redirects cleanly to the reports dashboard with a not-authorized banner.
 - Deposits page copy is owner-facing and explains Stripe fees, net deposits, payout timing, and CSV exports without implying invoice truth changes.
 - Date filters, apply/reset filters, summary CSV, and detail CSV passed production smoke.
-- No sync controls are exposed in the UI.
-- No Stripe API calls are made from report/deposit pages or exports.
-- No invoice, payment, allocation, or settlement mutation path was added from reports/deposits.
+- Controlled preview and explicit commit settlement-sync controls are exposed only to authorized financial users in the Bank Deposits report.
+- Stripe API calls occur only through the existing server-side settlement-sync service after explicit commit; report rendering and CSV exports remain read-only.
+- The report adds no invoice, payment, or allocation mutation path. Commit mode upserts only account-scoped Stripe settlement truth.
 - Settlement rows explain Stripe fee/net/payout timing only; they do not change invoice paid/balance truth.
 
 Remaining future gate, not a blocker to this foundation closeout:
