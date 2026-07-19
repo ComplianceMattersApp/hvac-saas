@@ -1,6 +1,6 @@
 # Google Address Autocomplete V1 — Audit and Implementation Plan
 
-Status: Phase A-Slice D and nationwide provider hardening complete; Slice E-G approval-gated
+Status: Phase A-Slice E and nationwide provider hardening complete; Slice F-G approval-gated
 
 Branch: `feature/google-address-autocomplete-v1`
 
@@ -306,6 +306,7 @@ The owner approved `PlaceAutocompleteElement`, the adjacent-assistant pattern, `
 | Slice D1 | Complete | `components/addresses/ServiceLocationAddressFields.tsx`; shared address merge helper/tests; new-job adapter reuse; this document | 4 files / 23 tests passed; typecheck and targeted ESLint passed | `/customers/new` has no existing Address Line 2 contract, so D2 will intentionally set `showAddressLine2={false}` rather than expand its action | Wire D2 creation surfaces |
 | Slice D2 | Complete | `app/customers/new/page.tsx`; Customer Profile Add Location in `app/customers/[id]/page.tsx`; creation wiring tests; shared island state-length parity; this document | 6 files / 36 tests passed; typecheck passed; targeted changed-file ESLint passed except two unrelated pre-existing quote-escape errors elsewhere in the customer profile file | Browser smoke unavailable; no Address Line 2 added to `/customers/new` because its action does not support it | Wire D3 edit surfaces |
 | Slice D3 | Complete, awaiting owner review | Customer Profile Edit Service Address in `app/customers/[id]/page.tsx`; `app/locations/[id]/page.tsx`; edit wiring and existing action regression tests; this document | 6 files / 38 focused tests passed; typecheck passed; targeted new-file ESLint passed; final broader regression results recorded below | Browser/provider smoke remains unavailable; full legacy route lint contains pre-existing errors outside the Slice D diff | Stop at Slice E approval gate |
+| Slice E | Complete, awaiting owner browser review | External-mode service-location block in `components/jobs/JobCoreFields.tsx`; contractor proposal validation in `lib/actions/job-actions.ts`; finalization CA-fallback cleanup; focused contractor boundary tests; this document | 30 files / 191 broad tests passed; typecheck and focused ESLint passed; provider-independent fallback covered by shared loader tests | Codex could not independently enter a contractor-authenticated browser session, so contractor desktop/mobile/keyboard/provider smoke remains owner-verification work | Stop after Slice E; no merge |
 
 ## Slice B closeout — shared non-wired foundation
 
@@ -413,7 +414,7 @@ D1 validation: Slice B/Slice C/shared-island tests passed (4 files / 23 tests), 
 ### D2 customer creation and Add Location
 
 - `/customers/new` now renders the shared island only inside the optional Primary Service Location section. `required={false}` preserves customer-only creation; `showAddressLine2={false}` preserves the exact existing action contract. Contact, notes, action, redirect, and optional-location creation logic are unchanged.
-- Customer Profile Add Location now renders the island after nickname/label with initial state `CA`. Hidden `customer_id`, notes, submit button, `addCustomerServiceLocationFromForm`, normalized duplicate-location reuse, redirects, and revalidation are unchanged.
+- Customer Profile Add Location renders the island after nickname/label. The later nationwide hardening pass removed its former `CA` initial value; hidden `customer_id`, notes, submit button, `addCustomerServiceLocationFromForm`, normalized duplicate-location reuse, redirects, and revalidation remain unchanged.
 - The shared state input retains the former two-character state limit.
 
 D2 validation: foundation/island/wiring plus `create-customer-action.test.ts` and `customer-service-locations.test.ts` passed (6 files / 36 tests); typecheck passed. Targeted ESLint passed for the new-customer page, shared island, and new test. Linting the full pre-existing customer profile file reports two unrelated `react/no-unescaped-entities` errors at line 2915, outside the Slice D diff; they were not repaired in this branch.
@@ -428,11 +429,11 @@ The completed Slice D covers every authorized physical/service-location creation
 
 D3 focused validation passed 6 files / 38 tests. The final combined foundation, wiring, customer/location action, new-job boundary, contractor intake/attachment, invoice rendering, and location regression run passed 14 files / 81 tests. `npx.cmd tsc --noEmit` passed. Targeted ESLint for the new test and shared island passed; full-file lint of the pre-existing action regression test reports its existing `no-explicit-any` query mock outside the D3 assertion change. Full-file lint for the legacy location page continues to report pre-existing `no-explicit-any`/unused-variable findings outside the changed address block, and the customer profile retains the two previously recorded quote-escape errors. Browser smoke is not claimed: this workspace still has no installed Playwright/Puppeteer harness and no approved restricted browser key. Automated tests cover missing-key fallback, loader single-flight/failure behavior, route visibility, merge behavior, canonical names, action wiring, and server boundaries; real-provider presentation, keyboard, mobile, attribution, and console/hydration checks remain pending.
 
-### Exact proposed Slice E plan (not authorized)
+### Slice E authorization baseline (superseded by completed closeout)
 
 After explicit owner approval, limit Slice E to contractor proposal/finalization address entry: the contractor branch of `app/jobs/new/NewJobForm.tsx` and the two new-location branches of `GuidedFinalizationWizard.tsx`. Preserve durable-first proposal submission, attachment tokens, `proposed_*` truth, existing-record selection, finalization decisions, canonical creation timing, field names, actions, validation, and redirects. Add focused contractor wiring tests and rerun the existing contractor intake/finalization/attachment regression suites. Do not touch customer/location routes, estimates, billing or business addresses, schema, data, environment files, Google Cloud, deployed configuration, provider settings, or production.
 
-Slice E is not approved. Remaining rollout gates are browser smoke with an approved restricted key/harness, owner review of Slice D, explicit Slice E authorization, and later separate approvals for environment/Cloud/provider/production work.
+Slice E was subsequently authorized under the nationwide address contract and is closed out below. Environment, Cloud, provider-production, estimate, and billing-address work remain separately approval-gated.
 
 ## Nationwide provider hardening closeout — 2026-07-19
 
@@ -446,4 +447,18 @@ Final nationwide regression validation passed 12 files and 100 tests covering th
 
 Codex did not independently perform mobile touch, full keyboard-navigation, screen-reader, attribution, every-route provider smoke, or the temporary missing-key restart sequence because no browser automation/runtime control was available. These remain explicit manual closeout checks and are not claimed as passed. The owner-confirmed desktop provider result supports retaining `PlaceAutocompleteElement` as the V1 recommendation.
 
-No schema, migration, database, Google Cloud, deployed environment, billing-address, estimate, callback, account/business-address, or contractor-intake change was made. Slice E remains unapproved. If later authorized, its exact scope remains the contractor branch of `app/jobs/new/NewJobForm.tsx` and the two new-location branches of `GuidedFinalizationWizard.tsx`, with focused contractor wiring tests and existing proposal/finalization/attachment regressions; nationwide visible State entry must be preserved. Stop at this approval gate.
+At that checkpoint no schema, migration, database, Google Cloud, deployed environment, billing-address, estimate, callback, account/business-address, or contractor-intake change had been made. Slice E was later authorized and completed under the nationwide contract below.
+
+## Slice E closeout — contractor intake autocomplete — 2026-07-19
+
+Slice E wires the existing shared `ServiceLocationAddressFields` island only into the external-mode service-location block used by contractor `/jobs/new`. The assistant is optional and client-side; Address, City, State, and ZIP remain visible, editable, required native fields with their unchanged form names. State begins blank and accepts any Google-supplied or manually entered U.S. state. Contractor proposal storage has no Address Line 2 column or current field contract, so `showAddressLine2={false}` preserves the existing scope rather than inventing unsupported persistence.
+
+The audit found that contractor intake already follows the required durable-first architecture. `createJobFromForm` validates the posted address, inserts `contractor_intake_submissions`, and redirects with the durable proposal ID. Only after that ID exists can the separate client attachment handler request signed upload tokens, upload files, and finalize attachment rows. Autocomplete selection does not invoke the action, submit the form, create canonical customers/locations/jobs, upload attachments, trigger notifications, or persist provider metadata. The stale server fallback that silently supplied `CA` for a missing contractor State was removed; missing State now follows the existing required-address rejection and creates no proposal.
+
+Internal finalization was audited and intentionally not wired. `GuidedFinalizationWizard` is a reuse-first adjudication workspace that searches existing customers/locations, surfaces address matches, and pre-fills any explicitly chosen new canonical location from proposal truth. Adding another provider assistant there would duplicate the earlier contractor entry step and compete with duplicate/reuse review. Its two stale `proposed.state || "CA"` fallbacks were removed so the submitted nationwide state is preserved and a genuinely missing state remains visible for internal correction.
+
+Focused Slice E validation passed 4 files / 23 tests. The broad address, contractor submission, attachment resilience, finalization, scope, contact-candidate, relationship, product-mode, new-job, and customer/location wiring regression run passed 30 files / 191 tests. TypeScript, focused ESLint, and whitespace validation passed. The known unrelated Step 5 and job-location source-string assertions remain outside the changed source and were not repaired.
+
+The restricted-key real-provider smoke previously confirmed the shared assistant, nationwide selection, current `gmp-select` event contract, and single stable script on the internal surface. The same shared loader/component/island is reused for contractor intake. Codex did not independently perform contractor-authenticated desktop/mobile/keyboard/touch/attribution smoke or the temporary missing-key restart sequence; no contractor browser session was available, so those checks remain explicit owner review items and are not claimed as passed. Automated loader tests continue to prove missing-key no-insertion behavior, provider-failure fallback, single-flight loading, transient retry, and retry after failure.
+
+No schema, migration, database, Google Cloud, deployed environment, estimate, billing-address, callback, business-address, or production configuration change occurred. `PlaceAutocompleteElement` remains recommended because the contractor surface reuses the already-hardened integration without a second loader or provider data path. Slice E is complete; stop here pending owner browser review and explicit merge or further-hardening direction.
