@@ -865,7 +865,7 @@ export default function GuidedFinalizationWizard({
               <input
                 id="wizard_en_state"
                 name="new_state"
-                defaultValue={proposed.state || "CA"}
+                defaultValue={proposed.state}
                 required
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
@@ -1030,7 +1030,7 @@ export default function GuidedFinalizationWizard({
                 <input
                   id="wizard_nn_state"
                   name="new_state"
-                  defaultValue={proposed.state || "CA"}
+                  defaultValue={proposed.state}
                   required
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
