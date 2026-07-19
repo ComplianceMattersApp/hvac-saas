@@ -1,6 +1,6 @@
 # Internal Invoice PDF Delivery V1 — Audit and Implementation Plan
 
-Status: Slice B complete; hard-gated before download-route implementation  
+Status: Slice C complete; hard-gated before email-attachment implementation
 Date: 2026-07-19  
 Scope: Audit and planning only; no application, schema, dependency, environment, or production changes
 
@@ -182,7 +182,7 @@ Existing test conventions to extend include `lib/actions/__tests__/internal-invo
 | --- | --- | --- |
 | A — repository and architecture audit | Complete | Stop for owner review; documentation-only change |
 | B — canonical PDF document foundation | Complete | Shared model, renderer, print reuse, and focused validation complete; stop for owner review |
-| C — download route and workspace action | Not started | Requires Slice B closeout approval |
+| C — download route and workspace action | Complete | Authenticated scoped route, workspace CTA, and focused validation complete |
 | D — send/resend attachment | Not started | Requires Slice C closeout approval |
 | E — history and observability | Not started | Requires Slice D closeout approval |
 | F — quality, smoke, docs, closeout | Not started | Requires Slice E closeout approval |
@@ -240,3 +240,50 @@ Date: 2026-07-19
 ### Next gate
 
 Stop for owner review. Slice C may add the authenticated, same-account `Download PDF` route and workspace CTA only after approval.
+
+## 13. Slice C closeout
+
+Date: 2026-07-19
+
+### What changed
+
+- Added `GET /jobs/{jobId}/invoice/pdf?invoice_id={invoiceId}` at `app/jobs/[id]/invoice/pdf/route.ts`.
+- Added a persistent `Download PDF` action to the internal invoice workspace and retained the existing browser print surface as `Print Invoice`.
+- Added focused download-route and workspace-wiring tests.
+
+### Access and failure posture
+
+- The route is explicitly Node runtime, dynamic, private/no-store, and internal-only.
+- Active internal authentication is required before account/invoice reads; unauthenticated requests receive 401 and non-internal/contractor/inactive actors receive 403.
+- Same-account job scope is verified before invoice loading or PDF mapping/rendering.
+- The selected invoice must match both the requested job and authenticated actor's `account_owner_user_id`; mismatches and missing records return the same safe 404 response.
+- The account must retain `internal_invoicing` billing mode.
+- Renderer failures return a safe actionable 500 response. Logs contain only account/job/invoice identifiers, stage, and error class—never PDF bytes or customer document content.
+
+### Response contract
+
+- `Content-Type: application/pdf`
+- `Content-Disposition: attachment; filename="Invoice-{safe invoice number}.pdf"`
+- Correct content length, `X-Content-Type-Options: nosniff`, and private no-store caching.
+- PDF generation occurs only after the explicit request and creates no email/provider call or persistent artifact.
+
+### Boundaries preserved
+
+- Existing print route remains functional and linked.
+- No invoice, line-item, payment, allocation, Stripe, job, closeout, event, notification, provider, QBO, portal, schema, storage, or environment mutation was added.
+- Download access matches the existing internal invoice workspace read posture and does not expose the contractor printable route or signed public payment route.
+
+### Validation
+
+- Slice B/C focused run: 5 files, 22 tests passed.
+- Scope/access regression run: 3 files, 99 tests passed (`internal-invoice-scope-hardening`, `financial-access`, and `field-billing-access`).
+- `npx.cmd tsc --noEmit`: passed.
+- Targeted ESLint for the new route and tests: passed.
+- The full pre-existing invoice workspace file still reports its known `no-explicit-any` lint findings outside the two-link CTA edit; the CTA itself is covered by source-wiring tests.
+- `git diff --check`: to be recorded immediately before commit.
+
+### Remaining risks and next gate
+
+- Manual authenticated browser download/open/visual smoke remains part of the later smoke matrix.
+- Email remains unchanged and does not yet include the PDF.
+- Stop for owner review. Slice D may extend the provider abstraction and shared send/resend flow only after approval.

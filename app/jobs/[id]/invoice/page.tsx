@@ -945,6 +945,14 @@ export default async function InternalInvoiceWorkspacePage({
                 Back to Job
               </Link>
             ) : null}
+            {invoice ? (
+              <Link
+                href={`/jobs/${jobId}/invoice/pdf?invoice_id=${encodeURIComponent(invoice.id)}`}
+                className={secondaryButtonClass}
+              >
+                Download PDF
+              </Link>
+            ) : null}
             {invoice && !showPostSendCompletion && !showGuidedDraft && !showGuidedIssued ? (
               <Link
                 href={`/jobs/${jobId}/invoice/print?invoice_id=${encodeURIComponent(invoice.id)}`}
@@ -952,7 +960,7 @@ export default async function InternalInvoiceWorkspacePage({
                 rel="noreferrer"
                 className={secondaryButtonClass}
               >
-                Print / Save PDF
+                Print Invoice
               </Link>
             ) : null}
             {/* Slice B cleanup: redundant on mobile where charges scroll inline. */}
