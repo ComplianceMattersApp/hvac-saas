@@ -4,7 +4,10 @@ import {
   formatServiceLocationAddressLines,
 } from "@/lib/business/internal-invoice-address-rendering";
 import type { OperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
-import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
+import {
+  formatInvoiceDisplayReference,
+  preferredInvoiceReference,
+} from "@/lib/utils/display-references";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 
 export const INTERNAL_INVOICE_PDF_MIME_TYPE = "application/pdf";
@@ -155,7 +158,11 @@ export function buildInternalInvoiceDocumentModel(params: {
 
   return {
     invoiceReference,
-    invoiceNumber: String(invoice.invoice_number ?? "").trim(),
+    invoiceNumber: preferredInvoiceReference({
+      invoiceDisplayNumber: invoice.invoice_display_number,
+      invoiceNumber: invoice.invoice_number,
+      invoiceId: invoice.id,
+    }),
     invoiceDateLabel: formatInvoiceDocumentDate(invoice.invoice_date),
     statusLabel: paymentStatus === "paid"
       ? "Paid"

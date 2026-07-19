@@ -81,7 +81,7 @@ describe("internal invoice document model", () => {
 
   it("maps canonical invoice, payment, address, and branding inputs without recalculating totals", () => {
     const model = buildInternalInvoiceDocumentModel({
-      invoice: invoice(),
+      invoice: invoice({ invoice_display_number: "2048", invoice_number: "INV-20260719-LEGACY" }),
       job: {
         title: "Cooling diagnostic",
         customer_first_name: "Taylor",
@@ -114,6 +114,17 @@ describe("internal invoice document model", () => {
     expect(JSON.stringify(model)).not.toContain("internal-uuid-must-not-be-presented");
     expect(JSON.stringify(model)).not.toContain("paymentUrl");
     expect(JSON.stringify(model)).not.toContain("emailHtml");
+  });
+
+  it("uses the customer-facing display number for the PDF filename value", () => {
+    const model = buildInternalInvoiceDocumentModel({
+      invoice: invoice({ invoice_display_number: "2048", invoice_number: "INV-20260719-LEGACY" }),
+      job: {},
+      paymentSummary: {},
+      tenantIdentity: { displayName: "EveryStep HVAC", supportEmail: null, supportPhone: null, logoUrl: null },
+    });
+
+    expect(buildInternalInvoicePdfFilename(model.invoiceNumber)).toBe("Invoice-2048.pdf");
   });
 
   it("handles missing optional customer and branding fields safely", () => {
