@@ -61,4 +61,21 @@ describe("sendEmail", () => {
       }),
     );
   });
+
+  it("translates provider-neutral in-memory attachments for Resend", async () => {
+    const { sendEmail } = await import("@/lib/email/sendEmail");
+    const content = Buffer.from("%PDF-test");
+    await sendEmail({
+      to: "billing@test.com",
+      subject: "Invoice",
+      html: "<p>Invoice</p>",
+      text: "Invoice",
+      attachments: [{ filename: "Invoice-3001.pdf", content, contentType: "application/pdf" }],
+    });
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({
+      html: "<p>Invoice</p>",
+      text: "Invoice",
+      attachments: [{ filename: "Invoice-3001.pdf", content }],
+    }));
+  });
 });

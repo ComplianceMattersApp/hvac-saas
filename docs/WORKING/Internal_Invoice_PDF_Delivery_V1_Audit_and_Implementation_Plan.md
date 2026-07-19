@@ -1,6 +1,6 @@
 # Internal Invoice PDF Delivery V1 — Audit and Implementation Plan
 
-Status: Slice C complete; hard-gated before email-attachment implementation
+Status: Slice D complete; hard-gated before delivery-history metadata/UI implementation
 Date: 2026-07-19  
 Scope: Audit and planning only; no application, schema, dependency, environment, or production changes
 
@@ -183,7 +183,7 @@ Existing test conventions to extend include `lib/actions/__tests__/internal-invo
 | A — repository and architecture audit | Complete | Stop for owner review; documentation-only change |
 | B — canonical PDF document foundation | Complete | Shared model, renderer, print reuse, and focused validation complete; stop for owner review |
 | C — download route and workspace action | Complete | Authenticated scoped route, workspace CTA, and focused validation complete |
-| D — send/resend attachment | Not started | Requires Slice C closeout approval |
+| D — send/resend attachment | Complete | Shared delivery helper and provider abstraction now require one current PDF |
 | E — history and observability | Not started | Requires Slice D closeout approval |
 | F — quality, smoke, docs, closeout | Not started | Requires Slice E closeout approval |
 
@@ -287,3 +287,48 @@ Date: 2026-07-19
 - Manual authenticated browser download/open/visual smoke remains part of the later smoke matrix.
 - Email remains unchanged and does not yet include the PDF.
 - Stop for owner review. Slice D may extend the provider abstraction and shared send/resend flow only after approval.
+
+## 14. Slice D closeout
+
+Date: 2026-07-19
+
+### What changed
+
+- Extended `lib/email/sendEmail.ts` with a provider-neutral in-memory attachment contract (`filename`, `content`, `contentType`) and contained Resend translation inside the provider wrapper.
+- Reused the canonical invoice-document model from the existing email build context, including the already scoped service-location label, current tenant branding, frozen invoice/line data, and current collected-payment summary.
+- Integrated `buildInternalInvoicePdfAttachment` into the existing shared `deliverInternalInvoiceEmailForContext` path. Initial send, resend, and compound issue/send therefore use one implementation and each generate one current PDF.
+- Added provider payload, initial attachment, resend regeneration, compound issue/send attachment, PDF-generation failure, and existing provider-failure coverage.
+
+### Send and failure posture
+
+- The PDF attachment is generated before the Resend provider call.
+- The existing premium HTML body, text fallback, subject, recipient behavior, payment link/button, branding, and send/resend distinction remain intact.
+- PDF-generation failure prevents the provider call, creates a failed—not sent—communication attempt, writes the existing failed invoice event with `pdf_generation_failed` classification, and returns the existing visible failure banner.
+- Renderer exception details are not persisted; the stored internal error is the safe `Invoice PDF generation failed.` message.
+- Provider rejection continues to mark the queued attempt failed and never records sent success.
+- Compound issue/send retains existing truth: issue mutation occurs before communication delivery. A later PDF/provider failure leaves an honestly issued but unsent invoice available for retry; it does not roll back or falsify invoice state.
+
+### Provider behavior
+
+- Resend receives exactly one attachment with an in-memory Buffer and sanitized `.pdf` filename. Resend infers transport MIME from the PDF filename; the provider-neutral domain object retains `application/pdf` for validation and Slice E metadata.
+- Existing callers without attachments remain backward compatible.
+- No public URL, local filesystem path, storage object, PDF base64 metadata, or provider-specific type leaks into invoice business code.
+
+### Boundaries preserved
+
+- No schema, storage, RLS, environment, invoice-total, payment, allocation, Stripe, job, closeout, QBO, portal, SMS, automatic-send, or scheduling behavior changed.
+- Cross-account denial still occurs before PDF generation and provider calls through the existing scoped send context; the 72-test invoice scope-hardening suite remains green.
+
+### Validation
+
+- Focused/regression Vitest: 6 files, 99 tests passed, covering provider abstraction, HTML/text/payment link preservation, initial send, resend, compound issue/send, generation failure, provider failure, canonical model, renderer, and scope hardening.
+- `npx.cmd tsc --noEmit`: passed.
+- Targeted ESLint for clean touched provider/model files: passed.
+- The two pre-existing large invoice action test files retain their existing `no-explicit-any` lint findings in fixture plumbing; no new lint category was introduced.
+- `git diff --check`: to be recorded immediately before commit.
+
+### Remaining work and next gate
+
+- Attachment facts are not yet projected into normalized delivery-history records or shown as `PDF attached`; that is Slice E.
+- Manual provider-backed email/attachment smoke remains part of Slice F and must not send a real customer email without controlled smoke authorization.
+- Stop for owner review. Slice E may add attachment metadata to existing notification/event payloads and a small backward-compatible history indicator after approval.

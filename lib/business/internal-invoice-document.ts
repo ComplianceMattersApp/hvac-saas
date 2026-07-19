@@ -131,6 +131,7 @@ export function buildInternalInvoiceDocumentModel(params: {
   invoice: InternalInvoiceRecord;
   job: InvoiceDocumentJob;
   location?: InvoiceDocumentLocation;
+  serviceLocation?: string | null;
   paymentSummary: InvoiceDocumentPaymentSummary;
   tenantIdentity: OperationalTenantIdentity;
 }): InternalInvoiceDocumentModel {
@@ -139,7 +140,8 @@ export function buildInternalInvoiceDocumentModel(params: {
   const customerName = formatPersonNamePart(
     [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ") || "Customer",
   );
-  const serviceLocation = formatServiceLocationAddressLines(params.location).join(", ");
+  const serviceLocation = String(params.serviceLocation ?? "").trim()
+    || formatServiceLocationAddressLines(params.location).join(", ");
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: invoice.invoice_display_number,
     invoiceNumber: invoice.invoice_number,

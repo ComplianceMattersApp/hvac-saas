@@ -15,6 +15,7 @@ const resolveInternalInvoiceByIdMock = vi.fn();
 const resolveOperationalTenantIdentityMock = vi.fn();
 const sendEmailMock = vi.fn();
 const createTenantInvoicePaymentLinkMock = vi.fn();
+const buildInternalInvoicePdfAttachmentMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -73,6 +74,10 @@ vi.mock('@/lib/email/operational-tenant-branding', () => ({
 
 vi.mock('@/lib/email/sendEmail', () => ({
   sendEmail: (...args: unknown[]) => sendEmailMock(...args),
+}));
+
+vi.mock('@/lib/pdf/internal-invoice-pdf', () => ({
+  buildInternalInvoicePdfAttachment: (...args: unknown[]) => buildInternalInvoicePdfAttachmentMock(...args),
 }));
 
 vi.mock('@/lib/notifications/account-owner', () => ({
@@ -265,6 +270,11 @@ describe('issueAndSendInternalInvoiceFromForm', () => {
       supportPhone: '2095550000',
     });
     sendEmailMock.mockResolvedValue(undefined);
+    buildInternalInvoicePdfAttachmentMock.mockResolvedValue({
+      filename: 'Invoice-INV-1.pdf',
+      contentType: 'application/pdf',
+      content: Buffer.from('%PDF-test'),
+    });
     createTenantInvoicePaymentLinkMock.mockResolvedValue({
       paymentLinkUrl: 'https://app.example/pay/token',
       balanceDueCents: 9900,
@@ -288,7 +298,14 @@ describe('issueAndSendInternalInvoiceFromForm', () => {
     expect(fixture.internalInvoiceUpdates.some((patch) => patch.status === 'issued')).toBe(true);
     // Sent: the email delivery ran.
     expect(sendEmailMock).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'billing@example.com' }),
+      expect.objectContaining({
+        to: 'billing@example.com',
+        attachments: [{
+          filename: 'Invoice-INV-1.pdf',
+          contentType: 'application/pdf',
+          content: Buffer.from('%PDF-test'),
+        }],
+      }),
     );
     expect(fixture.notificationInserts.length).toBeGreaterThan(0);
   });

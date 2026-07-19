@@ -128,4 +128,17 @@ describe("internal invoice document model", () => {
     expect(model.statusLabel).toBe("Paid");
     expect(model.balanceDueLabel).toBe("$0.00");
   });
+
+  it("accepts an already scoped canonical service-location label for send reuse", () => {
+    const model = buildInternalInvoiceDocumentModel({
+      invoice: invoice(),
+      job: { customer_first_name: "Taylor", customer_last_name: "Customer" },
+      serviceLocation: "Scoped Location Label",
+      location: { address_line1: "Ignored fallback" },
+      paymentSummary: { balanceDueCents: 12500, paymentStatus: "unpaid" },
+      tenantIdentity: { displayName: "EveryStep HVAC", supportEmail: null, supportPhone: null, logoUrl: null },
+    });
+    expect(model.serviceLocation).toBe("Scoped Location Label");
+    expect(model.lineItems[0]?.serviceLocation).toBe("Scoped Location Label");
+  });
 });

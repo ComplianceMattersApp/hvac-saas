@@ -25,6 +25,8 @@ import {
 } from '@/lib/business/internal-business-profile';
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE } from '@/lib/business/internal-invoice-delivery';
+import { buildInternalInvoiceDocumentModel } from '@/lib/business/internal-invoice-document';
+import { buildInternalInvoicePdfAttachment } from '@/lib/pdf/internal-invoice-pdf';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
 import { buildDraftBillingSnapshot } from '@/lib/business/invoice-billing-snapshot';
 import { autoSyncIssuedInvoiceToQbo } from '@/lib/qbo/qbo-auto-sync';
@@ -2782,6 +2784,40 @@ async function deliverInternalInvoiceEmailForContext(
 
   const email = await buildInternalInvoiceEmailForContext(context);
 
+  let pdfAttachment: Awaited<ReturnType<typeof buildInternalInvoicePdfAttachment>>;
+  try {
+    pdfAttachment = await buildInternalInvoicePdfAttachment(email.documentModel);
+  } catch {
+    const errorDetail = 'Invoice PDF generation failed.';
+    await insertInternalInvoiceEmailNotification({
+      supabase: context.supabase,
+      jobId: context.jobId,
+      invoiceId: invoice.id,
+      invoiceNumber: invoice.invoice_number,
+      recipientEmail,
+      subject: email.subject,
+      body: `Invoice email delivery failed: ${errorDetail}`,
+      attemptKind,
+      attemptNumber,
+      status: 'failed',
+      errorDetail,
+    });
+    await logInvoiceEvent({
+      supabase: context.supabase,
+      userId: context.userId,
+      jobId: context.jobId,
+      eventType: 'internal_invoice_email_failed',
+      invoice,
+      extraMeta: {
+        recipient_email: recipientEmail,
+        attempt_kind: attemptKind,
+        attempt_number: attemptNumber,
+        failure_classification: 'pdf_generation_failed',
+      },
+    });
+    return { attemptKind, status: 'failed' };
+  }
+
   const queuedDelivery = await insertInternalInvoiceEmailNotification({
     supabase: context.supabase,
     jobId: context.jobId,
@@ -2802,6 +2838,7 @@ async function deliverInternalInvoiceEmailForContext(
       subject: email.subject,
       html: email.html,
       text: email.text,
+      attachments: [pdfAttachment],
     });
     providerMessageId = String(sendResult?.data?.id ?? '').trim() || null;
   } catch (error) {
@@ -2902,6 +2939,14 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
   );
   const paymentSummary = paymentLedger.summary;
 
+  const documentModel = buildInternalInvoiceDocumentModel({
+    invoice,
+    job: context.job,
+    serviceLocation,
+    paymentSummary,
+    tenantIdentity,
+  });
+
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: invoice.invoice_display_number,
     invoiceNumber: invoice.invoice_number,
@@ -2938,7 +2983,7 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     paymentStatus: paymentSummary.paymentStatus,
   });
 
-  return { subject, html, text, paymentUrl };
+  return { subject, html, text, paymentUrl, documentModel };
 }
 
 export async function loadInternalInvoiceCustomerEmailPreview(formData: FormData) {

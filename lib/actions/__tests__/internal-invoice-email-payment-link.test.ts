@@ -15,6 +15,7 @@ const createTenantInvoicePaymentLinkMock = vi.fn();
 const resolveInvoiceCollectedPaymentLedgerMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const buildInternalInvoicePdfAttachmentMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -67,6 +68,10 @@ vi.mock('@/lib/email/operational-tenant-branding', () => ({
 
 vi.mock('@/lib/email/sendEmail', () => ({
   sendEmail: (...args: unknown[]) => sendEmailMock(...args),
+}));
+
+vi.mock('@/lib/pdf/internal-invoice-pdf', () => ({
+  buildInternalInvoicePdfAttachment: (...args: unknown[]) => buildInternalInvoicePdfAttachmentMock(...args),
 }));
 
 vi.mock('@/lib/notifications/account-owner', () => ({
@@ -284,7 +289,12 @@ function makeSupabaseFixture(overrides: { job?: Record<string, unknown>; contrac
 }
 
 function sentEmailPayload() {
-  return sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string; subject?: string } | undefined;
+  return sendEmailMock.mock.calls[0]?.[0] as {
+    html?: string;
+    text?: string;
+    subject?: string;
+    attachments?: Array<{ filename: string; contentType: string; content: Buffer }>;
+  } | undefined;
 }
 
 function buildInvoice(overrides: Partial<Record<string, unknown>> = {}) {
@@ -345,6 +355,11 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     });
     resolveNotificationAccountOwnerUserIdMock.mockResolvedValue('owner-1');
     sendEmailMock.mockResolvedValue(undefined);
+    buildInternalInvoicePdfAttachmentMock.mockResolvedValue({
+      filename: 'Invoice-INV-1.pdf',
+      contentType: 'application/pdf',
+      content: Buffer.from('%PDF-test'),
+    });
     insertJobEventMock.mockResolvedValue(undefined);
     createTenantInvoicePaymentLinkMock.mockResolvedValue({
       paymentLinkToken: 'signed-token',
@@ -688,6 +703,13 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     ).rejects.toThrow('/reports/invoices?status=issued&communication_state=none&banner=internal_invoice_email_sent');
 
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(sentEmailPayload()?.attachments).toEqual([{
+      filename: 'Invoice-INV-1.pdf',
+      contentType: 'application/pdf',
+      content: Buffer.from('%PDF-test'),
+    }]);
+    expect(sentEmailPayload()?.html).toContain('Pay Invoice');
+    expect(sentEmailPayload()?.text).toContain('Pay Invoice:');
     expect(fixture.notificationRows).toHaveLength(1);
     expect(fixture.notificationRows[0]?.status).toBe('sent');
     expect(fixture.notificationRows[0]?.sent_at).toEqual(expect.any(String));
@@ -701,6 +723,60 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
       }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith('/reports/invoices');
+  });
+
+  it('regenerates and attaches one current PDF for an independently auditable resend', async () => {
+    const fixture = makeSupabaseFixture();
+    fixture.notificationRows.push({
+      id: 'prior-send',
+      status: 'sent',
+      payload: { invoice_id: 'inv-1', attempt_kind: 'sent', attempt_number: 1 },
+      created_at: '2026-07-18T12:00:00.000Z',
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    buildInternalInvoicePdfAttachmentMock.mockResolvedValueOnce({
+      filename: 'Invoice-INV-1.pdf',
+      contentType: 'application/pdf',
+      content: Buffer.from('%PDF-current-resend'),
+    });
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData({ invoice_id: 'inv-1' }))).rejects.toThrow(
+      'banner=internal_invoice_email_resent',
+    );
+
+    expect(buildInternalInvoicePdfAttachmentMock).toHaveBeenCalledTimes(1);
+    expect(sentEmailPayload()?.attachments).toEqual([
+      expect.objectContaining({
+        filename: 'Invoice-INV-1.pdf',
+        contentType: 'application/pdf',
+        content: Buffer.from('%PDF-current-resend'),
+      }),
+    ]);
+    expect(fixture.notificationRows[0]?.payload).toEqual(expect.objectContaining({
+      attempt_kind: 'resent',
+      attempt_number: 2,
+    }));
+  });
+
+  it('records failed generation and never calls the provider or claims sent success', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    buildInternalInvoicePdfAttachmentMock.mockRejectedValueOnce(new Error('renderer stack detail'));
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData({ invoice_id: 'inv-1' }))).rejects.toThrow(
+      'banner=internal_invoice_email_failed',
+    );
+
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(fixture.notificationRows).toHaveLength(1);
+    expect(fixture.notificationRows[0]?.status).toBe('failed');
+    expect(fixture.notificationRows[0]?.sent_at).toBeNull();
+    expect(fixture.notificationRows[0]?.payload).toEqual(expect.objectContaining({
+      error_detail: 'Invoice PDF generation failed.',
+    }));
+    expect(JSON.stringify(fixture.notificationRows[0])).not.toContain('renderer stack detail');
   });
 
   it('provider failure returns visible failure and does not create false sent history', async () => {
