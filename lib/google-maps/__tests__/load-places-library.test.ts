@@ -45,4 +45,35 @@ describe("createGooglePlacesLoader", () => {
     });
     await expect(loader()).resolves.toEqual({ status: "unavailable", reason: "library_error" });
   });
+
+  it("retries a transient Places import failure during bootstrap", async () => {
+    class FakeAutocompleteElement {}
+    const importLibrary = vi.fn()
+      .mockRejectedValueOnce(new Error("not ready"))
+      .mockResolvedValueOnce({ PlaceAutocompleteElement: FakeAutocompleteElement });
+    const loader = createGooglePlacesLoader({
+      apiKey: "test-key",
+      window: { google: { maps: { importLibrary } } } as never,
+      document: {} as Document,
+    });
+
+    await expect(loader()).resolves.toMatchObject({ status: "available" });
+    expect(importLibrary).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows a later caller to retry after an unavailable result", async () => {
+    class FakeAutocompleteElement {}
+    const importLibrary = vi.fn()
+      .mockRejectedValueOnce(new Error("not ready"))
+      .mockRejectedValueOnce(new Error("still not ready"))
+      .mockResolvedValueOnce({ PlaceAutocompleteElement: FakeAutocompleteElement });
+    const loader = createGooglePlacesLoader({
+      apiKey: "test-key",
+      window: { google: { maps: { importLibrary } } } as never,
+      document: {} as Document,
+    });
+
+    await expect(loader()).resolves.toEqual({ status: "unavailable", reason: "library_error" });
+    await expect(loader()).resolves.toMatchObject({ status: "available" });
+  });
 });

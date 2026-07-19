@@ -9,7 +9,7 @@ import {
 import {
   loadGooglePlacesLibrary,
   type PlaceAutocompleteElementLike,
-  type PlaceSelectEventLike,
+  type PlacePredictionSelectEventLike,
 } from "@/lib/google-maps/load-places-library";
 
 type AssistantState = "loading" | "ready" | "unavailable";
@@ -38,10 +38,11 @@ export default function GoogleAddressAutocomplete({
     let autocomplete: PlaceAutocompleteElementLike | null = null;
 
     const handleSelection = async (event: Event) => {
-      const place = (event as PlaceSelectEventLike).place;
-      if (!place) return;
+      const placePrediction = (event as PlacePredictionSelectEventLike).placePrediction;
+      if (!placePrediction) return;
 
       try {
+        const place = placePrediction.toPlace();
         await place.fetchFields({ fields: ["addressComponents"] });
         if (cancelled) return;
         callbackRef.current(
@@ -66,29 +67,48 @@ export default function GoogleAddressAutocomplete({
       autocomplete.includedPrimaryTypes = ["street_address", "premise", "subpremise"];
       autocomplete.placeholder = "Start typing a U.S. street address";
       autocomplete.setAttribute("aria-label", label);
-      autocomplete.addEventListener("gmp-placeselect", handleSelection);
+      autocomplete.addEventListener("gmp-select", handleSelection);
       hostRef.current.replaceChildren(autocomplete);
       setState("ready");
     });
 
     return () => {
       cancelled = true;
-      autocomplete?.removeEventListener("gmp-placeselect", handleSelection);
+      autocomplete?.removeEventListener("gmp-select", handleSelection);
       autocomplete?.remove();
     };
   }, [label]);
 
   return (
-    <div className={className} data-address-autocomplete-assistant="google">
-      <div className="text-sm font-medium text-slate-700">{label}</div>
-      <div ref={hostRef} className={state === "ready" ? "mt-1" : "hidden"} />
-      <p className="mt-1 text-xs text-slate-500" aria-live="polite">
+    <div
+      className={`rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 shadow-sm ${className}`}
+      data-address-autocomplete-assistant="google"
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="text-sm font-semibold text-slate-900">Find address automatically</div>
+        <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+          Recommended
+        </span>
+      </div>
+      <p className="mb-2 text-xs leading-5 text-slate-600">{label}</p>
+      <div
+        ref={hostRef}
+        className={state === "ready" ? "bg-white" : "hidden"}
+      />
+      <p className="mt-2 text-xs text-slate-600" aria-live="polite">
         {state === "loading"
           ? "Loading address suggestions…"
           : state === "unavailable"
-            ? "Address suggestions are unavailable. Enter the address manually."
-            : "Choose a suggestion, then review and edit the address fields below."}
+            ? "Automatic search is unavailable. Enter the address manually below."
+            : "Choose a suggestion to fill the address fields, then review them below."}
       </p>
+      <div className="mt-3 flex items-center gap-2" aria-hidden="true">
+        <span className="h-px flex-1 bg-blue-200" />
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          Or enter manually below
+        </span>
+        <span className="h-px flex-1 bg-blue-200" />
+      </div>
     </div>
   );
 }

@@ -1,11 +1,17 @@
 export const GOOGLE_MAPS_SCRIPT_ID = "everystep-google-maps-javascript";
 
-type PlaceLike = {
+export type PlaceLike = {
   addressComponents?: readonly unknown[] | null;
   fetchFields(options: { fields: readonly ["addressComponents"] }): Promise<void>;
 };
 
-export type PlaceSelectEventLike = Event & { place?: PlaceLike };
+type PlacePredictionLike = {
+  toPlace(): PlaceLike;
+};
+
+export type PlacePredictionSelectEventLike = Event & {
+  placePrediction?: PlacePredictionLike;
+};
 
 export type PlaceAutocompleteElementLike = HTMLElement & {
   includedRegionCodes: string[];
@@ -66,6 +72,16 @@ async function importPlaces(win: BrowserWindow): Promise<PlacesLoadResult> {
   }
 }
 
+async function importPlacesWithRetry(win: BrowserWindow): Promise<PlacesLoadResult> {
+  const firstResult = await importPlaces(win);
+  if (firstResult.status === "available") return firstResult;
+
+  // The async Maps bootstrap can fire its script load event just before the
+  // Places library is ready to import. Give that handoff one bounded retry.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  return importPlaces(win);
+}
+
 function waitForScript(script: HTMLScriptElement): Promise<"loaded" | "error"> {
   return new Promise((resolve) => {
     const onLoad = () => {
@@ -101,7 +117,7 @@ export function createGooglePlacesLoader(defaultEnvironment: LoaderEnvironment =
     if (loadPromise) return loadPromise;
 
     loadPromise = (async () => {
-      if (win.google?.maps?.importLibrary) return importPlaces(win);
+      if (win.google?.maps?.importLibrary) return importPlacesWithRetry(win);
 
       let script = doc.getElementById(GOOGLE_MAPS_SCRIPT_ID) as HTMLScriptElement | null;
       if (!script) {
@@ -115,8 +131,12 @@ export function createGooglePlacesLoader(defaultEnvironment: LoaderEnvironment =
 
       const scriptResult = await waitForScript(script);
       if (scriptResult === "error") return { status: "unavailable", reason: "script_error" };
-      return importPlaces(win);
+      return importPlacesWithRetry(win);
     })();
+
+    void loadPromise.then((result) => {
+      if (result.status !== "available") loadPromise = null;
+    });
 
     return loadPromise;
   };
