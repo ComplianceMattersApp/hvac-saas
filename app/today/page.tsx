@@ -104,8 +104,6 @@ export default async function TodayPage() {
   }
 
   const model = result as TodayReadModel;
-  const hasUrgentChip = model.priorityChips.some((chip) => chip.urgent);
-
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6">
       <TodayWelcomeModal initiallyOpen={model.showWelcomeModal} />
@@ -124,11 +122,7 @@ export default async function TodayPage() {
           showFieldActions={model.todayWork.showFieldActions}
         />
 
-        {hasUrgentChip ? (
-          <PriorityChipsSection chips={model.priorityChips} />
-        ) : null}
-
-        {!hasUrgentChip && model.priorityChips.length > 0 ? (
+        {model.priorityChips.length > 0 ? (
           <PriorityChipsSection chips={model.priorityChips} />
         ) : null}
 
@@ -524,19 +518,27 @@ function PriorityChipsSection({
   if (chips.length === 0) return null;
   return (
     <section className={CARD_SHELL}>
-      <SectionEyebrow label="Priority Queues" />
-      <h2 className={SECTION_HEADING_TEXT}>
-        {desktop ? "Where to focus next" : "Tap to focus"}
-      </h2>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <SectionEyebrow label="Operations" />
+          <h2 className={SECTION_HEADING_TEXT}>Queues requiring attention</h2>
+          <p className="mt-1 text-xs text-slate-600">Live counts from the Operations workboard.</p>
+        </div>
+        {desktop ? (
+          <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
+            Open Operations
+          </Link>
+        ) : null}
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {chips.map((chip) => (
           <Link
             key={chip.key}
             href={chip.href}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-[0_10px_22px_-18px_rgba(15,31,53,0.4)] transition-colors ${chipToneClass(chip)}`}
+            className={`group flex min-h-16 items-center justify-between gap-4 rounded-xl border px-4 py-3 shadow-[0_12px_28px_-22px_rgba(15,31,53,0.45)] transition-colors ${chipToneClass(chip)}`}
           >
-            <span>{chip.label}</span>
-            <span className="rounded-full bg-white/85 px-1.5 py-0.5 tabular-nums text-current">
+            <span className="text-sm font-semibold">{chip.label}</span>
+            <span className="min-w-9 rounded-lg bg-white/85 px-2 py-1 text-center text-lg font-bold tabular-nums text-current shadow-sm">
               {chip.count}
             </span>
           </Link>
@@ -754,7 +756,11 @@ function RoleAwarePulseSection({
   collapsed?: boolean;
   connected?: boolean;
 }) {
-  const hasContent = pulse.tiles.length > 0;
+  const opsQueueKeys = new Set(["need_scheduling", "waiting", "closeout", "without_tech"]);
+  const visibleTiles = pulse.tiles.filter((tile) => opsQueueKeys.has(tile.key) && tile.value > 0);
+  const hasContent = visibleTiles.length > 0;
+
+  if (!hasContent) return null;
 
   return (
     <section className={`relative overflow-hidden ${CARD_SHELL} ${collapsed ? "opacity-95" : ""} ${connected ? "lg:flex lg:h-full lg:flex-col" : ""}`}>
@@ -773,15 +779,11 @@ function RoleAwarePulseSection({
       <h2 className={SECTION_HEADING_TEXT}>{pulse.title}</h2>
       <p className="mt-1 text-xs leading-5 text-slate-600">{pulse.subtitle}</p>
 
-      {!hasContent ? (
-        <EmptyState message="No role-specific pulse items are active right now." />
-      ) : (
-        <div className={`mt-3 grid grid-cols-2 gap-2 ${connected ? "" : "sm:grid-cols-3"}`}>
-          {pulse.tiles.map((tile) => (
+      <div className={`mt-3 grid grid-cols-2 gap-2 ${connected ? "" : "sm:grid-cols-3"}`}>
+          {visibleTiles.map((tile) => (
             <RoleAwarePulseTileCard key={tile.key} tile={tile} />
           ))}
-        </div>
-      )}
+      </div>
     </section>
   );
 }

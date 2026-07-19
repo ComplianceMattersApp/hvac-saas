@@ -22,6 +22,7 @@ const baseCounts = {
   onHold: 0,
   failed: 0,
   closeoutReady: 0,
+  followUps: 0,
   contractorIntake: 0,
 };
 
@@ -239,7 +240,7 @@ describe("buildPriorityChips", () => {
     expect(chips).toEqual([]);
   });
 
-  it("exposes open invoices chip for admin/billing", () => {
+  it("silences non-Ops open-invoice counts", () => {
     const chips = buildPriorityChips({
       productMode: "hybrid",
       role: "admin",
@@ -248,9 +249,7 @@ describe("buildPriorityChips", () => {
       openInvoiceCount: 2,
       canViewBusinessPulse: true,
     });
-    const openInvoices = chips.find((c) => c.key === "open_invoices");
-    expect(openInvoices?.count).toBe(2);
-    expect(openInvoices?.href).toBe("/reports/invoices?view=open");
+    expect(chips.find((c) => c.key === "open_invoices")).toBeUndefined();
   });
 
   it("does not expose open invoices chip to non-financial roles", () => {
@@ -265,7 +264,7 @@ describe("buildPriorityChips", () => {
     expect(chips.find((c) => c.key === "open_invoices")).toBeUndefined();
   });
 
-  it("suppresses need-scheduling chip when it is the primary action focus", () => {
+  it("keeps a live Ops queue visible even when it is the primary action", () => {
     const chips = buildPriorityChips({
       productMode: "hybrid",
       role: "office",
@@ -275,7 +274,7 @@ describe("buildPriorityChips", () => {
       canViewBusinessPulse: false,
       primaryFocusKey: "need_scheduling",
     });
-    expect(chips.find((c) => c.key === "need_scheduling")).toBeUndefined();
+    expect(chips.find((c) => c.key === "need_scheduling")?.count).toBe(12);
     expect(chips.find((c) => c.key === "closeout")?.count).toBe(2);
   });
 
@@ -309,8 +308,8 @@ describe("buildPriorityChips", () => {
     });
 
     const keys = chips.map((c) => c.key);
-    expect(keys).toContain("open_invoices");
     expect(keys).toContain("closeout");
+    expect(keys).not.toContain("open_invoices");
     expect(keys).not.toContain("need_scheduling");
     expect(keys).not.toContain("exceptions");
     expect(keys).not.toContain("waiting");
@@ -329,7 +328,7 @@ describe("buildPriorityChips", () => {
     const withoutTech = chips.find((c) => c.key === "without_tech");
     expect(withoutTech?.count).toBe(3);
     expect(withoutTech?.urgent).toBe(true);
-    expect(withoutTech?.href).toBe("/ops");
+    expect(withoutTech?.href).toBe("/ops?bucket=without_tech#ops-workspace");
   });
 
   it("adds pending contractor intake chip for admin and office", () => {
@@ -393,7 +392,7 @@ describe("buildPriorityChips", () => {
     expect(exceptions?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });
 
-  it("maps waiting and on-hold chips to the waiting queue", () => {
+  it("combines waiting statuses into the single Ops waiting queue", () => {
     const chips = buildPriorityChips({
       productMode: "hybrid",
       role: "office",
@@ -403,7 +402,8 @@ describe("buildPriorityChips", () => {
       canViewBusinessPulse: false,
     });
     expect(chips.find((c) => c.key === "waiting")?.href).toBe("/ops?bucket=waiting#ops-workspace");
-    expect(chips.find((c) => c.key === "on_hold")?.href).toBe("/ops?bucket=waiting#ops-workspace");
+    expect(chips.find((c) => c.key === "waiting")?.count).toBe(3);
+    expect(chips.find((c) => c.key === "on_hold")).toBeUndefined();
   });
 });
 
@@ -590,9 +590,7 @@ describe("buildFollowUpGroups", () => {
     expect(groups.find((g) => g.key === "closeout")?.count).toBe(4);
     expect(groups.find((g) => g.key === "closeout")?.label).toBe("Closeout & Review");
     const openInvoiceGroup = groups.find((g) => g.key === "payments");
-    expect(openInvoiceGroup?.count).toBe(1);
-    expect(openInvoiceGroup?.label).toBe("Open Invoice Follow-Up");
-    expect(openInvoiceGroup?.href).toBe("/reports/invoices?view=open");
+    expect(openInvoiceGroup).toBeUndefined();
   });
 
   it("maps waiting, exceptions, and without-tech groups to the main Ops board", () => {
@@ -624,7 +622,7 @@ describe("buildFollowUpGroups", () => {
     expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });
 
-  it("labels service plan group as follow-up", () => {
+  it("silences service-plan counts because they are not an Ops queue", () => {
     const groups = buildFollowUpGroups({
       role: "admin",
       followUps: [],
@@ -634,7 +632,7 @@ describe("buildFollowUpGroups", () => {
       canViewBusinessPulse: true,
     });
 
-    expect(groups.find((g) => g.key === "service_plans")?.label).toBe("Service Plan Follow-Up");
+    expect(groups.find((g) => g.key === "service_plans")).toBeUndefined();
   });
 
   it("keeps repeated waiting, exceptions, and without-tech groups on the main Ops board", () => {
@@ -666,7 +664,7 @@ describe("buildFollowUpGroups", () => {
     expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });
 
-  it("labels service plan group as follow-up", () => {
+  it("does not mix service-plan counts into Ops follow-up groups", () => {
     const groups = buildFollowUpGroups({
       role: "admin",
       followUps: [],
@@ -676,7 +674,7 @@ describe("buildFollowUpGroups", () => {
       canViewBusinessPulse: true,
     });
 
-    expect(groups.find((g) => g.key === "service_plans")?.count).toBe(2);
+    expect(groups.find((g) => g.key === "service_plans")).toBeUndefined();
   });
 
   it("returns no company follow-up groups for tech role", () => {
@@ -701,7 +699,7 @@ describe("buildFollowUpGroups", () => {
     expect(groups).toEqual([]);
   });
 
-  it("limits billing follow-up groups to closeout/payments", () => {
+  it("limits billing follow-up groups to the Ops closeout queue", () => {
     const groups = buildFollowUpGroups({
       role: "billing",
       followUps: [
@@ -727,7 +725,7 @@ describe("buildFollowUpGroups", () => {
 
     const keys = groups.map((g) => g.key);
     expect(keys).toContain("closeout");
-    expect(keys).toContain("payments");
+    expect(keys).not.toContain("payments");
     expect(keys).not.toContain("scheduling");
     expect(keys).not.toContain("waiting");
     expect(keys).not.toContain("service_plans");

@@ -59,6 +59,7 @@ import {
 } from "@/lib/ops/retest-queue-exclusivity";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
+import { isContractorIntakeQueueAvailableForProductMode } from "@/lib/ops/ops-workspace-queues";
 
 const OPEN_INVOICES_REPORT_HREF = "/reports/invoices?view=open";
 // -----------------------------------------------------------------------------
@@ -659,6 +660,7 @@ async function safeLoadPriorityCounts(params: {
   onHold: number | null;
   failed: number | null;
   closeoutReady: number | null;
+  followUps: number | null;
   contractorIntake: number | null;
 }> {
   const { supabase } = params;
@@ -764,6 +766,7 @@ async function safeLoadPriorityCounts(params: {
     onHold,
     failed,
     closeoutReady,
+    followUps,
     contractorIntake,
   ] = await Promise.all([
     scheduledTodayWithoutTechPromise,
@@ -788,6 +791,11 @@ async function safeLoadPriorityCounts(params: {
     ),
     exceptionCountPromise,
     closeoutCountPromise,
+    safeCount(supabase, "jobs", (q) =>
+      base(q)
+        .neq("status", "cancelled")
+        .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null"),
+    ),
     params.role === "admin" || params.role === "office"
       ? countPendingContractorIntakeQueueRows({
           supabase,
@@ -804,6 +812,7 @@ async function safeLoadPriorityCounts(params: {
     onHold,
     failed,
     closeoutReady,
+    followUps,
     contractorIntake,
   };
 }
@@ -1097,6 +1106,7 @@ export type NextBestActionInputs = {
     onHold: number | null;
     failed: number | null;
     closeoutReady: number | null;
+    followUps: number | null;
     contractorIntake: number | null;
   };
   openInvoiceCount: number | null;
@@ -1407,11 +1417,11 @@ export function buildFollowUpGroups(params: {
     });
   }
 
-  if (params.role !== "billing" && (schedulingCount > 0 || schedulingItems.length > 0)) {
+  if (params.role !== "billing" && schedulingCount > 0) {
     groups.push({
       key: "scheduling",
       label: "Needs Scheduling",
-      count: schedulingCount > 0 ? schedulingCount : schedulingItems.length,
+      count: schedulingCount,
       href: "/ops?bucket=pending#ops-workspace",
       preview: schedulingItems.slice(0, 3),
       summary: null,
@@ -1419,11 +1429,11 @@ export function buildFollowUpGroups(params: {
   }
 
   const closeoutCount = params.priorityCounts.closeoutReady ?? 0;
-  if (closeoutCount > 0 || closeoutItems.length > 0) {
+  if (closeoutCount > 0) {
     groups.push({
       key: "closeout",
       label: "Closeout & Review",
-      count: closeoutCount > 0 ? closeoutCount : closeoutItems.length,
+      count: closeoutCount,
       href: "/ops?bucket=closeout#ops-workspace",
       preview: closeoutItems.slice(0, 3),
       summary: closeoutItems.length === 0 ? `${closeoutCount} ${closeoutCount === 1 ? "job" : "jobs"} ready for closeout.` : null,
@@ -1431,11 +1441,11 @@ export function buildFollowUpGroups(params: {
   }
 
   const waitingCount = (params.priorityCounts.pendingInfo ?? 0) + (params.priorityCounts.onHold ?? 0);
-  if (params.role !== "billing" && (waitingCount > 0 || waitingItems.length > 0)) {
+  if (params.role !== "billing" && waitingCount > 0) {
     groups.push({
       key: "waiting",
       label: "Waiting / Pending Info",
-      count: waitingCount > 0 ? waitingCount : waitingItems.length,
+      count: waitingCount,
       href: "/ops?bucket=waiting#ops-workspace",
       preview: waitingItems.slice(0, 3),
       summary: null,
@@ -1443,36 +1453,14 @@ export function buildFollowUpGroups(params: {
   }
 
   const exceptionCount = params.priorityCounts.failed ?? 0;
-  if (params.role !== "billing" && (exceptionCount > 0 || exceptionItems.length > 0)) {
+  if (params.role !== "billing" && exceptionCount > 0) {
     groups.push({
       key: "exceptions",
       label: "Exceptions",
-      count: exceptionCount > 0 ? exceptionCount : exceptionItems.length,
+      count: exceptionCount,
       href: "/ops?bucket=exceptions#ops-workspace",
       preview: exceptionItems.slice(0, 3),
       summary: null,
-    });
-  }
-
-  if ((params.servicePlansOverdue ?? 0) > 0 && params.role === "admin") {
-    groups.push({
-      key: "service_plans",
-      label: "Service Plan Follow-Up",
-      count: params.servicePlansOverdue ?? 0,
-      href: "/service-plans",
-      preview: [],
-      summary: `${params.servicePlansOverdue} overdue ${params.servicePlansOverdue === 1 ? "plan" : "plans"}.`,
-    });
-  }
-
-  if (params.canViewBusinessPulse && (params.openInvoiceCount ?? 0) > 0) {
-    groups.push({
-      key: "payments",
-      label: "Open Invoice Follow-Up",
-      count: params.openInvoiceCount ?? 0,
-      href: OPEN_INVOICES_REPORT_HREF,
-      preview: [],
-      summary: `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice" : "invoices"} awaiting payment follow-up.`,
     });
   }
 
@@ -1492,126 +1480,84 @@ export function buildPriorityChips(params: {
   canViewBusinessPulse: boolean;
   primaryFocusKey?: NextBestAction["focusKey"];
 }): PriorityChip[] {
-  const surfaceProfile = resolveProductSurfaceProfile(params.productMode);
   if (params.role === "tech") {
     return [];
   }
 
   const chips: PriorityChip[] = [];
-  const focusKey = params.primaryFocusKey ?? null;
-
-  const pushChip = (chip: PriorityChip) => {
-    if (focusKey && chip.key === focusKey) {
-      return;
-    }
-    chips.push(chip);
+  const pushQueue = (queue: PriorityChip) => {
+    if (queue.count > 0) chips.push(queue);
   };
 
-  if (params.role !== "billing" && (params.priorityCounts.needScheduling ?? 0) > 0) {
-    pushChip({
+  if (params.role !== "billing") {
+    pushQueue({
       key: "need_scheduling",
-      label: "Start Here: Scheduling",
+      label: "Needs Scheduling",
       count: params.priorityCounts.needScheduling ?? 0,
-      href: "/ops?bucket=pending#ops-workspace",
+      href: "/ops/call-list",
       tone: "warn",
       urgent: (params.priorityCounts.needScheduling ?? 0) >= 5,
     });
-  }
-
-  if (
-    (params.role === "admin" || params.role === "office") &&
-    (params.priorityCounts.contractorIntake ?? 0) > 0
-  ) {
-    pushChip({
-      key: "contractor_intake",
-      label: "Contractor Intake",
-      count: params.priorityCounts.contractorIntake ?? 0,
-      href: "/ops?bucket=contractor_intake#ops-workspace",
+    pushQueue({
+      key: "field_work",
+      label: "Field Work",
+      count: params.priorityCounts.scheduledToday ?? 0,
+      href: "/ops/field",
       tone: "info",
       urgent: false,
     });
-  }
-
-  if (params.role !== "billing" && (params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0) {
-    pushChip({
+    pushQueue({
       key: "without_tech",
-      label: `Without ${surfaceProfile.labels.fieldUser}`,
+      label: "Needs Assignment",
       count: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
-      href: "/ops",
+      href: "/ops?bucket=without_tech#ops-workspace",
       tone: "warn",
       urgent: true,
     });
-  }
-
-  if (params.role !== "billing" && (params.priorityCounts.failed ?? 0) > 0) {
-    pushChip({
+    if (isContractorIntakeQueueAvailableForProductMode(params.productMode)) {
+      pushQueue({
+        key: "contractor_intake",
+        label: "Contractor Intake",
+        count: params.priorityCounts.contractorIntake ?? 0,
+        href: "/ops?bucket=contractor_intake#ops-workspace",
+        tone: "info",
+        urgent: false,
+      });
+    }
+    pushQueue({
+      key: "waiting",
+      label: "Waiting / Pending Info",
+      count: (params.priorityCounts.pendingInfo ?? 0) + (params.priorityCounts.onHold ?? 0),
+      href: "/ops?bucket=waiting#ops-workspace",
+      tone: "neutral",
+      urgent: false,
+    });
+    pushQueue({
       key: "exceptions",
-      label: "Needs Attention",
+      label: "Exceptions",
       count: params.priorityCounts.failed ?? 0,
       href: "/ops?bucket=exceptions#ops-workspace",
       tone: "danger",
       urgent: true,
     });
-  }
-
-  if (params.role !== "billing" && (params.priorityCounts.pendingInfo ?? 0) > 0) {
-    pushChip({
-      key: "waiting",
-      label: "Waiting on Info",
-      count: params.priorityCounts.pendingInfo ?? 0,
-      href: "/ops?bucket=waiting#ops-workspace",
+    pushQueue({
+      key: "follow_ups",
+      label: "Follow Ups",
+      count: params.priorityCounts.followUps ?? 0,
+      href: "/ops?bucket=follow_ups#ops-workspace",
       tone: "neutral",
       urgent: false,
     });
   }
 
-  if (params.role !== "billing" && (params.priorityCounts.onHold ?? 0) > 0) {
-    pushChip({
-      key: "on_hold",
-      label: "On Hold",
-      count: params.priorityCounts.onHold ?? 0,
-      href: "/ops?bucket=waiting#ops-workspace",
-      tone: "neutral",
-      urgent: false,
-    });
-  }
-
-  if ((params.priorityCounts.closeoutReady ?? 0) > 0) {
-    pushChip({
+  pushQueue({
       key: "closeout",
-      label: "Next: Closeout",
+      label: "Closeout & Review",
       count: params.priorityCounts.closeoutReady ?? 0,
-      href: "/ops?bucket=closeout#ops-workspace",
+      href: "/ops/closeout-queue",
       tone: "info",
       urgent: false,
-    });
-  }
-
-  if (
-    params.role === "admin" &&
-    params.productMode !== "ecc_hers" &&
-    (params.servicePlansOverdue ?? 0) > 0
-  ) {
-    pushChip({
-      key: "service_plans_due",
-      label: "Service Plans Due",
-      count: params.servicePlansOverdue ?? 0,
-      href: "/service-plans",
-      tone: "warn",
-      urgent: false,
-    });
-  }
-
-  if (params.canViewBusinessPulse && (params.openInvoiceCount ?? 0) > 0) {
-    pushChip({
-      key: "open_invoices",
-      label: "Money: Open Invoices",
-      count: params.openInvoiceCount ?? 0,
-      href: OPEN_INVOICES_REPORT_HREF,
-      tone: "info",
-      urgent: false,
-    });
-  }
+  });
 
   return chips;
 }
