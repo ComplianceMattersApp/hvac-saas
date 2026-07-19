@@ -1,6 +1,8 @@
 // components/jobs/JobCoreFields
 "use client";
 
+import ServiceLocationAddressFields from "@/components/addresses/ServiceLocationAddressFields";
+
 type Props = {
   mode: "internal" | "external";
   titleRequired?: boolean;
@@ -142,37 +144,53 @@ export default function JobCoreFields({
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
           <div className="text-sm font-semibold text-slate-900">Service Location</div>
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-slate-900">Address</label>
-            <input
-              type="text"
-              name="address_line1"
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
-              required
-            />
-          </div>
+          {mode === "external" ? (
+            <ServiceLocationAddressFields showAddressLine2={false} />
+          ) : (
+            <>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-900">Address</label>
+                <input
+                  type="text"
+                  name="address_line1"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                  required
+                />
+              </div>
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-slate-900">City</label>
-            <input
-              type="text"
-              name="city"
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
-              required
-            />
-          </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-900">City</label>
+                  <input
+                    type="text"
+                    name="city"
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-sm font-medium text-slate-900">State</label>
+                  <input
+                    type="text"
+                    name="state"
+                    maxLength={2}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                    required
+                  />
+                </div>
+              </div>
 
-          <div className="space-y-1">
-            <label className="block text-sm font-medium text-slate-900">ZIP Code</label>
-            <input
-              type="text"
-              name="zip"
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
-              required
-            />
-          </div>
-
-          <input type="hidden" name="state" value="CA" />
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-900">ZIP Code</label>
+                <input
+                  type="text"
+                  name="zip"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                  required
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 

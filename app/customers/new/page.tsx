@@ -4,6 +4,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { createCustomerOnlyFromForm } from "@/lib/actions/customer-actions";
+import ServiceLocationAddressFields from "@/components/addresses/ServiceLocationAddressFields";
 import SubmitButton from "@/components/SubmitButton";
 
 export const metadata = { title: "New Customer" };
@@ -135,39 +136,7 @@ export default async function NewCustomerPage() {
             <p className="mb-4 text-xs text-slate-400">
               Optional. Leave blank to add a location later from the customer profile.
             </p>
-            <div className="space-y-3">
-              <input
-                name="address_line1"
-                type="text"
-                autoComplete="address-line1"
-                placeholder="Address line 1"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <input
-                  name="city"
-                  type="text"
-                  autoComplete="address-level2"
-                  placeholder="City"
-                  className="col-span-2 sm:col-span-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <input
-                  name="state"
-                  type="text"
-                  autoComplete="address-level1"
-                  placeholder="State"
-                  maxLength={2}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-                <input
-                  name="zip"
-                  type="text"
-                  autoComplete="postal-code"
-                  placeholder="ZIP"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+            <ServiceLocationAddressFields required={false} showAddressLine2={false} />
           </section>
 
           {/* Actions */}

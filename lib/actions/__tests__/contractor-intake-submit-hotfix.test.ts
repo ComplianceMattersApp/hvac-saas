@@ -329,7 +329,7 @@ describe("contractor intake submit hotfix", () => {
     ).toBeUndefined();
   });
 
-  it("succeeds with proposed_state=CA when state field is missing from form (stale browser cache regression)", async () => {
+  it("rejects a contractor proposal when the nationwide state field is missing", async () => {
     const fixture = buildFixture({
       userId: "contractor-user-1",
       contractorMembershipId: "ctr-1",
@@ -340,17 +340,12 @@ describe("contractor intake submit hotfix", () => {
 
     const { createJobFromForm } = await import("@/lib/actions/job-actions");
 
-    // Simulate stale bundle: state field not posted at all
+    // State is nationwide and required; it must never silently fall back to CA.
     await expect(
       createJobFromForm(buildContractorProposalFormData({ state: "" })),
-    ).rejects.toThrow("REDIRECT:/jobs/new?err=contractor_proposal_submitted&proposal_id=proposal-1");
+    ).rejects.toThrow("REDIRECT:/jobs/new?err=contractor_proposal_invalid_input");
 
-    expect(fixture.proposalInsertPayloads).toHaveLength(1);
-    expect(fixture.proposalInsertPayloads[0]).toEqual(
-      expect.objectContaining({
-        proposed_state: "CA",
-      }),
-    );
+    expect(fixture.proposalInsertPayloads).toHaveLength(0);
   });
 
   it("denies unauthorized user before writes", async () => {

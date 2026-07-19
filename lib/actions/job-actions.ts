@@ -8987,7 +8987,7 @@ if (!canonicalOwnerUserId) {
   const state =
     postedState ||
     String(existingLocationSnapshot?.state ?? "").trim() ||
-    (isContractorUser ? "CA" : null);
+    null;
 
   const jobAddressRaw = address_line1;
 

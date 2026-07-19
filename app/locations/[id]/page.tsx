@@ -7,6 +7,7 @@ import {
   requireInternalUser,
 } from "@/lib/auth/internal-user";
 import { updateLocationServiceAddressFromForm } from "./notes-actions";
+import ServiceLocationAddressFields from "@/components/addresses/ServiceLocationAddressFields";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 function isUuid(v: string) {
@@ -417,50 +418,17 @@ export default async function LocationDetailPage(props: {
                 className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
               />
             </label>
-            <label className="grid gap-1 text-sm font-medium text-gray-700 sm:col-span-2">
-              Address Line 1
-              <input
-                name="address_line1"
-                required
-                defaultValue={(location as any).address_line1 ?? ""}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-gray-700 sm:col-span-2">
-              Address Line 2
-              <input
-                name="address_line2"
-                defaultValue={(location as any).address_line2 ?? ""}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-gray-700">
-              City
-              <input
-                name="city"
-                required
-                defaultValue={(location as any).city ?? ""}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-gray-700">
-              State
-              <input
-                name="state"
-                required
-                defaultValue={(location as any).state ?? ""}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-medium text-gray-700">
-              Zip / Postal Code
-              <input
-                name="zip"
-                required
-                defaultValue={(location as any).zip ?? (location as any).postal_code ?? ""}
-                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-              />
-            </label>
+            <ServiceLocationAddressFields
+              className="sm:col-span-2"
+              tone="muted"
+              initialValues={{
+                addressLine1: String(location.address_line1 ?? ""),
+                addressLine2: String(location.address_line2 ?? ""),
+                city: String(location.city ?? ""),
+                state: String(location.state ?? ""),
+                zip: String(location.zip ?? location.postal_code ?? ""),
+              }}
+            />
           </div>
 
           <label className="grid gap-1 text-sm font-medium text-gray-700">

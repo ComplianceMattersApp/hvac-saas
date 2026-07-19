@@ -10,6 +10,10 @@ const locationPageSource = readFileSync(
   resolve(__dirname, "../../../app/locations/[id]/page.tsx"),
   "utf8",
 );
+const serviceLocationAddressFieldsSource = readFileSync(
+  resolve(__dirname, "../../../components/addresses/ServiceLocationAddressFields.tsx"),
+  "utf8",
+);
 const customerActionsSource = readFileSync(
   resolve(__dirname, "../customer-actions.ts"),
   "utf8",
@@ -309,11 +313,12 @@ describe("location service address page wiring", () => {
       "This saved service address is used by existing jobs. Correcting it updates the saved customer location and future job creation. Completed job snapshots are not bulk-rewritten.",
     );
     expect(locationPageSource).toContain("action={updateLocationServiceAddressFromForm}");
-    expect(locationPageSource).toContain('name="address_line1"');
-    expect(locationPageSource).toContain('name="address_line2"');
-    expect(locationPageSource).toContain('name="city"');
-    expect(locationPageSource).toContain('name="state"');
-    expect(locationPageSource).toContain('name="zip"');
+    expect(locationPageSource).toContain("<ServiceLocationAddressFields");
+    expect(serviceLocationAddressFieldsSource).toContain('name="address_line1"');
+    expect(serviceLocationAddressFieldsSource).toContain('name="address_line2"');
+    expect(serviceLocationAddressFieldsSource).toContain('name="city"');
+    expect(serviceLocationAddressFieldsSource).toContain('name="state"');
+    expect(serviceLocationAddressFieldsSource).toContain('name="zip"');
     expect(locationPageSource).toContain('name="notes"');
   });
 

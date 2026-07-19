@@ -13,6 +13,7 @@ import {
   updateCustomerNotesFromForm,
 } from "@/lib/actions/customer-actions";
 import { updateLocationServiceAddressFromForm } from "@/app/locations/[id]/notes-actions";
+import ServiceLocationAddressFields from "@/components/addresses/ServiceLocationAddressFields";
 import { startCustomerSavedPaymentMethodSetupFromForm } from "@/lib/actions/customer-saved-payment-method-actions";
 import {
   addCustomerRoleContactFromForm,
@@ -2535,53 +2536,9 @@ export default async function CustomerDetailPage(props: {
                       />
                     </label>
                   </div>
-                  <label className="grid gap-1 text-xs font-medium text-slate-600">
-                    Address Line 1
-                    <input
-                      name="address_line1"
-                      required
-                      autoComplete="address-line1"
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-medium text-slate-600">
-                    Address Line 2
-                    <input
-                      name="address_line2"
-                      autoComplete="address-line2"
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                    />
-                  </label>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-1">
-                      City
-                      <input
-                        name="city"
-                        required
-                        autoComplete="address-level2"
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-medium text-slate-600">
-                      State
-                      <input
-                        name="state"
-                        required
-                        defaultValue="CA"
-                        autoComplete="address-level1"
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-medium text-slate-600">
-                      Zip
-                      <input
-                        name="zip"
-                        required
-                        autoComplete="postal-code"
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                      />
-                    </label>
-                  </div>
+                  <ServiceLocationAddressFields
+                    compact
+                  />
                   <label className="grid gap-1 text-xs font-medium text-slate-600">
                     Notes
                     <textarea
@@ -2802,50 +2759,17 @@ export default async function CustomerDetailPage(props: {
                                     className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
                                   />
                                 </label>
-                                <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
-                                  Address Line 1
-                                  <input
-                                    name="address_line1"
-                                    required
-                                    defaultValue={String(loc.address_line1 ?? "")}
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                  />
-                                </label>
-                                <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
-                                  Address Line 2
-                                  <input
-                                    name="address_line2"
-                                    defaultValue={String(loc.address_line2 ?? "")}
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                  />
-                                </label>
-                                <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                  City
-                                  <input
-                                    name="city"
-                                    required
-                                    defaultValue={String(loc.city ?? "")}
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                  />
-                                </label>
-                                <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                  State
-                                  <input
-                                    name="state"
-                                    required
-                                    defaultValue={String(loc.state ?? "")}
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                  />
-                                </label>
-                                <label className="grid gap-1 text-xs font-medium text-slate-600">
-                                  Zip
-                                  <input
-                                    name="zip"
-                                    required
-                                    defaultValue={String(loc.zip ?? loc.postal_code ?? "")}
-                                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
-                                  />
-                                </label>
+                                <ServiceLocationAddressFields
+                                  compact
+                                  className="sm:col-span-2"
+                                  initialValues={{
+                                    addressLine1: String(loc.address_line1 ?? ""),
+                                    addressLine2: String(loc.address_line2 ?? ""),
+                                    city: String(loc.city ?? ""),
+                                    state: String(loc.state ?? ""),
+                                    zip: String(loc.zip ?? loc.postal_code ?? ""),
+                                  }}
+                                />
                                 <label className="grid gap-1 text-xs font-medium text-slate-600 sm:col-span-2">
                                   Notes
                                   <textarea
