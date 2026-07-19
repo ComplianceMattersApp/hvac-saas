@@ -10,6 +10,10 @@ const paymentHistoryCardSource = readFileSync(
   resolve(__dirname, "../../../app/customers/[id]/_components/PaymentHistoryCard.tsx"),
   "utf8",
 );
+const servicePlanWorkspaceSource = readFileSync(
+  resolve(__dirname, "../../../components/maintenance-agreements/CustomerServicePlanWorkspace.tsx"),
+  "utf8",
+);
 const locationsContactsTabSource =
   customerPageSource.match(/activeWorkspaceTab === "locations-contacts"[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
 
@@ -132,6 +136,18 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain('name="location_id" value={locId}');
     expect(customerPageSource).toContain('href={`/locations/${locId}`}');
     expect(customerPageSource).toContain("Edit Service Address");
+  });
+
+  it("uses a compact responsive service-plan master-detail workspace", () => {
+    expect(customerPageSource).toContain("CustomerServicePlanWorkspace");
+    expect(customerPageSource).toContain("CustomerServicePlanDetail");
+    expect(customerPageSource).toContain('title="Plan details"');
+    expect(customerPageSource).toContain('title="Billing"');
+    expect(customerPageSource).toContain('title="Manage plan"');
+    expect(servicePlanWorkspaceSource).toContain("lg:grid-cols-[minmax(260px,320px)_minmax(0,1fr)]");
+    expect(servicePlanWorkspaceSource).toContain("overflow-x-auto");
+    expect(servicePlanWorkspaceSource).toContain("lg:sticky lg:top-24");
+    expect(servicePlanWorkspaceSource).toContain('url.searchParams.set("maFocus", id)');
   });
 
   it("keeps payment and service-plan controls out of Locations & Contacts tab", () => {

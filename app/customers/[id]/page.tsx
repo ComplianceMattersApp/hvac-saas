@@ -77,6 +77,11 @@ import {
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
 import { ServicePlanCreateFlow } from "@/components/maintenance-agreements/ServicePlanCreateFlow";
 import ServicePlanTerminalActions from "@/components/maintenance-agreements/ServicePlanTerminalActions";
+import {
+  CustomerServicePlanDetail,
+  CustomerServicePlanWorkspace,
+  type CustomerServicePlanNavItem,
+} from "@/components/maintenance-agreements/CustomerServicePlanWorkspace";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
@@ -1357,6 +1362,23 @@ export default async function CustomerDetailPage(props: {
     .map((agreement) => String(agreement.next_due_date ?? "").trim())
     .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
     .sort()[0] ?? null;
+  const customerServicePlanNavItems: CustomerServicePlanNavItem[] = customerAgreements.map((agreement) => ({
+    id: String(agreement.id),
+    name: String(agreement.agreement_name ?? "Untitled Service Plan"),
+    status: String(agreement.status ?? "draft"),
+    frequency: String(agreement.frequency ?? ""),
+    nextDueDate: String(agreement.next_due_date ?? "").trim() || null,
+    dueState: classifyMaintenanceAgreementDueState({
+      status: agreement.status,
+      nextDueDate: agreement.next_due_date,
+    }),
+  }));
+  const defaultCustomerServicePlanId =
+    customerServicePlanNavItems.find((plan) => plan.id === maintenanceAgreementFocusId)?.id ??
+    customerServicePlanNavItems.find((plan) => plan.dueState === "overdue" || plan.dueState === "due_today")?.id ??
+    customerServicePlanNavItems.find((plan) => plan.status === "active")?.id ??
+    customerServicePlanNavItems[0]?.id ??
+    null;
 
   const createBillingPeriodAction = createMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
   const updateBillingPeriodAction = updateMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
@@ -3327,7 +3349,7 @@ export default async function CustomerDetailPage(props: {
         {/* Maintenance Agreements — internal only, visible when ENABLE_MAINTENANCE_AGREEMENTS is on */}
         <WorkspaceTabPanel id="service-plans">
         {isInternalViewer && maintenanceAgreementsEnabled ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-navy">Maintenance Agreements</h2>
               <p className="mt-0.5 text-sm text-slate-500">
@@ -3335,14 +3357,14 @@ export default async function CustomerDetailPage(props: {
               </p>
             </div>
 
-            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-4">
               <div className="mb-3">
                 <h3 className="text-sm font-semibold text-navy">Service Plan Overview</h3>
                 <p className="mt-1 text-xs text-slate-600">
                   Plan status and billing-period health at a glance.
                 </p>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
                 <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Active Plans</div>
                   <div className="mt-1 text-base font-semibold text-slate-900">{activeServicePlanCount}</div>
@@ -3351,18 +3373,22 @@ export default async function CustomerDetailPage(props: {
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Next Due</div>
                   <div className="mt-1 text-base font-semibold text-slate-900">{nextServicePlanDueDate ? formatDate(nextServicePlanDueDate) : "Not scheduled"}</div>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Billing Attention</div>
-                  <div className="mt-1 text-base font-semibold text-slate-900">{billingPeriodsNeedingAttentionCount}</div>
-                  <div className="mt-1 text-xs text-slate-600">
-                    {linkedBillingPeriodCount} linked • {paidBillingPeriodCount} paid
+                {billingPeriodsNeedingAttentionCount > 0 ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Billing Attention</div>
+                    <div className="mt-1 text-base font-semibold text-slate-900">{billingPeriodsNeedingAttentionCount}</div>
+                    <div className="mt-1 text-xs text-slate-600">
+                      {linkedBillingPeriodCount} linked • {paidBillingPeriodCount} paid
+                    </div>
                   </div>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Scheduling</div>
-                  <div className="mt-1 text-base font-semibold text-slate-900">{overdueServicePlanCount} overdue</div>
-                  <div className="mt-1 text-xs text-slate-600">{notScheduledServicePlanCount} not scheduled</div>
-                </div>
+                ) : null}
+                {overdueServicePlanCount > 0 || notScheduledServicePlanCount > 0 ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Scheduling</div>
+                    <div className="mt-1 text-base font-semibold text-slate-900">{overdueServicePlanCount} overdue</div>
+                    <div className="mt-1 text-xs text-slate-600">{notScheduledServicePlanCount} not scheduled</div>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -3385,7 +3411,10 @@ export default async function CustomerDetailPage(props: {
                 <p className="mt-1 text-xs text-slate-400">Use the Add service plan button above to create one.</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <CustomerServicePlanWorkspace
+                plans={customerServicePlanNavItems}
+                initialSelectedId={defaultCustomerServicePlanId}
+              >
                 {customerAgreements.map((agr) => {
                   const normalizedAgreementType = String(agr.agreement_type).replace(/_/g, " ");
                   const normalizedFrequency = String(agr.frequency).replace(/_/g, " ");
@@ -3469,8 +3498,8 @@ export default async function CustomerDetailPage(props: {
                   const agreementBillingPeriods = billingPeriodsByAgreementId.get(agr.id) ?? [];
 
                   return (
+                    <CustomerServicePlanDetail key={agr.id} id={agr.id}>
                     <div
-                      key={agr.id}
                       id={`maintenance-agreement-${agr.id}`}
                       className={[
                         "rounded-xl border bg-slate-50 px-4 py-3 scroll-mt-24",
@@ -3538,7 +3567,7 @@ export default async function CustomerDetailPage(props: {
                           {agr.status !== "cancelled" && agr.status !== "expired" ? (
                             <Link
                               href={`/jobs/new?source=customer&customer_id=${customerId}&maintenance_agreement_id=${agr.id}`}
-                              className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                              className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
                             >
                               Create Work Order
                             </Link>
@@ -3562,8 +3591,11 @@ export default async function CustomerDetailPage(props: {
                         </div>
                       ) : null}
 
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">
-                        <SectionEyebrow>Plan Snapshot</SectionEyebrow>
+                      <Disclosure
+                        title="Plan details"
+                        subtitle="Dates, location, included work, checklist, and template source."
+                        className="mt-3"
+                      >
                         <dl className="mt-2 grid gap-x-3 gap-y-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
                           <div>
                             <dt className="font-medium text-slate-500">Plan</dt>
@@ -3685,9 +3717,13 @@ export default async function CustomerDetailPage(props: {
                             </div>
                           </div>
                         ) : null}
-                      </div>
+                      </Disclosure>
 
-                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">
+                      <Disclosure
+                        title="Billing"
+                        subtitle={`${agreementBillingPeriods.length} billing ${agreementBillingPeriods.length === 1 ? "period" : "periods"}`}
+                        className="mt-3"
+                      >
                         <div>
                           <SectionEyebrow>Billing Periods</SectionEyebrow>
                           <p className="mt-1 text-xs text-slate-500">
@@ -4290,9 +4326,13 @@ export default async function CustomerDetailPage(props: {
                             Billing-period mutation controls are hidden for this viewer.
                           </div>
                         )}
-                      </div>
+                      </Disclosure>
 
-                      <Disclosure title="Edit Plan & Work" className="mt-3">
+                      <Disclosure
+                        title="Manage plan"
+                        subtitle="Edit plan details or use lifecycle controls."
+                        className="mt-3"
+                      >
                         <form action={updateAgreementAction} className="grid gap-3 md:grid-cols-2">
                           <input type="hidden" name="agreement_id" value={agr.id} />
                           <input type="hidden" name="customer_id" value={customerId} />
@@ -4595,19 +4635,19 @@ export default async function CustomerDetailPage(props: {
                             </button>
                           </div>
                         </form>
+                        <ServicePlanTerminalActions
+                          agreementId={agr.id}
+                          status={String(agr.status ?? "")}
+                          cancelAction={cancelMaintenanceAgreementFromForm}
+                          deleteAction={deleteMaintenanceAgreementDraftFromForm}
+                        />
                       </Disclosure>
-
-                      <ServicePlanTerminalActions
-                        agreementId={agr.id}
-                        status={String(agr.status ?? "")}
-                        cancelAction={cancelMaintenanceAgreementFromForm}
-                        deleteAction={deleteMaintenanceAgreementDraftFromForm}
-                      />
                       </div>
                     </div>
+                    </CustomerServicePlanDetail>
                   );
                 })}
-              </div>
+              </CustomerServicePlanWorkspace>
             )}
           </section>
         ) : null}
