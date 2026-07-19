@@ -462,3 +462,46 @@ Focused Slice E validation passed 4 files / 23 tests. The broad address, contrac
 The restricted-key real-provider smoke previously confirmed the shared assistant, nationwide selection, current `gmp-select` event contract, and single stable script on the internal surface. The same shared loader/component/island is reused for contractor intake. Codex did not independently perform contractor-authenticated desktop/mobile/keyboard/touch/attribution smoke or the temporary missing-key restart sequence; no contractor browser session was available, so those checks remain explicit owner review items and are not claimed as passed. Automated loader tests continue to prove missing-key no-insertion behavior, provider-failure fallback, single-flight loading, transient retry, and retry after failure.
 
 No schema, migration, database, Google Cloud, deployed environment, estimate, billing-address, callback, business-address, or production configuration change occurred. `PlaceAutocompleteElement` remains recommended because the contractor surface reuses the already-hardened integration without a second loader or provider data path. Slice E is complete; stop here pending owner browser review and explicit merge or further-hardening direction.
+
+## Final hardening and merge readiness — 2026-07-19
+
+All planned V1 implementation slices are complete. Wired surfaces are internal `/jobs/new` new-customer/new-location and existing-customer/new-location modes, `/customers/new` optional initial location, Customer Profile Add Location and Edit Service Address, `/locations/[id]`, and contractor-authenticated `/jobs/new` new service-address entry. Existing saved-location reuse remains assistant-free. Estimates, billing/mailing addresses, callbacks/returns, business/account addresses, read-only displays, and internal contractor-intake finalization remain explicitly unwired.
+
+### Browser evidence
+
+- Owner-performed internal desktop smoke confirmed Google suggestions, a non-California South Carolina selection, street/city/state/ZIP+4 population, editable fields, the promoted search panel, and manual fallback.
+- Owner-performed contractor-authenticated portal smoke confirmed the Google assistant appears and autofill works in contractor intake.
+- Earlier owner console diagnostics confirmed the stable script element exists, `google.maps.importLibrary("places")` succeeds, `PlaceAutocompleteElement` is constructible, and the custom element registers. Codex verified the configured value reaches the served client chunk without printing it.
+- Contractor mobile width, keyboard traversal/selection, touch selection, attribution visibility, full submit-plus-attachment browser flow, and repeated route mount/unmount console inspection were not specifically reported by the owner and were not independently executable by Codex. They remain recommended acceptance checks, not claimed results.
+- The temporary missing-key restart was not performed because it would require interrupting and mutating the owner's active local development environment. Automated loader tests prove an absent key returns `missing_key`, inserts no script, and leaves every shared manual field rendered; provider rejection and retry paths are also covered. A manual restart check remains recommended before production configuration.
+
+### Final automated and build validation
+
+The final combined suite passed 35 files / 249 tests covering parser/loader/shared fields, every wired route contract, customer and location creation/edit actions, duplicate handling, location ownership, billing synchronization, invoice address rendering, relationship intake, contractor proposal truth, attachment resilience, finalization, contact-candidate handling, product modes, and new-job defaults. `npx.cmd tsc --noEmit`, focused ESLint, and `git diff --check` passed. `npm.cmd run build` passed with Next.js 16.2.2: compilation, TypeScript, page-data collection, and generation of all 98 static pages completed successfully. The active `/jobs/new` development route remained healthy after the build.
+
+Known unrelated baseline findings remain the previously recorded stale Step 5 source assertions and the job-service-location source-string assertion that scans an entire shared action file; neither asserted source was changed by this feature. Legacy full-file lint findings outside the changed blocks remain out of scope.
+
+### Full feature-diff security and scope review
+
+The complete `main...feature/google-address-autocomplete-v1` diff contains 22 expected files. No key-shaped literal exists in the full diff or any feature commit patch. No environment, schema, migration, generated, temporary, estimate, billing-address, production-configuration, or `.claude/` file is included. Provider metadata terms occur only in documentation/tests that prohibit persistence; no Place ID, coordinates, raw components, or provider payload assignment was added. `GOOGLE_MAPS_API_KEY` is mentioned only to document separation and was not changed in code or configuration. The browser loader reads only `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`, loads on demand, and retains one stable script ID and single-flight promise.
+
+### Production configuration checklist — document only
+
+- Create a dedicated production browser key; do not reuse the local development key or `GOOGLE_MAPS_API_KEY`.
+- Restrict the key by exact production HTTP referrer origins. Do not use broad wildcard origins unless explicitly reviewed.
+- Restrict APIs to Maps JavaScript API and Places API (New) only.
+- Add the secret value to Vercel Production as `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY`; never add it to tracked files or documentation.
+- Keep preview deployments manual-only unless a separately restricted preview key is intentionally created.
+- Configure peak-aware quota limits, billing budgets, threshold alerts, and verified alert recipients.
+- Redeploy after the production environment value is configured.
+- After deployment, smoke internal and contractor new-address entry, nationwide selection, keyboard/mobile behavior, attribution, one-script behavior, console cleanliness, and manual fallback.
+
+### Rollback checklist
+
+1. Remove `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_API_KEY` from the deployed environment and redeploy. The assistant becomes unavailable while canonical manual entry remains usable.
+2. If code removal is necessary, revert the feature commits or the eventual feature merge commit and redeploy.
+3. No schema or migration rollback exists. No database backfill, record cleanup, or provider-data deletion is required because stored customer/location/proposal records contain only ordinary canonical address fields.
+
+### Verdict
+
+The branch is code- and regression-ready for review and merge. The remaining manual checks—contractor/internal mobile, keyboard/touch, attribution, and missing-key restart—are deployment-readiness confidence checks rather than known defects. Given this repository's recent history, the recommended integration is an explicit non-fast-forward merge commit from `feature/google-address-autocomplete-v1` into an up-to-date `main`, preserving the coherent slice commits and providing one revert point. Do not merge until the owner explicitly authorizes it.
