@@ -1,6 +1,6 @@
 # Internal Invoice PDF Delivery V1 — Audit and Implementation Plan
 
-Status: Slice E complete; hard-gated before final quality/smoke closeout
+Status: Implementation complete; controlled authenticated/provider smoke pending
 Date: 2026-07-19  
 Scope: Audit and planning only; no application, schema, dependency, environment, or production changes
 
@@ -185,7 +185,7 @@ Existing test conventions to extend include `lib/actions/__tests__/internal-invo
 | C — download route and workspace action | Complete | Authenticated scoped route, workspace CTA, and focused validation complete |
 | D — send/resend attachment | Complete | Shared delivery helper and provider abstraction now require one current PDF |
 | E — history and observability | Complete | Existing payload metadata and compact backward-compatible UI indicator implemented |
-| F — quality, smoke, docs, closeout | Not started | Requires Slice E closeout approval |
+| F — quality, smoke, docs, closeout | Complete for automated/local-safe scope | Controlled authenticated download and provider-backed recipient smoke remain operator-gated |
 
 ## 11. Slice A closeout
 
@@ -369,3 +369,45 @@ Date: 2026-07-19
 - Slice F remains: consolidated automated validation, controlled local/manual smoke where feasible, final documentation and boundary confirmation.
 - No real customer email or production mutation is authorized by this closeout.
 - Stop for owner review before Slice F.
+
+## 16. Slice F quality, smoke, and closeout
+
+Date: 2026-07-19
+
+### Consolidated automated validation
+
+- Invoice/PDF/email/payment/access regression run: 19 files, 268 tests passed.
+- Covered PDF model/rendering, filename safety, download route scope/headers/failure, initial send, resend, compound issue/send, premium HTML/text and payment-link preservation, generation/provider failures, delivery metadata/history compatibility, invoice payments, payment allocations, financial access, field-billing access, print/workspace wiring, and same-account hardening.
+- Additional local-safe PDF variant smoke: paid, partially paid, normal invoice, 45-line multi-page invoice, long descriptions/names/locations, missing optional billing fields, no logo, and failed remote-logo fallback all produced valid PDF buffers.
+- Production `next build --webpack`: passed; Next registered `/jobs/[id]/invoice/pdf` as a dynamic server route and completed compilation, TypeScript, trace collection, and 98-page static generation.
+- Sequential `npx.cmd tsc --noEmit`: passed. An earlier parallel build/typecheck attempt produced transient missing `.next/types` files because both processes mutated/read build output concurrently; sequential rerun proved the harness race and passed.
+- Targeted ESLint across all new PDF model/renderer/provider/route/delivery modules and clean focused tests: passed.
+- `git diff --check`: to be recorded immediately before closeout commit.
+
+### Safe local smoke conclusions
+
+- Download response contract is exercised without authentication bypass: valid PDF bytes, customer-safe filename, attachment disposition, private no-store caching, content length, and `nosniff`.
+- Cross-account, missing invoice, unauthenticated, contractor/non-internal, disabled billing mode, and renderer-failure paths stop before document/provider work as applicable.
+- Multi-page output is structurally confirmed with more than one PDF page; totals are held together and repeating document/table/footer elements are renderer-controlled.
+- Email payload tests prove the premium HTML and text fallback remain present, the Pay Invoice link remains present when eligible, and exactly one current PDF buffer reaches the provider abstraction on initial send and resend.
+- Failure tests prove generation failure makes no provider call and provider failure remains failed; neither path records false sent success or stores PDF content.
+
+### Controlled smoke not falsely claimed
+
+The following require an authenticated internal browser session, representative tenant invoices, and/or an explicitly controlled email recipient. They were not executed automatically because no safe test credentials/recipient were supplied and real customer/provider delivery was not authorized:
+
+- Visual inspection of a downloaded PDF in a desktop PDF viewer and printed output.
+- Real tenant logo rendering from its signed storage URL.
+- Browser verification of the Download PDF and retained Print Invoice controls under owner/admin/billing/authorized field roles.
+- Provider-backed initial send/resend with attachment opened from the received email and Resend delivery evidence checked.
+- Human visual judgment of page breaks across representative real invoices.
+
+These are operational confirmation items, not known code failures. Use only a designated test invoice and controlled recipient; do not send a live customer invoice merely to close smoke evidence.
+
+### Final boundary confirmation
+
+No change was made to invoice totals/calculation truth, payment rows/status/allocations, Stripe checkout or saved-card behavior, job/closeout state, work items, QBO sync/mapping, estimate/proposal behavior, customer/contractor portal exposure, SMS, schema/RLS, storage buckets, environment configuration, or production data. The browser print route remains intact. No PDF artifact is persisted.
+
+### Implementation acceptance posture
+
+The code implementation and automated/local-safe acceptance criteria are complete. Final operational acceptance should be recorded after the controlled authenticated download and provider-recipient smoke above. Until then, the feature is build-validated and test-complete but not claimed as live-provider human-smoke complete.

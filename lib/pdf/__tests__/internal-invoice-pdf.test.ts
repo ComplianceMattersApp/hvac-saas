@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { InternalInvoiceDocumentModel } from "@/lib/business/internal-invoice-document";
 import { buildInternalInvoicePdfAttachment, renderInternalInvoicePdf } from "@/lib/pdf/internal-invoice-pdf";
 
@@ -40,6 +40,8 @@ function model(lineCount = 1): InternalInvoiceDocumentModel {
 }
 
 describe("internal invoice PDF renderer", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("renders a valid invoice-only PDF buffer", async () => {
     const buffer = await renderInternalInvoicePdf(model());
     expect(buffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
@@ -53,4 +55,36 @@ describe("internal invoice PDF renderer", () => {
     expect(attachment.content.subarray(0, 5).toString("ascii")).toBe("%PDF-");
     expect(attachment.content.toString("latin1")).toMatch(/\/Count\s+[2-9]/);
   }, 30_000);
+
+  it("renders paid and partially paid presentation variants", async () => {
+    const paid = model(3);
+    paid.statusLabel = "Paid";
+    paid.paymentStatus = "paid";
+    paid.amountPaidCents = paid.totalCents;
+    paid.amountPaidLabel = paid.totalLabel;
+    paid.balanceDueCents = 0;
+    paid.balanceDueLabel = "$0.00";
+
+    const partial = model(3);
+    partial.statusLabel = "Partially Paid";
+    partial.paymentStatus = "partial";
+    partial.amountPaidCents = 12500;
+    partial.amountPaidLabel = "$125.00";
+    partial.balanceDueCents = partial.totalCents - 12500;
+    partial.balanceDueLabel = "$250.00";
+
+    for (const buffer of await Promise.all([renderInternalInvoicePdf(paid), renderInternalInvoicePdf(partial)])) {
+      expect(buffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+      expect(buffer.length).toBeGreaterThan(1000);
+    }
+  }, 30_000);
+
+  it("falls back safely when the configured logo cannot be loaded", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("logo unavailable"); }));
+    const withBrokenLogo = model();
+    withBrokenLogo.business.logoUrl = "https://example.invalid/logo.png";
+    const buffer = await renderInternalInvoicePdf(withBrokenLogo);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(buffer.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  }, 20_000);
 });
