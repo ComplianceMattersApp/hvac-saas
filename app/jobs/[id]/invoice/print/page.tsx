@@ -6,42 +6,12 @@ import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/busi
 import { resolveInternalInvoiceById, resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
 import { resolveInvoiceCollectedPaymentLedger } from "@/lib/business/internal-invoice-payments";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
-import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
 import {
-  formatInvoiceBillingAddressLines,
-  formatServiceLocationAddressLines,
-} from "@/lib/business/internal-invoice-address-rendering";
+  buildInternalInvoiceDocumentModel,
+  formatInvoiceDocumentCurrencyFromAmount,
+  formatInvoiceDocumentCurrencyFromCents,
+} from "@/lib/business/internal-invoice-document";
 import PrintToolbar from "./PrintToolbar";
-
-function formatCurrencyFromCents(cents?: number | null) {
-  const amount = Number(cents ?? 0) / 100;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(Number.isFinite(amount) ? amount : 0);
-}
-
-function formatCurrencyFromAmount(amount?: number | null) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(Number(amount ?? 0) || 0);
-}
-
-function formatInvoiceDateMMDDYYYY(value?: string | null) {
-  const normalized = String(value ?? "").trim();
-  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return normalized || "N/A";
-  return `${match[2]}-${match[3]}-${match[1]}`;
-}
-
-function formatInvoiceStatus(status?: string | null) {
-  const normalized = String(status ?? "").trim().toLowerCase();
-  if (normalized === "issued") return "Issued";
-  if (normalized === "void") return "Void";
-  return "Draft";
-}
 
 export default async function InternalInvoicePrintPage({
   params,
@@ -134,38 +104,36 @@ export default async function InternalInvoicePrintPage({
     supabase,
   );
   const paymentSummary = paymentLedger.summary;
-  const customerFacingStatus = paymentSummary.paymentStatus === "paid"
-    ? "Paid"
-    : paymentSummary.paymentStatus === "partial"
-      ? "Partially Paid"
-      : formatInvoiceStatus(invoice.status);
 
   const tenantIdentity = await resolveOperationalTenantIdentity({
     accountOwnerUserId: internalUser.account_owner_user_id,
     supabase,
   });
 
-  const location = Array.isArray((job as any).locations)
-    ? (job as any).locations.find(Boolean)
-    : (job as any).locations;
-
-  const serviceLocationParts = formatServiceLocationAddressLines(location);
-  const serviceLocationLabel = serviceLocationParts.join(", ");
-
-  const customerName = formatPersonNamePart(
-    [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ") || "Customer",
-  );
-
-  const billingName = String(invoice.billing_name ?? "").trim() || customerName;
-  const billingEmail = String(invoice.billing_email ?? "").trim();
-  const billingPhone = String(invoice.billing_phone ?? "").trim();
-  const billingAddress = formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient);
-  const hasLogo = String(tenantIdentity.logoUrl ?? "").trim().length > 0;
-  const invoiceReference = formatInvoiceDisplayReference({
-    invoiceDisplayNumber: invoice.invoice_display_number,
-    invoiceNumber: invoice.invoice_number,
-    invoiceId: invoice.id,
+  const jobWithLocations = job as typeof job & {
+    locations?: Array<{ address_line1?: string | null; address_line2?: string | null; city?: string | null; state?: string | null; zip?: string | null }> | {
+      address_line1?: string | null; address_line2?: string | null; city?: string | null; state?: string | null; zip?: string | null;
+    } | null;
+  };
+  const location = Array.isArray(jobWithLocations.locations)
+    ? jobWithLocations.locations.find(Boolean)
+    : jobWithLocations.locations;
+  const documentModel = buildInternalInvoiceDocumentModel({
+    invoice,
+    job,
+    location,
+    paymentSummary,
+    tenantIdentity,
   });
+  const customerFacingStatus = documentModel.statusLabel;
+  const serviceLocationLabel = documentModel.serviceLocation;
+  const customerName = documentModel.customerName;
+  const billingName = documentModel.billing.name;
+  const billingEmail = documentModel.billing.email;
+  const billingPhone = documentModel.billing.phone;
+  const billingAddress = documentModel.billing.addressLines;
+  const hasLogo = Boolean(documentModel.business.logoUrl);
+  const invoiceReference = documentModel.invoiceReference;
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 bg-slate-50/40 p-4 text-slate-900 sm:p-6 print:max-w-none print:bg-white print:p-0">
@@ -204,7 +172,7 @@ export default async function InternalInvoicePrintPage({
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <dt>Invoice Date</dt>
-                  <dd className="font-semibold text-slate-900">{formatInvoiceDateMMDDYYYY(invoice.invoice_date)}</dd>
+                  <dd className="font-semibold text-slate-900">{documentModel.invoiceDateLabel}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <dt>Status</dt>
@@ -213,12 +181,12 @@ export default async function InternalInvoicePrintPage({
                 {paymentSummary.amountPaidCents > 0 ? (
                   <div className="flex items-center justify-between gap-4">
                     <dt>Amount Paid</dt>
-                    <dd className="font-semibold text-emerald-700">{formatCurrencyFromCents(paymentSummary.amountPaidCents)}</dd>
+                    <dd className="font-semibold text-emerald-700">{documentModel.amountPaidLabel}</dd>
                   </div>
                 ) : null}
                 <div className="flex items-center justify-between gap-4 border-t border-slate-200 pt-2 text-base print:border-slate-300">
                   <dt className="font-semibold text-slate-900">Balance Due</dt>
-                  <dd className={`font-bold ${paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : "text-slate-950"}`}>{formatCurrencyFromCents(paymentSummary.balanceDueCents)}</dd>
+                  <dd className={`font-bold ${paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : "text-slate-950"}`}>{documentModel.balanceDueLabel}</dd>
                 </div>
               </dl>
             </div>
@@ -263,11 +231,11 @@ export default async function InternalInvoicePrintPage({
                     </div>
                     <div>
                       <dt className="text-xs text-slate-500">Unit Price</dt>
-                      <dd className="mt-0.5 font-medium text-slate-900">{formatCurrencyFromAmount(lineItem.unit_price)}</dd>
+                      <dd className="mt-0.5 font-medium text-slate-900">{formatInvoiceDocumentCurrencyFromAmount(lineItem.unit_price)}</dd>
                     </div>
                     <div className="col-span-2 border-t border-slate-100 pt-2">
                       <dt className="text-xs text-slate-500">Subtotal</dt>
-                      <dd className="mt-0.5 text-base font-semibold text-slate-950">{formatCurrencyFromAmount(lineItem.line_subtotal)}</dd>
+                      <dd className="mt-0.5 text-base font-semibold text-slate-950">{formatInvoiceDocumentCurrencyFromAmount(lineItem.line_subtotal)}</dd>
                     </div>
                   </dl>
                 </article>
@@ -300,8 +268,8 @@ export default async function InternalInvoicePrintPage({
                     <div className="text-slate-700">{serviceLocationLabel || "Service location unavailable"}</div>
                     <div className="text-slate-700">{customerName}</div>
                     <div className="text-right text-slate-700">{Number(lineItem.quantity ?? 0).toFixed(2)}</div>
-                    <div className="text-right text-slate-700">{formatCurrencyFromAmount(lineItem.unit_price)}</div>
-                    <div className="text-right font-semibold text-slate-900">{formatCurrencyFromAmount(lineItem.line_subtotal)}</div>
+                    <div className="text-right text-slate-700">{formatInvoiceDocumentCurrencyFromAmount(lineItem.unit_price)}</div>
+                    <div className="text-right font-semibold text-slate-900">{formatInvoiceDocumentCurrencyFromAmount(lineItem.line_subtotal)}</div>
                   </div>
                 ))}
               </div>
@@ -309,7 +277,7 @@ export default async function InternalInvoicePrintPage({
             </div>
             <div className="flex items-center justify-end gap-6 border-t border-slate-200 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-900 print:border-slate-300 print:bg-white">
               <span>{paymentSummary.paymentStatus === "paid" ? "Paid in Full" : "Balance Due"}</span>
-              <span className={paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : undefined}>{formatCurrencyFromCents(paymentSummary.balanceDueCents)}</span>
+              <span className={paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : undefined}>{formatInvoiceDocumentCurrencyFromCents(paymentSummary.balanceDueCents)}</span>
             </div>
           </div>
 

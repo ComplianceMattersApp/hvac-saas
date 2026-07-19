@@ -9,11 +9,8 @@ const source = readFileSync(
 
 describe("internal invoice print reference wiring", () => {
   it("uses shared short invoice reference helper for primary print title and summary", () => {
-    expect(source).toContain('import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";');
-    expect(source).toContain("const invoiceReference = formatInvoiceDisplayReference({");
-    expect(source).toContain("invoiceDisplayNumber: invoice.invoice_display_number");
-    expect(source).toContain("invoiceNumber: invoice.invoice_number");
-    expect(source).toContain("invoiceId: invoice.id");
+    expect(source).toContain("buildInternalInvoiceDocumentModel");
+    expect(source).toContain("const invoiceReference = documentModel.invoiceReference;");
     expect(source).toContain("{invoiceReference}");
     expect(source).toContain("<h1");
     expect(source).not.toContain("Invoice {invoice.invoice_number}");
@@ -51,17 +48,17 @@ describe("internal invoice print reference wiring", () => {
   });
 
   it("formats billing contact details on separate lines without slash-separated contact copy", () => {
-    expect(source).toContain("const billingEmail = String(invoice.billing_email ?? \"\").trim();");
-    expect(source).toContain("const billingPhone = String(invoice.billing_phone ?? \"\").trim();");
+    expect(source).toContain("const billingEmail = documentModel.billing.email;");
+    expect(source).toContain("const billingPhone = documentModel.billing.phone;");
     expect(source).toContain("{billingEmail ? <div");
     expect(source).toContain("{billingPhone ? <div");
     expect(source).not.toContain('join(" / ")');
   });
 
   it("keeps billing recipient separate from line-level service details", () => {
-    expect(source).toContain('from "@/lib/business/internal-invoice-address-rendering";');
-    expect(source).toContain("formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient)");
-    expect(source).toContain("formatServiceLocationAddressLines(location)");
+    expect(source).toContain('from "@/lib/business/internal-invoice-document";');
+    expect(source).toContain("const billingAddress = documentModel.billing.addressLines;");
+    expect(source).toContain("const serviceLocationLabel = documentModel.serviceLocation;");
     expect(source).toContain("Service details are listed by line item below.");
     expect(source).not.toContain("invoiceServiceLocationMatchesBillingAddress");
     expect(source).not.toContain("Same as billing address");
@@ -87,7 +84,7 @@ describe("internal invoice print reference wiring", () => {
     expect(source).toContain("Qty");
     expect(source).toContain("Unit Price");
     expect(source).toContain("Subtotal");
-    expect(source).toContain("Total Due");
+    expect(source).toContain("Balance Due");
     expect(source).toContain("Billing Recipient");
     expect(source).not.toContain("Payment + Billing Notice");
     expect(source).not.toContain("manual records");
