@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { describe, expect, it } from "vitest";
+import { financialMonthBoundariesLA } from "@/lib/home/today-read-model";
 
 const todayPageSource = readFileSync(
   resolve(__dirname, "../../../app/today/page.tsx"),
@@ -55,6 +56,25 @@ describe("today business attention wiring", () => {
     expect(todayReadModelSource).toContain('status !== "recorded"');
   });
 
+  it("loads recorded collections by paid date for the financial snapshot", () => {
+    expect(todayReadModelSource).toContain("safeLoadFinancialSnapshot");
+    expect(todayReadModelSource).toContain('.eq("payment_status", "recorded")');
+    expect(todayReadModelSource).toContain('.gte("paid_at", startIso)');
+    expect(todayReadModelSource).toContain('.lt("paid_at", endIso)');
+    expect(todayPageSource).toContain("Collected in {snapshot.monthLabel}");
+    expect(todayPageSource).toContain("same point last month");
+  });
+
+  it("builds LA month-to-date comparison windows across DST", () => {
+    const boundaries = financialMonthBoundariesLA(new Date("2026-07-19T12:34:00.000Z"));
+    expect(boundaries).toMatchObject({
+      currentStartIso: "2026-07-01T07:00:00.000Z",
+      priorStartIso: "2026-06-01T07:00:00.000Z",
+      priorEndIso: "2026-06-19T12:34:00.000Z",
+      monthLabel: "July",
+    });
+  });
+
   it("does not expose retry, acknowledge, resolve, or customer-message actions", () => {
     expect(todayPageSource).not.toContain("Retry saved card");
     expect(todayPageSource).not.toContain("Acknowledge");
@@ -63,11 +83,12 @@ describe("today business attention wiring", () => {
     expect(todayPageSource).not.toContain("Send Email");
   });
 
-  it("renders role-aware pulse section titles", () => {
+  it("separates financial attention from the Ops queue summary", () => {
     expect(todayPageSource).toContain('pulse.mode === "business"');
-    expect(todayReadModelSource).toContain("Business Pulse");
-    expect(todayReadModelSource).toContain("Money Attention");
-    expect(todayReadModelSource).toContain("Ops Pressure");
+    expect(todayReadModelSource).toContain("Business Attention");
+    expect(todayReadModelSource).toContain("Financial Attention");
+    expect(todayReadModelSource).not.toContain("Ops Pressure");
+    expect(todayPageSource).toContain('"open_invoices", "confirm_payments", "failed_attempts"');
   });
 
   it("keeps field technicians out of business-pressure chip/groups", () => {

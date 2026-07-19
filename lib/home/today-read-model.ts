@@ -40,6 +40,7 @@ import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agre
 import {
   displayWindowLA,
   formatBusinessDateUS,
+  laDateTimeToUtcIso,
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
@@ -199,6 +200,14 @@ export type RoleAwarePulse = {
   title: string;
   subtitle: string;
   tiles: RoleAwarePulseTile[];
+  financialSnapshot: FinancialSnapshot | null;
+};
+
+export type FinancialSnapshot = {
+  monthLabel: string;
+  collectedMonthToDateCents: number;
+  collectedPriorMonthToDateCents: number;
+  comparisonPercent: number | null;
 };
 
 export type TeamCoverageAssignment = {
@@ -1090,6 +1099,82 @@ async function safeLoadOpenInvoiceSnapshot(params: {
   }
 }
 
+export function financialMonthBoundariesLA(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const year = value("year");
+  const month = value("month");
+  const day = value("day");
+  const hour = value("hour");
+  const minute = value("minute");
+  const priorYear = month === 1 ? year - 1 : year;
+  const priorMonth = month === 1 ? 12 : month - 1;
+  const priorLastDay = new Date(Date.UTC(priorYear, priorMonth, 0)).getUTCDate();
+  const priorDay = Math.min(day, priorLastDay);
+  const ymd = (y: number, m: number, d: number) =>
+    `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+
+  return {
+    currentStartIso: laDateTimeToUtcIso(ymd(year, month, 1), "00:00"),
+    currentEndIso: now.toISOString(),
+    priorStartIso: laDateTimeToUtcIso(ymd(priorYear, priorMonth, 1), "00:00"),
+    priorEndIso: laDateTimeToUtcIso(ymd(priorYear, priorMonth, priorDay), hm),
+    monthLabel: new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      month: "long",
+    }).format(now),
+  };
+}
+
+async function safeLoadFinancialSnapshot(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  now?: Date;
+}): Promise<FinancialSnapshot | null> {
+  try {
+    const boundaries = financialMonthBoundariesLA(params.now);
+    const loadRange = async (startIso: string, endIso: string) => {
+      const { data, error } = await params.supabase
+        .from("internal_invoice_payments")
+        .select("amount_cents")
+        .eq("account_owner_user_id", params.accountOwnerUserId)
+        .eq("payment_status", "recorded")
+        .gte("paid_at", startIso)
+        .lt("paid_at", endIso)
+        .limit(2000);
+      if (error) throw error;
+      return (data ?? []).reduce(
+        (total: number, row: any) => total + Math.max(0, Number(row?.amount_cents ?? 0) || 0),
+        0,
+      );
+    };
+
+    const [current, prior] = await Promise.all([
+      loadRange(boundaries.currentStartIso, boundaries.currentEndIso),
+      loadRange(boundaries.priorStartIso, boundaries.priorEndIso),
+    ]);
+
+    return {
+      monthLabel: boundaries.monthLabel,
+      collectedMonthToDateCents: current,
+      collectedPriorMonthToDateCents: prior,
+      comparisonPercent: prior > 0 ? Math.round(((current - prior) / prior) * 100) : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Pure ranking: Next Best Action
 // -----------------------------------------------------------------------------
@@ -1575,19 +1660,14 @@ function buildRoleAwarePulse(params: {
   confirmPaymentsTotalReportedCents: number | null;
   failedPaymentsOpenCount: number | null;
   failedPaymentsBalanceAtRiskCents: number | null;
+  financialSnapshot: FinancialSnapshot | null;
 }): RoleAwarePulse {
-  const surfaceProfile = resolveProductSurfaceProfile(params.productMode);
-  const waitingCount =
-    (params.priorityCounts.pendingInfo ?? 0) +
-    (params.priorityCounts.onHold ?? 0);
-
   const tiles: RoleAwarePulseTile[] = [];
 
   const pushTile = (tile: RoleAwarePulseTile) => {
-    tiles.push(tile);
+    if (tile.value > 0) tiles.push(tile);
   };
 
-  const canViewOpsPressure = params.role === "admin" || params.role === "office";
   const canViewMoneyAttention = params.canViewBusinessPulse;
 
   if (canViewMoneyAttention) {
@@ -1635,93 +1715,41 @@ function buildRoleAwarePulse(params: {
     });
   }
 
-  if (canViewOpsPressure) {
-    pushTile({
-      key: "need_scheduling",
-      label: "NEEDS SCHEDULING",
-      value: params.priorityCounts.needScheduling ?? 0,
-      valueDetail: null,
-      href: "/ops?bucket=pending#ops-workspace",
-      context: "Live queue",
-      tone: (params.priorityCounts.needScheduling ?? 0) > 0 ? "warn" : "neutral",
-    });
-    pushTile({
-      key: "waiting",
-      label: "WAITING / PENDING",
-      value: waitingCount,
-      valueDetail: null,
-      href: "/ops?bucket=waiting#ops-workspace",
-      context: "Office follow-up",
-      tone: waitingCount > 0 ? "warn" : "neutral",
-    });
-    pushTile({
-      key: "closeout",
-      label: "CLOSEOUT / INVOICE",
-      value: params.priorityCounts.closeoutReady ?? 0,
-      valueDetail: null,
-      href: "/ops?bucket=closeout#ops-workspace",
-      context: "Office follow-up",
-      tone: (params.priorityCounts.closeoutReady ?? 0) > 0 ? "info" : "neutral",
-    });
-    pushTile({
-      key: "without_tech",
-      label: `WITHOUT ${surfaceProfile.labels.fieldUser.toUpperCase()}`,
-      value: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
-      valueDetail: null,
-      href: "/ops",
-      context: "Dispatch coverage",
-      tone: (params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0 ? "warn" : "neutral",
-    });
-  }
+  const financialSnapshot =
+    (params.financialSnapshot?.collectedMonthToDateCents ?? 0) > 0 ||
+    (params.financialSnapshot?.collectedPriorMonthToDateCents ?? 0) > 0
+      ? params.financialSnapshot
+      : null;
 
-  if (params.role === "billing" && !canViewOpsPressure) {
-    pushTile({
-      key: "closeout",
-      label: "INVOICE / CLOSEOUT",
-      value: params.priorityCounts.closeoutReady ?? 0,
-      valueDetail: null,
-      href: "/ops?bucket=closeout#ops-workspace",
-      context: "Billing-ready office work",
-      tone: (params.priorityCounts.closeoutReady ?? 0) > 0 ? "info" : "neutral",
-    });
+  if (tiles.length === 0 && !financialSnapshot) {
+    return {
+      visible: false,
+      mode: null,
+      title: "",
+      subtitle: "",
+      tiles: [],
+      financialSnapshot: null,
+    };
   }
 
   if (params.role === "admin") {
     return {
       visible: true,
       mode: "business",
-      title: "Business Pulse",
-      subtitle: "Financial attention plus operational pressure.",
+      title: "Business Attention",
+      subtitle: "Financial items that need owner review.",
       tiles,
-    };
-  }
-
-  if (params.role === "billing") {
-    return {
-      visible: true,
-      mode: "money",
-      title: "Money Attention",
-      subtitle: "Financial follow-up and verification pressure.",
-      tiles,
-    };
-  }
-
-  if (params.role === "office") {
-    return {
-      visible: true,
-      mode: "ops",
-      title: "Ops Pressure",
-      subtitle: "Dispatch and office follow-up pressure.",
-      tiles,
+      financialSnapshot,
     };
   }
 
   return {
-    visible: false,
-    mode: null,
-    title: "",
-    subtitle: "",
-    tiles: [],
+    visible: true,
+    mode: "money",
+    title: "Financial Attention",
+    subtitle: "Payment and receivables items that need review.",
+    tiles,
+    financialSnapshot,
   };
 }
 
@@ -2014,6 +2042,12 @@ async function buildTodayReadModelForInternalActor(
       : Promise.resolve({ count: null, balanceCents: null }),
   );
 
+  const financialSnapshotPromise = localTimedPhase("financialSnapshotRead", () =>
+    canViewBusinessPulse
+      ? safeLoadFinancialSnapshot({ supabase, accountOwnerUserId })
+      : Promise.resolve(null),
+  );
+
   const failedPaymentAttentionPromise = localTimedPhase("failedPaymentAttentionRead", async () => {
     if (!canViewFailedPaymentAttention) {
       return {
@@ -2081,6 +2115,7 @@ async function buildTodayReadModelForInternalActor(
     recent,
     servicePlans,
     openInvoice,
+    financialSnapshot,
     failedPaymentAttention,
     confirmPaymentAttention,
   ] = await localTimedPhase("groupedParallelAwait", async () =>
@@ -2097,6 +2132,7 @@ async function buildTodayReadModelForInternalActor(
       recentPromise,
       servicePlansPromise,
       openInvoicePromise,
+      financialSnapshotPromise,
       failedPaymentAttentionPromise,
       confirmPaymentAttentionPromise,
     ]),
@@ -2192,6 +2228,7 @@ async function buildTodayReadModelForInternalActor(
     failedPaymentsOpenCount: failedPaymentAttention.openCount,
     failedPaymentsBalanceAtRiskCents:
       failedPaymentAttention.totalBalanceDueCents,
+    financialSnapshot,
   });
 
   const showFieldActions = role === "tech";

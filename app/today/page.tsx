@@ -10,6 +10,7 @@ import { redirect } from "next/navigation";
 
 import {
   buildTodayReadModel,
+  type FinancialSnapshot,
   type FollowUpGroup,
   type NextBestAction,
   type PriorityChip,
@@ -756,9 +757,9 @@ function RoleAwarePulseSection({
   collapsed?: boolean;
   connected?: boolean;
 }) {
-  const opsQueueKeys = new Set(["need_scheduling", "waiting", "closeout", "without_tech"]);
-  const visibleTiles = pulse.tiles.filter((tile) => opsQueueKeys.has(tile.key) && tile.value > 0);
-  const hasContent = visibleTiles.length > 0;
+  const financialKeys = new Set(["open_invoices", "confirm_payments", "failed_attempts"]);
+  const visibleTiles = pulse.tiles.filter((tile) => financialKeys.has(tile.key) && tile.value > 0);
+  const hasContent = visibleTiles.length > 0 || pulse.financialSnapshot != null;
 
   if (!hasContent) return null;
 
@@ -779,13 +780,97 @@ function RoleAwarePulseSection({
       <h2 className={SECTION_HEADING_TEXT}>{pulse.title}</h2>
       <p className="mt-1 text-xs leading-5 text-slate-600">{pulse.subtitle}</p>
 
-      <div className={`mt-3 grid grid-cols-2 gap-2 ${connected ? "" : "sm:grid-cols-3"}`}>
+      {pulse.financialSnapshot ? (
+        <FinancialSnapshotCard snapshot={pulse.financialSnapshot} />
+      ) : null}
+
+      {visibleTiles.length > 0 ? (
+        <div className={`mt-3 grid grid-cols-2 gap-2 ${connected ? "" : "sm:grid-cols-3"}`}>
           {visibleTiles.map((tile) => (
             <RoleAwarePulseTileCard key={tile.key} tile={tile} />
           ))}
-      </div>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
+  const maximum = Math.max(
+    snapshot.collectedMonthToDateCents,
+    snapshot.collectedPriorMonthToDateCents,
+    1,
+  );
+  const barWidth = (amountCents: number) =>
+    amountCents > 0 ? Math.max(4, Math.round((amountCents / maximum) * 100)) : 0;
+  const currentWidth = barWidth(snapshot.collectedMonthToDateCents);
+  const priorWidth = barWidth(snapshot.collectedPriorMonthToDateCents);
+  const comparison = snapshot.comparisonPercent;
+  const comparisonLabel =
+    comparison == null
+      ? "No comparable collections last month"
+      : `${comparison >= 0 ? "+" : ""}${comparison}% vs. the same point last month`;
+
+  return (
+    <div className="mt-3 rounded-xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white p-3.5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800/70">
+        Collected in {snapshot.monthLabel}
+      </div>
+      <div className="mt-1 text-2xl font-bold tracking-tight text-emerald-950 tabular-nums">
+        {formatMoney(snapshot.collectedMonthToDateCents)}
+      </div>
+      <div className="mt-1 text-xs font-medium text-emerald-800">{comparisonLabel}</div>
+
+      <div className="mt-3 space-y-2" aria-label="Month-to-date collections comparison">
+        <FinancialComparisonBar
+          label="This month"
+          amountCents={snapshot.collectedMonthToDateCents}
+          widthPercent={currentWidth}
+          current
+        />
+        <FinancialComparisonBar
+          label="Last month"
+          amountCents={snapshot.collectedPriorMonthToDateCents}
+          widthPercent={priorWidth}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FinancialComparisonBar({
+  label,
+  amountCents,
+  widthPercent,
+  current = false,
+}: {
+  label: string;
+  amountCents: number;
+  widthPercent: number;
+  current?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+        <span>{label}</span>
+        <span className="tabular-nums">{formatMoney(amountCents)}</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+        <div
+          className={`h-full rounded-full ${current ? "bg-emerald-500" : "bg-slate-400"}`}
+          style={{ width: `${widthPercent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function formatMoney(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format((Number.isFinite(cents) ? cents : 0) / 100);
 }
 
 function RoleAwarePulseTileCard({
