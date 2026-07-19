@@ -63,7 +63,7 @@ export default function ReportCenterTabs({ current, showDeposits = false }: Prop
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1.5 shadow-[0_14px_28px_-30px_rgba(15,23,42,0.3)]">
       <ReportLink href="/reports/invoices?view=open" current={current} active="invoices">
-        Open Invoices
+        Invoices
       </ReportLink>
       <ReportLink href="/reports/jobs" current={current} active="jobs">
         Jobs
@@ -72,7 +72,7 @@ export default function ReportCenterTabs({ current, showDeposits = false }: Prop
         Closeout
       </ReportLink>
       <ReportLink href="/reports/payments" current={current} active="payments">
-        Payments Received
+        Payments
       </ReportLink>
       <ReportLink href="/reports/attention" current={current} active="attention">
         Needs Attention
@@ -87,11 +87,11 @@ export default function ReportCenterTabs({ current, showDeposits = false }: Prop
           {showDeposits ? (
             <Link
               href="/reports/deposits"
-              title="Review Stripe fees, net deposits, payout timing, and CSV exports."
-              aria-label="Deposits - Review Stripe fees, net deposits, payout timing, and CSV exports."
+              title="Review invoice payments, processing fees, and expected Stripe bank deposits."
+              aria-label="Bank deposits - Review invoice payments, processing fees, and expected Stripe bank deposits."
               className={tabClass(current === "deposits")}
             >
-              Deposits
+              Bank Deposits
             </Link>
           ) : null}
           <Link href="/reports/service-cases" className={tabClass(current === "service-cases")}>Work History</Link>

@@ -24,9 +24,9 @@ describe("deposit detail page wiring", () => {
 
   it("renders required summary labels and friendly boundary copy", () => {
     for (const label of [
-      "Gross Collected",
-      "Fees & Adjustments",
-      "Net Deposit",
+      "Amount Paid",
+      "Total Deductions",
+      "Expected In Bank",
       "Payments",
       "Unmatched / Needs Review",
     ]) {
@@ -34,13 +34,13 @@ describe("deposit detail page wiring", () => {
     }
 
     expect(detailPageSource).toContain(
-      "Review the online payments, fees, net amount, and payout timing behind this deposit group.",
+      "Review the invoice payments, deductions, expected bank amount, and Stripe payout timing behind this deposit.",
     );
     expect(detailPageSource).toContain(
       "Deposits help explain how online payments become bank deposits. Your invoices and payment records stay unchanged.",
     );
     expect(detailPageSource).toContain(
-      "This read-only detail view shows how fees and adjustments affect the net amount for this deposit group.",
+      "This read-only detail shows what customers paid, proven deductions, and the amount Stripe says should reach your bank.",
     );
   });
 

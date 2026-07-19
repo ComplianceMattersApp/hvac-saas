@@ -23,14 +23,16 @@ import {
 } from "@/components/reports/ReportLedgerChrome";
 import {
   depositDetailHrefForGroup,
+  getDepositDetailExportRows,
   getDepositsLedgerSummary,
+  type DepositDetailSettlementRow,
   type DepositsLedgerPayoutRow,
 } from "@/lib/reports/deposits-ledger";
 import { getDepositsReconciliationStatus } from "@/lib/reports/deposits-reconciliation-status";
 
 export const metadata = {
-  title: "Deposits",
-  description: "Review online payment deposits, fees, net amounts, and payout timing.",
+  title: "Bank Deposits",
+  description: "Trace invoice payments through processing fees to expected Stripe bank deposits.",
 };
 
 const PAYOUT_STATUS_OPTIONS = [
@@ -130,6 +132,17 @@ function buildReviewLabels(row: DepositsLedgerPayoutRow) {
   return labels.length ? Array.from(new Set(labels)) : ["Clear"];
 }
 
+function invoicePaymentDepositStatus(row: DepositDetailSettlementRow) {
+  if (row.needsReview || row.syncStatus === "failed") return "Needs review";
+  if (!row.payoutId) return "Waiting for Stripe";
+  const status = String(row.payoutStatus ?? "").toLowerCase();
+  if (status === "paid" || status === "complete") return "Paid by Stripe";
+  if (status === "in_transit") return "In transit";
+  if (status === "pending") return "Scheduled";
+  if (status === "failed" || status === "canceled") return "Needs review";
+  return "Waiting for Stripe";
+}
+
 export default async function DepositsReportPage({
   searchParams,
 }: {
@@ -171,12 +184,20 @@ export default async function DepositsReportPage({
     syncStatus: normalizeOption(firstParam(resolvedSearchParams, "sync_status"), SYNC_STATUS_OPTIONS),
   };
 
-  const [internalBusinessIdentity, depositsLedger] = await Promise.all([
+  const [internalBusinessIdentity, depositsLedger, invoicePayments] = await Promise.all([
     resolveInternalBusinessIdentityByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
     }),
     getDepositsLedgerSummary({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      dateFrom: filters.dateFrom || null,
+      dateTo: filters.dateTo || null,
+      payoutStatus: filters.payoutStatus as any,
+      syncStatus: filters.syncStatus as any,
+    }),
+    getDepositDetailExportRows({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
       dateFrom: filters.dateFrom || null,
@@ -207,14 +228,14 @@ export default async function DepositsReportPage({
 
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Deposits"
-        description="Review online payment deposits, fees, net amounts, payout timing, and exportable records."
+        title="Bank deposits"
+        description="See what customers paid, processing fees, expected bank amounts, and the Stripe deposits that contain each invoice payment."
         countSummary={hasRows ? `Showing ${depositsLedger.rows.length} deposit groups` : "No deposits to review yet"}
-        truthNote="Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing. Your invoices and payment records stay unchanged."
+        truthNote="Use this report to explain the lump-sum Stripe deposit shown by your bank. Your bank or accounting feed remains the final record of what actually arrived."
       />
 
       <section className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
-        Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing.
+        Follow each online invoice payment from the amount paid, through proven deductions, to the Stripe deposit expected in your bank.
       </section>
 
       <DepositsSyncPanel
@@ -327,16 +348,63 @@ export default async function DepositsReportPage({
         />
       </ReportStatGrid>
 
-      <ReportTableShell note="This read-only report groups online payments by payout. Open a group to inspect the included payments.">
+      <ReportTableShell note="Invoice-payment view. An invoice may appear more than once when it was paid in installments. Amounts come only from synced Stripe settlement records.">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="font-semibold text-slate-950">Invoice payment breakdown</h2>
+          <p className="mt-1 text-xs text-slate-600">See what was paid, what Stripe deducted, and what amount is expected in the bank.</p>
+        </div>
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-50/90">
+            <tr className={reportTableHeadClass}>
+              <th className="px-3 py-3">Invoice</th>
+              <th className="px-3 py-3">Customer</th>
+              <th className="px-3 py-3">Payment date</th>
+              <th className="px-3 py-3">Amount paid</th>
+              <th className="px-3 py-3">Processing fee</th>
+              <th className="px-3 py-3">Other proven deductions</th>
+              <th className="px-3 py-3">Expected in bank</th>
+              <th className="px-3 py-3">Deposit date</th>
+              <th className="px-3 py-3">Deposit status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoicePayments.length === 0 ? (
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-slate-500">No synced invoice payments match this date range and filters.</td></tr>
+            ) : invoicePayments.map((row) => {
+              const invoiceHref = row.jobId && row.invoiceId ? `/jobs/${encodeURIComponent(row.jobId)}/invoice` : null;
+              return (
+                <tr key={row.settlementId} className={reportTableRowClass}>
+                  <td className="px-3 py-3">{invoiceHref ? <Link href={invoiceHref} className="font-medium text-blue-700 hover:underline">{row.invoiceLabel}</Link> : <span className="text-slate-700">{row.invoiceLabel}</span>}</td>
+                  <td className="px-3 py-3 text-slate-700">{row.customerName}</td>
+                  <td className="px-3 py-3 text-slate-700">{formatDate(row.paymentDate)}</td>
+                  <td className="px-3 py-3 font-medium text-slate-900">{formatUsdCents(row.grossCents)}</td>
+                  <td className="px-3 py-3 text-slate-700">{formatUsdCents(row.stripeFeeCents)}</td>
+                  <td className="px-3 py-3 text-slate-700">{formatUsdCents(row.platformFeeCents)}</td>
+                  <td className="px-3 py-3 font-medium text-slate-900">{formatUsdCents(row.netCents)}</td>
+                  <td className="px-3 py-3 text-slate-700">{formatDate(row.payoutArrivalDate)}</td>
+                  <td className="px-3 py-3"><Link href={row.payoutHref} className="font-medium text-blue-700 hover:underline">{invoicePaymentDepositStatus(row)}</Link></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </ReportTableShell>
+
+      <ReportTableShell note="Supporting breakdown only. Compare the expected Stripe deposit with the lump-sum transaction shown by your bank or accounting feed.">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <h2 className="font-semibold text-slate-950">Stripe deposits</h2>
+          <p className="mt-1 text-xs text-slate-600">Each deposit explains the lump sum: customer payments minus proven fees and deductions equals the expected bank deposit.</p>
+        </div>
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50/90">
             <tr className={reportTableHeadClass}>
               <th className="px-3 py-3">Payout / Deposit</th>
               <th className="px-3 py-3">Arrival Date</th>
               <th className="px-3 py-3">Status</th>
-              <th className="px-3 py-3">Gross Collected</th>
-              <th className="px-3 py-3">Fees & Adjustments</th>
-              <th className="px-3 py-3">Net Deposit</th>
+              <th className="px-3 py-3">Customer Payments</th>
+              <th className="px-3 py-3">Processing Fees</th>
+              <th className="px-3 py-3">Other Deductions</th>
+              <th className="px-3 py-3">Expected Bank Deposit</th>
               <th className="px-3 py-3">Payments</th>
               <th className="px-3 py-3">Needs Review</th>
             </tr>
@@ -344,7 +412,7 @@ export default async function DepositsReportPage({
           <tbody>
             {!hasRows ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-500">
+                <td colSpan={9} className="px-4 py-12 text-center text-sm text-slate-500">
                   <div className="mx-auto max-w-md space-y-2">
                     <div className="font-semibold text-slate-700">
                       {reconciliation.recordedStripePayments === 0
@@ -380,10 +448,18 @@ export default async function DepositsReportPage({
                       {row.hasMultipleCurrencies ? "Review by currency" : formatUsdCents(row.grossCollectedCents)}
                     </td>
                     <td className="px-3 py-3 text-slate-700">
-                      {row.hasMultipleCurrencies ? "Review by currency" : formatUsdCents(row.feesAndAdjustmentsCents)}
+                      {row.hasMultipleCurrencies ? "Review by currency" : formatUsdCents(row.processingFeesCents)}
+                    </td>
+                    <td className="px-3 py-3 text-slate-700">
+                      {row.hasMultipleCurrencies ? "Review by currency" : formatUsdCents(row.otherDeductionsCents)}
                     </td>
                     <td className="px-3 py-3 text-slate-700">
                       {row.hasMultipleCurrencies ? "Review by currency" : formatUsdCents(row.netDepositsCents)}
+                      {!row.hasMultipleCurrencies ? (
+                        <div className="mt-1 whitespace-nowrap text-[11px] text-slate-500">
+                          {formatUsdCents(row.grossCollectedCents)} − {formatUsdCents(row.processingFeesCents + row.otherDeductionsCents)} = {formatUsdCents(row.netDepositsCents)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-3 py-3 text-slate-700">{row.paymentCount}</td>
                     <td className="px-3 py-3">

@@ -54,6 +54,8 @@ export type DepositsLedgerPayoutRow = {
   availableDateFrom: string | null;
   availableDateTo: string | null;
   grossCollectedCents: number;
+  processingFeesCents: number;
+  otherDeductionsCents: number;
   feesAndAdjustmentsCents: number;
   netDepositsCents: number;
   paymentCount: number;
@@ -110,6 +112,8 @@ export type DepositDetailSettlementRow = {
   payoutId: string | null;
   payoutStatus: string | null;
   payoutArrivalDate: string | null;
+  payoutGroupKey: string;
+  payoutHref: string;
   internalInvoicePaymentId: string | null;
   invoiceId: string | null;
   invoiceLabel: string;
@@ -372,6 +376,11 @@ function buildGroupRow(groupKey: string, rows: StripePaymentSettlementRow[]): De
     availableDateFrom: availableDates[0] ?? null,
     availableDateTo: availableDates[availableDates.length - 1] ?? null,
     grossCollectedCents: rows.reduce((sum, row) => sum + grossForRow(row), 0),
+    processingFeesCents: rows.reduce((sum, row) => sum + stripeFeeForRow(row), 0),
+    otherDeductionsCents: rows.reduce(
+      (sum, row) => sum + feesAndAdjustmentsForRow(row) - stripeFeeForRow(row),
+      0,
+    ),
     feesAndAdjustmentsCents: rows.reduce((sum, row) => sum + feesAndAdjustmentsForRow(row), 0),
     netDepositsCents: rows.reduce((sum, row) => sum + netForRow(row), 0),
     paymentCount: rows.filter((row) => normalizeSettlementKind(row.settlement_kind) === "payment" && isIncludedInSettlementMath(row)).length,
@@ -550,12 +559,15 @@ function buildDetailRows(params: {
     const customer = customerId ? params.contexts.customersById.get(customerId) ?? null : null;
     const jobId = clean(payment?.job_id) || null;
     const job = jobId ? params.contexts.jobsById.get(jobId) ?? null : null;
+    const payoutGroupKey = groupKeyForRow(row);
 
     return {
       settlementId: clean(row.id),
       payoutId: clean(row.stripe_payout_id) || null,
       payoutStatus: clean(row.payout_status) || null,
       payoutArrivalDate: dateKey(row.payout_arrival_date),
+      payoutGroupKey,
+      payoutHref: depositDetailHrefForGroup({ payoutId: clean(row.stripe_payout_id) || null, groupKey: payoutGroupKey }),
       internalInvoicePaymentId: paymentId,
       invoiceId,
       invoiceLabel: displayInvoice(invoice, invoiceId),

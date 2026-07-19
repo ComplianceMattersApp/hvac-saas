@@ -114,15 +114,15 @@ export default async function DepositDetailPage({
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Deposit Detail"
-        description="Review the online payments, fees, net amount, and payout timing behind this deposit group."
+        title="Bank deposit detail"
+        description="Review the invoice payments, deductions, expected bank amount, and Stripe payout timing behind this deposit."
         countSummary={detail.found ? `${detail.rows.length} payments in ${detail.payoutLabel}` : "Deposit group not found"}
         truthNote="Deposits help explain how online payments become bank deposits. Your invoices and payment records stay unchanged."
       />
 
       <div className="flex flex-wrap gap-2">
         <Link href="/reports/deposits" className={reportActionClass()}>
-          Back to Deposits
+          Back to Bank deposits
         </Link>
         <Link
           href={`/reports/deposits/export/detail?payout_group_id=${encodeURIComponent(payoutGroupId)}`}
@@ -133,7 +133,7 @@ export default async function DepositDetailPage({
       </div>
 
       <section className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
-        This read-only detail view shows how fees and adjustments affect the net amount for this deposit group.
+        This read-only detail shows what customers paid, proven deductions, and the amount Stripe says should reach your bank.
       </section>
 
       {pendingNoPayout ? (
@@ -156,19 +156,19 @@ export default async function DepositDetailPage({
 
           <ReportStatGrid>
             <ReportStatCard
-              label="Gross Collected"
+              label="Amount Paid"
               value={totalsAreMixed ? "Review by currency" : formatUsdCents(detail.summary.grossCollectedCents)}
               helperText="Online payments included in this deposit group."
               tone="emerald"
             />
             <ReportStatCard
-              label="Fees & Adjustments"
+              label="Total Deductions"
               value={totalsAreMixed ? "Review by currency" : formatUsdCents(detail.summary.feesAndAdjustmentsCents)}
               helperText="Stripe fees, platform fees when present, and settlement adjustments."
               tone="blue"
             />
             <ReportStatCard
-              label="Net Deposit"
+              label="Expected In Bank"
               value={totalsAreMixed ? "Review by currency" : formatUsdCents(detail.summary.netDepositsCents)}
               helperText="Estimated amount moving toward bank deposit after fees and adjustments."
               tone="blue"
@@ -194,9 +194,9 @@ export default async function DepositDetailPage({
                   <th className="px-3 py-3">Invoice</th>
                   <th className="px-3 py-3">Customer</th>
                   <th className="px-3 py-3">Job / Test Reference</th>
-                  <th className="px-3 py-3">Gross</th>
-                  <th className="px-3 py-3">Fees & Adjustments</th>
-                  <th className="px-3 py-3">Net</th>
+                  <th className="px-3 py-3">Amount Paid</th>
+                  <th className="px-3 py-3">Total Deductions</th>
+                  <th className="px-3 py-3">Expected In Bank</th>
                   <th className="px-3 py-3">Payment / Available Date</th>
                   <th className="px-3 py-3">Charge ID</th>
                   <th className="px-3 py-3">Payment Intent ID</th>

@@ -19,17 +19,17 @@ const depositsPageSource = readFileSync(
 );
 
 describe("report center deposits link wiring", () => {
-  it("keeps Reports navigation focused on four primary reports and moves Deposits under Advanced", () => {
+  it("uses simple invoice, payment, and bank-deposit navigation labels", () => {
     expect(reportCenterTabsSource).toContain('href="/reports/invoices?view=open"');
-    expect(reportCenterTabsSource).toMatch(/>\s*Open Invoices\s*<\/ReportLink>/);
+    expect(reportCenterTabsSource).toMatch(/>\s*Invoices\s*<\/ReportLink>/);
     expect(reportCenterTabsSource).toContain('href="/reports/payments"');
     expect(reportCenterTabsSource).toContain('href="/reports/deposits"');
     expect(reportCenterTabsSource).toContain("Advanced / More");
-    expect(reportCenterTabsSource).toMatch(/>\s*Deposits\s*<\/Link>/);
+    expect(reportCenterTabsSource).toMatch(/>\s*Bank Deposits\s*<\/Link>/);
     expect(reportCenterTabsSource).toContain("showDeposits = false");
     expect(reportCenterTabsSource).toContain("showDeposits ?");
     expect(reportCenterTabsSource).toContain(
-      "Review Stripe fees, net deposits, payout timing, and CSV exports.",
+      "Review invoice payments, processing fees, and expected Stripe bank deposits.",
     );
   });
 
@@ -40,9 +40,9 @@ describe("report center deposits link wiring", () => {
     expect(reportsDashboardSource).toContain('showDeposits={canViewDepositsReport}');
     expect(reportsDashboardSource).toContain('href="/reports/deposits"');
     expect(reportsDashboardSource).toContain("canViewDepositsReport ? (");
-    expect(reportsDashboardSource).toMatch(/>\s*Deposits\s*<\/div>/);
+    expect(reportsDashboardSource).toMatch(/>\s*Bank deposits\s*<\/div>/);
     expect(reportsDashboardSource).toContain(
-      "Review Stripe fees, net deposits, payout timing, and CSV exports.",
+      "Trace invoice payments through processing fees to the amounts expected in your bank.",
     );
     expect(reportsDashboardSource.indexOf('href="/reports/payments"')).toBeLessThan(
       reportsDashboardSource.indexOf('href="/reports/deposits"'),

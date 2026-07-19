@@ -756,9 +756,9 @@ export default async function ReportCenterDashboardPage({
                     href="/reports/deposits"
                     className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                   >
-                    <div className="text-sm font-semibold text-slate-950">Deposits</div>
+                    <div className="text-sm font-semibold text-slate-950">Bank deposits</div>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Review Stripe fees, net deposits, payout timing, and CSV exports.
+                      Trace invoice payments through processing fees to the amounts expected in your bank.
                     </p>
                   </Link>
                 ) : null}
