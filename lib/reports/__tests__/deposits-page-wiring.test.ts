@@ -22,6 +22,22 @@ describe("deposits report page wiring", () => {
     expect(depositsPageSource).toContain("dateTo: filters.dateTo || null");
     expect(depositsPageSource).toContain("payoutStatus: filters.payoutStatus");
     expect(depositsPageSource).toContain("syncStatus: filters.syncStatus");
+    expect(depositsPageSource).toContain("getDepositDetailExportRows");
+  });
+
+  it("shows an invoice-first payment-to-bank breakdown using proven settlement fields", () => {
+    for (const label of ["Invoice payment breakdown", "Amount paid", "Processing fee", "Other proven deductions", "Expected in bank", "Deposit status"]) {
+      expect(depositsPageSource).toContain(label);
+    }
+    expect(depositsPageSource).toContain("row.stripeFeeCents");
+    expect(depositsPageSource).toContain("row.platformFeeCents");
+    expect(depositsPageSource).toContain("row.netCents");
+    expect(depositsPageSource).toContain("row.payoutHref");
+    expect(depositsPageSource).toContain("Paid by Stripe");
+    expect(depositsPageSource).toContain("Supporting breakdown only");
+    expect(depositsPageSource).toContain("Customer Payments");
+    expect(depositsPageSource).toContain("Processing Fees");
+    expect(depositsPageSource).toContain("Expected Bank Deposit");
   });
 
   it("renders the required owner-facing summary labels and boundary copy", () => {
@@ -36,12 +52,12 @@ describe("deposits report page wiring", () => {
     }
 
     expect(depositsPageSource).toContain(
-      "Review online payment deposits, fees, net amounts, payout timing, and exportable records.",
+      "See what customers paid, processing fees, expected bank amounts, and the Stripe deposits that contain each invoice payment.",
     );
     expect(depositsPageSource).toContain(
-      "Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing.",
+      "Follow each online invoice payment from the amount paid, through proven deductions, to the Stripe deposit expected in your bank.",
     );
-    expect(depositsPageSource).toContain("Your invoices and payment records stay unchanged.");
+    expect(depositsPageSource).toContain("Your bank or accounting feed remains the final record");
     expect(depositsPageSource).toContain("Online payments included in this report.");
     expect(depositsPageSource).toContain("Stripe fees, platform fees when present, and settlement adjustments.");
     expect(depositsPageSource).toContain(

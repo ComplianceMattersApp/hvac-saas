@@ -278,6 +278,10 @@ describe("deposits ledger read model", () => {
 
     expect(view.summary.grossCollectedCents).toBe(100000);
     expect(view.rows.flatMap((row) => row.groupKey)).toEqual(expect.arrayContaining(["payout:po_1", "pending:no-payout"]));
+    expect(view.rows.find((row) => row.groupKey === "payout:po_1")).toMatchObject({
+      processingFeesCents: 1500,
+      otherDeductionsCents: 500,
+    });
   });
 
   it("reads only settlement truth and not manual/off-platform payment truth", async () => {
@@ -376,6 +380,8 @@ describe("deposits ledger read model", () => {
         payoutId: "po_1",
         payoutStatus: "paid",
         payoutArrivalDate: "2026-06-12T00:00:00.000Z",
+        payoutGroupKey: "payout:po_1",
+        payoutHref: "/reports/deposits/po_1",
         internalInvoicePaymentId: "pay-1",
         invoiceId: "inv-1",
         invoiceLabel: 'INV-1001, "Quoted"',
@@ -407,6 +413,8 @@ describe("deposits ledger read model", () => {
         payoutId: null,
         payoutStatus: "pending",
         payoutArrivalDate: null,
+        payoutGroupKey: "unmatched",
+        payoutHref: "/reports/deposits/unmatched",
         internalInvoicePaymentId: null,
         invoiceId: null,
         invoiceLabel: "Unmatched Stripe item",
