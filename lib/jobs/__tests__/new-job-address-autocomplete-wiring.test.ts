@@ -89,6 +89,11 @@ describe("internal new-job address autocomplete pilot", () => {
     expect(formSource).toContain("onChange={(e) => setNewLocationAddressLine2(e.target.value)}");
   });
 
+  it("does not assume California for a new service location", () => {
+    expect(formSource).toContain('const [newLocationState, setNewLocationState] = useState("")');
+    expect(formSource).not.toContain('const [newLocationState, setNewLocationState] = useState("CA")');
+  });
+
   it("uses one application-owned selection handler without submit, action, or identity mutations", () => {
     expect(formSource).toContain("function applyAutocompleteSelection");
     const handler = formSource.slice(

@@ -515,7 +515,7 @@ export default function NewJobForm({
   const [newLocationAddressLine1, setNewLocationAddressLine1] = useState("");
   const [newLocationAddressLine2, setNewLocationAddressLine2] = useState("");
   const [newLocationCity, setNewLocationCity] = useState("");
-  const [newLocationState, setNewLocationState] = useState("CA");
+  const [newLocationState, setNewLocationState] = useState("");
   const [newLocationZip, setNewLocationZip] = useState("");
   const [siteAccessContactDifferent, setSiteAccessContactDifferent] = useState(false);
   const [siteAccessContactName, setSiteAccessContactName] = useState("");
