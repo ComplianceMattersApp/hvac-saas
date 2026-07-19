@@ -48,12 +48,38 @@ describe("shared service-location address fields", () => {
     )).toEqual(current);
   });
 
+  it("accepts a non-California U.S. state without relabeling it", () => {
+    expect(mergeSelectedServiceAddressFields(
+      {
+        addressLine1: "",
+        addressLine2: "",
+        city: "",
+        state: "",
+        zip: "",
+      },
+      {
+        addressLine1: "123 Mroz Road",
+        city: "Beaufort",
+        state: "SC",
+        zip: "29906-8536",
+        suggestedUnit: "",
+      },
+    )).toMatchObject({
+      addressLine1: "123 Mroz Road",
+      city: "Beaufort",
+      state: "SC",
+      zip: "29906-8536",
+    });
+  });
+
   it("preserves canonical native form names and React-owned editability", () => {
     for (const name of ["address_line1", "address_line2", "city", "state", "zip"]) {
       expect(componentSource).toContain(`name="${name}"`);
     }
     expect(componentSource).toContain("value={values.addressLine1}");
     expect(componentSource).toContain('onChange={(event) => update("addressLine1", event.target.value)}');
+    expect(componentSource).toContain("value={values.state}");
+    expect(componentSource).toContain('onChange={(event) => update("state", event.target.value)}');
     expect(componentSource).toContain("required={required}");
   });
 

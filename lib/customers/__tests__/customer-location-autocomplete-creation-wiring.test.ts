@@ -24,7 +24,8 @@ describe("customer location autocomplete creation wiring", () => {
     expect(customerProfileSource).toContain("<form action={addCustomerServiceLocationFromForm}");
     expect(customerProfileSource).toContain('<input type="hidden" name="customer_id" value={customerId} />');
     expect(customerProfileSource).toContain("<ServiceLocationAddressFields");
-    expect(customerProfileSource).toContain('initialValues={{ state: "CA" }}');
+    expect(customerProfileSource).not.toContain('initialValues={{ state: "CA" }}');
+    expect(customerProfileSource).not.toContain('type="hidden" name="state" value="CA"');
   });
 
   it("preserves normalized duplicate-location reuse and submit-time creation", () => {

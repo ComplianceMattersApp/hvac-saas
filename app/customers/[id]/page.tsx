@@ -2538,7 +2538,6 @@ export default async function CustomerDetailPage(props: {
                   </div>
                   <ServiceLocationAddressFields
                     compact
-                    initialValues={{ state: "CA" }}
                   />
                   <label className="grid gap-1 text-xs font-medium text-slate-600">
                     Notes
