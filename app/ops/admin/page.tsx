@@ -17,6 +17,7 @@ import { buildHelpAssistantSafeContext } from "@/lib/help-assistant/help-assista
 import {
   isAskComplianceMattersEnabled,
   isHelpGapReviewQueueEnabled,
+  isTrainerAiEnabled,
 } from "@/lib/help-assistant/help-assistant-flags";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { createClient } from "@/lib/supabase/server";
@@ -588,7 +589,7 @@ export default async function OpsAdminPage() {
         </div>
       </div>
       {isAskComplianceMattersEnabled() ? (
-        <AskComplianceMattersLauncher context={helpAssistantContext} />
+        <AskComplianceMattersLauncher context={helpAssistantContext} trainerAiEnabled={isTrainerAiEnabled()} />
       ) : null}
     </div>
   );

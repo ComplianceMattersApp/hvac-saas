@@ -17,7 +17,7 @@ import {
   resolveFieldBillingCapabilities,
 } from "@/lib/auth/field-billing-access";
 import { buildHelpAssistantSafeContext } from "@/lib/help-assistant/help-assistant-context";
-import { isAskComplianceMattersEnabled } from "@/lib/help-assistant/help-assistant-flags";
+import { isAskComplianceMattersEnabled, isTrainerAiEnabled } from "@/lib/help-assistant/help-assistant-flags";
 import {
   landingPathForDualContextAccess,
   resolveDualContextAccess,
@@ -312,7 +312,7 @@ export default async function TrainingRoomPage() {
       </section>
 
       {isAskComplianceMattersEnabled() ? (
-        <AskComplianceMattersLauncher context={helpAssistantContext} />
+        <AskComplianceMattersLauncher context={helpAssistantContext} trainerAiEnabled={isTrainerAiEnabled()} />
       ) : null}
     </div>
   );

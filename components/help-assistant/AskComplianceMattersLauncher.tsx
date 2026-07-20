@@ -18,6 +18,7 @@ import {
   type HelpGapEvent,
 } from "@/lib/help-assistant/help-gap-events";
 import { persistHelpGapEventFromAssistantAction } from "@/lib/actions/help-gap-actions";
+import { askTrainerAiAction } from "@/lib/actions/trainer-ai-actions";
 import {
   getHelpGapFeedbackMessage,
   resolveHelpGapPersistenceStatus,
@@ -29,6 +30,7 @@ type FeedbackState = "helpful" | "not_helpful" | "still_need_help" | null;
 
 type AskComplianceMattersLauncherProps = {
   context: HelpAssistantSafeContext;
+  trainerAiEnabled?: boolean;
 };
 
 const quickQuestions = [
@@ -54,7 +56,7 @@ function splitAnswerBody(value: string) {
     .filter(Boolean);
 }
 
-export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLauncherProps) {
+export function AskComplianceMattersLauncher({ context, trainerAiEnabled = false }: AskComplianceMattersLauncherProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<AssistantMode>("ask");
@@ -65,6 +67,9 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
   const [helpGapPersistenceStatus, setHelpGapPersistenceStatus] =
     useState<HelpGapPersistenceUiStatus>("idle");
   const [persistedEventKey, setPersistedEventKey] = useState<string | null>(null);
+  const [isAnswering, setIsAnswering] = useState(false);
+  const [trainerUnsupported, setTrainerUnsupported] = useState(false);
+  const [trainerGapLogged, setTrainerGapLogged] = useState(false);
   const safeContext = useMemo(
     () => buildHelpAssistantSafeContext({ ...context, pathname: pathname ?? context.pathname }),
     [context, pathname],
@@ -110,7 +115,33 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
     }
   }
 
-  function ask(nextQuestion: string) {
+  async function ask(nextQuestion: string) {
+    if (trainerAiEnabled) {
+      setIsAnswering(true);
+      setTrainerUnsupported(false);
+      setTrainerGapLogged(false);
+      try {
+        const result = await askTrainerAiAction({ question: nextQuestion, context: safeContext });
+        if (result.ok) {
+          setQuestion(nextQuestion);
+          setAnswer({
+            status: result.answer.supported ? "answered" : "fallback",
+            title: result.answer.supported ? "Trainer answer" : "Not documented yet",
+            body: result.answer.answer,
+            links: result.answer.citations.map((source) => ({ label: source.title, href: source.sourcePath })),
+          });
+          setFeedback(null);
+          setHelpGapEvent(null);
+          setHelpGapPersistenceStatus("idle");
+          setTrainerUnsupported(!result.answer.supported);
+          setTrainerGapLogged(result.knowledgeGapLogged);
+          setMode("ask");
+          return;
+        }
+      } finally {
+        setIsAnswering(false);
+      }
+    }
     const nextAnswer = answerAskComplianceMatters(nextQuestion, safeContext);
     const nextHelpGapEvent =
       nextAnswer.status === "fallback"
@@ -128,6 +159,8 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
     setHelpGapPersistenceStatus(nextHelpGapEvent ? "pending" : "idle");
     setPersistedEventKey(null);
     setMode("ask");
+    setTrainerUnsupported(false);
+    setTrainerGapLogged(false);
 
     if (nextHelpGapEvent) {
       void persistHelpGapEvent(nextHelpGapEvent);
@@ -225,7 +258,7 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                       <button
                         key={item}
                         type="button"
-                        onClick={() => ask(item)}
+                        onClick={() => void ask(item)}
                         className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold leading-5 text-slate-700 hover:bg-slate-50"
                       >
                         {item}
@@ -237,7 +270,7 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();
-                    ask(question);
+                    void ask(question);
                   }}
                   className="rounded-lg border border-slate-200 bg-white p-3.5"
                 >
@@ -252,8 +285,8 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                     className="mt-2 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-900 outline-none focus:border-slate-500"
                     placeholder="Ask about setup, training, roles, or first-job flow."
                   />
-                  <button type="submit" className="mt-2 w-full rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">
-                    Ask
+                  <button type="submit" disabled={isAnswering} className="mt-2 w-full rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-wait disabled:bg-slate-500">
+                    {isAnswering ? "Searching approved knowledge..." : "Ask"}
                   </button>
                 </form>
 
@@ -277,11 +310,11 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                         <p key={paragraph}>{paragraph}</p>
                       ))}
                     </div>
-                    {helpGapEvent?.eventType === "unknown_answer" ? (
+                    {helpGapEvent?.eventType === "unknown_answer" || trainerUnsupported ? (
                       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900">
                         <div className="font-semibold">I don't know that yet.</div>
-                        <p className="mt-1">This is the kind of question we should improve. Contact support if this is blocking your work.</p>
-                        <p className="mt-1">{feedbackMessage()}</p>
+                        <p className="mt-1">{trainerUnsupported ? (trainerGapLogged ? "A private draft was added to the review queue so the approved knowledge can be improved." : "The answer is not documented yet. The private review draft could not be saved, so contact support if this is blocking work.") : "This is the kind of question we should improve. Contact support if this is blocking your work."}</p>
+                        {helpGapEvent ? <p className="mt-1">{feedbackMessage()}</p> : null}
                       </div>
                     ) : null}
                     {answer.links.length > 0 ? (

@@ -37,6 +37,10 @@ export type HelpGapReviewItem = {
   setupStepKey: string | null;
   trainingMissionKey: string | null;
   linkedSupportCaseId: string | null;
+  draftAnswer: string | null;
+  draftArticleTitle: string | null;
+  draftArticleBody: string | null;
+  providerModel: string | null;
   capabilitySnapshot: {
     canViewFinancialRegister: boolean;
     canCollectFieldPayment: boolean;
@@ -101,6 +105,10 @@ type HelpGapReviewRow = {
   linked_support_case_id: string | null;
   can_view_financial_register: boolean | null;
   can_collect_field_payment: boolean | null;
+  draft_answer?: string | null;
+  draft_article_title?: string | null;
+  draft_article_body?: string | null;
+  provider_model?: string | null;
 };
 
 const REVIEW_STATUSES = [
@@ -148,6 +156,10 @@ const HELP_GAP_REVIEW_COLUMNS = [
   "linked_support_case_id",
   "can_view_financial_register",
   "can_collect_field_payment",
+  "draft_answer",
+  "draft_article_title",
+  "draft_article_body",
+  "provider_model",
 ].join(", ");
 
 function emptySummary(): HelpGapReviewSummary {
@@ -270,6 +282,10 @@ function mapRow(row: HelpGapReviewRow): HelpGapReviewItem | null {
     setupStepKey: row.setup_step_key ? normalizeString(row.setup_step_key) : null,
     trainingMissionKey: row.training_mission_key ? normalizeString(row.training_mission_key) : null,
     linkedSupportCaseId: row.linked_support_case_id ? normalizeString(row.linked_support_case_id) : null,
+    draftAnswer: row.draft_answer ? normalizeString(row.draft_answer) : null,
+    draftArticleTitle: row.draft_article_title ? normalizeString(row.draft_article_title) : null,
+    draftArticleBody: row.draft_article_body ? normalizeString(row.draft_article_body) : null,
+    providerModel: row.provider_model ? normalizeString(row.provider_model) : null,
     capabilitySnapshot: {
       canViewFinancialRegister: row.can_view_financial_register === true,
       canCollectFieldPayment: row.can_collect_field_payment === true,

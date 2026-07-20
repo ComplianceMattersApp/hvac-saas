@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { updateHelpGapReviewStatusFromForm } from "@/lib/actions/help-gap-review-actions";
+import { publishTrainerKnowledgeDraftFromForm } from "@/lib/actions/trainer-knowledge-review-actions";
+import { getRequestUser } from "@/lib/auth/request-identity";
+import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import {
   listHelpGapReviewQueue,
   type HelpGapReviewFilterOptions,
@@ -279,7 +282,7 @@ function Filters({
   );
 }
 
-function HelpGapRow({ item }: { item: HelpGapReviewItem }) {
+function HelpGapRow({ item, canPublishKnowledge }: { item: HelpGapReviewItem; canPublishKnowledge: boolean }) {
   return (
     <article className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -332,6 +335,28 @@ function HelpGapRow({ item }: { item: HelpGapReviewItem }) {
           <dd className="mt-1 break-words text-slate-800">{formatOptional(item.trainingMissionKey)}</dd>
         </div>
       </dl>
+
+      {item.draftArticleTitle || item.draftArticleBody ? (
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50/60 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">Proposed knowledge article</div>
+          <h4 className="mt-2 text-base font-semibold text-slate-950">{item.draftArticleTitle || "Untitled draft"}</h4>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.draftArticleBody || "No draft body was generated."}</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">Drafted by {item.providerModel || "the trainer"}. It is not searchable knowledge until reviewed and published.</p>
+          {canPublishKnowledge && item.reviewStatus !== "converted_to_help_article" ? (
+            <form action={publishTrainerKnowledgeDraftFromForm} className="mt-3">
+              <input type="hidden" name="event_id" value={item.id} />
+              <button type="submit" className="inline-flex min-h-9 items-center rounded-md bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-800">Approve and publish</button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+
+      {item.draftAnswer ? (
+        <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-slate-700">Show trainer fallback response</summary>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{item.draftAnswer}</p>
+        </details>
+      ) : null}
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
         Support case link: {item.linkedSupportCaseId ? "Dormant reference present" : "None"}. No support case is created from this page.
@@ -401,6 +426,8 @@ export default async function HelpGapReviewPage({
   };
 
   const result = await listHelpGapReviewQueue(filters);
+  const requestUser = await getRequestUser();
+  const canPublishKnowledge = Boolean(requestUser && isPlatformOwnerActor({ userId: requestUser.id, email: requestUser.email }));
 
   if (!result.enabled) {
     return (
@@ -465,7 +492,7 @@ export default async function HelpGapReviewPage({
         {result.items.length > 0 ? (
           <div className="mt-5 space-y-4">
             {result.items.map((item) => (
-              <HelpGapRow key={item.id} item={item} />
+              <HelpGapRow key={item.id} item={item} canPublishKnowledge={canPublishKnowledge} />
             ))}
           </div>
         ) : (
