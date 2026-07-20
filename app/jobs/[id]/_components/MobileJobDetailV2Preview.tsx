@@ -206,6 +206,17 @@ function buildBillingPreview(props: {
   }
 
   if (props.isEccComplianceActive) {
+    if (props.showInternalInvoicePanel) {
+      return {
+        title: props.internalInvoiceTruth ? "Review invoice" : props.jobPageInvoiceStateLabel || "Create invoice",
+        summary:
+          props.jobPageInvoiceSummaryText ||
+          "Prepare the ECC invoice now. Issue and send become available when the job is ready for closeout.",
+        actionLabel: props.internalInvoiceTruth ? props.jobPageInvoiceNextAction || "Review invoice" : "Create Invoice",
+        hrefAnchor: "mobile-invoice-summary-card",
+        statusLabel: props.internalInvoiceTruth ? "Invoice active" : "Invoice available",
+      };
+    }
     return {
       title: "Billing / Closeout",
       summary: "No billing action needed yet.",
@@ -517,7 +528,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     isReadOnlyState,
   });
   const canShowNativeInvoiceSummaryAction =
-    billingPreview.hrefAnchor === "mobile-invoice-summary-card" && !isReadOnlyState && !isEccComplianceActive;
+    billingPreview.hrefAnchor === "mobile-invoice-summary-card" && !isReadOnlyState;
   const canShowNativeExternalBillingAction =
     Boolean(showExternalDataEntryPrompt) && !showPrimaryCloseoutBlockers && !isReadOnlyState && !isEccComplianceActive;
   const canShowNativeInvoiceWorkspaceLink =
@@ -527,7 +538,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     !internalInvoiceTruth &&
     Boolean(hasDirectInvoiceWorkflowAccess) &&
     Boolean(showInternalInvoicePanel) &&
-    !showPrimaryCloseoutBlockers;
+    (!showPrimaryCloseoutBlockers || isEcc);
   const canShowNativeStatusActionLink =
     billingPreview.hrefAnchor === "mobile-next-service-action" && showPrimaryCloseoutBlockers;
   const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);

@@ -419,6 +419,13 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('Boolean(internalInvoiceTruth);');
     expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}&mobileLayout=v2#invoice-workspace`}');
     expect(mobileJobDetailV2PreviewSource).toContain('>View Invoice</span>');
+    expect(mobileJobDetailV2PreviewSource).toContain('props.isEccComplianceActive');
+    expect(mobileJobDetailV2PreviewSource).toContain('props.showInternalInvoicePanel');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Prepare the ECC invoice now. Issue and send become available when the job is ready for closeout."');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: props.internalInvoiceTruth ? props.jobPageInvoiceNextAction || "Review invoice" : "Create Invoice"');
+    expect(mobileJobDetailV2PreviewSource).toContain('billingPreview.hrefAnchor === "mobile-invoice-summary-card" && !isReadOnlyState;');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('billingPreview.hrefAnchor === "mobile-invoice-summary-card" && !isReadOnlyState && !isEccComplianceActive;');
+    expect(mobileJobDetailV2PreviewSource).toContain('(!showPrimaryCloseoutBlockers || isEcc);');
     expect(mobileJobWorkScopePanelSource).toContain('invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}&mobileLayout=v2');
     expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-next-service-action"');
     expect(mobileJobDetailV2PreviewSource).not.toContain("props.isEccPermitNeededActive ||\n      Boolean(props.closeoutNeeds?.needsCerts)");
