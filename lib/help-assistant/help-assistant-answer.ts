@@ -2,6 +2,7 @@ import { firstJobMissionSteps, roleTrainingTracks } from "@/lib/training/trainin
 import type { HelpAssistantSafeContext } from "./help-assistant-context";
 import { setupCoachChecklist, type SetupCoachItem } from "./setup-coach-knowledge";
 import { buildAskCmBaselineAnswer } from "./ask-cm-baseline-knowledge";
+import { findAskCmEasterEgg } from "./ask-cm-easter-eggs";
 
 export type HelpAssistantLink = {
   label: string;
@@ -98,6 +99,9 @@ export function answerAskComplianceMatters(
 ): HelpAssistantAnswer {
   const q = normalizeQuestion(question);
   if (!q) return fallbackAnswer();
+
+  const easterEgg = findAskCmEasterEgg(q);
+  if (easterEgg) return easterEgg;
 
   const baselineAnswer = buildAskCmBaselineAnswer(q, context);
   if (baselineAnswer) return baselineAnswer;

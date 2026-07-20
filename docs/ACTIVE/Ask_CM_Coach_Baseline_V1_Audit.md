@@ -47,6 +47,7 @@ Every curated intent carries machine-reviewable `sources.docs` and `sources.code
 - Links point only to safe internal list, report, training, calendar, and intake routes; no placeholder ids or customer/public routes are emitted.
 - Ask CM remains non-mutating. It does not create jobs, invoices, payments, customers, support cases, or any other operational record.
 - Unknown questions use a friendly Needs review fallback, link to Training Room and support guidance, and use the existing Help Gap path when enabled.
+- A small owner-approved Easter egg catalog uses exact local triggers only. It contains no family names, external links, provider calls, or mutation behavior, and cannot override ordinary workflow phrasing.
 
 ## Docs/code mismatches found
 
