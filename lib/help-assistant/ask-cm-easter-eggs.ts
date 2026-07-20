@@ -59,6 +59,36 @@ const easterEggs: Array<{
       links: [],
     },
   },
+  {
+    triggers: ["who is nana terry", "tell me about nana terry", "nana terry"],
+    answer: {
+      status: "answered",
+      title: "Nana Terry",
+      body:
+        "Nana Terry is the glue that holds the whole side of the family together—the kind of person who keeps everyone connected, remembers what matters, and somehow makes a gathering feel complete just by being there. Every strong family has a center of gravity. This one has Nana Terry.",
+      links: [],
+    },
+  },
+  {
+    triggers: ["who is nana mary", "tell me about nana mary", "nana mary"],
+    answer: {
+      status: "answered",
+      title: "Nana Mary",
+      body:
+        "Nana Mary is love with a security perimeter. She is warm, loyal, and absolutely unwilling to let a single soul mess up so much as one hair on her loved ones' heads. Trouble may arrive with confidence, but it leaves after realizing Nana Mary was already on watch.",
+      links: [],
+    },
+  },
+  {
+    triggers: ["who is terry", "tell me about terry", "terry is the boss"],
+    answer: {
+      status: "answered",
+      title: "The Boss",
+      body:
+        "Terry is the boss. She runs the house, keeps the operation moving, and—through an act of extraordinary generosity—occasionally lets Eddie pretend he is in charge. Every great organization has strong leadership. At home, the org chart is not complicated.",
+      links: [],
+    },
+  },
 ];
 
 function normalize(value: string) {

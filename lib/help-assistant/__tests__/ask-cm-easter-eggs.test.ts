@@ -19,6 +19,9 @@ describe("Ask CM Easter eggs", () => {
     ["What is a cremote?", "The Cremote", "family law"],
     ["Who is Apa?", "Grandpa Apa", "invented by grandchildren"],
     ["Tell me about the family", "The Team Behind the Team", "two beautiful girls"],
+    ["Who is Nana Terry?", "Nana Terry", "center of gravity"],
+    ["Who is Nana Mary?", "Nana Mary", "security perimeter"],
+    ["Who is Terry?", "The Boss", "org chart"],
   ])("reveals %s only through its deliberate trigger", (question, title, expectedCopy) => {
     const answer = answerAskComplianceMatters(question, context);
     expect(answer.status).toBe("answered");
