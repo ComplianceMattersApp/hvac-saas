@@ -41,7 +41,7 @@ Use a small owner-curated regression set before changing the model, prompt, retr
 
 - core navigation and setup;
 - customers, locations, jobs, scheduling, and field completion;
-- estimates and Good / Better / Best proposals;
+- estimates and two-or-three-option comparison proposals (Good and Better, with optional Best);
 - equipment, service plans, parts, and follow-up visits;
 - invoices, payments, and financial visibility by role;
 - ECC/HERS and permit workflows;

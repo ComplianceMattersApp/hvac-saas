@@ -2144,7 +2144,7 @@ Field-note launch-hardening closeout alignment note (current baseline):
   - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
 - Launch gating remains unchanged:
   - controlled tester onboarding remains parked pending explicit owner approval
-  - Estimates and Support Console production enablement remain parked behind runbooks
+  - Historical checkpoint: Estimates and Support Console were parked here; Estimates later completed controlled enablement, while Support Console remains runbook-gated
   - tenant customer payments V1 is complete for current intended scope; the Payments V2 deferred register is parked
   - QBO remains optional/downstream only
 
@@ -2234,7 +2234,7 @@ Ops First Impression (`/ops`) closeout alignment note (current pass complete):
   6. First-owner/operator handoff dry-run
   7. Controlled tester onboarding
 - Tester pressure must not trigger roadmap panic; controlled tester onboarding remains intentionally queued after readiness checkpoints are acceptably complete.
-- Support Console and Estimates production enablement remain parked behind their runbooks.
+- Support Console remains parked behind its runbook. Estimates later completed controlled production enablement and remains independently runtime-gated during owner production testing.
 - Tenant customer payment execution remains deferred.
 - QBO remains optional downstream/last-last.
 - Resume broader launch-readiness sequencing after this docs closeout.
@@ -2725,6 +2725,7 @@ Out-of-box readiness / business identity / settings packaging is also closed at 
 The next natural roadmap area is smaller service-model revisions / service workflow refinement.
 Estimates/quoting V1A-V1J is now implemented to the current guarded internal baseline.
 Estimates is internal-only production-live: V1A and V1H migrations are applied in production, `ENABLE_ESTIMATES=true` is enabled in Vercel Production only, and `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
+July 20, 2026 estimates lane closeout supersedes older forward-looking notes in this historical ledger: Estimate Coach and concise line rewrite are implemented; Trainer uses governed repository knowledge and durable owner-reviewed help-gap logging; owner-only AI usage tracking enforces the configured $25 monthly application cap; estimate photos and explicit customer-visibility controls are implemented; Finalize & Send Proposal is implemented; comparison proposals require two populated options and allow an optional third; and the owner confirmed production migration `20260720150000_estimate_photos.sql` applied. Runtime capabilities remain independently environment-gated while owner production testing continues.
 The earlier enabled-mode render error is now a watch item only for planning purposes: clean captured smoke did not reproduce the `TypeError: Cannot read properties of undefined (reading 'call')`, and `/estimates` plus multiple `/estimates/[id]` routes returned `200` without a real stack trace.
 Estimates internal-only production enablement execution is complete and documented in the runbook closeout.
 Section 2I / 2J / 2K docs closeout is complete: estimate UX cleanup, proposal-link/customer approval delivery, provider-backed proposal email delivery, Customer Delivery UI streamlining, internal approval notification delivery, active-link fallback hardening, and local preview-mode (`EMAIL_DELIVERY_MODE=preview`) safety path are recorded as closed for this lane.
@@ -2762,7 +2763,7 @@ Production readiness hardening guard is complete and committed: `createEstimateD
   - the contractor report current-scope closeout is the current quality benchmark for future estimate presentation polish and customer-facing document tone
   - completed in current baseline: workflow wording now makes `Send Estimate` and `Mark Sent Manually` clearly distinct actions so communication attempts do not read as lifecycle transitions
   - completed in current baseline: draft estimate Pricebook add now behaves as editable defaults before add while preserving provenance
-  - Customer Estimate Profile Entry V1 is now complete on the guarded internal baseline (commits `bcfa9f7`, `b977c89`): `/customers/[id]` now shows an internal-only Estimates section when `ENABLE_ESTIMATES=true`; customer profile header includes `Create Estimate` for internal users when enabled; `Create Estimate` routes to `/estimates/new?customer_id=<id>`; `/estimates/new` validates the UUID and preselects the customer; customer estimates appear in the customer profile history/list; `/estimates/[id]` includes `Back to Customer` when `estimate.customer_id` is set; section CTA behavior was cleaned up (no duplicate always-visible CTA; empty state keeps `Create First Estimate`); contractors do not see estimate controls; existing feature gates remain intact; production estimates remain disabled unless explicitly enabled under runbook gates.
+  - Customer Estimate Profile Entry V1 is complete (commits `bcfa9f7`, `b977c89`): internal users can create estimates from a customer profile with validated customer context, see estimate history, and navigate back to the customer; contractors do not receive internal estimate controls; runtime feature gates remain intact.
   - Customer Estimate Profile Entry V1 is guarded internal baseline only: no real outbound email, PDF generation/storage, customer approval/decline/request-change, public/customer portal links, contractor visibility, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, schema changes, migrations, RLS changes, or production data actions were introduced.
   - Customer Estimate Profile Entry V1 validation: `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `131` tests); user browser smoke passed.
   - Job-context Estimate Entry Wiring V1 is now complete on the guarded internal baseline (commit `92df487`): job detail workspace (`/jobs/[id]`) now shows an internal-only `Create Estimate` CTA when `ENABLE_ESTIMATES=true` and `customer_id`, `location_id`, and `job.id` are all present; CTA URL carries `customer_id`, `location_id`, `origin_job_id`, and `service_case_id` (when available); `/estimates/new` now parses and UUID-validates all four prefill params via `resolveEstimateNewPrefillQuery`; `resolveEstimateNewInitialSelection` safely derives initial customer/location selection and rejects mismatched or invalid params; `NewEstimateForm` initializes location selection from `initialLocationId` and passes `origin_job_id` and `service_case_id` through `buildEstimateDraftCreatePayload` into `createEstimateDraft`; new pure helper module `lib/estimates/estimate-new-entry.ts` holds all UUID validation, query parsing, selection resolution, and payload-building logic with no Next.js/Supabase imports; two new test files cover prefill query parsing and payload building.
@@ -2773,7 +2774,7 @@ Production readiness hardening guard is complete and committed: `createEstimateD
   - future customer-centered estimate entry and history should surface from customer profile/history, reporting, and standard nav only when the estimate track is intentionally promoted beyond the guarded internal baseline
   - future estimate entry should support customer email/location prefill with explicit editability
   - future response flow may include explicit customer approve/decline/request-change outcomes only after dedicated design/gates
-  - future reporting/conversion work may include estimate reporting, explicit estimate-to-job/service-visit handoff, explicit later estimate-to-invoice-charge handoff, and multi-option/good-better-best quoting, but those remain deferred
+  - remaining future work may include estimate reporting and further field-evidence-driven polish; estimate-to-job and estimate-to-invoice draft conversion, customer proposal delivery, and two-or-three-option quoting are implemented
   - future top-ribbon/nav estimate access should align to normal workflow once intentionally enabled beyond guarded internal use
   - future pricebook-backed estimate/invoice drafting should keep prefilling editable draft fields rather than locking transactional line detail
   - future Work Item-first billing flow remains separate audit/planning work: structured Work Items as primary operational truth, free-text notes as narrative context, and eventual Invoice Charge building from existing Work Items with review/editing rather than re-entry
@@ -3197,7 +3198,7 @@ Next natural roadmap area:
   - Create-next in V1 does not auto-clear source waiting state; explicit/manual release remains required.
   - This refinement advances the service model without introducing parts inventory, estimate automation, service-case-level blocker orchestration, or auto-release behavior.
   - Estimates/quoting V1A-V1J is implemented to the current guarded internal baseline.
-  - Production estimates remain intentionally disabled/deferred pending migration apply plus explicit feature-flag enablement.
+  - Historical note: production Estimates were disabled at this stage. They were later enabled for internal use, expanded for owner-controlled customer proposal testing, and the July 20, 2026 photo migration is applied.
   - V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
   - V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
   - V1E keeps line editing draft-only and hides line-edit controls after `sent`.
@@ -3350,7 +3351,7 @@ Required line-item fields:
 - unit_price
 - line_subtotal
 
-Multi-option proposal planning note: future Good / Better / Best support is locked to a parent Estimate / Proposal with child Option Packages, not three linked estimates and not fake option headers inside flat `estimate_line_items`. See [Estimate_Multi_Option_Proposal_Model_Spec.md](./Estimate_Multi_Option_Proposal_Model_Spec.md).
+Multi-option proposal implementation note: Good/Better comparison proposals use one parent Estimate / Proposal with child Option Packages, not linked estimates or fake flat-line headers. New comparisons start with Good and Better; Best is optional. See [Estimate_Multi_Option_Proposal_Model_Spec.md](./Estimate_Multi_Option_Proposal_Model_Spec.md).
 
 ### Locked rule
 If the pricebook changes later, old estimates do not change.
@@ -3402,7 +3403,7 @@ Full procedure: hardened committed production execution runbook (`df9870f`) at `
 ### Next implementation direction (post-V1J)
 - V1I decision remains recorded and V1J internal document-template/readiness implementation is complete.
 - Future multi-option proposal work must follow the parent-estimate + child-option model lock in `docs/ACTIVE/Estimate_Multi_Option_Proposal_Model_Spec.md`.
-- Any production estimate enablement remains a future explicit execution decision under the hardened runbook gates; Option A comes later as sandbox-only real provider enablement after all documented go/no-go gates are satisfied.
+- Historical planning note superseded by the July 20, 2026 closeout: controlled Estimates enablement and provider-backed proposal delivery are implemented; runtime flags and rollback gates remain authoritative during owner production testing.
 - draft-detail smoke caveat is closed.
 - Do not enable production estimate email sending without an explicit rollout plan.
 - no customer approval, customer/contractor portal authority, email/PDF, conversion, or payment behavior should be implemented without a design pass

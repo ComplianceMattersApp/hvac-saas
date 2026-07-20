@@ -374,7 +374,7 @@ These boundaries are hard limits under V0. They may only change through explicit
 | Production data edits | **Prohibited** outside of reviewed engineering hotfixes following standard commit/test/push flow. |
 | Support Console | **Not activated.** Support Console feature remains parked behind its production enablement runbook. V0 does not require it. |
 | Runbook bypass | **Prohibited.** No estimates, support-console, or first-owner provisioning operations may be executed outside their runbooks. |
-| Estimates production enablement | **Parked.** Requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`. |
+| Estimates production operations | **Owner-controlled.** Estimates are enabled for internal use and the current AI/proposal/photo lane is deployed for owner production testing. Runtime flags and the Estimates runbook still govern activation and rollback; Support V0 may not bypass them. |
 | Support Console production enablement | **Parked.** Requires explicit gate approval per `docs/ACTIVE/Support_Console_Production_Enablement_Runbook.md`. |
 | Tenant customer payment execution | **Deferred.** No Pay Now / Charge Card / checkout / refund / dispute actions are live at V0. |
 | QBO | **Not in scope.** Optional downstream only. |

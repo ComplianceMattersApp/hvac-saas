@@ -392,7 +392,7 @@ Use [PROJECT_TRUTH.md](../PROJECT_TRUTH.md) for current product truth, [Release_
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
   7. Controlled tester onboarding only after the above are acceptably complete
 - Tester remains in the wings intentionally and is not to be treated as a public launch trigger.
-- Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payments V1 is complete for current intended scope; the Payments V2 deferred register is parked; QBO remains optional downstream/last-last.
+- Support Console remains parked behind its runbook; Estimates later completed controlled production enablement and remains runtime-gated for owner testing; tenant customer payments V1 is complete for current intended scope; the Payments V2 deferred register is parked; QBO remains optional downstream/last-last.
 - Resume broader launch-readiness sequencing after this docs closeout without treating tester pressure as a launch trigger.
 - Owner Visibility / Business Pulse V1 is closed for current pass after Role-Aware Today Pulse V1 and owner visual/mobile approval on `/today`.
 - Owner Visibility / Business Pulse score update: previous `7.1/10`, current `8.0/10` for controlled rollout readiness.
@@ -595,7 +595,7 @@ Verification notes (2026-05-07, local dev session):
   - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
 - Launch gating posture remains unchanged:
   - controlled tester onboarding remains parked until explicit owner approval after remaining spine review
-  - Estimates and Support Console production enablement remain parked behind runbooks
+  - Historical checkpoint: Estimates and Support Console were parked here; Estimates later completed controlled enablement, while Support Console remains runbook-gated
   - tenant customer payments V1 is closed for current intended scope; further payment expansions remain deferred
   - QBO remains optional/downstream only
 
@@ -607,7 +607,7 @@ Summary of locked posture:
 - Notifications, calendar, contractor portal, reports, admin/setup, job workspace, ops, product mode matrix, and customer continuity V1 are closed for the current owner-release pass.
 - Deferred/parked items (customer portal, QBO, payment V2 add-ons beyond current tenant customer invoice payment V1, estimates/support-console expansion, mode-switch UI) are not release blockers unless the owner explicitly reopens them.
 - True App Package / Device-App Experience is complete for controlled rollout use and is not an open blocker.
-- Runbook-gated items (estimates enablement, support console enablement, first-owner provisioning) remain parked behind their runbooks.
+- Runbook controls remain authoritative. Estimates later completed controlled enablement; Support Console and first-owner provisioning remain parked until their respective gates are met.
 - No codebase split. ECC/HERS-first with HVAC Service-ready shared foundation.
 
 This section is a pointer only. Do not duplicate the full deferred list here; the release packet is the canonical source.
@@ -1427,7 +1427,7 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - production estimate feature enablement
 - Production rollout remains a later explicit decision. The sole pre-production code blocker (missing `createEstimateDraft` flag guard) is now resolved and committed.
 - Internal-only production enablement execution is completed through runbook phases, including pre-enable disabled-state checks, Production-only `ENABLE_ESTIMATES=true` enablement, production redeploy, and internal-only smoke with controlled draft creation.
-- Production `ENABLE_ESTIMATE_EMAIL_SEND` must remain unset/false for the internal-only slice. Real outbound estimate email requires a separate email-enablement runbook after all V1I go/no-go gates are satisfied.
+- Historical internal-only gate: production proposal email remained disabled during the original enablement slice. The later customer proposal delivery lane is implemented and remains controlled by its independent runtime flag and owner rollout posture.
 - Full procedure and execution closeout are documented in `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md` (latest runbook history entry v1.7).
 - Next implementation direction: V1I planning and V1J internal document-template/readiness implementation are both complete.
   - draft-detail smoke caveat is closed
@@ -1438,13 +1438,14 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - future estimate polish should target the same professional clarity standard already reached by contractor report delivery
   - completed in current baseline: workflow wording now separates `Send Estimate` from `Mark Sent Manually` more explicitly
   - completed in current baseline: draft estimate Pricebook add now applies editable defaults before add while preserving provenance
-  - Customer Estimate Profile Entry V1 is now complete on the guarded internal baseline (commits `bcfa9f7`, `b977c89`): `/customers/[id]` shows an internal-only Estimates section when `ENABLE_ESTIMATES=true`; the customer profile header includes `Create Estimate` for internal users when enabled; `Create Estimate` routes to `/estimates/new?customer_id=<id>`; `/estimates/new` validates the UUID and preselects the customer; customer/location context is prefilled or filtered where available but fields remain fully editable; customer estimates appear in the profile history/list; `/estimates/[id]` includes `Back to Customer` when `estimate.customer_id` is set; section CTA was cleaned up (no duplicate always-visible CTA; empty state retains `Create First Estimate`); contractors do not see estimate controls; existing feature gates remain intact; production estimates remain disabled unless explicitly enabled under runbook gates.
+  - Customer Estimate Profile Entry V1 is complete (commits `bcfa9f7`, `b977c89`): `/customers/[id]` shows an internal Estimates section when `ENABLE_ESTIMATES=true`; create actions preselect validated customer/location context while remaining editable; customer estimate history and Back to Customer navigation are present; contractors do not receive internal estimate controls; runtime gates remain intact.
   - Customer Estimate Profile Entry V1 is guarded internal baseline only: no real outbound email, PDF generation/storage, customer approval/decline/request-change, public/customer portal links, contractor visibility, estimate-to-job conversion, estimate-to-invoice conversion, payment/deposit, Stripe tenant payment behavior, QBO behavior, schema changes, migrations, RLS changes, or production data actions were introduced.
   - Customer Estimate Profile Entry V1 validation: `npx.cmd tsc --noEmit` passed; `npx.cmd vitest run lib/estimates` passed (`7` files / `131` tests); user browser smoke passed.
   - future customer-centered estimate access/history may extend into customer profile/history, reporting, and standard nav once the guarded internal baseline is intentionally advanced
   - future estimate entry should support customer email/location prefill with explicit editability
   - future response flow may include explicit customer approve/decline/request-change outcomes after dedicated design/gates
-  - future estimate reporting, explicit estimate-to-job/service-visit conversion, explicit later estimate-to-invoice-charge conversion, multi-option/good-better-best quoting, and top-ribbon/nav workflow access remain deferred design tracks
+  - July 20, 2026 superseding closeout: explicit estimate-to-job and estimate-to-invoice-draft conversion, customer proposal delivery, two-or-three-option comparison quoting, Estimate Coach/Trainer, Finalize & Send, and estimate photos are implemented; future estimate reporting and field-evidence-driven polish remain follow-up work
+  - owner confirmed `20260720150000_estimate_photos.sql` applied in production; owner-controlled production testing continues
   - future Work Item-first billing flow remains a separate audit/planning item: Work Items stay primary operational truth, free-text scope/notes stay narrative context, and Invoice Charges should eventually be buildable from existing Work Items with review/editing
   - future slices may explore Pricebook -> Work Item assisted creation, smarter defaults, and broader invoice panel polish; those remain deferred and are not implemented by this slice
   - payment/deposit remains deferred until tenant payment execution is intentionally enabled

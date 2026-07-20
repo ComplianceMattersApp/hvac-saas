@@ -20,7 +20,7 @@ Implementation closeout (2026-07-20):
 - Production migration `20260720150000_estimate_photos.sql` was confirmed applied by the owner on 2026-07-20.
 - Runtime remains environment-gated and is being exercised through owner-controlled production testing.
 
-Future Good / Better / Best proposal support must use one parent Estimate / Proposal with child Option Packages.
+Good/Better comparison proposal support uses one parent Estimate / Proposal with child Option Packages; Best is an optional third package.
 
 The current implemented Estimates model supports one parent estimate with one flat `estimate_line_items` list and one total. That is acceptable for current single-option internal quoting, but it does not cleanly support primary commercial alternatives.
 
@@ -305,7 +305,7 @@ Section 2C Action A closeout note (2026-05-20):
 - No invoice conversion is included in this slice.
 - No payment/Stripe tenant execution/QBO/SMS/email/customer portal/public-link/e-signature/stored-PDF behavior is introduced.
 
-Estimate-to-invoice conversion (Action B) remains deferred.
+Estimate-to-invoice draft conversion (Action B) is implemented behind the existing schema/runtime safeguards.
 
 ---
 
@@ -332,12 +332,12 @@ Recommended future sequence:
 
 1. Schema design review for parent estimate plus child option packages.
 2. Add option package foundation and option-scoped line item model, behind existing estimate guards.
-3. Add read helpers that can project both current single-option estimates and future option-package estimates safely.
-4. Add internal draft UI for creating/editing up to 3 primary options with Good / Better / Best defaults.
+3. Maintain read helpers that project both single-option estimates and option-package estimates safely.
+4. Add internal draft UI that starts with Good and Better and permits an optional third Best package (maximum 3).
 5. Add internal print/readiness presentation for multi-option proposals.
 6. Add internal response/selection recording model only after approval semantics are reviewed.
 7. Add customer-facing approval/e-signature/public/portal surfaces only after separate authority and security design.
-8. (**Section 2B locked, May 20, 2026**) Add conversion from selected option id following the locked two-action model: Action A (estimate → job), then Action B (estimate → invoice draft). Action A is now implemented internally (environment migration-gated) with durable linkage and audit trail. Action B remains deferred.
+8. (**Implemented**) Convert the approved selected option through the locked two-action model: Action A (estimate → job), then Action B (estimate → invoice draft), with durable linkage, audit events, idempotency, and schema/runtime guards.
 9. Add optional add-ons as a separate model after primary options are proven.
 10. Add versioned template system after proposal content/revision semantics are mature enough to freeze safely.
 
