@@ -5,6 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addEstimateOptionLineItem,
+  addOptionalThirdEstimateOption,
   createDefaultEstimateOptions,
   removeEstimateOptionLineItem,
   updateEstimateOptionLineItem,
@@ -103,6 +104,7 @@ function makeSupabaseClient(
     estimateStatus?: string;
     flatLinesCount?: number;
     existingOptionsCount?: number;
+    existingOptionSlots?: number[];
     optionsUnavailable?: boolean;
     optionExists?: boolean;
   } = {}
@@ -112,6 +114,7 @@ function makeSupabaseClient(
     estimateStatus = "draft",
     flatLinesCount = 0,
     existingOptionsCount = 0,
+    existingOptionSlots,
     optionsUnavailable = false,
     optionExists = true,
   } = options;
@@ -137,8 +140,10 @@ function makeSupabaseClient(
     const listResult = {
       data: optionsUnavailable
         ? null
-        : existingOptionsCount > 0
-          ? [{ id: OPTION_ID }]
+        : existingOptionSlots
+          ? existingOptionSlots.map((slot_index) => ({ id: `opt-${slot_index}`, slot_index }))
+          : existingOptionsCount > 0
+          ? [{ id: OPTION_ID, slot_index: 1 }]
           : [],
       error: optionsUnavailable
         ? {
@@ -199,9 +204,16 @@ function makeSupabaseClient(
       if (table === "estimate_options") {
         return {
           select: vi.fn(() => makeOptionSelectChain()),
-          insert: vi.fn(async (payload: unknown) => {
+          insert: vi.fn((payload: unknown) => {
             insertedRows.push({ table, payload });
-            return { data: null, error: null };
+            const result = { data: null, error: null };
+            const chain: any = {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "opt-3" }, error: null })),
+              })),
+              then: (resolve: any, reject: any) => Promise.resolve(result).then(resolve, reject),
+            };
+            return chain;
           }),
           update: vi.fn((payload: Record<string, unknown>) => {
             updatedRows.push({ table, payload });
@@ -469,7 +481,7 @@ describe("createDefaultEstimateOptions", () => {
     isEstimatesEnabledMock.mockReturnValue(true);
   });
 
-  it("creates exactly three default options for eligible empty draft estimate", async () => {
+  it("creates two default options for an eligible empty draft estimate", async () => {
     const supabase = makeSupabaseClient({
       estimateExists: true,
       estimateStatus: "draft",
@@ -484,9 +496,21 @@ describe("createDefaultEstimateOptions", () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.createdOptions).toBe(3);
+      expect(result.createdOptions).toBe(2);
       expect(result.estimateId).toBe(ESTIMATE_ID);
     }
+  });
+
+  it("adds an optional third option after the first two exist", async () => {
+    const supabase = makeSupabaseClient({ existingOptionSlots: [1, 2] });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await addOptionalThirdEstimateOption({ estimateId: ESTIMATE_ID });
+
+    expect(result.success).toBe(true);
+    const optionInsert = supabase.__insertedRows.find((row: any) => row.table === "estimate_options");
+    expect(optionInsert?.payload).toMatchObject({ slot_index: 3, label: "Best" });
   });
 
   it("blocks if flat estimate_line_items exist", async () => {

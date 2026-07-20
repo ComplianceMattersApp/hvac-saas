@@ -32,6 +32,7 @@ import {
   removeEstimateOptionLineItem,
   transitionEstimateStatus,
   createDefaultEstimateOptions,
+  addOptionalThirdEstimateOption,
   updateEstimateOptionMetadata,
   recordEstimateApprovalResponse,
   convertApprovedEstimateToJob,
@@ -417,10 +418,8 @@ export async function submitEstimateProposalEmailActionFromForm(
 function validateFinalizeAndSendContent(estimate: Awaited<ReturnType<typeof getEstimateById>>) {
   if (!estimate) return "Estimate was not found.";
   if (estimate.proposalMode === "multi_option_packages") {
-    if (!estimate.options?.length) return "Add proposal options before finalizing.";
-    if (estimate.options.some((option) => !option.line_items?.length)) {
-      return "Each proposal option needs at least one line item before finalizing.";
-    }
+    const populatedOptions = (estimate.options ?? []).filter((option) => option.line_items?.length > 0);
+    if (populatedOptions.length < 2) return "Add line items to at least two proposal options before finalizing.";
     return null;
   }
   if (!estimate.line_items?.length) return "Add at least one line item before finalizing.";
@@ -502,6 +501,14 @@ export async function createDefaultEstimateOptionsFromForm(formData: FormData) {
   if (result.success) {
     revalidatePath(`/estimates/${estimateId}`);
   }
+}
+
+export async function addOptionalThirdEstimateOptionFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) return;
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) return;
+  const result = await addOptionalThirdEstimateOption({ estimateId });
+  if (result.success) revalidatePath(`/estimates/${estimateId}`);
 }
 
 /**

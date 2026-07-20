@@ -26,6 +26,8 @@ import {
   convertEstimateToJobFromForm,
   convertEstimateToInvoiceDraftFromForm,
   saveManualEstimateLineToPricebookFromForm,
+  removeEstimateOptionLineItemFromForm,
+  addOptionalThirdEstimateOptionFromForm,
 } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateCoachPanel from "./EstimateCoachPanel";
@@ -39,7 +41,6 @@ import FinalizeAndSendProposalForm from "./FinalizeAndSendProposalForm";
 import EstimatePhotos from "./EstimatePhotos";
 import { listEstimatePhotos } from "@/lib/estimates/estimate-photos";
 import { getDraftCustomerDeliveryHelperCopy } from "./status-copy";
-import { removeEstimateOptionLineItemFromForm } from "./actions";
 
 export const metadata = { title: "Estimate" };
 
@@ -654,7 +655,7 @@ export default async function EstimateDetailPage({
                       action={recordEstimateApprovalResponseFromForm}
                       estimateId={estimate.id}
                       proposalMode={estimate.proposalMode}
-                      options={(estimate.options ?? []).map((o) => ({
+                      options={(estimate.options ?? []).filter((o) => o.line_items.length > 0).map((o) => ({
                         id: o.id,
                         label: o.label,
                         total_cents: o.total_cents,
@@ -1014,6 +1015,15 @@ export default async function EstimateDetailPage({
                   )}
                 </div>
               ))}
+              {isDraft && (estimate.options ?? []).length === 2 ? (
+                <form action={addOptionalThirdEstimateOptionFromForm} className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 text-center print:hidden">
+                  <input type="hidden" name="estimate_id" value={estimate.id} />
+                  <button type="submit" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Add Third Option
+                  </button>
+                  <p className="mt-2 text-xs text-slate-500">Optional. Two completed choices are enough to finalize and send.</p>
+                </form>
+              ) : null}
             </div>
           </>
         ) : (

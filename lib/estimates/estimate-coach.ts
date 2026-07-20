@@ -86,21 +86,19 @@ export function buildEstimateCoachReport(input: EstimateCoachInput): EstimateCoa
 
   if (estimate.proposalMode === "multi_option_packages") {
     const options = estimate.options ?? [];
-    if (options.length === 0) {
+    const populatedOptions = options.filter((option) => option.line_items.length > 0);
+    if (populatedOptions.length < 2) {
       addAttention(
         "missing_options",
-        "Add option packages",
-        "This proposal is marked as multi-option but has no option packages.",
+        "Add at least two complete options",
+        "A comparison proposal needs at least two options with line items. A third option is optional.",
         "option_package_suggestion"
       );
     }
-    for (const [index, option] of options.entries()) {
+    for (const [index, option] of populatedOptions.entries()) {
       const optionName = hasText(option.label) ? option.label.trim() : `Option ${index + 1}`;
       if (!hasText(option.label)) {
         addAttention(`option_${option.id}_label`, `Name ${optionName}`, "Each option needs a customer-readable label; stored order remains separate from its label.", "option_package_suggestion");
-      }
-      if (option.line_items.length === 0) {
-        addAttention(`option_${option.id}_lines`, `Add lines to ${optionName}`, "Every primary option should contain its own proposed commercial scope.", "option_package_suggestion");
       }
       if (option.total_cents <= 0) {
         addAttention(`option_${option.id}_total`, `Review the ${optionName} total`, "This option totals $0. Confirm pricing and quantities before delivery.", "option_package_suggestion");

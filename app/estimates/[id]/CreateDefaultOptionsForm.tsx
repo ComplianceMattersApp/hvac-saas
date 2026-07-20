@@ -47,7 +47,7 @@ export default function CreateDefaultOptionsForm({
               </span>
               <span aria-hidden="true" className="text-slate-300">→</span>
               <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
-                Good / Better / Best
+                Compare Two or Three Options
               </span>
             </div>
           </div>
@@ -58,7 +58,7 @@ export default function CreateDefaultOptionsForm({
                 type="submit"
                 className="inline-flex min-h-10 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,transform] hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]"
               >
-                Create Good / Better / Best
+                Start With Two Options
               </button>
             </form>
         </div>

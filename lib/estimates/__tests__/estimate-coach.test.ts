@@ -34,7 +34,7 @@ describe("buildEstimateCoachReport", () => {
     ]));
   });
 
-  it("checks every multi-option package instead of the flat parent total", () => {
+  it("requires two populated options and ignores an unfinished optional choice", () => {
     const report = buildEstimateCoachReport({
       estimate: estimateFixture({
         proposalMode: "multi_option_packages",
@@ -47,8 +47,9 @@ describe("buildEstimateCoachReport", () => {
       }),
       customerEmail: "buyer@example.com",
     });
-    expect(report.attentionCount).toBe(2);
-    expect(report.suggestions.map((item) => item.id)).toEqual(expect.arrayContaining(["option_better_lines", "option_better_total"]));
+    expect(report.attentionCount).toBe(1);
+    expect(report.suggestions.map((item) => item.id)).toContain("missing_options");
+    expect(report.suggestions.map((item) => item.id)).not.toContain("option_better_total");
     expect(report.suggestions.map((item) => item.id)).not.toContain("zero_total");
   });
 });

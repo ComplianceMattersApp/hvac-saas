@@ -146,6 +146,9 @@ export async function approveEstimateFromProposalLink(
     if (!selectedOption?.id) {
       return { success: false, error: "selected_option_invalid" };
     }
+    if (!Array.isArray(selectedOption.line_items) || selectedOption.line_items.length === 0) {
+      return { success: false, error: "selected_option_invalid" };
+    }
 
     selectedOptionId = String(selectedOption.id ?? "").trim() || null;
     selectedOptionLabelSnapshot = String(selectedOption.label ?? "").trim() || null;

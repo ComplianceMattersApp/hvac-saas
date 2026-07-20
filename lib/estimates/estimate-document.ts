@@ -118,7 +118,7 @@ export function buildEstimateDocumentViewModel(params: {
   const proposalMode = params.estimate.proposalMode;
   const options: EstimateDocumentOptionViewModel[] =
     proposalMode === "multi_option_packages" && Array.isArray(params.estimate.options)
-      ? params.estimate.options.map((opt) => ({
+      ? params.estimate.options.filter((opt) => opt.line_items.length > 0).map((opt) => ({
           id: opt.id,
           slotIndex: opt.slot_index,
           label: opt.label,

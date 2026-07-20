@@ -1791,7 +1791,7 @@ export type CreateDefaultEstimateOptionsResult =
   | { success: false; error: string };
 
 /**
- * Create exactly three default empty option packages (Good, Better, Best)
+ * Create two default empty option packages (Good and Better).
  * on a draft estimate with no existing options and no flat line items.
  *
  * Eligibility:
@@ -1805,7 +1805,7 @@ export type CreateDefaultEstimateOptionsResult =
  * Do not copy or move flat lines into options.
  *
  * On success:
- * - Creates exactly 3 rows in estimate_options
+ * - Creates exactly 2 rows in estimate_options
  * - Writes estimate_options_created event
  * - Does not update parent estimate totals
  * - Returns the number of options created
@@ -1896,7 +1896,7 @@ export async function createDefaultEstimateOptions(
     };
   }
 
-  // Create exactly three default option packages
+  // Start with two choices. A third Best option can be added separately.
   const nowIso = new Date().toISOString();
   const defaultOptions = [
     {
@@ -1929,21 +1929,6 @@ export async function createDefaultEstimateOptions(
       created_at: nowIso,
       updated_at: nowIso,
     },
-    {
-      estimate_id: estimateId,
-      slot_index: 3,
-      default_label_key: "best",
-      label: "Best",
-      sort_order: 3,
-      summary: null,
-      notes: null,
-      subtotal_cents: 0,
-      total_cents: 0,
-      created_by_user_id: userId,
-      updated_by_user_id: userId,
-      created_at: nowIso,
-      updated_at: nowIso,
-    },
   ];
 
   const { error: insertErr } = await supabase
@@ -1957,8 +1942,8 @@ export async function createDefaultEstimateOptions(
     estimate_id: estimateId,
     event_type: "estimate_options_created",
     meta: {
-      option_count: 3,
-      labels: ["Good", "Better", "Best"],
+      option_count: 2,
+      labels: ["Good", "Better"],
     },
     user_id: userId,
   });
@@ -1966,8 +1951,62 @@ export async function createDefaultEstimateOptions(
   return {
     success: true,
     estimateId,
-    createdOptions: 3,
+    createdOptions: 2,
   };
+}
+
+export async function addOptionalThirdEstimateOption(params: { estimateId: string }) {
+  if (!isEstimatesEnabled()) return { success: false as const, error: "Estimates are currently unavailable." };
+  const estimateId = String(params.estimateId ?? "").trim();
+  if (!estimateId) return { success: false as const, error: "estimate_id is required." };
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+  const accountOwnerUserId = internalUser.account_owner_user_id;
+  const userId = internalUser.user_id;
+  const { data: estimate, error: estimateError } = await supabase
+    .from("estimates")
+    .select("id, status")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+  if (estimateError) throw estimateError;
+  if (!estimate?.id) return { success: false as const, error: "Estimate not found in this account." };
+  if (estimate.status !== "draft") return { success: false as const, error: "Options can only be changed while the estimate is a draft." };
+
+  const { data: options, error: optionsError } = await supabase
+    .from("estimate_options")
+    .select("id, slot_index")
+    .eq("estimate_id", estimateId);
+  if (optionsError) throw optionsError;
+  const slotIndexes = new Set((options ?? []).map((option) => Number(option.slot_index)));
+  if (!slotIndexes.has(1) || !slotIndexes.has(2)) return { success: false as const, error: "Create the first two proposal options before adding a third." };
+  if (slotIndexes.has(3)) return { success: false as const, error: "This estimate already has a third option." };
+
+  const nowIso = new Date().toISOString();
+  const { data: inserted, error: insertError } = await supabase.from("estimate_options").insert({
+    estimate_id: estimateId,
+    slot_index: 3,
+    default_label_key: "best",
+    label: "Best",
+    sort_order: 3,
+    summary: null,
+    notes: null,
+    subtotal_cents: 0,
+    total_cents: 0,
+    created_by_user_id: userId,
+    updated_by_user_id: userId,
+    created_at: nowIso,
+    updated_at: nowIso,
+  }).select("id").single();
+  if (insertError || !inserted?.id) throw insertError ?? new Error("Could not add third option.");
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_option_added",
+    meta: { option_id: inserted.id, slot_index: 3, label: "Best" },
+    user_id: userId,
+  });
+  return { success: true as const, estimateId, estimateOptionId: String(inserted.id) };
 }
 
 // ---------------------------------------------------------------------------
@@ -2236,6 +2275,17 @@ export async function recordEstimateApprovalResponse(
         success: false,
         error: "selected_option_id not found on this estimate.",
       };
+    }
+
+    const { data: selectedOptionLines, error: selectedOptionLinesError } = await supabase
+      .from("estimate_option_line_items")
+      .select("id")
+      .eq("estimate_id", estimateId)
+      .eq("estimate_option_id", option.id)
+      .limit(1);
+    if (selectedOptionLinesError) throw selectedOptionLinesError;
+    if (!selectedOptionLines?.length) {
+      return { success: false, error: "Selected option has no line items." };
     }
 
     selectedOptionId = option.id;

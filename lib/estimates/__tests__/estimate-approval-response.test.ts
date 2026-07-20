@@ -157,6 +157,10 @@ function buildSupabaseMock(options: {
         };
       }
 
+      if (table === "estimate_option_line_items") {
+        return makeChain([{ id: "option-line-1" }]);
+      }
+
       return makeChain(null);
     }),
   };

@@ -233,6 +233,7 @@ describe("approveEstimateFromProposalLink", () => {
             slot_index: 1,
             label: "Good",
             total_cents: 120000,
+            line_items: [{ id: "line-1" }],
           },
         ],
       })
@@ -276,6 +277,7 @@ describe("approveEstimateFromProposalLink", () => {
             slot_index: 2,
             label: "Best",
             total_cents: 160000,
+            line_items: [{ id: "line-2" }],
           },
         ],
       })

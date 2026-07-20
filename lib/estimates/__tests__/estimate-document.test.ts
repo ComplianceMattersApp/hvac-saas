@@ -362,7 +362,7 @@ describe("buildEstimateDocumentViewModel � proposalMode", () => {
       estimate: buildMultiOptionEstimateFixture(),
     });
     expect(vm.proposalMode).toBe("multi_option_packages");
-    expect(vm.options).toHaveLength(3);
+    expect(vm.options).toHaveLength(2);
   });
 
   it("options are mapped in sort order with correct shape", () => {
@@ -396,12 +396,12 @@ describe("buildEstimateDocumentViewModel � proposalMode", () => {
     }
   });
 
-  it("option summary is included when present and null when absent", () => {
+  it("option summaries are included when present", () => {
     const vm = buildEstimateDocumentViewModel({
       estimate: buildMultiOptionEstimateFixture(),
     });
     expect(vm.options[0].summary).toBe("Entry-level scope");
-    expect(vm.options[2].summary).toBeNull();
+    expect(vm.options[1].summary).toBe("Mid-tier scope");
   });
 
   it("option line items are mapped with correct shape including descriptions", () => {
@@ -430,14 +430,11 @@ describe("buildEstimateDocumentViewModel � proposalMode", () => {
     expect(betterLines[0].description).toBeNull();
   });
 
-  it("empty option renders with empty lines array", () => {
+  it("omits an empty optional third choice from the customer document", () => {
     const vm = buildEstimateDocumentViewModel({
       estimate: buildMultiOptionEstimateFixture(),
     });
-    const bestOption = vm.options[2];
-    expect(bestOption.label).toBe("Best");
-    expect(bestOption.lines).toHaveLength(0);
-    expect(bestOption.totalCents).toBe(0);
+    expect(vm.options.map((option) => option.label)).toEqual(["Good", "Better"]);
   });
 
   it("parent estimate totals are not derived from option totals in the view model", () => {
