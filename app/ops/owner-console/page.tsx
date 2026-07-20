@@ -239,6 +239,9 @@ export default async function PlatformOwnerConsolePage(props: {
   const hasActiveFilters = Boolean(
     accountQuery || selectedAccountOwnerId || productFilter !== "all" || statusFilter !== "all",
   );
+  const aiAccountLabels = Object.fromEntries(
+    model.rows.map((row) => [row.accountOwnerUserId, row.company]),
+  );
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-5 p-4 text-slate-900 sm:p-6">
@@ -256,7 +259,11 @@ export default async function PlatformOwnerConsolePage(props: {
         </div>
       </section>
 
-      <AiUsageBudgetPanel snapshot={aiBudgetSnapshot} notice={aiNotice} />
+      <AiUsageBudgetPanel
+        snapshot={aiBudgetSnapshot}
+        notice={aiNotice}
+        accountLabels={aiAccountLabels}
+      />
 
       {/* View switcher */}
       <section className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-5">

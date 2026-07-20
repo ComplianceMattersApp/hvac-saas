@@ -30,8 +30,8 @@ describe("AI usage budget helpers", () => {
     const settings = queryResult({ data: { monthly_limit_microusd: 25_000_000, is_enabled: true }, error: null });
     const usage = queryResult({
       data: [
-        { feature_key: "trainer", status: "completed", actual_cost_microusd: 1_500_000, estimated_cost_microusd: 2_000_000 },
-        { feature_key: "estimate_coach", status: "completed", actual_cost_microusd: 500_000, estimated_cost_microusd: 700_000 },
+        { feature_key: "trainer", account_owner_user_id: "account-1", status: "completed", actual_cost_microusd: 1_500_000, estimated_cost_microusd: 2_000_000 },
+        { feature_key: "estimate_coach", account_owner_user_id: "account-2", status: "completed", actual_cost_microusd: 500_000, estimated_cost_microusd: 700_000 },
         { feature_key: "trainer", status: "reserved", actual_cost_microusd: 0, estimated_cost_microusd: 1_000_000 },
         { feature_key: "trainer", status: "rejected", actual_cost_microusd: 0, estimated_cost_microusd: 5_000_000 },
       ],
@@ -49,6 +49,7 @@ describe("AI usage budget helpers", () => {
       completedRequests: 2,
       rejectedRequests: 1,
       byFeature: { trainer: 1_500_000, estimate_coach: 500_000 },
+      byAccount: { "account-1": 1_500_000, "account-2": 500_000 },
     });
     expect(usage.gte).toHaveBeenCalledWith("created_at", "2026-07-01T00:00:00.000Z");
   });

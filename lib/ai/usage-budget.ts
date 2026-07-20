@@ -12,6 +12,7 @@ export type AiBudgetSnapshot = {
   completedRequests: number;
   rejectedRequests: number;
   byFeature: Record<string, number>;
+  byAccount: Record<string, number>;
 };
 
 export function formatMicrousd(value: number): string {
@@ -42,11 +43,12 @@ export async function loadAiBudgetSnapshot(params: {
     completedRequests: 0,
     rejectedRequests: 0,
     byFeature: {},
+    byAccount: {},
   };
 
   const [settingsResult, usageResult] = await Promise.all([
     params.admin.from("ai_global_budget_settings").select("monthly_limit_microusd, is_enabled").eq("singleton_key", "global").maybeSingle(),
-    params.admin.from("ai_usage_events").select("feature_key, status, estimated_cost_microusd, actual_cost_microusd").gte("created_at", monthStart),
+    params.admin.from("ai_usage_events").select("feature_key, account_owner_user_id, status, estimated_cost_microusd, actual_cost_microusd").gte("created_at", monthStart),
   ]);
 
   if (settingsResult.error || usageResult.error || !settingsResult.data) return unavailable;
@@ -56,6 +58,7 @@ export async function loadAiBudgetSnapshot(params: {
   let completedRequests = 0;
   let rejectedRequests = 0;
   const byFeature: Record<string, number> = {};
+  const byAccount: Record<string, number> = {};
 
   for (const row of usageResult.data ?? []) {
     const actual = Math.max(0, Number(row.actual_cost_microusd ?? 0));
@@ -64,6 +67,8 @@ export async function loadAiBudgetSnapshot(params: {
       completedRequests += 1;
       const feature = String(row.feature_key ?? "unknown");
       byFeature[feature] = (byFeature[feature] ?? 0) + actual;
+      const account = String(row.account_owner_user_id ?? "unattributed");
+      byAccount[account] = (byAccount[account] ?? 0) + actual;
     } else if (row.status === "reserved") {
       reservedCostMicrousd += Math.max(0, Number(row.estimated_cost_microusd ?? 0));
     } else if (row.status === "rejected") {
@@ -82,6 +87,7 @@ export async function loadAiBudgetSnapshot(params: {
     completedRequests,
     rejectedRequests,
     byFeature,
+    byAccount,
   };
 }
 

@@ -11,9 +11,11 @@ function featureLabel(value: string) {
 export default function AiUsageBudgetPanel({
   snapshot,
   notice,
+  accountLabels,
 }: {
   snapshot: AiBudgetSnapshot;
   notice: string;
+  accountLabels: Record<string, string>;
 }) {
   if (!snapshot.available) {
     return (
@@ -66,6 +68,23 @@ export default function AiUsageBudgetPanel({
           {Object.entries(snapshot.byFeature).map(([feature, cost]) => (
             <span key={feature} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700">{featureLabel(feature)}: <strong>{formatMicrousd(cost)}</strong></span>
           ))}
+        </div>
+      ) : null}
+
+      {Object.keys(snapshot.byAccount).length > 0 ? (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Completed spend by account</p>
+          <div className="mt-3 space-y-2">
+            {Object.entries(snapshot.byAccount)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 8)
+              .map(([accountOwnerId, cost]) => (
+                <div key={accountOwnerId} className="flex items-center justify-between gap-4 text-sm">
+                  <span className="truncate text-slate-700" title={accountOwnerId}>{accountLabels[accountOwnerId] ?? (accountOwnerId === "unattributed" ? "Platform smoke / unattributed" : accountOwnerId)}</span>
+                  <strong className="shrink-0 text-slate-950">{formatMicrousd(cost)}</strong>
+                </div>
+              ))}
+          </div>
         </div>
       ) : null}
 
