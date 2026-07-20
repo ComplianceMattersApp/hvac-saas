@@ -33,6 +33,9 @@ describe("trainer knowledge foundation", () => {
     }
     expect(expansion).toContain("ADD COLUMN IF NOT EXISTS keywords");
     expect(expansion).toContain("ON CONFLICT (slug) DO UPDATE");
+    const seededSourcePaths = [...expansion.matchAll(/, '([^']+)', ARRAY\[/g)].map((match) => match[1]);
+    expect(seededSourcePaths.length).toBeGreaterThan(20);
+    expect(seededSourcePaths.every((path) => path.startsWith("/") && !path.includes("?") && !path.includes("#"))).toBe(true);
   });
 
   it("uses lexical and alias fallback for natural field questions", async () => {
