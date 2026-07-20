@@ -16,6 +16,8 @@ This section records current shipped runtime truth and supersedes older phase-lo
 - Invoice rows link to the app invoice where local context exists; deposit status links to the real payout group detail.
 - Visible navigation uses the simple terms **Invoices**, **Payments**, and **Bank Deposits**. The route remains `/reports/deposits` for compatibility.
 - A controlled **Preview sync** and separate explicit **Sync deposits** action are available only inside the financially authorized Bank Deposits report.
+- Newly recorded Stripe invoice payments now receive a best-effort automatic settlement sync immediately after webhook payment truth is committed. A settlement failure is logged but cannot fail or roll back webhook acknowledgement, invoice payment confirmation, allocation truth, QBO follow-up, or payment-received email delivery.
+- The controlled manual actions remain available for historical backfill and for refreshing rows when Stripe attaches or changes payout information after the original payment event. No new cron or scheduler infrastructure is introduced.
 - Preview mode makes no Stripe calls and writes no settlement rows. Commit mode is explicit and never inferred from preview submission.
 - The server action authenticates and proves financial authority/account scope with the session client, then uses the server-only admin client for the explicitly scoped settlement read/upsert because authenticated RLS intentionally exposes SELECT only.
 - Candidate discovery honors `stripe_charged_at`, then `paid_at`, then `created_at` fallback semantics. Calendar ranges include the complete selected end date.
@@ -59,10 +61,10 @@ Closed/confirmed:
 - The report adds no invoice, payment, or allocation mutation path. Commit mode upserts only account-scoped Stripe settlement truth.
 - Settlement rows explain Stripe fee/net/payout timing only; they do not change invoice paid/balance truth.
 
-Remaining future gate, not a blocker to this foundation closeout:
+Production verification gate completed:
 
-- A controlled production money-flow smoke remains a later explicit gate: one real/live paid invoice or existing paid production invoice, one settlement sync, Stripe Dashboard gross/fee/net comparison, Deposits report/detail/CSV verification, and payout/bank deposit confirmation when available.
-- That future smoke must remain controlled and explicit. It is not part of this closeout and does not authorize production sync controls, broad tenant sync, payment links, charges, refunds, disputes, or invoice/payment/allocation mutation.
+- The controlled production money-flow smoke passed: the live payment, settlement sync, Stripe Dashboard gross/fee/net comparison, report/detail/CSV behavior, and payout/bank-deposit explanation were verified.
+- This confirmation authorizes the next narrow evolution to best-effort webhook-assisted settlement sync only. It does not authorize broad tenant sync, new cron infrastructure, payment links, charges, refunds, disputes, or invoice/payment/allocation mutation.
 
 ## Phase H-1A Note - Settlement Upsert Uniqueness Repair
 

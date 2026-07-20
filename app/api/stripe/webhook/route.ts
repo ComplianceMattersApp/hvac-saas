@@ -16,9 +16,25 @@ import { recordTenantSavedPaymentMethodSetupFromCheckoutSession } from "@/lib/bu
 import { createAdminClient } from "@/lib/supabase/server";
 import { deliverInternalPaymentReceivedEmail } from "@/lib/payments/payment-received-email";
 import { autoSyncRecordedPaymentToQbo } from "@/lib/qbo/qbo-payment-auto-sync";
+import { autoSyncRecordedPaymentSettlement } from "@/lib/business/stripe-settlement-auto-sync";
 
 async function notifyNewRecordedPayment(result: { recorded: boolean; paymentId?: string }) {
   if (!result.recorded || !result.paymentId) return;
+  try {
+    const settlementResult = await autoSyncRecordedPaymentSettlement({ paymentId: result.paymentId });
+    if (settlementResult.status !== "synced") {
+      console.warn("Stripe settlement sync did not complete after payment truth was recorded", {
+        paymentId: result.paymentId,
+        status: settlementResult.status,
+        code: settlementResult.code,
+      });
+    }
+  } catch (error) {
+    console.warn("Stripe settlement sync failed after payment truth was recorded", {
+      paymentId: result.paymentId,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+  }
   try {
     const qboResult = await autoSyncRecordedPaymentToQbo({ paymentId: result.paymentId });
     if (qboResult && qboResult.status !== "synced") {
