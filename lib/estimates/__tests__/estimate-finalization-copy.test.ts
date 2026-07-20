@@ -20,13 +20,12 @@ describe("estimate finalization copy", () => {
     expect(copy).not.toHaveProperty("confirmMessage");
   });
 
-  it("draft helper copy states this does not send email and avoids confirmation phrasing", () => {
+  it("draft helper copy explains the combined lock, link, and email action", () => {
     const helper = getDraftCustomerDeliveryHelperCopy();
 
-    expect(helper).toContain("does not send an email");
-    expect(helper.toLowerCase()).not.toContain("finalize this proposal?");
-    expect(helper.toLowerCase()).not.toContain("are you sure");
-    expect(helper.toLowerCase()).not.toContain("mark sent manually");
+    expect(helper).toContain("Finalize & Send");
+    expect(helper).toContain("secure proposal link");
+    expect(helper).toContain("emails it to the customer");
     expect(helper.toLowerCase()).not.toContain("customer received");
   });
 });

@@ -11,5 +11,5 @@ export function getFinalizeProposalActionCopy(params: FinalizeProposalCopyParams
 }
 
 export function getDraftCustomerDeliveryHelperCopy() {
-  return "Finalizing locks editing and enables Proposal Link and Email Proposal tools. This action does not send an email.";
+  return "Finalize & Send locks editing, creates a secure proposal link, and emails it to the customer. Confirm the scope, pricing, photos, and recipient first.";
 }

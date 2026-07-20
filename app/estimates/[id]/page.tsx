@@ -35,12 +35,10 @@ import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import EditEstimateOptionForm from "./EditEstimateOptionForm";
 import AddEstimateOptionLineForm from "./AddEstimateOptionLineForm";
 import ProposalEmailControls from "./ProposalEmailControls";
+import FinalizeAndSendProposalForm from "./FinalizeAndSendProposalForm";
 import EstimatePhotos from "./EstimatePhotos";
 import { listEstimatePhotos } from "@/lib/estimates/estimate-photos";
-import {
-  getDraftCustomerDeliveryHelperCopy,
-  getFinalizeProposalActionCopy,
-} from "./status-copy";
+import { getDraftCustomerDeliveryHelperCopy } from "./status-copy";
 import { removeEstimateOptionLineItemFromForm } from "./actions";
 
 export const metadata = { title: "Estimate" };
@@ -447,14 +445,16 @@ export default async function EstimateDetailPage({
       })
     : { schemaAvailable: true, activeLink: null };
 
-  const finalizeProposalCopy = getFinalizeProposalActionCopy({ isMultiOptionProposal });
-
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
       {notice && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 print:hidden">
           {notice === "estimate_converted_to_job"
             ? "Estimate converted to job successfully."
+            : notice === "proposal_finalized_email_sent"
+              ? "Proposal finalized and emailed successfully. The customer can review it using the secure link."
+              : notice === "proposal_finalized_email_retry_needed"
+                ? "Proposal finalized, but the email was not sent. Retry from Customer Delivery or copy the secure proposal link."
             : notice === "estimate_converted_to_invoice_draft"
               ? "Draft invoice created from this estimate successfully."
               : notice === "estimate_manual_line_saved_to_pricebook"
@@ -715,14 +715,8 @@ export default async function EstimateDetailPage({
 
               <div className="flex flex-wrap gap-2 lg:justify-end">
                 {isDraft && (
-                  <>
-                    <EstimateStatusActionForm
-                      action={transitionEstimateStatusFromForm}
-                      estimateId={estimate.id}
-                      nextStatus="sent"
-                      label={finalizeProposalCopy.label}
-                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
-                    />
+                  <div className="space-y-2">
+                    <FinalizeAndSendProposalForm estimateId={estimate.id} defaultRecipientEmail={customerEmail} />
                     <EstimateStatusActionForm
                       action={transitionEstimateStatusFromForm}
                       estimateId={estimate.id}
@@ -731,7 +725,7 @@ export default async function EstimateDetailPage({
                       confirmMessage="Cancel this estimate? No job or draft invoice will be created from this estimate."
                       className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition-[background-color,border-color,transform] hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
                     />
-                  </>
+                  </div>
                 )}
               </div>
             </div>

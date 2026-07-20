@@ -64,6 +64,10 @@ import {
   initialProposalEmailActionState,
   type ProposalEmailActionState,
 } from "./proposal-email-action-state";
+import {
+  initialFinalizeAndSendProposalActionState,
+  type FinalizeAndSendProposalActionState,
+} from "./finalize-send-action-state";
 
 type TransitionTargetStatus = "sent" | "approved" | "declined" | "expired" | "cancelled";
 
@@ -408,6 +412,80 @@ export async function submitEstimateProposalEmailActionFromForm(
   formData: FormData
 ): Promise<ProposalEmailActionState> {
   return sendEstimateProposalEmailFromForm(formData);
+}
+
+function validateFinalizeAndSendContent(estimate: Awaited<ReturnType<typeof getEstimateById>>) {
+  if (!estimate) return "Estimate was not found.";
+  if (estimate.proposalMode === "multi_option_packages") {
+    if (!estimate.options?.length) return "Add proposal options before finalizing.";
+    if (estimate.options.some((option) => !option.line_items?.length)) {
+      return "Each proposal option needs at least one line item before finalizing.";
+    }
+    return null;
+  }
+  if (!estimate.line_items?.length) return "Add at least one line item before finalizing.";
+  return null;
+}
+
+export async function submitFinalizeAndSendProposalActionFromForm(
+  _previousState: FinalizeAndSendProposalActionState,
+  formData: FormData,
+): Promise<FinalizeAndSendProposalActionState> {
+  if (!isEstimatesEnabled()) {
+    return { ...initialFinalizeAndSendProposalActionState, error: "Estimates are currently unavailable.", code: "estimates_unavailable" };
+  }
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  const recipientEmail = String(formData.get("recipient_email") ?? "").trim().toLowerCase();
+  if (!estimateId) return { ...initialFinalizeAndSendProposalActionState, error: "Estimate not found.", code: "estimate_not_found" };
+  if (!recipientEmail) return { ...initialFinalizeAndSendProposalActionState, error: "Customer email is required.", code: "recipient_required" };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) {
+    return { ...initialFinalizeAndSendProposalActionState, error: "Enter a valid customer email.", code: "recipient_invalid" };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+  const estimate = await getEstimateById({ estimateId, internalUser, supabase });
+  const contentError = validateFinalizeAndSendContent(estimate);
+  if (contentError) return { ...initialFinalizeAndSendProposalActionState, error: contentError, code: "proposal_incomplete" };
+
+  const currentStatus = String(estimate?.status ?? "").trim().toLowerCase();
+  let finalized = currentStatus === "sent";
+  if (currentStatus !== "draft" && currentStatus !== "sent") {
+    return { ...initialFinalizeAndSendProposalActionState, error: "Only a draft proposal can be finalized and sent.", code: "invalid_status" };
+  }
+
+  if (!finalized) {
+    const transition = await transitionEstimateStatus({ estimateId, nextStatus: "sent" });
+    if (!transition.success) {
+      return { ...initialFinalizeAndSendProposalActionState, error: transition.error, code: "finalize_failed" };
+    }
+    finalized = true;
+  }
+
+  try {
+    const delivery = await sendEstimateProposalEmail({ estimateId, recipientEmail });
+    revalidatePath(`/estimates/${estimateId}`);
+    if (!delivery.success) {
+      return { ...initialFinalizeAndSendProposalActionState, finalized, error: delivery.error, code: delivery.code };
+    }
+    return {
+      success: delivery.attemptStatus === "accepted",
+      finalized,
+      error: delivery.attemptStatus === "accepted" ? null : "The proposal is finalized, but email delivery did not complete.",
+      attemptStatus: delivery.attemptStatus,
+      deliveryMode: delivery.deliveryMode,
+      communicationId: delivery.communicationId,
+      proposalLinkId: delivery.proposalLinkId,
+      proposalUrl: delivery.proposalUrl,
+      emailPreviewUrl: delivery.emailPreviewUrl,
+      providerMessageId: delivery.providerMessageId,
+      emailDisabled: delivery.emailDisabled,
+    };
+  } catch {
+    revalidatePath(`/estimates/${estimateId}`);
+    return { ...initialFinalizeAndSendProposalActionState, finalized, error: "The proposal is finalized, but email delivery failed.", code: "send_failed" };
+  }
 }
 
 /**
