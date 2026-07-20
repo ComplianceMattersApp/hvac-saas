@@ -28,8 +28,8 @@ describe("ask compliance matters local shell", () => {
   it("returns a safe fallback for unknown questions", () => {
     const answer = answerAskComplianceMatters("Can you solve something unrelated?", techContext);
     expect(answer.status).toBe("fallback");
-    expect(answer.body).toContain("I don't know that yet.");
-    expect(answer.body).toContain("Use Training Room or contact support.");
+    expect(answer.body).toContain("I don't have a good answer for that yet");
+    expect(answer.body).toContain("contact support if this is blocking your work");
   });
 
   it("returns a read-only setup coach checklist", () => {
@@ -141,8 +141,8 @@ describe("ask compliance matters local shell", () => {
     expect(adminAnswer.body).toContain("Launch Room readiness");
   });
 
-  it("answers support and feedback questions without implying durable logging", () => {
-    expect(answerAskComplianceMatters("What does Not helpful do?", techContext).body).toContain("locally in this session");
+  it("answers support and feedback questions without implying automatic training or case creation", () => {
+    expect(answerAskComplianceMatters("What does Not helpful do?", techContext).body).toContain("private feedback signal");
     expect(answerAskComplianceMatters("Does the assistant create a support case?", techContext).body).toContain("I do not create a support case yet");
     expect(answerAskComplianceMatters("What if I am stuck?", techContext).body).toContain("contact support");
   });

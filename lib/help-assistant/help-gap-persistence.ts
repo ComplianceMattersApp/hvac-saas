@@ -46,8 +46,8 @@ type PersistHelpGapEventOptions = {
 };
 
 type SanitizedRoute = {
-  routePathname: "/ops/admin" | "/training";
-  pageFamily: "launch_room" | "training_room";
+  routePathname: string;
+  pageFamily: "launch_room" | "training_room" | "operations" | "today" | "admin" | "other";
 };
 
 const EVENT_TYPES = ["unknown_answer", "not_helpful", "still_need_help"] as const;
@@ -111,6 +111,31 @@ function sanitizeApprovedRoute(value: unknown): SanitizedRoute | null {
   if (normalized === "/training" || normalized.startsWith("/training/")) {
     return { routePathname: "/training", pageFamily: "training_room" };
   }
+
+  if (normalized === "/today" || normalized.startsWith("/today/")) {
+    return { routePathname: "/today", pageFamily: "today" };
+  }
+  if (normalized === "/ops" || normalized.startsWith("/ops/")) {
+    return { routePathname: "/ops", pageFamily: "operations" };
+  }
+  if (normalized === "/account" || normalized.startsWith("/account/")) {
+    return { routePathname: "/account", pageFamily: "admin" };
+  }
+
+  const approvedBase = [
+    "/calendar",
+    "/contractors",
+    "/customers",
+    "/estimates",
+    "/jobs",
+    "/locations",
+    "/reports",
+    "/service-plans",
+    "/services",
+    "/notes",
+    "/time-clock",
+  ].find((base) => normalized === base || normalized.startsWith(`${base}/`));
+  if (approvedBase) return { routePathname: approvedBase, pageFamily: "other" };
 
   return null;
 }

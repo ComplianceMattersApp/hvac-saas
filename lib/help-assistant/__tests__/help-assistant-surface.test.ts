@@ -53,6 +53,14 @@ describe("help assistant surface wiring", () => {
     expect(launcherSource).not.toContain("analytics");
   });
 
+  it("uses curated known workflows before the optional Trainer provider", () => {
+    const localAnswerIndex = launcherSource.indexOf("const localAnswer = answerAskComplianceMatters");
+    const trainerIndex = launcherSource.indexOf("if (trainerAiEnabled)");
+    expect(localAnswerIndex).toBeGreaterThan(-1);
+    expect(trainerIndex).toBeGreaterThan(localAnswerIndex);
+    expect(launcherSource).toContain('localAnswer.status === "answered"');
+  });
+
   it("does not wire provider calls or mutation paths into the local answer engine", () => {
     expect(answerSource).not.toContain("OpenAI");
     expect(answerSource).not.toContain("openai");

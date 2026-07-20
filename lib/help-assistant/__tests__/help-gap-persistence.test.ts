@@ -101,7 +101,7 @@ describe("help gap persistence helper", () => {
   it("rejects unsupported routes without inserting", async () => {
     const { supabase, from } = makeSupabase();
     const result = await persistHelpGapEvent(
-      { ...baseInput, routePathname: "/jobs/secret-job-id?token=abc#frag" },
+      { ...baseInput, routePathname: "/portal/jobs/secret-job-id?token=abc#frag" },
       {
         supabase,
         env: enabledEnv,
@@ -111,6 +111,24 @@ describe("help gap persistence helper", () => {
 
     expect(result).toEqual({ ok: false, reason: "unsupported_route" });
     expect(from).not.toHaveBeenCalled();
+  });
+
+  it("accepts global internal routes while removing record ids and query data", async () => {
+    const { supabase, calls } = makeSupabase();
+    const result = await persistHelpGapEvent(
+      { ...baseInput, routePathname: "/jobs/secret-job-id?token=abc#frag" },
+      {
+        supabase,
+        env: enabledEnv,
+        requireInternalUserFn: vi.fn(async () => makeInternalUser()),
+        readProductModeFn: mockReadProductMode("hvac_service"),
+      },
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(calls[0]?.payload).toMatchObject({ route_pathname: "/jobs", page_family: "other" });
+    expect(JSON.stringify(calls[0]?.payload)).not.toContain("secret-job-id");
+    expect(JSON.stringify(calls[0]?.payload)).not.toContain("token");
   });
 
   it("accepts /ops/admin after server-side route and question sanitization", async () => {

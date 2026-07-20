@@ -1,6 +1,7 @@
 import { firstJobMissionSteps, roleTrainingTracks } from "@/lib/training/training-room-content";
 import type { HelpAssistantSafeContext } from "./help-assistant-context";
 import { setupCoachChecklist, type SetupCoachItem } from "./setup-coach-knowledge";
+import { buildAskCmBaselineAnswer } from "./ask-cm-baseline-knowledge";
 
 export type HelpAssistantLink = {
   label: string;
@@ -59,7 +60,7 @@ function fallbackAnswer(): HelpAssistantAnswer {
     status: "fallback",
     title: "I don't know that yet.",
     body:
-      "I don't know that yet. Use Training Room or contact support. This would be a good help article for a future version.",
+      "I don't have a good answer for that yet, but this is a useful question for us to improve. Try Training Room, or contact support if this is blocking your work.",
     links: [
       { label: "Training Room", href: "/training" },
       { label: "Admin Center", href: "/ops/admin" },
@@ -97,6 +98,9 @@ export function answerAskComplianceMatters(
 ): HelpAssistantAnswer {
   const q = normalizeQuestion(question);
   if (!q) return fallbackAnswer();
+
+  const baselineAnswer = buildAskCmBaselineAnswer(q, context);
+  if (baselineAnswer) return baselineAnswer;
 
   if (
     includesAny(q, [
@@ -510,7 +514,7 @@ export function answerAskComplianceMatters(
       status: "answered",
       title: "Not helpful",
       body:
-        "Not helpful only marks feedback locally in this session. It does not save a durable record yet, create a support case, or train an AI model.",
+        "Not helpful sends a private feedback signal for review when help-gap logging is enabled. It does not create a support case, change app data, or train the model automatically.",
       links: [{ label: "Training Room", href: "/training" }],
     };
   }

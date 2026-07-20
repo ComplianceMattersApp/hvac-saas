@@ -147,6 +147,20 @@ export function AskComplianceMattersLauncher({
   }
 
   async function ask(nextQuestion: string) {
+    const localAnswer = answerAskComplianceMatters(nextQuestion, safeContext);
+    if (localAnswer.status === "answered") {
+      setQuestion(nextQuestion);
+      setAnswer(localAnswer);
+      setFeedback(null);
+      setHelpGapEvent(null);
+      setHelpGapPersistenceStatus("idle");
+      setPersistedEventKey(null);
+      setMode("ask");
+      setTrainerUnsupported(false);
+      setTrainerGapLogged(false);
+      return;
+    }
+
     if (trainerAiEnabled) {
       setIsAnswering(true);
       setTrainerUnsupported(false);
@@ -173,7 +187,7 @@ export function AskComplianceMattersLauncher({
         setIsAnswering(false);
       }
     }
-    const nextAnswer = answerAskComplianceMatters(nextQuestion, safeContext);
+    const nextAnswer = localAnswer;
     const nextHelpGapEvent =
       nextAnswer.status === "fallback"
         ? createUnknownAnswerHelpGapEvent({

@@ -134,7 +134,7 @@ Current support/help/training posture:
 - `docs/ACTIVE/Support_V0_Issue_Log_Template.md` defines slim and full support issue logging templates.
 - `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md` and Support Case V1 code provide durable owner/support-internal issue records, separate from Support Console.
 - The in-app Training Room now exists at `/training`.
-- Ask Compliance Matters now exists as a local/mock assistant on approved Launch Room and Training Room surfaces.
+- Ask Compliance Matters began as a local/mock assistant on Launch Room and Training Room. It now uses curated local workflow answers first across approved authenticated internal routes, with the independently gated grounded Trainer provider available for broader documented questions.
 - Durable Help Gap Logging and the owner/admin Help Gap Review queue now exist behind explicit feature flags. See `docs/ACTIVE/Help_Gap_Logging_Durable_Model_Spec.md`.
 
 ## 3. Current File / Component / Read-Model Inventory

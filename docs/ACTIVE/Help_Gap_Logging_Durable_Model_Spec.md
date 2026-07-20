@@ -219,7 +219,7 @@ V1 route allowlist recommendation:
 - `/ops/admin`
 - `/training`
 
-Because Ask Compliance Matters is currently mounted only on those routes, first persistence should reject or no-op any other route unless the mounting scope is explicitly expanded.
+Historical first-persistence rule: Ask Compliance Matters was initially mounted only on Admin Center and Training Room. The launcher is now available across approved authenticated internal route families; persistence canonicalizes those routes to safe base paths, strips record ids/query data, and continues to reject portal/public routes.
 
 Do not attempt broad PII extraction in V1 unless a reviewed helper exists. Length limits and context boundaries are the V1 safety control.
 
