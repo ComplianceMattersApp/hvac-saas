@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Eye, Link2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   requireInternalUser,
   isInternalAccessError,
@@ -35,6 +35,8 @@ import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import EditEstimateOptionForm from "./EditEstimateOptionForm";
 import AddEstimateOptionLineForm from "./AddEstimateOptionLineForm";
 import ProposalEmailControls from "./ProposalEmailControls";
+import EstimatePhotos from "./EstimatePhotos";
+import { listEstimatePhotos } from "@/lib/estimates/estimate-photos";
 import {
   getDraftCustomerDeliveryHelperCopy,
   getFinalizeProposalActionCopy,
@@ -249,6 +251,12 @@ export default async function EstimateDetailPage({
 
   const estimate = await getEstimateById({ estimateId: id, internalUser, supabase });
   if (!estimate) notFound();
+
+  const estimatePhotos = await listEstimatePhotos({
+    estimateId: estimate.id,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    admin: createAdminClient(),
+  });
 
   const isMultiOptionProposal = estimate.proposalMode === "multi_option_packages";
 
@@ -1221,6 +1229,8 @@ export default async function EstimateDetailPage({
           aiEnabled={isEstimateCoachAiEnabled()}
         />
       ) : null}
+
+      <EstimatePhotos estimateId={estimate.id} initialPhotos={estimatePhotos} editable={isDraft} />
 
       {/* Non-goal confirmation: no approval/conversion/payment/email/PDF UI */}
     </div>

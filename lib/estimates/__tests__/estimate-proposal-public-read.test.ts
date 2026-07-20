@@ -4,6 +4,7 @@ const createAdminClientMock = vi.fn();
 const getEstimateByIdMock = vi.fn();
 const resolveOperationalTenantIdentityMock = vi.fn();
 const isEstimateProposalLinksEnabledMock = vi.fn();
+const listEstimatePhotosMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
@@ -12,6 +13,10 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/estimates/estimate-read", () => ({
   getEstimateById: (...args: unknown[]) => getEstimateByIdMock(...args),
+}));
+
+vi.mock("@/lib/estimates/estimate-photos", () => ({
+  listEstimatePhotos: (...args: unknown[]) => listEstimatePhotosMock(...args),
 }));
 
 vi.mock("@/lib/email/operational-tenant-branding", () => ({
@@ -144,12 +149,47 @@ describe("readPublicEstimateProposalByToken", () => {
     vi.resetAllMocks();
     vi.resetModules();
     isEstimateProposalLinksEnabledMock.mockReturnValue(true);
+    listEstimatePhotosMock.mockResolvedValue([]);
     resolveOperationalTenantIdentityMock.mockResolvedValue({
       displayName: "Compliance Matters Heating & Air",
       supportEmail: "hello@example.com",
       supportPhone: "(555) 111-2222",
       logoUrl: "https://example.com/logo.png",
     });
+  });
+
+  it("returns only customer-safe photo fields", async () => {
+    createAdminClientMock.mockReturnValue(buildAdminClient({
+      proposalLink: {
+        id: "plink-photo",
+        estimate_id: ESTIMATE_ID,
+        account_owner_user_id: ACCOUNT_OWNER,
+        status: "active",
+        expires_at: "2099-06-06T00:00:00.000Z",
+        revoked_at: null,
+      },
+    }));
+    getEstimateByIdMock.mockResolvedValue(buildEstimate());
+    listEstimatePhotosMock.mockResolvedValue([{
+      id: "internal-photo-id",
+      fileName: "private-name.jpg",
+      contentType: "image/jpeg",
+      fileSize: 1234,
+      caption: "Existing condenser",
+      customerVisible: true,
+      signedUrl: "https://storage.example/signed-photo",
+    }]);
+
+    const { readPublicEstimateProposalByToken } = await import("../estimate-proposal-public-read");
+    const result = await readPublicEstimateProposalByToken("a".repeat(48));
+    expect(result.available).toBe(true);
+    if (!result.available) return;
+    expect(result.proposal.photos).toEqual([{
+      caption: "Existing condenser",
+      signedUrl: "https://storage.example/signed-photo",
+    }]);
+    expect(JSON.stringify(result.proposal.photos)).not.toContain("internal-photo-id");
+    expect(JSON.stringify(result.proposal.photos)).not.toContain("private-name.jpg");
   });
 
   it("resolves a valid token for a sent flat proposal", async () => {

@@ -6,6 +6,12 @@ import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant
 import {
   findActiveProposalLinkByRawToken,
 } from "@/lib/estimates/estimate-proposal-public-shared";
+import { listEstimatePhotos, type EstimatePhoto } from "@/lib/estimates/estimate-photos";
+
+type PublicEstimatePhoto = {
+  caption: string | null;
+  signedUrl: string;
+};
 
 export type PublicProposalShellResult =
   | { available: false }
@@ -29,6 +35,7 @@ export type PublicProposalShellResult =
         context: {
           locationDisplay: string | null;
         };
+        photos: PublicEstimatePhoto[];
         proposalMode: "single_option_flat" | "multi_option_packages";
         totals: {
           subtotalCents: number;
@@ -101,6 +108,7 @@ async function loadSafeLocationDisplay(params: {
 function toPublicProposalShell(input: {
   documentView: ReturnType<typeof buildEstimateDocumentViewModel>;
   business: Awaited<ReturnType<typeof resolveOperationalTenantIdentity>>;
+  photos: EstimatePhoto[];
 }): PublicProposalShellResult {
   return {
     available: true,
@@ -122,6 +130,10 @@ function toPublicProposalShell(input: {
       context: {
         locationDisplay: input.documentView.context.locationDisplay,
       },
+      photos: input.photos.map((photo) => ({
+        caption: photo.caption,
+        signedUrl: photo.signedUrl,
+      })),
       proposalMode: input.documentView.proposalMode,
       totals: {
         subtotalCents: input.documentView.totals.subtotalCents,
@@ -209,5 +221,12 @@ export async function readPublicEstimateProposalByToken(rawToken: string): Promi
     supabase: admin,
   });
 
-  return toPublicProposalShell({ documentView, business });
+  const photos = await listEstimatePhotos({
+    estimateId: estimate.id,
+    accountOwnerUserId: proposalLink.account_owner_user_id,
+    customerVisibleOnly: true,
+    admin,
+  });
+
+  return toPublicProposalShell({ documentView, business, photos });
 }

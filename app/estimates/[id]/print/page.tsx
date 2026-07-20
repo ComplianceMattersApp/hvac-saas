@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   requireInternalUser,
   isInternalAccessError,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/estimates/estimate-document";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import PrintToolbar from "./PrintToolbar";
+import { listEstimatePhotos } from "@/lib/estimates/estimate-photos";
 
 function formatCents(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
@@ -120,6 +121,13 @@ export default async function EstimatePrintPage({
     estimate,
     customerName,
     locationDisplay,
+  });
+
+  const estimatePhotos = await listEstimatePhotos({
+    estimateId: estimate.id,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    customerVisibleOnly: true,
+    admin: createAdminClient(),
   });
 
   const tenantIdentity = await resolveOperationalTenantIdentity({
@@ -305,6 +313,20 @@ export default async function EstimatePrintPage({
             <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
               <p className="font-semibold text-slate-900">Proposal Notes</p>
               <p className="mt-1 whitespace-pre-wrap">{estimate.notes}</p>
+            </div>
+          ) : null}
+
+          {estimatePhotos.length ? (
+            <div className="mt-5 break-inside-avoid">
+              <p className="text-sm font-semibold text-slate-900">Project Photos</p>
+              <div className="mt-3 grid grid-cols-2 gap-3 print:grid-cols-3">
+                {estimatePhotos.map((photo) => (
+                  <figure key={photo.id} className="overflow-hidden rounded-xl border border-slate-200 print:rounded-none print:border-slate-300">
+                    <img src={photo.signedUrl} alt={photo.caption || "Estimate photo"} className="h-40 w-full object-cover print:h-32" />
+                    {photo.caption ? <figcaption className="px-2.5 py-2 text-xs text-slate-700">{photo.caption}</figcaption> : null}
+                  </figure>
+                ))}
+              </div>
             </div>
           ) : null}
 

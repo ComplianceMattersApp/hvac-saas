@@ -140,6 +140,23 @@ export default async function PublicProposalPage({
           options={proposal.options}
         />
 
+        {proposal.photos.length ? (
+          <section className="rounded-[28px] border border-slate-200/90 bg-white/96 p-5 shadow-[0_26px_70px_-46px_rgba(15,23,42,0.36)] sm:p-6">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Project photos</div>
+            <h2 className="mt-1 text-xl font-semibold tracking-[-0.03em] text-slate-950">What we reviewed</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {proposal.photos.map((photo) => (
+                <figure key={photo.signedUrl} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                  <a href={photo.signedUrl} target="_blank" rel="noreferrer">
+                    <img src={photo.signedUrl} alt={photo.caption || "Estimate photo"} className="h-52 w-full object-cover" />
+                  </a>
+                  {photo.caption ? <figcaption className="px-3 py-2.5 text-sm text-slate-700">{photo.caption}</figcaption> : null}
+                </figure>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {proposal.proposalMode === "multi_option_packages" ? (
           <section className="space-y-4">
             <div className="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-5 py-4 text-sm text-amber-950 shadow-[0_18px_40px_-34px_rgba(120,53,15,0.26)]">
