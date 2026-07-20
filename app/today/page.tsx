@@ -834,6 +834,9 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
           widthPercent={priorWidth}
         />
       </div>
+      <Link href="/reports/monthly" className="mt-3 inline-flex text-xs font-semibold text-emerald-800 hover:text-emerald-950">
+        Open monthly overview →
+      </Link>
     </div>
   );
 }

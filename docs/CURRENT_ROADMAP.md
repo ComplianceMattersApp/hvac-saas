@@ -170,7 +170,7 @@ These are future/business-layer modules, not spine failures. Each stays parked u
 **Payments / billing deferrals**
 - **Deeper Payments V2** (refunds, ACH, autopay expansion, disputes/chargebacks, saved-method self-service) — beyond the P1 tracking foundation. *Unlock:* after Lane 5 (QBO) posture is set + owner decision.
 - **Service Plan billing / autopay / generated-invoice expansion** — beyond the current maintenance-agreement baseline. *Unlock:* owner decision + Payments V2 sequencing.
-- **Controlled production money-flow / deposit proof** — see runbook-gated items.
+- **Controlled production money-flow / deposit proof** — COMPLETE; live gross/fee/net, detail/CSV, and payout/bank explanation smoke passed.
 
 **Platform / packaging deferrals**
 - **Native app-store wrapper ahead of Lane 6** — Web/PWA is the baseline; the wrap is deliberately last. *Unlock:* everything above Lane 6 solid.
@@ -193,7 +193,7 @@ Built or partially built, but held behind an explicit flag/runbook and owner app
 - **Estimates production** — Gate: `ENABLE_ESTIMATES` and `ENABLE_ESTIMATE_EMAIL_SEND` (both disabled in prod; estimate migrations are sandbox-only, production estimate migrations not applied). Owner doc: [ACTIVE/Estimates_Production_Enablement_Runbook.md](./ACTIVE/Estimates_Production_Enablement_Runbook.md).
 - **Support Console** — Gate: `ENABLE_SUPPORT_CONSOLE` (fail-closed, unset in prod); sessions are read-only, account-owner scoped, audited. Owner doc: [ACTIVE/Support_Console_Production_Enablement_Runbook.md](./ACTIVE/Support_Console_Production_Enablement_Runbook.md).
 - **Owner-Scoped Permit Workflow** — Gate: `ENABLE_PERMIT_WORKFLOW_ACCOUNT_OWNER_IDS` allowlist (owner/operator only; internal Permits visibility, contractor Request Permit exposure, and permit mutations all fail closed outside the allowlist). Owner doc: [ACTIVE/Owner_Scoped_Permit_Workflow_V1_Model_Spec.md](./ACTIVE/Owner_Scoped_Permit_Workflow_V1_Model_Spec.md).
-- **Controlled production money-flow / deposit proof** — Gate: explicit controlled smoke + owner approval. Owner doc: [ACTIVE/Compliance_Matters_Payments_Roadmap.md](./ACTIVE/Compliance_Matters_Payments_Roadmap.md).
+- **Automatic deposit settlement sync** — COMPLETE for new webhook-recorded Stripe payments; controlled manual refresh remains the late-payout and historical fallback.
 - **First-owner provisioning (operator path)** — Gate: `ALLOW_FIRST_OWNER_PROVISIONING` + `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING` for hosted `.supabase.co` targets; dry-run first. Owner doc: [ACTIVE/First_Owner_Provisioning_Runbook.md](./ACTIVE/First_Owner_Provisioning_Runbook.md).
 
 ---

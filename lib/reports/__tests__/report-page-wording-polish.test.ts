@@ -11,7 +11,8 @@ describe("report page wording polish", () => {
     const tabsSource = source("components/reports/ReportCenterTabs.tsx");
     const dashboardSource = source("app/reports/dashboard/page.tsx");
 
-    expect(tabsSource).toContain("Payments Received");
+    expect(tabsSource).toContain('href="/reports/payments"');
+    expect(tabsSource).toContain("Payments");
     expect(tabsSource).toContain("Work History");
     expect(tabsSource).toContain("Priority Board");
     expect(dashboardSource).toContain("Billing follow-up");
