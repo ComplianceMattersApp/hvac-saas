@@ -10,14 +10,11 @@ import {
   orderTracksForTrainingVisibility,
   resolveTrainingRoomVisibility,
 } from "@/lib/training/training-room-visibility";
-import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncher";
 import { canViewFinancialRegister, isStructuralAccountOwner } from "@/lib/auth/financial-access";
 import {
   hasFieldPaymentCollectionAccess,
   resolveFieldBillingCapabilities,
 } from "@/lib/auth/field-billing-access";
-import { buildHelpAssistantSafeContext } from "@/lib/help-assistant/help-assistant-context";
-import { isAskComplianceMattersEnabled, isTrainerAiEnabled } from "@/lib/help-assistant/help-assistant-flags";
 import {
   landingPathForDualContextAccess,
   resolveDualContextAccess,
@@ -170,21 +167,6 @@ export default async function TrainingRoomPage() {
   });
   const primaryTracks = orderTracksForTrainingVisibility(roleTrainingTracks, visibility.primaryTrackIds);
   const crossTrainingTracks = orderTracksForTrainingVisibility(roleTrainingTracks, visibility.crossTrainingTrackIds);
-  const canSeeFinancialRegister = canViewFinancialRegister({
-    actorUserId: access.user.id,
-    internalUser: scopedInternalUser,
-  });
-  const helpAssistantContext = buildHelpAssistantSafeContext({
-    pathname: "/training",
-    internalRole: access.internalUser.role,
-    isAccountOwner: isStructuralAccountOwner({
-      actorUserId: access.user.id,
-      internalUser: scopedInternalUser,
-    }),
-    productMode,
-    canViewFinancialRegister: canSeeFinancialRegister,
-    canCollectFieldPayment: hasFieldPaymentCollectionAccess(fieldBillingCapabilities),
-  });
 
   return (
     <div className={pageClass}>
@@ -311,9 +293,6 @@ export default async function TrainingRoomPage() {
         </details>
       </section>
 
-      {isAskComplianceMattersEnabled() ? (
-        <AskComplianceMattersLauncher context={helpAssistantContext} trainerAiEnabled={isTrainerAiEnabled()} />
-      ) : null}
     </div>
   );
 }

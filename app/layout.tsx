@@ -23,6 +23,14 @@ import { shouldShowPortalMenuItem } from "@/lib/portal/partner-work-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 import { countAttentionCenterItems } from "@/lib/reports/attention-center-count";
+import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncher";
+import {
+  buildHelpAssistantSafeContext,
+  type HelpAssistantSafeContext,
+} from "@/lib/help-assistant/help-assistant-context";
+import { isAskComplianceMattersEnabled, isTrainerAiEnabled } from "@/lib/help-assistant/help-assistant-flags";
+import { canViewFinancialRegister, isStructuralAccountOwner } from "@/lib/auth/financial-access";
+import { hasFieldPaymentCollectionAccess, resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -103,6 +111,7 @@ export default async function RootLayout({
   let permitWorkflowEnabled = false;
   let attentionCount = 0;
   let canViewFinancialAttention = false;
+  let helpAssistantContext: HelpAssistantSafeContext | null = null;
 
   if (access.preferredLandingContext === "portal") {
     homeHref = "/portal";
@@ -132,6 +141,26 @@ export default async function RootLayout({
     unreadNotificationCount = badgeCount;
     productMode = resolvedProductMode;
     attentionCount = resolvedAttentionCount;
+    const scopedInternalUser = {
+      user_id: access.internalUser.userId,
+      role: access.internalUser.role,
+      is_active: access.internalUser.isActive,
+      account_owner_user_id: accountOwnerUserId,
+    };
+    const financialAccessParams = {
+      actorUserId: user?.id,
+      internalUser: scopedInternalUser,
+      resourceAccountOwnerUserId: accountOwnerUserId,
+    };
+    const fieldBillingCapabilities = resolveFieldBillingCapabilities(financialAccessParams);
+    helpAssistantContext = buildHelpAssistantSafeContext({
+      pathname: "/",
+      internalRole: access.internalUser.role,
+      isAccountOwner: isStructuralAccountOwner(financialAccessParams),
+      productMode,
+      canViewFinancialRegister: canViewFinancialRegister(financialAccessParams),
+      canCollectFieldPayment: hasFieldPaymentCollectionAccess(fieldBillingCapabilities),
+    });
   }
 
   const profileFullName = await profileFullNamePromise;
@@ -387,6 +416,13 @@ export default async function RootLayout({
             {children}
           </main>
 
+          {isInternalUser && helpAssistantContext && isAskComplianceMattersEnabled() ? (
+            <AskComplianceMattersLauncher
+              context={helpAssistantContext}
+              trainerAiEnabled={isTrainerAiEnabled()}
+              globalInternalSurface
+            />
+          ) : null}
         </div>
       </body>
     </html>

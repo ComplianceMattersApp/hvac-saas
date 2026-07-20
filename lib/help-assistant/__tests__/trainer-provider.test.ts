@@ -11,6 +11,11 @@ describe("trainer provider", () => {
     expect(result.answer.supported).toBe(true);
     expect(result.answer.citationSlugs).toEqual(["first-job"]);
     expect(result.answer.citations).toHaveLength(1);
+    expect(parse).toHaveBeenCalledWith(expect.objectContaining({
+      store: false,
+      max_output_tokens: 600,
+    }));
+    expect(parse.mock.calls[0]?.[0]?.input?.[0]?.content).toContain("Lead with the direct answer");
   });
 
   it("fails closed and produces a review draft when knowledge does not support an answer", async () => {

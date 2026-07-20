@@ -6,7 +6,7 @@ import type { HelpAssistantSafeContext } from "./help-assistant-context";
 import type { TrainerKnowledgeSource } from "./trainer-knowledge";
 
 export const TRAINER_MODEL = ESTIMATE_COACH_MODEL;
-export const TRAINER_MAX_OUTPUT_TOKENS = 1_000;
+export const TRAINER_MAX_OUTPUT_TOKENS = 600;
 
 const trainerResponseSchema = z.object({
   supported: z.boolean(),
@@ -51,6 +51,7 @@ export async function generateTrainerAnswer(params: {
           "Answer only from the published knowledge excerpts supplied below.",
           "Never infer app behavior from general software knowledge and never claim to inspect account records, the database, or source code.",
           "Respect the supplied role and capability context. Do not advise bypassing permissions.",
+          "Lead with the direct answer. Keep routine answers to a short paragraph plus only the essential numbered steps; omit background, repetition, and generic reassurance.",
           "If the excerpts do not fully support the answer, set supported=false, clearly say the answer is not documented yet, and draft a proposed help article for owner review.",
           "When supported=true, cite only supplied source slugs and set draftArticle=null.",
           "Guidance only: do not claim to change settings or perform workflow actions.",

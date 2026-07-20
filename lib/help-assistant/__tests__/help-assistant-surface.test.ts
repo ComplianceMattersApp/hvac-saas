@@ -6,6 +6,7 @@ const launcherSource = readFileSync(
   resolve(__dirname, "../../../components/help-assistant/AskComplianceMattersLauncher.tsx"),
   "utf8",
 );
+const rootLayoutSource = readFileSync(resolve(__dirname, "../../../app/layout.tsx"), "utf8");
 const adminPageSource = readFileSync(resolve(__dirname, "../../../app/ops/admin/page.tsx"), "utf8");
 const trainingPageSource = readFileSync(resolve(__dirname, "../../../app/training/page.tsx"), "utf8");
 const answerSource = readFileSync(resolve(__dirname, "../help-assistant-answer.ts"), "utf8");
@@ -13,11 +14,17 @@ const helpGapEventsSource = readFileSync(resolve(__dirname, "../help-gap-events.
 const helpGapCopySource = readFileSync(resolve(__dirname, "../help-gap-persistence-copy.ts"), "utf8");
 
 describe("help assistant surface wiring", () => {
-  it("mounts the launcher behind the feature flag on scoped internal pages", () => {
-    expect(adminPageSource).toContain("isAskComplianceMattersEnabled()");
-    expect(adminPageSource).toContain("AskComplianceMattersLauncher");
-    expect(trainingPageSource).toContain("isAskComplianceMattersEnabled()");
-    expect(trainingPageSource).toContain("AskComplianceMattersLauncher");
+  it("mounts one globally guarded launcher for authenticated internal routes", () => {
+    expect(rootLayoutSource).toContain("isAskComplianceMattersEnabled()");
+    expect(rootLayoutSource).toContain("<AskComplianceMattersLauncher");
+    expect(rootLayoutSource).toContain("globalInternalSurface");
+    expect(launcherSource).toContain('"/today"');
+    expect(launcherSource).toContain('"/estimates"');
+    expect(launcherSource).toContain('"/training"');
+    expect(launcherSource).not.toContain('"/portal"');
+    expect(launcherSource).not.toContain('"/proposals"');
+    expect(adminPageSource).not.toContain("<AskComplianceMattersLauncher");
+    expect(trainingPageSource).not.toContain("<AskComplianceMattersLauncher");
   });
 
   it("wires help-gap persistence through the sanctioned server action only", () => {

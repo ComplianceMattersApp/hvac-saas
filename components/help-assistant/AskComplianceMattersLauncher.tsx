@@ -31,6 +31,7 @@ type FeedbackState = "helpful" | "not_helpful" | "still_need_help" | null;
 type AskComplianceMattersLauncherProps = {
   context: HelpAssistantSafeContext;
   trainerAiEnabled?: boolean;
+  globalInternalSurface?: boolean;
 };
 
 const quickQuestions = [
@@ -58,7 +59,33 @@ function splitAnswerBody(value: string) {
     .filter(Boolean);
 }
 
-export function AskComplianceMattersLauncher({ context, trainerAiEnabled = false }: AskComplianceMattersLauncherProps) {
+const GLOBAL_INTERNAL_PATHS = [
+  "/today",
+  "/ops",
+  "/calendar",
+  "/contractors",
+  "/customers",
+  "/estimates",
+  "/jobs",
+  "/locations",
+  "/reports",
+  "/training",
+  "/account",
+  "/service-plans",
+  "/services",
+  "/notes",
+  "/time-clock",
+];
+
+function isGlobalInternalTrainerPath(pathname: string) {
+  return GLOBAL_INTERNAL_PATHS.some((base) => pathname === base || pathname.startsWith(`${base}/`));
+}
+
+export function AskComplianceMattersLauncher({
+  context,
+  trainerAiEnabled = false,
+  globalInternalSurface = false,
+}: AskComplianceMattersLauncherProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<AssistantMode>("ask");
@@ -77,6 +104,8 @@ export function AskComplianceMattersLauncher({ context, trainerAiEnabled = false
     [context, pathname],
   );
   const setupCoach = getSetupCoachAnswer();
+
+  if (globalInternalSurface && !isGlobalInternalTrainerPath(pathname ?? "/")) return null;
 
   function persistenceKeyFor(event: HelpGapEvent) {
     return [
