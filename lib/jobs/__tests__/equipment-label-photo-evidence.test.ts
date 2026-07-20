@@ -71,6 +71,14 @@ describe("equipment label photo evidence", () => {
     expect(equipmentEditCardSource).toContain("<EquipmentLabelPhotoEvidencePanel");
   });
 
+  it("saves a selected label photo through the equipment form's final action", () => {
+    expect(equipmentCreateFormSource).toContain("saveWithParentForm");
+    expect(equipmentEditCardSource).toContain("saveWithParentForm");
+    expect(equipmentPhotoPanelSource).toContain('form.addEventListener("submit", handleSubmit)');
+    expect(equipmentPhotoPanelSource).toContain("form.requestSubmit(");
+    expect(equipmentPhotoPanelSource).toContain("Photo will save when you complete this step.");
+  });
+
   it("persists the pending equipment id on equipment creation without changing structured fields", () => {
     expect(jobActionsSource).toContain('const requestedEquipmentId = String(formData.get("equipment_id") || "").trim();');
     expect(jobActionsSource).toContain("...(requestedEquipmentId ? { id: requestedEquipmentId } : {})");

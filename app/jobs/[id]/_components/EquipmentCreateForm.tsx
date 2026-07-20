@@ -81,6 +81,7 @@ export default function EquipmentCreateForm({
               equipmentLabel={equipmentRoleLabel(role)}
               variant="action"
               onSavedChange={setHasLabelPhotoEvidence}
+              saveWithParentForm
             />
           ) : null
         }

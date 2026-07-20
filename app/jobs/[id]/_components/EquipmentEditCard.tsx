@@ -413,6 +413,7 @@ export default function EquipmentEditCard({
           systemName={eq.system_location}
           equipmentLabel={equipmentRoleLabel(role)}
           evidenceAttachments={labelPhotoAttachments}
+          saveWithParentForm
         />
 
         <div className="pt-2">

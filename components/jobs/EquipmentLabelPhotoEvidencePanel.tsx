@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, type ChangeEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -27,6 +27,7 @@ type Props = {
   evidenceAttachments?: EvidenceAttachment[];
   variant?: "panel" | "action";
   onSavedChange?: (saved: boolean) => void;
+  saveWithParentForm?: boolean;
 };
 
 function formatUploadDate(value: string) {
@@ -44,11 +45,15 @@ export default function EquipmentLabelPhotoEvidencePanel({
   evidenceAttachments = [],
   variant = "panel",
   onSavedChange,
+  saveWithParentForm = false,
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const takePhotoRef = useRef<HTMLInputElement | null>(null);
   const uploadPhotoRef = useRef<HTMLInputElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const bypassNextSubmitRef = useRef(false);
+  const uploadInFlightRef = useRef(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -114,48 +119,83 @@ export default function EquipmentLabelPhotoEvidencePanel({
     }
   }
 
-  function uploadSelectedFiles() {
-    if (!pendingFiles.length || isPending) return;
+  async function saveSelectedFiles(refreshAfterSave = true) {
+    if (!pendingFiles.length) return true;
     setError(null);
     setOk(null);
+    const uploadedIds: string[] = [];
 
-    startTransition(async () => {
-      const uploadedIds: string[] = [];
-
-      try {
-        for (const file of pendingFiles) {
-          const attachmentId = await uploadOne(file);
-          if (attachmentId) uploadedIds.push(attachmentId);
-        }
-
-        await finalizeInternalJobAttachmentUpload({
-          jobId,
-          caption: defaultLabel,
-          note: "Equipment label photo evidence",
-          attachmentIds: uploadedIds,
-          fileNames: pendingFiles.map((file) => file.name),
-          attachmentEvidenceContext: "equipment_label_photo",
-        });
-
-        setPendingFiles([]);
-        setOk("Label photo captured.");
-        onSavedChange?.(true);
-        router.refresh();
-      } catch (uploadError) {
-        for (const attachmentId of uploadedIds) {
-          try {
-            await discardInternalJobAttachmentUpload({ jobId, attachmentId });
-          } catch (cleanupError) {
-            console.error("discardInternalJobAttachmentUpload failed", cleanupError);
-          }
-        }
-        setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
+    try {
+      for (const file of pendingFiles) {
+        const attachmentId = await uploadOne(file);
+        if (attachmentId) uploadedIds.push(attachmentId);
       }
+
+      await finalizeInternalJobAttachmentUpload({
+        jobId,
+        caption: defaultLabel,
+        note: "Equipment label photo evidence",
+        attachmentIds: uploadedIds,
+        fileNames: pendingFiles.map((file) => file.name),
+        attachmentEvidenceContext: "equipment_label_photo",
+      });
+
+      setPendingFiles([]);
+      setOk("Label photo captured.");
+      onSavedChange?.(true);
+      if (refreshAfterSave) router.refresh();
+      return true;
+    } catch (uploadError) {
+      for (const attachmentId of uploadedIds) {
+        try {
+          await discardInternalJobAttachmentUpload({ jobId, attachmentId });
+        } catch (cleanupError) {
+          console.error("discardInternalJobAttachmentUpload failed", cleanupError);
+        }
+      }
+      setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
+      return false;
+    }
+  }
+
+  function uploadSelectedFiles() {
+    if (!pendingFiles.length || isPending) return;
+    startTransition(async () => {
+      await saveSelectedFiles();
     });
   }
 
+  useEffect(() => {
+    if (!saveWithParentForm) return;
+    const form = rootRef.current?.closest("form");
+    if (!form) return;
+
+    const handleSubmit = async (event: SubmitEvent) => {
+      if (bypassNextSubmitRef.current) {
+        bypassNextSubmitRef.current = false;
+        return;
+      }
+      if (!pendingFiles.length) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (uploadInFlightRef.current) return;
+      uploadInFlightRef.current = true;
+      const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+      const saved = await saveSelectedFiles(false).finally(() => {
+        uploadInFlightRef.current = false;
+      });
+      if (!saved) return;
+      bypassNextSubmitRef.current = true;
+      form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : undefined);
+    };
+
+    form.addEventListener("submit", handleSubmit);
+    return () => form.removeEventListener("submit", handleSubmit);
+  }, [pendingFiles, saveWithParentForm]);
+
   return (
-    <div className={isActionVariant ? "min-w-0 text-xs text-slate-700" : "border-t border-slate-200 pt-3 text-xs text-slate-700"}>
+    <div ref={rootRef} className={isActionVariant ? "min-w-0 text-xs text-slate-700" : "border-t border-slate-200 pt-3 text-xs text-slate-700"}>
       <input
         ref={takePhotoRef}
         type="file"
@@ -224,7 +264,7 @@ export default function EquipmentLabelPhotoEvidencePanel({
         </span>
       </div>
 
-      {pendingFiles.length ? (
+      {pendingFiles.length && !saveWithParentForm ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -243,6 +283,10 @@ export default function EquipmentLabelPhotoEvidencePanel({
             Clear
           </button>
         </div>
+      ) : null}
+
+      {pendingFiles.length && saveWithParentForm ? (
+        <div className="mt-2 text-xs font-medium text-blue-700">Photo will save when you complete this step.</div>
       ) : null}
 
       {evidenceAttachments.length ? (

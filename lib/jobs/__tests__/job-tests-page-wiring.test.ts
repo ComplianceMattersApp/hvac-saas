@@ -220,6 +220,10 @@ describe("job tests page wiring", () => {
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('capture="environment"');
     expect(refrigerantChargePhotoEvidencePanelSource.match(/capture=/g) ?? []).toHaveLength(1);
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('attachmentEvidenceContext: "refrigerant_charge_photo"');
+    expect(refrigerantBlock).toContain('saveWithParentForm');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('form.addEventListener("submit", handleSubmit)');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('form.requestSubmit(');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('Photo will save when you complete the test.');
     expect(refrigerantBlock).not.toContain('Photo / Notes');
     expect(refrigerantBlock).not.toContain('Photo Taken - user attests gauge photo was captured');
     expect(refrigerantBlock).not.toContain('EccLivePreview mode="refrigerant_charge"');

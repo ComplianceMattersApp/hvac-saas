@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition, type ChangeEvent, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type ChangeEvent, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -21,6 +21,7 @@ type Props = {
   jobId: string;
   systemName?: string | null;
   evidenceAttachments: EvidenceAttachment[];
+  saveWithParentForm?: boolean;
 };
 
 function formatUploadDate(value: string) {
@@ -33,11 +34,15 @@ export default function RefrigerantChargePhotoEvidencePanel({
   jobId,
   systemName,
   evidenceAttachments,
+  saveWithParentForm = false,
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const takePhotoRef = useRef<HTMLInputElement | null>(null);
   const uploadPhotoRef = useRef<HTMLInputElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const bypassNextSubmitRef = useRef(false);
+  const uploadInFlightRef = useRef(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -93,47 +98,82 @@ export default function RefrigerantChargePhotoEvidencePanel({
     }
   }
 
-  function uploadSelectedFiles() {
-    if (!pendingFiles.length || isPending) return;
+  async function saveSelectedFiles(refreshAfterSave = true) {
+    if (!pendingFiles.length) return true;
     setError(null);
     setOk(null);
+    const uploadedIds: string[] = [];
 
-    startTransition(async () => {
-      const uploadedIds: string[] = [];
-
-      try {
-        for (const file of pendingFiles) {
-          const attachmentId = await uploadOne(file);
-          if (attachmentId) uploadedIds.push(attachmentId);
-        }
-
-        await finalizeInternalJobAttachmentUpload({
-          jobId,
-          caption: defaultLabel,
-          note: "Refrigerant charge photo evidence",
-          attachmentIds: uploadedIds,
-          fileNames: pendingFiles.map((file) => file.name),
-          attachmentEvidenceContext: "refrigerant_charge_photo",
-        });
-
-        setPendingFiles([]);
-        setOk(`Uploaded ${uploadedIds.length} photo${uploadedIds.length === 1 ? "" : "s"}.`);
-        router.refresh();
-      } catch (uploadError) {
-        for (const attachmentId of uploadedIds) {
-          try {
-            await discardInternalJobAttachmentUpload({ jobId, attachmentId });
-          } catch (cleanupError) {
-            console.error("discardInternalJobAttachmentUpload failed", cleanupError);
-          }
-        }
-        setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
+    try {
+      for (const file of pendingFiles) {
+        const attachmentId = await uploadOne(file);
+        if (attachmentId) uploadedIds.push(attachmentId);
       }
+
+      await finalizeInternalJobAttachmentUpload({
+        jobId,
+        caption: defaultLabel,
+        note: "Refrigerant charge photo evidence",
+        attachmentIds: uploadedIds,
+        fileNames: pendingFiles.map((file) => file.name),
+        attachmentEvidenceContext: "refrigerant_charge_photo",
+      });
+
+      setPendingFiles([]);
+      setOk(`Uploaded ${uploadedIds.length} photo${uploadedIds.length === 1 ? "" : "s"}.`);
+      if (refreshAfterSave) router.refresh();
+      return true;
+    } catch (uploadError) {
+      for (const attachmentId of uploadedIds) {
+        try {
+          await discardInternalJobAttachmentUpload({ jobId, attachmentId });
+        } catch (cleanupError) {
+          console.error("discardInternalJobAttachmentUpload failed", cleanupError);
+        }
+      }
+      setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
+      return false;
+    }
+  }
+
+  function uploadSelectedFiles() {
+    if (!pendingFiles.length || isPending) return;
+    startTransition(async () => {
+      await saveSelectedFiles();
     });
   }
 
+  useEffect(() => {
+    if (!saveWithParentForm) return;
+    const form = rootRef.current?.closest("form");
+    if (!form) return;
+
+    const handleSubmit = async (event: SubmitEvent) => {
+      if (bypassNextSubmitRef.current) {
+        bypassNextSubmitRef.current = false;
+        return;
+      }
+      if (!pendingFiles.length) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (uploadInFlightRef.current) return;
+      uploadInFlightRef.current = true;
+      const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+      const saved = await saveSelectedFiles(false).finally(() => {
+        uploadInFlightRef.current = false;
+      });
+      if (!saved) return;
+      bypassNextSubmitRef.current = true;
+      form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : undefined);
+    };
+
+    form.addEventListener("submit", handleSubmit);
+    return () => form.removeEventListener("submit", handleSubmit);
+  }, [pendingFiles, saveWithParentForm]);
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700">
+    <div ref={rootRef} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700">
       <input
         ref={takePhotoRef}
         type="file"
@@ -194,7 +234,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
         </span>
       </div>
 
-      {pendingFiles.length ? (
+      {pendingFiles.length && !saveWithParentForm ? (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -213,6 +253,10 @@ export default function RefrigerantChargePhotoEvidencePanel({
             Clear
           </button>
         </div>
+      ) : null}
+
+      {pendingFiles.length && saveWithParentForm ? (
+        <div className="mt-2 text-xs font-medium text-blue-700">Photo will save when you complete the test.</div>
       ) : null}
 
       {evidenceAttachments.length ? (

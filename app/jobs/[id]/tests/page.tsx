@@ -4760,6 +4760,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       jobId={job.id}
                       systemName={selectedSystemName}
                       evidenceAttachments={refrigerantEvidenceAttachments}
+                      saveWithParentForm
                     />
                   </RefrigerantChargeExceptionFields>
                   <div
