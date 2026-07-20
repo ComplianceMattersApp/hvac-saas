@@ -606,14 +606,6 @@ export default async function EstimateDetailPage({
         </div>
       </div>
 
-      {estimateCoachReport ? (
-        <EstimateCoachPanel
-          report={estimateCoachReport}
-          estimateId={estimate.id}
-          aiEnabled={isEstimateCoachAiEnabled()}
-        />
-      ) : null}
-
       {/* Create default option packages (if eligible for multi-option upgrade) */}
       <CreateDefaultOptionsForm
         estimateId={estimate.id}
@@ -1221,6 +1213,14 @@ export default async function EstimateDetailPage({
           </>
         )}
       </div>
+
+      {estimateCoachReport ? (
+        <EstimateCoachPanel
+          report={estimateCoachReport}
+          estimateId={estimate.id}
+          aiEnabled={isEstimateCoachAiEnabled()}
+        />
+      ) : null}
 
       {/* Non-goal confirmation: no approval/conversion/payment/email/PDF UI */}
     </div>
