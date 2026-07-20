@@ -34,12 +34,14 @@ type AskComplianceMattersLauncherProps = {
 };
 
 const quickQuestions = [
-  "What should I do first?",
-  "How do I run my first job?",
-  "What is Launch Room?",
-  "What is Training Room?",
-  "What are Online Invoice Payments?",
-  "What is my role responsible for?",
+  "How do I create and schedule a job?",
+  "What happens after a tech finishes?",
+  "How do I build an estimate?",
+  "How do Good, Better, Best options work?",
+  "Where do I add equipment details?",
+  "Why can't I see billing?",
+  "How do I record parts needed?",
+  "How does an ECC retest work?",
 ];
 
 const modeButtonClass =
@@ -242,16 +244,16 @@ export function AskComplianceMattersLauncher({ context, trainerAiEnabled = false
               <div className="mt-4 space-y-3.5">
                 {!answer ? (
                   <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-                    <div className="text-sm font-semibold text-slate-950">Ask about the startup path</div>
+                    <div className="text-sm font-semibold text-slate-950">Ask about EveryStep</div>
                     <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Ask about setup, training, roles, online payments, or first-job workflow.
+                      Ask in your own words about customers, jobs, scheduling, field work, estimates, equipment, billing, payments, ECC/HERS, setup, or roles.
                     </p>
                   </div>
                 ) : null}
 
                 <div className="rounded-lg border border-slate-200 bg-white p-3.5">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Starter prompts
+                    Examples — not the limit
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {quickQuestions.map((item) => (
@@ -283,7 +285,7 @@ export function AskComplianceMattersLauncher({ context, trainerAiEnabled = false
                     onChange={(event) => setQuestion(event.target.value)}
                     rows={3}
                     className="mt-2 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm leading-6 text-slate-900 outline-none focus:border-slate-500"
-                    placeholder="Ask about setup, training, roles, or first-job flow."
+                    placeholder="What do you need help with?"
                   />
                   <button type="submit" disabled={isAnswering} className="mt-2 w-full rounded-lg bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-wait disabled:bg-slate-500">
                     {isAnswering ? "Searching approved knowledge..." : "Ask"}
