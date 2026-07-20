@@ -48,4 +48,9 @@ describe("Today page hierarchy", () => {
     expect(source).toContain("wide");
     expect(source).toContain("sm:grid-cols-[minmax(8rem,0.75fr)_minmax(0,1.6fr)_auto_auto]");
   });
+
+  it("stacks Team Coverage identity and location details on narrow screens", () => {
+    expect(source).toContain(': "grid gap-1.5"');
+    expect(source).toContain('wide ? "" : "justify-self-start"');
+  });
 });

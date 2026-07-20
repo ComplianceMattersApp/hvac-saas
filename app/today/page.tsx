@@ -700,7 +700,7 @@ function TeamCoverageSection({
                 className={
                   wide
                     ? "grid items-center gap-3 sm:grid-cols-[minmax(8rem,0.75fr)_minmax(0,1.6fr)_auto_auto]"
-                    : "flex items-start justify-between gap-3"
+                    : "grid gap-1.5"
                 }
               >
                 <div className="min-w-0">
@@ -717,7 +717,7 @@ function TeamCoverageSection({
                     {row.windowLabel ?? "Window pending"}
                   </span>
                 ) : null}
-                <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                <span className={`shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 ${wide ? "" : "justify-self-start"}`}>
                   {row.statusLabel}
                 </span>
               </div>
