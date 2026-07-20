@@ -180,6 +180,7 @@ These are future/business-layer modules, not spine failures. Each stays parked u
 **Field-workflow deferrals**
 - **Checklist Phase 2 — Field Mode** — target surface `MobileJobDetailV2Preview`; not part of Field Invoice Flow V1. *Unlock:* separate mobile-surface audit + explicit owner sign-off.
 - **Tech dispatch phone notifications** (PROJECT_TRUTH §11.9 backlog) — a tech assigned/dispatched should receive a phone notification, with a later on/off preference. *Unlock:* notification + preference/toggle work is scheduled.
+- **Estimate photo attachments** — allow internal users to take or upload photos and explicitly attach them to a draft estimate for customer proposal context. Preserve account scope, mobile upload ergonomics, explicit user review/removal, proposal visibility controls, and durable-first signed upload/finalize behavior; photos must not be interpreted, attached, or published automatically by Estimate AI. *Unlock:* estimate attachment model/storage audit + customer-facing proposal privacy decision + owner sign-off.
 - **Inventory, job costing, payroll, financing, mileage / expense capture, broad customer-specific pricing complexity** — out of current product scope. *Unlock:* owner decision.
 
 ---
