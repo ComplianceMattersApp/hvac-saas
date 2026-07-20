@@ -6,6 +6,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { requireInternalUser } from "@/lib/auth/internal-user";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { getEstimateById } from "@/lib/estimates/estimate-read";
+import {
+  buildEstimateCoachAiContext,
+  ESTIMATE_COACH_MODEL,
+  estimateCoachReservationMicrousd,
+  generateEstimateCoachAiSuggestions,
+  type EstimateCoachAiResponse,
+} from "@/lib/ai/estimate-coach-provider";
+import { releaseAiUsage, reserveAiUsage, settleAiUsage } from "@/lib/ai/usage-budget";
 import {
   addEstimateLineItem,
   addEstimateOptionLineItem,
@@ -40,6 +51,7 @@ import { sendEstimateCommunication } from "@/lib/estimates/estimate-communicatio
 import { sendEstimateProposalEmail } from "@/lib/estimates/estimate-proposal-email";
 import {
   isEstimateProposalLinksEnabled,
+  isEstimateCoachAiEnabled,
   isEstimatesEnabled,
 } from "@/lib/estimates/estimate-exposure";
 import {
@@ -50,6 +62,76 @@ import {
 type TransitionTargetStatus = "sent" | "approved" | "declined" | "expired" | "cancelled";
 
 type ProposalLinkActionIntent = "issue" | "regenerate" | "revoke";
+
+export type EstimateCoachAiActionResult =
+  | { success: true; suggestions: EstimateCoachAiResponse }
+  | { success: false; error: string };
+
+export async function generateEstimateCoachSuggestionsAction(params: {
+  estimateId: string;
+}): Promise<EstimateCoachAiActionResult> {
+  if (!isEstimatesEnabled() || !isEstimateCoachAiEnabled()) {
+    return { success: false, error: "AI suggestions are currently unavailable." };
+  }
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  if (!estimateId) return { success: false, error: "Estimate is required." };
+
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase });
+  const estimate = await getEstimateById({ estimateId, internalUser, supabase });
+  if (!estimate) return { success: false, error: "Estimate was not found." };
+
+  const context = buildEstimateCoachAiContext(estimate);
+  const admin = createAdminClient();
+  const requestId = `estimate-coach:${crypto.randomUUID()}`;
+  let reservation: Awaited<ReturnType<typeof reserveAiUsage>>;
+  try {
+    reservation = await reserveAiUsage({
+      admin,
+      requestId,
+      featureKey: "estimate_coach",
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      actorUserId: userId,
+      model: ESTIMATE_COACH_MODEL,
+      estimatedCostMicrousd: estimateCoachReservationMicrousd(context),
+      metadata: { proposal_mode: estimate.proposalMode },
+    });
+  } catch {
+    return { success: false, error: "AI budget controls are unavailable. No provider request was made." };
+  }
+
+  if (!reservation.accepted) {
+    return {
+      success: false,
+      error: reservation.reason === "monthly_cap_reached"
+        ? "The monthly AI budget has been reached. Deterministic guidance remains available."
+        : "AI suggestions are paused by the Platform Owner.",
+    };
+  }
+
+  let providerCompleted = false;
+  try {
+    const result = await generateEstimateCoachAiSuggestions({
+      context,
+    });
+    providerCompleted = true;
+    await settleAiUsage({
+      admin,
+      requestId,
+      actualCostMicrousd: result.usage.actualCostMicrousd,
+      inputTokens: result.usage.inputTokens,
+      cachedInputTokens: result.usage.cachedInputTokens,
+      outputTokens: result.usage.outputTokens,
+    });
+    return { success: true, suggestions: result.suggestions };
+  } catch {
+    if (!providerCompleted) {
+      await releaseAiUsage({ admin, requestId }).catch(() => undefined);
+    }
+    return { success: false, error: "AI suggestions could not be generated. No estimate changes were made." };
+  }
+}
 
 function toSafeProposalLinkErrorState(message?: string | null): EstimateProposalLinkActionState {
   const normalized = String(message ?? "").toLowerCase();

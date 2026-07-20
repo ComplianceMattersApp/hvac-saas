@@ -18,6 +18,14 @@ export function isEstimateCoachEnabled(rawValue?: string | null): boolean {
   return ENABLED_VALUES.has(normalized);
 }
 
+/** Fail-closed guard for paid, provider-backed Estimate Coach suggestions. */
+export function isEstimateCoachAiEnabled(rawValue?: string | null): boolean {
+  const source = rawValue ?? process.env.ENABLE_ESTIMATE_COACH_AI;
+  const normalized = String(source ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  return ENABLED_VALUES.has(normalized);
+}
+
 /**
  * Fail-closed guard for the estimate email send feature.
  * When disabled, send attempts are recorded as attempt_status='blocked'

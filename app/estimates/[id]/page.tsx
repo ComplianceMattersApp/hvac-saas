@@ -15,7 +15,7 @@ import {
 } from "@/lib/estimates/estimate-document";
 import { buildEstimateCoachReport } from "@/lib/estimates/estimate-coach";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
-import { isEstimateCoachEnabled, isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { isEstimateCoachAiEnabled, isEstimateCoachEnabled, isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { readActiveEstimateProposalLinkForInternal } from "@/lib/estimates/estimate-proposal-links";
 import {
   removeLineItemFromForm,
@@ -606,7 +606,13 @@ export default async function EstimateDetailPage({
         </div>
       </div>
 
-      {estimateCoachReport ? <EstimateCoachPanel report={estimateCoachReport} /> : null}
+      {estimateCoachReport ? (
+        <EstimateCoachPanel
+          report={estimateCoachReport}
+          estimateId={estimate.id}
+          aiEnabled={isEstimateCoachAiEnabled()}
+        />
+      ) : null}
 
       {/* Create default option packages (if eligible for multi-option upgrade) */}
       <CreateDefaultOptionsForm

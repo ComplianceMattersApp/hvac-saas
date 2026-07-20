@@ -1,7 +1,16 @@
 import { CircleAlert, CircleCheck, Sparkles } from "lucide-react";
 import type { EstimateCoachReport } from "@/lib/estimates/estimate-coach";
+import EstimateCoachAiSuggestions from "./EstimateCoachAiSuggestions";
 
-export default function EstimateCoachPanel({ report }: { report: EstimateCoachReport }) {
+export default function EstimateCoachPanel({
+  report,
+  estimateId,
+  aiEnabled,
+}: {
+  report: EstimateCoachReport;
+  estimateId: string;
+  aiEnabled: boolean;
+}) {
   const attentionItems = report.suggestions.filter((item) => item.severity === "attention");
   const guidanceItems = report.suggestions.filter((item) => item.severity === "guidance");
 
@@ -46,7 +55,9 @@ export default function EstimateCoachPanel({ report }: { report: EstimateCoachRe
           </div>
         ))}
 
-        <p className="text-xs text-slate-500">Suggestion-only: no AI provider call, database write, send, approval, conversion, invoice, payment, QBO, or SMS action occurs here.</p>
+        {aiEnabled ? <EstimateCoachAiSuggestions estimateId={estimateId} /> : null}
+
+        <p className="text-xs text-slate-500">Suggestion-only: a provider call occurs only when requested above. No estimate write, send, approval, conversion, invoice, payment, QBO, or SMS action occurs here.</p>
       </div>
     </section>
   );

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  isEstimateCoachAiEnabled,
   isEstimateCoachEnabled,
   isEstimatesEnabled,
   isEstimateProposalLinksEnabled,
@@ -14,8 +15,17 @@ describe("isEstimateCoachEnabled", () => {
   });
 });
 
+describe("isEstimateCoachAiEnabled", () => {
+  it("fails closed independently from the deterministic coach flag", () => {
+    expect(isEstimateCoachAiEnabled(undefined)).toBe(false);
+    expect(isEstimateCoachAiEnabled("false")).toBe(false);
+    expect(isEstimateCoachAiEnabled("true")).toBe(true);
+  });
+});
+
 beforeEach(() => {
   delete process.env.ENABLE_ESTIMATE_COACH;
+  delete process.env.ENABLE_ESTIMATE_COACH_AI;
   delete process.env.ENABLE_ESTIMATES;
 });
 
