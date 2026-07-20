@@ -84,11 +84,19 @@ describe("today business attention wiring", () => {
   });
 
   it("separates financial attention from the Ops queue summary", () => {
-    expect(todayPageSource).toContain('pulse.mode === "business"');
+    expect(todayPageSource).toContain('aria-label="Today summaries"');
+    expect(todayPageSource).toContain("<RoleAwarePulseSection pulse={model.roleAwarePulse} />");
+    expect(todayPageSource).not.toContain("connected />");
     expect(todayReadModelSource).toContain("Business Attention");
     expect(todayReadModelSource).toContain("Financial Attention");
     expect(todayReadModelSource).not.toContain("Ops Pressure");
     expect(todayPageSource).toContain('"open_invoices", "confirm_payments", "failed_attempts"');
+  });
+
+  it("uses compact financial information instead of raised metric panels", () => {
+    expect(todayPageSource).toContain('className="mt-3 divide-y divide-slate-200 border-y border-slate-200"');
+    expect(todayPageSource).not.toContain("FinancialComparisonBar");
+    expect(todayPageSource).not.toContain("bg-gradient-to-br from-emerald-50");
   });
 
   it("keeps field technicians out of business-pressure chip/groups", () => {

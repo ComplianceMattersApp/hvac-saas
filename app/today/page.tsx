@@ -113,21 +113,13 @@ export default async function TodayPage() {
         briefing={model.dailyBriefing}
       />
 
-      {/* MOBILE-FIRST RANKED STREAM (visible on mobile, hidden on lg+) */}
-      <div className="space-y-4 lg:hidden">
+      {/* MOBILE-FIRST RANKED STREAM (visible below the wide desktop layout) */}
+      <div className="space-y-4 xl:hidden">
         <NextBestActionCard action={model.nextBestAction} mobile />
-
-        <TodayWorkSection
-          label={model.todayWork.label}
-          jobs={model.todayWork.jobs.slice(0, 5)}
-          showFieldActions={model.todayWork.showFieldActions}
-        />
 
         {model.priorityChips.length > 0 ? (
           <PriorityChipsSection chips={model.priorityChips} />
         ) : null}
-
-        <FollowUpSection groups={model.followUpGroups.slice(0, 3)} />
 
         {model.teamCoverage.visible ? (
           <TeamCoverageSection
@@ -137,42 +129,36 @@ export default async function TodayPage() {
           />
         ) : null}
 
+        {model.roleAwarePulse.visible ? (
+          <RoleAwarePulseSection pulse={model.roleAwarePulse} />
+        ) : null}
+
+        <TodayWorkSection
+          label={model.todayWork.label}
+          jobs={model.todayWork.jobs.slice(0, 5)}
+          showFieldActions={model.todayWork.showFieldActions}
+        />
+
+        <FollowUpSection groups={model.followUpGroups.slice(0, 3)} />
+
         <ResumeRecentSection
           items={model.resumeRecentWork.slice(0, 3)}
           hasMore={model.resumeRecentHasMore}
         />
-
-        {model.roleAwarePulse.visible ? (
-          <RoleAwarePulseSection
-            pulse={model.roleAwarePulse}
-            collapsed
-          />
-        ) : null}
       </div>
 
-      {/* DESKTOP MULTI-PANEL LAUNCHPAD (hidden on mobile, visible on lg+) */}
-      <div className="hidden lg:block lg:space-y-5">
-        {/* Hero surface — Next Best Action + Business Pulse presented as one
-            designed dashboard band, so the rail reads as connected rather
-            than a separate, unrelated card. */}
-        <div className="rounded-[28px] border border-blue-100/70 bg-gradient-to-br from-white via-white to-blue-50/50 p-2 shadow-[0_34px_72px_-38px_rgba(15,31,53,0.4)]">
-          <div className={`grid gap-2 ${model.roleAwarePulse.visible ? "lg:grid-cols-5 lg:items-stretch" : ""}`}>
-            <div className={model.roleAwarePulse.visible ? "lg:col-span-3 lg:flex lg:w-full" : ""}>
-              <NextBestActionCard action={model.nextBestAction} matchHeight={model.roleAwarePulse.visible} />
-            </div>
-            {model.roleAwarePulse.visible ? (
-              <div className="lg:col-span-2 lg:flex">
-                <RoleAwarePulseSection pulse={model.roleAwarePulse} connected />
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="grid gap-5 lg:grid-cols-3">
-          <div className="space-y-5 lg:col-span-2">
-            {model.priorityChips.length > 0 ? (
-              <PriorityChipsSection chips={model.priorityChips} desktop />
-            ) : null}
+      {/* WIDE DESKTOP MAIN COLUMN + INDEPENDENT RIGHT RAIL */}
+      <div className="hidden xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] xl:items-start xl:gap-5">
+        <main className="min-w-0 space-y-5">
+          <NextBestActionCard action={model.nextBestAction} />
+          {model.teamCoverage.visible ? (
+            <TeamCoverageSection
+              coverage={model.teamCoverage}
+              label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
+              wide
+            />
+          ) : null}
+          <div className="space-y-5">
             <TodayWorkSection
               label={model.todayWork.label}
               jobs={model.todayWork.jobs}
@@ -181,22 +167,20 @@ export default async function TodayPage() {
               primary
             />
             <FollowUpSection groups={model.followUpGroups} desktop primary />
-          </div>
-
-          <div className="space-y-5">
-            {model.teamCoverage.visible ? (
-              <TeamCoverageSection
-                coverage={model.teamCoverage}
-                label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
-              />
-            ) : null}
             <ResumeRecentSection
               items={model.resumeRecentWork}
               hasMore={model.resumeRecentHasMore}
-              desktop
             />
           </div>
-        </div>
+        </main>
+        <aside className="space-y-5" aria-label="Today summaries">
+          {model.priorityChips.length > 0 ? (
+            <PriorityChipsSection chips={model.priorityChips} desktop />
+          ) : null}
+          {model.roleAwarePulse.visible ? (
+            <RoleAwarePulseSection pulse={model.roleAwarePulse} />
+          ) : null}
+        </aside>
       </div>
 
     </div>
@@ -294,26 +278,20 @@ function ClockChip({ state }: { state: TodayHeader["clockState"] }) {
 function NextBestActionCard({
   action,
   mobile = false,
-  matchHeight = false,
 }: {
   action: NextBestAction;
   mobile?: boolean;
-  matchHeight?: boolean;
 }) {
   const isEmpty = action.kind === "empty";
   return (
     <section
-      className={`relative overflow-hidden rounded-2xl border border-[#0f1f35] bg-gradient-to-br from-[#0f1f35] to-[#16263f] p-4 shadow-[0_30px_64px_-26px_rgba(8,15,30,0.55)] sm:p-5 ${
-        matchHeight ? "lg:flex lg:h-full lg:w-full lg:flex-col lg:justify-center" : ""
-      }`}
+      className="relative overflow-hidden rounded-2xl border border-[#0f1f35] bg-gradient-to-br from-[#0f1f35] to-[#16263f] p-4 shadow-[0_30px_64px_-26px_rgba(8,15,30,0.55)] sm:p-5"
     >
       <div
         className={`pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-blue-500/20 blur-[90px] ${isEmpty ? "opacity-60" : ""}`}
       />
       <div
-        className={`pointer-events-none absolute -bottom-20 -left-12 h-48 w-48 rounded-full bg-blue-400/10 blur-[100px] ${
-          matchHeight ? "lg:block hidden" : "hidden"
-        }`}
+        className="pointer-events-none absolute -bottom-20 -left-12 hidden h-48 w-48 rounded-full bg-blue-400/10 blur-[100px]"
       />
       <div className="relative">
         <div className="flex items-center gap-2">
@@ -516,30 +494,39 @@ function PriorityChipsSection({
   chips: PriorityChip[];
   desktop?: boolean;
 }) {
-  if (chips.length === 0) return null;
+  const snapshotKeys = new Set([
+    "need_scheduling",
+    "field_work",
+    "waiting",
+    "exceptions",
+    "follow_ups",
+    "closeout",
+  ]);
+  const snapshotChips = chips.filter((chip) => snapshotKeys.has(chip.key));
+  if (snapshotChips.length === 0) return null;
   return (
     <section className={CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
         <div>
           <SectionEyebrow label="Operations" />
-          <h2 className={SECTION_HEADING_TEXT}>Queues requiring attention</h2>
+          <h2 className={SECTION_HEADING_TEXT}>Operations snapshot</h2>
           <p className="mt-1 text-xs text-slate-600">Live counts from the Operations workboard.</p>
         </div>
         {desktop ? (
           <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
-            Open Operations
+            Open Operations →
           </Link>
         ) : null}
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        {chips.map((chip) => (
+      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+        {snapshotChips.map((chip) => (
           <Link
             key={chip.key}
             href={chip.href}
-            className={`group flex min-h-16 items-center justify-between gap-4 rounded-xl border px-4 py-3 shadow-[0_12px_28px_-22px_rgba(15,31,53,0.45)] transition-colors ${chipToneClass(chip)}`}
+            className={`group flex min-h-11 items-center justify-between gap-4 border-l-[3px] border-b border-b-slate-200/80 px-3 py-2.5 text-slate-800 transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${chipAccentClass(chip)}`}
           >
             <span className="text-sm font-semibold">{chip.label}</span>
-            <span className="min-w-9 rounded-lg bg-white/85 px-2 py-1 text-center text-lg font-bold tabular-nums text-current shadow-sm">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-700">
               {chip.count}
             </span>
           </Link>
@@ -549,11 +536,10 @@ function PriorityChipsSection({
   );
 }
 
-function chipToneClass(chip: PriorityChip): string {
-  if (chip.tone === "danger") return "border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100";
-  if (chip.tone === "warn") return "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100";
-  if (chip.tone === "info") return "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100";
-  return "border-slate-200 bg-slate-50 text-slate-800 hover:bg-white";
+function chipAccentClass(chip: PriorityChip): string {
+  if (chip.key === "exceptions") return "border-l-rose-400 bg-rose-50/30";
+  if (chip.key === "need_scheduling") return "border-l-amber-400";
+  return "border-l-slate-300";
 }
 
 function normalizeReasonToken(value: string | null | undefined): string {
@@ -678,17 +664,19 @@ function TeamCoverageSection({
   coverage,
   label = "Team Coverage",
   mobile = false,
+  wide = false,
 }: {
   coverage: TeamCoverage;
   label?: string;
   mobile?: boolean;
+  wide?: boolean;
 }) {
   return (
     <section className={CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
         <div>
           <SectionEyebrow label={label} />
-          <h2 className={SECTION_HEADING_TEXT}>Who's assigned today</h2>
+          <h2 className={SECTION_HEADING_TEXT}>Who&apos;s assigned today</h2>
           <p className="mt-1 text-xs text-slate-600">{coverage.summaryLabel}</p>
         </div>
         <Link href={coverage.href} className="text-xs font-semibold text-blue-700 hover:underline">
@@ -708,22 +696,37 @@ function TeamCoverageSection({
         <ul className="mt-3 space-y-2">
           {coverage.assignments.slice(0, mobile ? 3 : 5).map((row) => (
             <li key={row.key} className={ROW_SHELL}>
-              <div className="flex items-start justify-between gap-3">
+              <div
+                className={
+                  wide
+                    ? "grid items-center gap-3 sm:grid-cols-[minmax(8rem,0.75fr)_minmax(0,1.6fr)_auto_auto]"
+                    : "flex items-start justify-between gap-3"
+                }
+              >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-[#0f1f35]">{row.assigneeName}</div>
-                  <Link href={row.href} className="mt-0.5 block truncate text-xs font-medium text-blue-700 hover:underline">
+                  <div className="text-sm font-semibold text-[#0f1f35]">{row.assigneeName}</div>
+                </div>
+                <div className="min-w-0">
+                  <Link href={row.href} className="block text-xs font-medium text-blue-700 hover:underline">
                     {row.jobTitle}
                   </Link>
-                  <div className="mt-0.5 truncate text-xs text-slate-600">{row.customerLocationLabel}</div>
+                  <div className="mt-0.5 text-xs leading-5 text-slate-600">{row.customerLocationLabel}</div>
                 </div>
+                {wide ? (
+                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {row.windowLabel ?? "Window pending"}
+                  </span>
+                ) : null}
                 <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                   {row.statusLabel}
                 </span>
               </div>
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                  {row.windowLabel ?? "Window pending"}
-                </span>
+              <div className={`mt-2 flex items-center gap-3 ${wide ? "justify-end" : "justify-between"}`}>
+                {!wide ? (
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {row.windowLabel ?? "Window pending"}
+                  </span>
+                ) : null}
                 <Link href={row.href} className="text-xs font-semibold text-blue-700 hover:underline">
                   Open Job
                 </Link>
@@ -748,14 +751,8 @@ function TeamCoverageSection({
 // Role-Aware Pulse
 // -----------------------------------------------------------------------------
 
-function RoleAwarePulseSection({
-  pulse,
-  collapsed = false,
-  connected = false,
-}: {
+function RoleAwarePulseSection({ pulse }: {
   pulse: RoleAwarePulse;
-  collapsed?: boolean;
-  connected?: boolean;
 }) {
   const financialKeys = new Set(["open_invoices", "confirm_payments", "failed_attempts"]);
   const visibleTiles = pulse.tiles.filter((tile) => financialKeys.has(tile.key) && tile.value > 0);
@@ -764,19 +761,8 @@ function RoleAwarePulseSection({
   if (!hasContent) return null;
 
   return (
-    <section className={`relative overflow-hidden ${CARD_SHELL} ${collapsed ? "opacity-95" : ""} ${connected ? "lg:flex lg:h-full lg:flex-col" : ""}`}>
-      {connected ? (
-        <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-blue-300/40" />
-      ) : null}
-      <SectionEyebrow
-        label={
-          pulse.mode === "business"
-            ? "Business Attention"
-            : pulse.mode === "money"
-            ? "Financial Attention"
-            : "Operations Attention"
-        }
-      />
+    <section className={CARD_SHELL}>
+      <SectionEyebrow label="Owner overview" />
       <h2 className={SECTION_HEADING_TEXT}>{pulse.title}</h2>
       <p className="mt-1 text-xs leading-5 text-slate-600">{pulse.subtitle}</p>
 
@@ -785,7 +771,7 @@ function RoleAwarePulseSection({
       ) : null}
 
       {visibleTiles.length > 0 ? (
-        <div className={`mt-3 grid grid-cols-2 gap-2 ${connected ? "" : "sm:grid-cols-3"}`}>
+        <div className="mt-3 divide-y divide-slate-200 border-y border-slate-200">
           {visibleTiles.map((tile) => (
             <RoleAwarePulseTileCard key={tile.key} tile={tile} />
           ))}
@@ -796,74 +782,24 @@ function RoleAwarePulseSection({
 }
 
 function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
-  const maximum = Math.max(
-    snapshot.collectedMonthToDateCents,
-    snapshot.collectedPriorMonthToDateCents,
-    1,
-  );
-  const barWidth = (amountCents: number) =>
-    amountCents > 0 ? Math.max(4, Math.round((amountCents / maximum) * 100)) : 0;
-  const currentWidth = barWidth(snapshot.collectedMonthToDateCents);
-  const priorWidth = barWidth(snapshot.collectedPriorMonthToDateCents);
   const comparison = snapshot.comparisonPercent;
   const comparisonLabel =
     comparison == null
       ? "No comparable collections last month"
-      : `${comparison >= 0 ? "+" : ""}${comparison}% vs. the same point last month`;
+      : `${comparison > 0 ? "↑ " : comparison < 0 ? "↓ " : ""}${Math.abs(comparison)}% compared with the same point last month`;
 
   return (
-    <div className="mt-3 rounded-xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-white p-3.5">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-800/70">
+    <div className="mt-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
         Collected in {snapshot.monthLabel}
       </div>
-      <div className="mt-1 text-2xl font-bold tracking-tight text-emerald-950 tabular-nums">
+      <div className="mt-1 text-2xl font-bold tracking-tight text-[#0f1f35] tabular-nums">
         {formatMoney(snapshot.collectedMonthToDateCents)}
       </div>
-      <div className="mt-1 text-xs font-medium text-emerald-800">{comparisonLabel}</div>
-
-      <div className="mt-3 space-y-2" aria-label="Month-to-date collections comparison">
-        <FinancialComparisonBar
-          label="This month"
-          amountCents={snapshot.collectedMonthToDateCents}
-          widthPercent={currentWidth}
-          current
-        />
-        <FinancialComparisonBar
-          label="Last month"
-          amountCents={snapshot.collectedPriorMonthToDateCents}
-          widthPercent={priorWidth}
-        />
-      </div>
-      <Link href="/reports/monthly" className="mt-3 inline-flex text-xs font-semibold text-emerald-800 hover:text-emerald-950">
-        Open monthly overview →
+      <div className={`mt-1 text-xs font-medium ${comparison != null && comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
+      <Link href="/reports/monthly" className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
+        View monthly overview →
       </Link>
-    </div>
-  );
-}
-
-function FinancialComparisonBar({
-  label,
-  amountCents,
-  widthPercent,
-  current = false,
-}: {
-  label: string;
-  amountCents: number;
-  widthPercent: number;
-  current?: boolean;
-}) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between gap-3 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-        <span>{label}</span>
-        <span className="tabular-nums">{formatMoney(amountCents)}</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
-        <div
-          className={`h-full rounded-full ${current ? "bg-emerald-500" : "bg-slate-400"}`}
-          style={{ width: `${widthPercent}%` }}
-        />
-      </div>
     </div>
   );
 }
@@ -881,29 +817,20 @@ function RoleAwarePulseTileCard({
 }: {
   tile: RoleAwarePulseTile;
 }) {
-  const toneClass =
-    tile.tone === "danger"
-      ? "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100"
-      : tile.tone === "warn"
-      ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
-      : tile.tone === "info"
-      ? "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100"
-      : "border-slate-200 bg-slate-50/70 text-slate-900 hover:bg-white";
-
   return (
     <Link
       href={tile.href}
-      className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 shadow-[0_10px_22px_-18px_rgba(15,31,53,0.4)] transition-colors ${toneClass}`}
+      className="flex min-h-11 items-center justify-between gap-3 py-2.5 text-slate-800 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
-      <div className="text-xl font-bold leading-none tabular-nums">{tile.value}</div>
       <div className="min-w-0">
-        <div className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-current/70">
+        <div className="text-xs font-semibold text-[#0f1f35]">
           {tile.label}
         </div>
-        <div className="truncate text-[10px] text-current/55">
+        <div className="text-[11px] text-slate-500">
           {tile.valueDetail || tile.context}
         </div>
       </div>
+      <div className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{tile.value}</div>
     </Link>
   );
 }
@@ -915,11 +842,9 @@ function RoleAwarePulseTileCard({
 function ResumeRecentSection({
   items,
   hasMore,
-  desktop = false,
 }: {
   items: ResumeRecentItem[];
   hasMore: boolean;
-  desktop?: boolean;
 }) {
   return (
     <section id="resume-recent-work" className={CARD_SHELL}>
