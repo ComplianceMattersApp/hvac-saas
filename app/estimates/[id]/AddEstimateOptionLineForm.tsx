@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addEstimateOptionLineItemFromForm } from "./actions";
 import EstimatePricebookSearchPicker from "./EstimatePricebookSearchPicker";
+import EstimateLineRewriteAssistant from "./EstimateLineRewriteAssistant";
 import {
   applySearchValueToDraft,
   formatPricebookDollars,
@@ -31,10 +32,12 @@ export default function AddEstimateOptionLineForm({
   estimateId,
   estimateOptionId,
   pricebookItems,
+  aiEnabled,
 }: {
   estimateId: string;
   estimateOptionId: string;
   pricebookItems: EstimatePricebookPickerItem[];
+  aiEnabled: boolean;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -279,6 +282,15 @@ export default function AddEstimateOptionLineForm({
             }
             className={inputClass}
           />
+          {aiEnabled ? (
+            <EstimateLineRewriteAssistant
+              estimateId={estimateId}
+              itemName={draft.itemName}
+              itemType={draft.itemType}
+              roughDescription={draft.description}
+              onUseRewrite={(description) => setDraft((prev) => ({ ...prev, description }))}
+            />
+          ) : null}
         </div>
       </div>
 

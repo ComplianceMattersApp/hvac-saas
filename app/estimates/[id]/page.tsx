@@ -1014,6 +1014,7 @@ export default async function EstimateDetailPage({
                         estimateId={estimate.id}
                         estimateOptionId={option.id}
                         pricebookItems={pricebookItems}
+                        aiEnabled={isEstimateCoachAiEnabled()}
                       />
                     </div>
                   )}
@@ -1205,7 +1206,7 @@ export default async function EstimateDetailPage({
         {/* Add line item draft only */}
         {isDraft && (
           <div className="border-t border-slate-200/85 bg-slate-50/80 px-5 py-4 print:hidden">
-            <AddLineItemForm estimateId={estimate.id} pricebookItems={pricebookItems} />
+            <AddLineItemForm estimateId={estimate.id} pricebookItems={pricebookItems} aiEnabled={isEstimateCoachAiEnabled()} />
           </div>
         )}
 

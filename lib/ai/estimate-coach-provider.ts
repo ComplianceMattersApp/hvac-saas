@@ -131,6 +131,8 @@ export async function generateEstimateCoachAiSuggestions(params: {
           "Suggestions are optional and require operator review. Estimate lines are proposed commercial scope, not Work Items or Invoice Charges.",
           "Never claim that an estimate is approved, sent, converted, invoiced, or paid. Do not instruct the app to perform actions.",
           "Focus on concise proposal wording, missing commercial detail, sensible Good/Better/Best differentiation, and safe conversion guidance.",
+          "Lead with the most useful customer-ready wording. Keep the summary to two short sentences and return no more than three high-value suggestions.",
+          "Put missing specifics after proposed wording. Avoid repetitive warnings, lectures, and generic coaching.",
         ].join(" "),
       },
       {

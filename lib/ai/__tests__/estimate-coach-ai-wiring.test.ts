@@ -14,14 +14,15 @@ describe("Estimate Coach live AI wiring", () => {
   });
 
   it("reserves before provider execution and settles measured usage", () => {
-    expect(actions.indexOf("await reserveAiUsage")).toBeLessThan(actions.indexOf("await generateEstimateCoachAiSuggestions"));
-    expect(actions.indexOf("await generateEstimateCoachAiSuggestions")).toBeLessThan(actions.indexOf("await settleAiUsage"));
-    expect(actions).toContain("await releaseAiUsage");
+    const coachAction = actions.slice(actions.indexOf("export async function generateEstimateCoachSuggestionsAction"));
+    expect(coachAction.indexOf("await reserveAiUsage")).toBeLessThan(coachAction.indexOf("await generateEstimateCoachAiSuggestions"));
+    expect(coachAction.indexOf("await generateEstimateCoachAiSuggestions")).toBeLessThan(coachAction.indexOf("await settleAiUsage"));
+    expect(coachAction).toContain("await releaseAiUsage");
   });
 
   it("keeps suggestions operator-triggered and has no apply action", () => {
-    expect(panel).toContain("Generate suggestions");
-    expect(panel).toContain("Nothing above has been applied");
+    expect(panel).toContain("Review whole estimate");
+    expect(panel).toContain("Nothing was changed");
     expect(panel).not.toContain("Apply suggestion");
     expect(provider).toContain("store: false");
     expect(provider).not.toContain("tools:");

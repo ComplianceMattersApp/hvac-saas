@@ -18,6 +18,12 @@ import {
 } from "@/lib/ai/estimate-coach-provider";
 import { releaseAiUsage, reserveAiUsage, settleAiUsage } from "@/lib/ai/usage-budget";
 import {
+  ESTIMATE_LINE_REWRITE_MODEL,
+  estimateLineRewriteReservationMicrousd,
+  rewriteEstimateLineDescription,
+  type EstimateLineRewrite,
+} from "@/lib/ai/estimate-line-rewrite-provider";
+import {
   addEstimateLineItem,
   addEstimateOptionLineItem,
   updateEstimateLineItem,
@@ -66,6 +72,56 @@ type ProposalLinkActionIntent = "issue" | "regenerate" | "revoke";
 export type EstimateCoachAiActionResult =
   | { success: true; suggestions: EstimateCoachAiResponse }
   | { success: false; error: string };
+
+export type EstimateLineRewriteActionResult =
+  | { success: true; rewrite: EstimateLineRewrite }
+  | { success: false; error: string };
+
+export async function rewriteEstimateLineDescriptionAction(input: {
+  estimateId: string;
+  itemName: string;
+  itemType: string;
+  roughDescription: string;
+}): Promise<EstimateLineRewriteActionResult> {
+  if (!isEstimatesEnabled() || !isEstimateCoachAiEnabled()) return { success: false, error: "AI rewrite is currently unavailable." };
+  const estimateId = String(input.estimateId ?? "").trim();
+  const itemName = String(input.itemName ?? "").replace(/\0/g, "").trim().slice(0, 180);
+  const itemType = String(input.itemType ?? "").replace(/\0/g, "").trim().slice(0, 80);
+  const roughDescription = String(input.roughDescription ?? "").replace(/\0/g, "").trim().slice(0, 2_000);
+  if (!estimateId || (!itemName && roughDescription.length < 3)) return { success: false, error: "Add a name or a few rough notes first." };
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase });
+  const estimate = await getEstimateById({ estimateId, internalUser, supabase });
+  if (!estimate) return { success: false, error: "Estimate was not found." };
+  const admin = createAdminClient();
+  const requestId = `estimate-line-rewrite:${crypto.randomUUID()}`;
+  let reservation;
+  try {
+    reservation = await reserveAiUsage({
+      admin,
+      requestId,
+      featureKey: "estimate_coach",
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      actorUserId: userId,
+      model: ESTIMATE_LINE_REWRITE_MODEL,
+      estimatedCostMicrousd: estimateLineRewriteReservationMicrousd({ itemName, itemType, roughDescription }),
+      metadata: { operation: "line_description_rewrite" },
+    });
+  } catch {
+    return { success: false, error: "AI budget controls are unavailable. No rewrite was requested." };
+  }
+  if (!reservation.accepted) return { success: false, error: reservation.reason === "monthly_cap_reached" ? "The monthly AI budget has been reached." : "AI rewrites are paused by the Platform Owner." };
+  let providerCompleted = false;
+  try {
+    const result = await rewriteEstimateLineDescription({ itemName, itemType, roughDescription });
+    providerCompleted = true;
+    await settleAiUsage({ admin, requestId, actualCostMicrousd: result.usage.actualCostMicrousd, inputTokens: result.usage.inputTokens, cachedInputTokens: result.usage.cachedInputTokens, outputTokens: result.usage.outputTokens });
+    return { success: true, rewrite: result.rewrite };
+  } catch {
+    if (!providerCompleted) await releaseAiUsage({ admin, requestId }).catch(() => undefined);
+    return { success: false, error: "The rewrite could not be generated. Your notes were not changed." };
+  }
+}
 
 export async function generateEstimateCoachSuggestionsAction(params: {
   estimateId: string;

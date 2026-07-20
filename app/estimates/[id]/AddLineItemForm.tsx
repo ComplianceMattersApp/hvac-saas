@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { addLineItemAction } from "./actions";
 import EstimatePricebookSearchPicker from "./EstimatePricebookSearchPicker";
+import EstimateLineRewriteAssistant from "./EstimateLineRewriteAssistant";
 import {
   applySearchValueToDraft,
   formatPricebookDollars,
@@ -32,9 +33,11 @@ const inputClass =
 export default function AddLineItemForm({
   estimateId,
   pricebookItems,
+  aiEnabled,
 }: {
   estimateId: string;
   pricebookItems: EstimatePricebookPickerItem[];
+  aiEnabled: boolean;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -309,6 +312,15 @@ export default function AddLineItemForm({
                 }
                 className={inputClass}
               />
+              {aiEnabled ? (
+                <EstimateLineRewriteAssistant
+                  estimateId={estimateId}
+                  itemName={pricebookDraft.itemName}
+                  itemType={pricebookDraft.itemType}
+                  roughDescription={pricebookDraft.description}
+                  onUseRewrite={(description) => setPricebookDraft((prev) => ({ ...prev, description }))}
+                />
+              ) : null}
             </div>
           </div>
 
