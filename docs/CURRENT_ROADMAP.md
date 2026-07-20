@@ -152,6 +152,7 @@ One-liner per lane (detail lives in the ledgers):
 - **Operational entitlement mutation guard** — CLOSED, production-promoted. Expired/invalid entitlement blocks operational mutations server-side (see PROJECT_TRUTH §16).
 - **True App / PWA V1** — CLOSED for controlled tester use. `proxy.ts` is the correct Next.js 16 routing convention; native-store distribution deferred.
 - **Reporting / analytics (milestone 3)** — substantially complete for current scope.
+- **Estimates AI and proposal delivery** — CLOSED in code (July 20, 2026); owner-controlled production testing continues. Includes concise Estimate Coach/line rewrite support, owner-only $25 monthly AI budget tracking, repository-backed Trainer with durable help-gap logging, estimate photos with explicit customer visibility, combined Finalize & Send Proposal, and comparison proposals that require two populated choices with an optional third.
 
 ---
 
@@ -180,7 +181,6 @@ These are future/business-layer modules, not spine failures. Each stays parked u
 **Field-workflow deferrals**
 - **Checklist Phase 2 — Field Mode** — target surface `MobileJobDetailV2Preview`; not part of Field Invoice Flow V1. *Unlock:* separate mobile-surface audit + explicit owner sign-off.
 - **Tech dispatch phone notifications** (PROJECT_TRUTH §11.9 backlog) — a tech assigned/dispatched should receive a phone notification, with a later on/off preference. *Unlock:* notification + preference/toggle work is scheduled.
-- **Estimate photo attachments** — allow internal users to take or upload photos and explicitly attach them to a draft estimate for customer proposal context. Preserve account scope, mobile upload ergonomics, explicit user review/removal, proposal visibility controls, and durable-first signed upload/finalize behavior; photos must not be interpreted, attached, or published automatically by Estimate AI. *Unlock:* estimate attachment model/storage audit + customer-facing proposal privacy decision + owner sign-off.
 - **Inventory, job costing, payroll, financing, mileage / expense capture, broad customer-specific pricing complexity** — out of current product scope. *Unlock:* owner decision.
 
 ---
@@ -191,7 +191,7 @@ Built or partially built, but held behind an explicit flag/runbook and owner app
 
 - **Live SMS send** — Gate: toggle-ready slices + webhook/signature validation + STOP/HELP/opt-out + legal/provider/A2P + explicit activation. Owner doc: the `SMS_*` spec family (`SMS_Provider_Twilio_Readiness_Spec.md` and related).
 - **QuickBooks Online sync (Lane 5)** — Gate: Intuit production OAuth approval + owner enablement. Code is on `main` and both migrations are applied to production (additive schema); the feature stays gated until Intuit approves the production app. Owner doc: the QBO integration ledger / Lane 5 detail above.
-- **Estimates production** — Gate: `ENABLE_ESTIMATES` and `ENABLE_ESTIMATE_EMAIL_SEND` (both disabled in prod; estimate migrations are sandbox-only, production estimate migrations not applied). Owner doc: [ACTIVE/Estimates_Production_Enablement_Runbook.md](./ACTIVE/Estimates_Production_Enablement_Runbook.md).
+- **Estimates production** — Code and required schema are deployed for owner-controlled production testing; the owner confirmed `20260720150000_estimate_photos.sql` applied on July 20, 2026. Runtime capabilities remain independently environment-gated, including Estimates, AI coaching/Trainer, and real proposal email delivery. Owner doc: [ACTIVE/Estimates_Production_Enablement_Runbook.md](./ACTIVE/Estimates_Production_Enablement_Runbook.md).
 - **Support Console** — Gate: `ENABLE_SUPPORT_CONSOLE` (fail-closed, unset in prod); sessions are read-only, account-owner scoped, audited. Owner doc: [ACTIVE/Support_Console_Production_Enablement_Runbook.md](./ACTIVE/Support_Console_Production_Enablement_Runbook.md).
 - **Owner-Scoped Permit Workflow** — Gate: `ENABLE_PERMIT_WORKFLOW_ACCOUNT_OWNER_IDS` allowlist (owner/operator only; internal Permits visibility, contractor Request Permit exposure, and permit mutations all fail closed outside the allowlist). Owner doc: [ACTIVE/Owner_Scoped_Permit_Workflow_V1_Model_Spec.md](./ACTIVE/Owner_Scoped_Permit_Workflow_V1_Model_Spec.md).
 - **Automatic deposit settlement sync** — COMPLETE for new webhook-recorded Stripe payments; controlled manual refresh remains the late-payout and historical fallback.

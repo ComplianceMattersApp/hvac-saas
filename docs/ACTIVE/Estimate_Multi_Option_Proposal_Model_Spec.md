@@ -1,13 +1,24 @@
 # Compliance Matters - Estimate Multi-Option Proposal Model Spec
 
-Status: ACTIVE planning/model spec
+Status: IMPLEMENTED; production owner testing in progress
 Authority: Subordinate to docs/ACTIVE/Active Spine V4.0 Current.md and docs/ACTIVE/Compliance_Matters_Business_Layer_Roadmap.md
-Mode: Documentation/model only (no implementation)
-Date: 2026-05-19
+Mode: Implemented model and behavior record
+Date: 2026-05-19; implementation closeout updated 2026-07-20
 
 ---
 
 ## 1) Current Decision
+
+Implementation closeout (2026-07-20):
+
+- Comparison proposals start with two option packages (`Good` and `Better`); the operator may add an optional third (`Best`).
+- Finalize & Send requires at least two populated option packages. It does not require all three slots.
+- Empty optional packages are omitted from customer proposal/print output and cannot be selected for approval.
+- Existing estimates that already contain an unused third package may leave it empty; it does not block finalization or appear to the customer.
+- Finalize & Send Proposal combines readiness validation, proposal finalization, signed customer-link delivery, and the existing approval/notification workflow.
+- Internal users can take or upload estimate photos, review/remove them, and control customer proposal visibility. Estimate AI does not automatically interpret or publish photos.
+- Production migration `20260720150000_estimate_photos.sql` was confirmed applied by the owner on 2026-07-20.
+- Runtime remains environment-gated and is being exercised through owner-controlled production testing.
 
 Future Good / Better / Best proposal support must use one parent Estimate / Proposal with child Option Packages.
 
@@ -25,7 +36,7 @@ Schema foundation closeout note (2026-05-19):
 
 Internal authoring closeout notes (2026-05-19):
 
-- Empty draft estimates can create exactly three default option packages: Good / Better / Best.
+- Empty draft estimates create two default option packages, Good and Better; a third Best package is optional.
 - Draft multi-option estimates can edit option `label` and `summary` only.
 - Draft multi-option estimates can add/remove manual option line items inside each option package with server-computed line subtotals and option-only total recomputation.
 - Draft multi-option estimates can add option line items from an internal option-scoped Pricebook picker (with editable defaults), reusing option-line domain snapshots and option-only recomputation.
@@ -49,7 +60,7 @@ Approval Response V1 closeout note (2026-05-20):
 
 - Internal authenticated browser print route (`/estimates/[id]/print`) branches on `proposalMode`: single-option flat renders as before; multi-option renders option package sections (label, summary, line items, per-option total) with no parent "Proposed Total" shown.
 - Option notes are excluded from the print view model; option summaries are included.
-- Empty options show a safe empty message ("No line items added for this option.").
+- Empty optional packages remain available for internal draft editing but are omitted from customer proposal and print output.
 - Explanatory copy states options are proposed alternatives and no selection occurs in the print view.
 - Boundary copy states choosing/approving/paying/converting/invoicing an option is not captured by this print view.
 - Document view model (`buildEstimateDocumentViewModel`) extended with `proposalMode` and `options` fields; flat `lines` and parent `totals` remain unchanged.
