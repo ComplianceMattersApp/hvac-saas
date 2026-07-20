@@ -13,8 +13,9 @@ import {
 import {
   buildEstimateDocumentViewModel,
 } from "@/lib/estimates/estimate-document";
+import { buildEstimateCoachReport } from "@/lib/estimates/estimate-coach";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
-import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { isEstimateCoachEnabled, isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { readActiveEstimateProposalLinkForInternal } from "@/lib/estimates/estimate-proposal-links";
 import {
   removeLineItemFromForm,
@@ -27,6 +28,7 @@ import {
   saveManualEstimateLineToPricebookFromForm,
 } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
+import EstimateCoachPanel from "./EstimateCoachPanel";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
 import EstimateApprovalResponseForm from "./EstimateApprovalResponseForm";
 import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
@@ -374,6 +376,9 @@ export default async function EstimateDetailPage({
     customerName,
     locationDisplay,
   });
+  const estimateCoachReport = isEstimateCoachEnabled()
+    ? buildEstimateCoachReport({ estimate, customerEmail })
+    : null;
 
   let convertedJobTitle: string | null = null;
   let convertedInvoiceId: string | null =
@@ -600,6 +605,8 @@ export default async function EstimateDetailPage({
           </p>
         </div>
       </div>
+
+      {estimateCoachReport ? <EstimateCoachPanel report={estimateCoachReport} /> : null}
 
       {/* Create default option packages (if eligible for multi-option upgrade) */}
       <CreateDefaultOptionsForm

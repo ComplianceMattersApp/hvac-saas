@@ -1,10 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  isEstimateCoachEnabled,
   isEstimatesEnabled,
   isEstimateProposalLinksEnabled,
 } from "@/lib/estimates/estimate-exposure";
 
+describe("isEstimateCoachEnabled", () => {
+  it("fails closed and accepts only explicit enabled values", () => {
+    expect(isEstimateCoachEnabled(undefined)).toBe(false);
+    expect(isEstimateCoachEnabled("false")).toBe(false);
+    expect(isEstimateCoachEnabled("true")).toBe(true);
+    expect(isEstimateCoachEnabled("ON")).toBe(true);
+  });
+});
+
 beforeEach(() => {
+  delete process.env.ENABLE_ESTIMATE_COACH;
   delete process.env.ENABLE_ESTIMATES;
 });
 
