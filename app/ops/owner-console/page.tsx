@@ -18,6 +18,8 @@ import {
 } from "@/lib/business/platform-owner-dashboard";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/auth/request-identity";
+import { loadAiBudgetSnapshot } from "@/lib/ai/usage-budget";
+import AiUsageBudgetPanel from "./AiUsageBudgetPanel";
 
 type OwnerConsoleProductFilter = "all" | "hvac_service" | "ecc_hers" | "hybrid" | "not_set";
 type OwnerConsoleStatusFilter = "all" | "active" | "trial" | "grace" | "expired" | "suspended" | "cancelled" | "not_set";
@@ -201,7 +203,10 @@ export default async function PlatformOwnerConsolePage(props: {
   await requirePlatformOwnerOrFailClosed();
 
   const admin = createAdminClient();
-  const model = await loadPlatformOwnerDashboardModel({ admin });
+  const [model, aiBudgetSnapshot] = await Promise.all([
+    loadPlatformOwnerDashboardModel({ admin }),
+    loadAiBudgetSnapshot({ admin }),
+  ]);
   const hiddenEmails = parseHiddenAccountEmails(process.env);
   const internalEmails = parseInternalAccountEmails(process.env);
   const searchParams = (props.searchParams ? await props.searchParams : {}) ?? {};
@@ -210,6 +215,7 @@ export default async function PlatformOwnerConsolePage(props: {
   const selectedAccountOwnerId = firstSearchParamValue(searchParams, "account");
   const productFilter = resolveProductFilter(firstSearchParamValue(searchParams, "product"));
   const statusFilter = resolveStatusFilter(firstSearchParamValue(searchParams, "status"));
+  const aiNotice = firstSearchParamValue(searchParams, "ai_notice");
   const viewRows = filterPlatformOwnerDashboardRows({
     rows: model.rows,
     view,
@@ -244,11 +250,13 @@ export default async function PlatformOwnerConsolePage(props: {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Platform Owner</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950">Owner Console</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Read-only platform-wide account overview. No tenant mutation actions.
+              Platform-wide account overview with guarded global controls. No tenant workflow mutations.
             </p>
           </div>
         </div>
       </section>
+
+      <AiUsageBudgetPanel snapshot={aiBudgetSnapshot} notice={aiNotice} />
 
       {/* View switcher */}
       <section className="rounded-3xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:px-5">
