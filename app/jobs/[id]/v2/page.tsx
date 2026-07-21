@@ -813,6 +813,10 @@ export default async function JobDetailV2Page({
     !billedTruthSatisfied &&
     billingState.lightweightBillingAllowed &&
     opsStatus !== "closed";
+  const canShowCloseoutBillingAction =
+    fieldComplete &&
+    closeoutNeeds.needsInvoice &&
+    (billingState.internalInvoicePanelEnabled || canShowInvoiceButton);
   const createEstimateFromJobHref = (() => {
     if (!isEstimatesEnabled() || !job.customer_id || !job.location_id || !job.id) return null;
     const params = new URLSearchParams({
@@ -865,6 +869,7 @@ export default async function JobDetailV2Page({
       if (opsStatus === "pending_office_review") return "Field complete - pending office review.";
       return "Field complete - pending closeout.";
     }
+    if (closeoutNeeds.needsPermit && closeoutNeeds.needsInvoice) return "Permit number and invoice are needed. Billing can be completed while the permit is pending.";
     if (closeoutNeeds.needsPermit) return "Permit number needed before certs can be sent and this job can close.";
     if (closeoutNeeds.needsCerts && closeoutNeeds.needsInvoice) return "Field work complete — send certs and invoice to close this job.";
     if (closeoutNeeds.needsCerts) return "Field work complete — send certs to close this job.";
@@ -3678,7 +3683,7 @@ export default async function JobDetailV2Page({
                   Certs were sent
                 </ImmediateSubmitButton>
               </form>
-            ) : fieldComplete && closeoutNeeds.needsInvoice && (billingState.internalInvoicePanelEnabled || canShowInvoiceButton) ? (
+            ) : canShowCloseoutBillingAction ? (
               renderCloseoutBillingAction(S.primaryBtn as React.CSSProperties)
             ) : fieldComplete ? (
               <div
@@ -3717,7 +3722,7 @@ export default async function JobDetailV2Page({
                 status={String(job.status ?? "")}
                 action={updateJobScheduleFromForm}
               />
-            ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton && closeoutNeeds.needsInvoice && (billingState.internalInvoicePanelEnabled || canShowInvoiceButton) ? (
+            ) : canShowCloseoutBillingAction && (closeoutNeeds.needsPermit || (closeoutNeeds.needsCerts && canShowCertsButton)) ? (
               renderCloseoutBillingAction(S.outlineBtn(false) as React.CSSProperties, { secondary: true })
             ) : null}
           </div>

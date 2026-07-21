@@ -167,7 +167,7 @@ describe("desktop job detail V2 billing brief", () => {
     const railSlice = source.slice(railIndex, railIndex + 3600);
 
     expect(railIndex).toBeGreaterThanOrEqual(0);
-    expect(railSlice).toContain("billingState.internalInvoicePanelEnabled || canShowInvoiceButton");
+    expect(railSlice).toContain("canShowCloseoutBillingAction");
     expect(railSlice).toContain("renderCloseoutBillingAction(S.primaryBtn");
     expect(railSlice).toContain("renderCloseoutBillingAction(S.outlineBtn");
     expect(railSlice).not.toContain("<form action={markInvoiceCompleteFromForm}");
@@ -204,6 +204,13 @@ describe("desktop job detail V2 billing brief", () => {
     expect(permitRailBranch).toContain('triggerStyle={{');
     expect(permitRailBranch).not.toContain('href="#compliance"');
     expect(source).toContain('isFailedUnresolved || hasCloseoutNeeds');
+  });
+
+  it("keeps invoicing available while an ECC permit is still missing", () => {
+    expect(source).toContain("const canShowCloseoutBillingAction =");
+    expect(source).toContain('if (closeoutNeeds.needsPermit && closeoutNeeds.needsInvoice) return "Permit number and invoice are needed. Billing can be completed while the permit is pending.";');
+    expect(source).toContain("canShowCloseoutBillingAction && (closeoutNeeds.needsPermit || (closeoutNeeds.needsCerts && canShowCertsButton))");
+    expect(source).toContain("renderCloseoutBillingAction(S.outlineBtn(false) as React.CSSProperties, { secondary: true })");
   });
 
   it("keeps the failed ECC banner separate from the follow-up reminder surface", () => {
