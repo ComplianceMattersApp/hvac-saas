@@ -182,6 +182,7 @@ export default function DuctLeakageEntryFields({
   }, [formId, projectType, selectedException?.label, measuredInput, previewVersion]);
 
   const exceptionActive = Boolean(selectedException);
+  const asbestosExempt = selectedException?.value === "asbestos";
   const statusLabel =
     exceptionActive
       ? "Exception"
@@ -245,6 +246,14 @@ export default function DuctLeakageEntryFields({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {children}
 
+        {asbestosExempt ? (
+          <section className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 sm:col-span-2 sm:p-4">
+            <div className="font-semibold">Duct leakage test exempt</div>
+            <p className="mt-1">
+              Asbestos prevents duct leakage testing under Title 24. Record the exception reason and complete the test without entering results.
+            </p>
+          </section>
+        ) : (
         <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] sm:col-span-2 sm:p-4">
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2 sm:gap-3">
             <div>
@@ -310,6 +319,7 @@ export default function DuctLeakageEntryFields({
             />
           </div>
         </section>
+        )}
       </div>
     </>
   );

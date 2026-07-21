@@ -98,6 +98,14 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).not.toContain('<datalist id={`ovr-reason-list-${runDL.id}`}>');
   });
 
+  it("hides duct leakage result entry only for the asbestos exemption", () => {
+    expect(ductLeakageEntryFieldsSource).toContain('const asbestosExempt = selectedException?.value === "asbestos";');
+    expect(ductLeakageEntryFieldsSource).toContain('Asbestos prevents duct leakage testing under Title 24.');
+    expect(ductLeakageEntryFieldsSource).toContain('{asbestosExempt ? (');
+    expect(ductLeakageEntryFieldsSource).toContain('name="measured_duct_leakage_cfm"');
+    expect(ductLeakageEntryFieldsSource).toContain(') : (');
+  });
+
   it("keeps Duct Leakage field-first layout without the extra calculated card", () => {
     const ductIndex = jobTestsPageSource.indexOf('Duct Leakage Results');
     expect(ductIndex).toBeGreaterThan(-1);
