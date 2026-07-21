@@ -34,7 +34,8 @@ import { QboIntegrationSection } from "./_components/QboIntegrationSection";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 import { SettingsSection } from "./_components/SettingsSection";
 import { SectionForm } from "./_components/SectionForm";
-import { TextField } from "./_components/fields";
+import { SelectField, TextField } from "./_components/fields";
+import { DEFAULT_ACCOUNT_TIME_ZONE, listAccountTimeZoneOptions } from "@/lib/utils/account-time-zone";
 import { Disclosure } from "@/components/ui/Disclosure";
 import {
   formatTimestampDateDisplayLA,
@@ -48,6 +49,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   display_name_required: { tone: "error", message: "Enter your company name before saving." },
   invalid_support_email: { tone: "error", message: "Enter a valid support email, or leave it blank." },
   invalid_google_review_url: { tone: "error", message: "Enter a Google review link starting with https://, or leave it blank." },
+  invalid_time_zone: { tone: "error", message: "Choose a valid business timezone." },
   invalid_logo_file: { tone: "error", message: "Upload a PNG, JPG, SVG, or WebP image for your logo." },
   unsafe_logo_file: { tone: "error", message: "That SVG contains embedded scripts and can't be used. Upload a plain image (PNG, JPG, or WebP) or a script-free SVG." },
   logo_too_large: { tone: "error", message: "Logo files must be 5 MB or smaller." },
@@ -156,6 +158,7 @@ export default async function AdminCompanyProfilePage({
   const supportEmail = String(profile?.support_email ?? "").trim();
   const supportPhone = String(profile?.support_phone ?? "").trim();
   const billingMode = profile?.billing_mode ?? DEFAULT_BILLING_MODE;
+  const timeZoneOptions = listAccountTimeZoneOptions();
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
 
   // ECC/HERS Partner Network live summary. The read helper returns [] if the
@@ -520,6 +523,21 @@ export default async function AdminCompanyProfilePage({
                       placeholder="(209) 555-1234"
                       autoComplete="tel"
                     />
+                    <SelectField
+                      id="time_zone"
+                      name="time_zone"
+                      label="Business timezone"
+                      requirement="required"
+                      defaultValue={profile?.time_zone ?? DEFAULT_ACCOUNT_TIME_ZONE}
+                      helper="Used for operational timestamps, schedules, and business-day boundaries."
+                      className="sm:col-span-2"
+                    >
+                      {timeZoneOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label} ({option.value})
+                        </option>
+                      ))}
+                    </SelectField>
                     <TextField
                       id="google_review_url"
                       name="google_review_url"

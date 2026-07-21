@@ -11,6 +11,7 @@ import {
   normalizeBillingMode,
   parseInternalBusinessProfileLogoStorageRef,
 } from "@/lib/business/internal-business-profile";
+import { isValidIanaTimeZone, normalizeAccountTimeZone } from "@/lib/utils/account-time-zone";
 import {
   createTenantStripeConnectOnboardingLink,
   normalizeStripeConnectError,
@@ -139,6 +140,8 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   const supportEmail = normalizeNullableText(formData.get("support_email"));
   const supportPhone = normalizeNullableText(formData.get("support_phone"));
   const googleReviewUrl = normalizeNullableText(formData.get("google_review_url"));
+  const hasTimeZoneInput = formData.has("time_zone");
+  const timeZone = normalizeText(formData.get("time_zone"));
   const hasBillingModeInput = formData.has("billing_mode");
   const logoFileEntry = formData.get("logo_file");
   const removeLogo = String(formData.get("remove_logo") ?? "").trim() === "1";
@@ -153,6 +156,10 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
 
   if (googleReviewUrl && !isValidHttpsUrl(googleReviewUrl)) {
     redirect(withNotice("invalid_google_review_url"));
+  }
+
+  if (hasTimeZoneInput && !isValidIanaTimeZone(timeZone)) {
+    redirect(withNotice("invalid_time_zone"));
   }
 
   const logoFile = isUploadFile(logoFileEntry) && logoFileEntry.size > 0 ? logoFileEntry : null;
@@ -192,7 +199,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
 
   const { data: existingProfile, error: existingProfileError } = await admin
     .from("internal_business_profiles")
-    .select("logo_url, billing_mode")
+    .select("logo_url, billing_mode, time_zone")
     .eq("account_owner_user_id", internalUser.account_owner_user_id)
     .maybeSingle();
 
@@ -240,6 +247,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
         google_review_url: googleReviewUrl,
         logo_url: nextLogoUrl,
         billing_mode: billingMode,
+        time_zone: normalizeAccountTimeZone(hasTimeZoneInput ? timeZone : existingProfile?.time_zone),
         profile_reviewed_at: new Date().toISOString(),
       },
       {

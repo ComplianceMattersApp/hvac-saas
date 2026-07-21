@@ -60,6 +60,8 @@ import {
 } from "@/lib/ops/closeout-queue";
 import { buildWaitingQueueRows, type FocusedQueueJob } from "@/lib/ops/focused-queues";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
+import { resolveAccountTimeZoneByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
   buildLatestCustomerAttemptByJob,
@@ -148,19 +150,14 @@ function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   return "all";
 }
 
-function formatTeamClockSince(value: string | null | undefined) {
-  const normalized = String(value ?? "").trim();
-  if (!normalized) return "-";
-
-  const parsed = new Date(normalized);
-  if (Number.isNaN(parsed.getTime())) return "-";
-
-  return new Intl.DateTimeFormat("en-US", {
+function formatTeamClockSince(value: string | null | undefined, timeZone: string) {
+  return formatTimestampInAccountTimeZone(value, timeZone, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  }).format(parsed);
+    timeZoneName: "short",
+  });
 }
 
 function formatTeamClockElapsedFromClockIn(clockInAt: string | null | undefined) {
@@ -258,6 +255,10 @@ export default async function OpsPage({
 
   const internalUser = actorContext.internalUser;
   const admin = createAdminClient();
+  const accountTimeZone = await resolveAccountTimeZoneByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
   if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
 
   const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
@@ -345,7 +346,7 @@ export default async function OpsPage({
           internalUserId,
           displayName,
           statusLabel,
-          sinceAt: formatTeamClockSince(sinceSource),
+          sinceAt: formatTeamClockSince(sinceSource, accountTimeZone),
           elapsed: formatTeamClockElapsedFromClockIn(row.clockInAt),
         };
       });
@@ -1450,16 +1451,13 @@ export default async function OpsPage({
     }
 
     function formatWorkspaceTimestamp(value: string | null | undefined) {
-      const normalized = String(value ?? "").trim();
-      if (!normalized) return "-";
-      const parsed = new Date(normalized);
-      if (Number.isNaN(parsed.getTime())) return "-";
-      return new Intl.DateTimeFormat("en-US", {
+      return formatTimestampInAccountTimeZone(value, accountTimeZone, {
         month: "short",
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
-      }).format(parsed);
+        timeZoneName: "short",
+      });
     }
 
     function buildCloseoutRowView(job: any, visibleReason: OpsBoardVisibleReason): CloseoutRowView {
@@ -1726,17 +1724,13 @@ export default async function OpsPage({
     const permitAttachmentsByRequestId = selectedPermitAttachmentResult.attachmentsByPermitRequestId;
 
     function formatPermitQueueTimestamp(value: string | null | undefined) {
-      const normalized = String(value ?? "").trim();
-      if (!normalized) return "Not available";
-      const parsed = new Date(normalized);
-      if (Number.isNaN(parsed.getTime())) return "Not available";
-
-      return new Intl.DateTimeFormat("en-US", {
+      return formatTimestampInAccountTimeZone(value, accountTimeZone, {
         month: "short",
         day: "numeric",
         hour: "numeric",
         minute: "2-digit",
-      }).format(parsed);
+        timeZoneName: "short",
+      }, "Not available");
     }
 
     function permitQueueContext(row: PermitRequestQueueRow) {

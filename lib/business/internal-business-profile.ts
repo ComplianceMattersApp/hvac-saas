@@ -1,5 +1,6 @@
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { DEFAULT_ACCOUNT_TIME_ZONE, normalizeAccountTimeZone } from "@/lib/utils/account-time-zone";
 
 const INTERNAL_BUSINESS_LOGO_STORAGE_PREFIX = "storage://attachments/";
 
@@ -15,6 +16,7 @@ export type InternalBusinessProfile = {
   logo_url: string | null;
   google_review_url: string | null;
   billing_mode: BillingMode;
+  time_zone: string;
   created_at: string;
   updated_at: string;
 };
@@ -94,6 +96,7 @@ function normalizeInternalBusinessProfileRow(row: any): InternalBusinessProfile 
     logo_url: String(row?.logo_url ?? "").trim() || null,
     google_review_url: row?.google_review_url ?? null,
     billing_mode: normalizeBillingMode(String(row?.billing_mode ?? "")),
+    time_zone: normalizeAccountTimeZone(row?.time_zone),
     created_at: String(row?.created_at ?? "").trim(),
     updated_at: String(row?.updated_at ?? "").trim(),
   };
@@ -111,7 +114,7 @@ export async function getInternalBusinessProfileByAccountOwnerId(params: {
   const { data, error } = await supabase
     .from("internal_business_profiles")
     .select(
-      "account_owner_user_id, display_name, support_email, support_phone, logo_url, google_review_url, billing_mode, created_at, updated_at",
+      "account_owner_user_id, display_name, support_email, support_phone, logo_url, google_review_url, billing_mode, time_zone, created_at, updated_at",
     )
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
@@ -119,6 +122,20 @@ export async function getInternalBusinessProfileByAccountOwnerId(params: {
   if (error) throw error;
 
   return normalizeInternalBusinessProfileRow(data);
+}
+
+export async function resolveAccountTimeZoneByAccountOwnerId(params: {
+  accountOwnerUserId: string | null | undefined;
+  supabase?: any;
+}): Promise<string> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  if (!accountOwnerUserId) return DEFAULT_ACCOUNT_TIME_ZONE;
+
+  const profile = await getInternalBusinessProfileByAccountOwnerId({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  });
+  return normalizeAccountTimeZone(profile?.time_zone);
 }
 
 export async function getCurrentInternalBusinessProfile(params: {
