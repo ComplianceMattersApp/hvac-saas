@@ -235,6 +235,7 @@ describe("job tests page wiring", () => {
     expect(refrigerantBlock).toContain('saveWithParentForm');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('form.addEventListener("submit", handleSubmit)');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('form.requestSubmit(');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('new CustomEvent("attachment-upload-state", { detail: { pending: true } })');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('Photo will save when you complete the test.');
     expect(refrigerantBlock).not.toContain('Photo / Notes');
     expect(refrigerantBlock).not.toContain('Photo Taken - user attests gauge photo was captured');

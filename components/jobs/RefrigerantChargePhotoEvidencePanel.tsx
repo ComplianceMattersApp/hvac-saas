@@ -163,13 +163,20 @@ export default function RefrigerantChargePhotoEvidencePanel({
       event.stopImmediatePropagation();
       if (uploadInFlightRef.current) return;
       uploadInFlightRef.current = true;
+      form.dispatchEvent(new CustomEvent("attachment-upload-state", { detail: { pending: true } }));
       const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
       const saved = await saveSelectedFiles(false).finally(() => {
         uploadInFlightRef.current = false;
       });
-      if (!saved) return;
+      if (!saved) {
+        form.dispatchEvent(new CustomEvent("attachment-upload-state", { detail: { pending: false } }));
+        return;
+      }
       bypassNextSubmitRef.current = true;
       form.requestSubmit(submitter instanceof HTMLButtonElement || submitter instanceof HTMLInputElement ? submitter : undefined);
+      queueMicrotask(() => {
+        form.dispatchEvent(new CustomEvent("attachment-upload-state", { detail: { pending: false } }));
+      });
     };
 
     form.addEventListener("submit", handleSubmit);

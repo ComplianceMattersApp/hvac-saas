@@ -80,6 +80,7 @@ describe("equipment label photo evidence", () => {
     expect(equipmentPhotoPanelSource).toContain("onSavedChange?.(files.length > 0 || savedCount > 0)");
     expect(equipmentPhotoPanelSource).toContain("onSavedChange?.(savedCount > 0)");
     expect(equipmentCreateFormSource).toContain("showSubmitButton={canSubmitEquipment}");
+    expect(equipmentPhotoPanelSource).toContain('new CustomEvent("attachment-upload-state", { detail: { pending: true } })');
   });
 
   it("persists the pending equipment id on equipment creation without changing structured fields", () => {
