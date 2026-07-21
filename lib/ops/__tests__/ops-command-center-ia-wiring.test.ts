@@ -233,6 +233,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   it("does not cap active operations queues to ten preview rows", () => {
     expect(opsPageSource).toContain("previewLimit: Math.max(scheduledOpenRows.length, 1)");
     expect(opsPageSource).not.toContain(").slice(0, 10);");
+    expect(opsPageSource).not.toContain("queuePreviewLimit");
   });
 
   it("shows failed-report delivery awareness without changing exception routing", () => {

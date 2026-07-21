@@ -41,8 +41,7 @@ export default async function OpsWithoutTechQueuePage() {
     .eq("status", "open")
     .eq("ops_status", "scheduled")
     .order("scheduled_date", { ascending: true })
-    .order("window_start", { ascending: true })
-    .limit(500);
+    .order("window_start", { ascending: true });
 
   if (error) throw error;
 
@@ -55,7 +54,7 @@ export default async function OpsWithoutTechQueuePage() {
     jobs: scheduledJobs,
     assignmentDisplayMap,
     accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
-    previewLimit: 500,
+    previewLimit: scheduledJobs.length,
   });
   const rows = snapshot.preview;
 

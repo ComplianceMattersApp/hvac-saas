@@ -230,7 +230,7 @@ export default function OpsFilteredPreviewClient(props: Props) {
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredJobs.slice(0, 25).map((job) => {
+            {filteredJobs.map((job) => {
               const waitingState = getWaitingStateSignal(job);
               return (
               <div key={job.id} className="rounded-lg border border-gray-200 bg-white p-3">

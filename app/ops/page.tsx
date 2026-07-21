@@ -782,8 +782,7 @@ export default async function OpsPage({
       .eq("status", "open")
       .eq("ops_status", "scheduled")
       .order("scheduled_date", { ascending: true })
-      .order("window_start", { ascending: true })
-      .limit(50);
+      .order("window_start", { ascending: true });
 
     let closeoutCountRowsQ = supabase
       .from("jobs")
@@ -791,8 +790,7 @@ export default async function OpsPage({
       .is("deleted_at", null)
       .neq("status", "cancelled")
       .eq("field_complete", true)
-      .order("created_at", { ascending: false })
-      .limit(500);
+      .order("created_at", { ascending: false });
 
     const [
       needToScheduleCountRes,
@@ -898,9 +896,8 @@ export default async function OpsPage({
       accountOwnerUserId: internalUser.account_owner_user_id,
       jobs: closeoutProjectionInputs(closeoutCountSourceRows),
     });
-    // Full closeout set (uncapped) — reused for both the chip count and the
-    // Contractor Focus facet so the picker counts every closeout job, not just
-    // the 10-row workbench preview (loadCloseoutWorkspaceRows slices to 10).
+    // Full closeout set (uncapped) — reused for counts, contractor facets, and
+    // every desktop/mobile queue card.
     const closeoutQueueRowsFull = listCloseoutQueueJobs(
       closeoutCountSourceRows,
       (job: any) => closeoutCountProjectionByJobId.get(String(job?.id ?? "").trim()) ?? job,
@@ -1034,8 +1031,7 @@ export default async function OpsPage({
         .is("deleted_at", null)
         .neq("status", "cancelled")
         .eq("field_complete", true)
-        .order("created_at", { ascending: true })
-        .limit(500);
+        .order("created_at", { ascending: true });
       if (closeoutRowsRes.error) throw closeoutRowsRes.error;
 
       const closeoutSourceRows = closeoutRowsRes.data ?? [];
@@ -1098,16 +1094,12 @@ export default async function OpsPage({
         });
       }
 
-      const tabCount = workspaceTabs.find((item) => item.key === workspaceKey)?.count ?? 0;
-      const queuePreviewLimit = Math.max(tabCount, 10);
-
       let queueQ = supabase
         .from("jobs")
         .select(workspaceSelect)
         .is("deleted_at", null)
         .neq("status", "cancelled")
-        .order("created_at", { ascending: true })
-        .limit(queuePreviewLimit);
+        .order("created_at", { ascending: true });
 
       if (workspaceKey === "need_to_schedule") {
         queueQ = queueQ.eq("status", "open").eq("ops_status", "need_to_schedule");
