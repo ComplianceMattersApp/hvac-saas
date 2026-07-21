@@ -73,13 +73,12 @@ describe("job detail field billing panel wiring", () => {
     expect(summarySlice).not.toContain("status === \"issued\"");
   });
 
-  it("keeps the immediate job-detail invoice read scoped to the primary invoice", () => {
-    const immediateReadIndex = source.indexOf('.from("internal_invoices")');
-    const immediateReadSlice = source.slice(immediateReadIndex, immediateReadIndex + 300);
+  it("keeps the immediate job-detail invoice read on the active-primary membership resolver", () => {
+    const immediateReadIndex = source.indexOf('const immediateInvoiceTruthPromise');
+    const immediateReadSlice = source.slice(immediateReadIndex, immediateReadIndex + 1800);
 
-    expect(immediateReadSlice).toContain('.eq("job_id", jobId)');
-    expect(immediateReadSlice).toContain('.eq("invoice_kind", "primary")');
-    expect(immediateReadSlice).toContain('.neq("status", "void")');
+    expect(immediateReadSlice).toContain("resolveInternalInvoiceByJobId({ supabase, jobId })");
+    expect(immediateReadSlice).toContain("invoiceTruthRow.line_items");
   });
 
   it("reads durable job billing disposition for job closeout and invoice labels", () => {

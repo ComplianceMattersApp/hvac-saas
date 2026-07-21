@@ -649,7 +649,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
     invoice
     && (
       invoice.account_owner_user_id !== internalUser.account_owner_user_id
-      || invoice.job_id !== jobId
+      || !(invoice.member_job_ids?.length ? invoice.member_job_ids : [invoice.job_id]).includes(jobId)
     )
   ) {
     redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
@@ -670,6 +670,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
     internalUser,
     job,
     invoice,
+    invoiceJobIds: invoice?.member_job_ids?.length ? invoice.member_job_ids : invoice ? [invoice.job_id] : [],
     fieldBillingExplicitCapabilities,
   };
 }
@@ -1803,6 +1804,21 @@ async function applyInternalInvoiceIssueMutation(context: LoadedInternalInvoiceC
 
   const issuedAt = new Date().toISOString();
   const previousOpsStatus = String(context.job.ops_status ?? '').trim() || null;
+  const memberJobs = context.invoiceJobIds.length > 1
+    ? await (async () => {
+        const { data, error } = await context.supabase
+          .from('jobs')
+          .select('id, title, job_type, status, field_complete, ops_status, service_case_id')
+          .in('id', context.invoiceJobIds);
+        if (error) throw error;
+        if ((data ?? []).length !== context.invoiceJobIds.length) throw new Error('Invoice member jobs are unavailable.');
+        return data ?? [];
+      })()
+    : [context.job];
+
+  if (memberJobs.some((job: any) => !job.field_complete || String(job.status ?? '').trim().toLowerCase() !== 'completed')) {
+    throw new Error('Every consolidated invoice job must remain completed before issue.');
+  }
 
   const { error: invoiceErr } = await context.supabase
     .from('internal_invoices')
@@ -1818,37 +1834,39 @@ async function applyInternalInvoiceIssueMutation(context: LoadedInternalInvoiceC
 
   if (invoiceErr) throw invoiceErr;
 
-  const { error: jobErr } = await context.supabase
+  let jobUpdate = context.supabase
     .from('jobs')
     .update({
       invoice_complete: true,
       invoice_number: invoice.invoice_number,
-    })
-    .eq('id', context.jobId);
+    });
+  jobUpdate = context.invoiceJobIds.length > 1
+    ? jobUpdate.in('id', context.invoiceJobIds)
+    : jobUpdate.eq('id', context.jobId);
+  const { error: jobErr } = await jobUpdate;
 
   if (jobErr) throw jobErr;
 
-  await logInvoiceEvent({
-    supabase: context.supabase,
-    userId: context.userId,
-    jobId: context.jobId,
-    eventType: 'internal_invoice_issued',
-    invoice: {
-      ...invoice,
-      status: 'issued',
-    },
-  });
-
-  await recomputeOpsAfterInvoiceMutation({
-    supabase: context.supabase,
-    jobId: context.jobId,
-    userId: context.userId,
-    accountOwnerUserId: context.internalUser.account_owner_user_id,
-    jobType: context.job.job_type ?? null,
-    serviceCaseId: context.job.service_case_id ?? null,
-    previousOpsStatus,
-    source: 'internal_invoice_issue_recompute',
-  });
+  for (const memberJob of memberJobs) {
+    await logInvoiceEvent({
+      supabase: context.supabase,
+      userId: context.userId,
+      jobId: String(memberJob.id),
+      eventType: 'internal_invoice_issued',
+      invoice: { ...invoice, status: 'issued' },
+      extraMeta: context.invoiceJobIds.length > 1 ? { consolidated: true, included_job_count: context.invoiceJobIds.length } : undefined,
+    });
+    await recomputeOpsAfterInvoiceMutation({
+      supabase: context.supabase,
+      jobId: String(memberJob.id),
+      userId: context.userId,
+      accountOwnerUserId: context.internalUser.account_owner_user_id,
+      jobType: memberJob.job_type ?? null,
+      serviceCaseId: memberJob.service_case_id ?? null,
+      previousOpsStatus: String(memberJob.ops_status ?? '').trim() || (String(memberJob.id) === context.jobId ? previousOpsStatus : null),
+      source: 'internal_invoice_issue_recompute',
+    });
+  }
 
   // Auto-sync the freshly-issued invoice to QBO so users never have to run a
   // manual sync. Best-effort and never throws: unconnected accounts and envs
@@ -2086,6 +2104,17 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
   const voidReason = getOptionalText(formData.get('void_reason'));
   const previousOpsStatus = String(context.job.ops_status ?? '').trim() || null;
   const wasIssued = context.invoice.status === 'issued';
+  const memberJobs = context.invoiceJobIds.length > 1
+    ? await (async () => {
+        const { data, error } = await context.supabase
+          .from('jobs')
+          .select('id, job_type, ops_status, service_case_id')
+          .in('id', context.invoiceJobIds);
+        if (error) throw error;
+        if ((data ?? []).length !== context.invoiceJobIds.length) throw new Error('Invoice member jobs are unavailable.');
+        return data ?? [];
+      })()
+    : [context.job];
 
   const { error: invoiceErr } = await context.supabase
     .from('internal_invoices')
@@ -2103,40 +2132,42 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
   if (invoiceErr) throw invoiceErr;
 
   if (wasIssued) {
-    const { error: jobErr } = await context.supabase
+    let jobUpdate = context.supabase
       .from('jobs')
       .update({
         invoice_complete: false,
         invoice_number: null,
-      })
-      .eq('id', context.jobId);
+      });
+    jobUpdate = context.invoiceJobIds.length > 1
+      ? jobUpdate.in('id', context.invoiceJobIds)
+      : jobUpdate.eq('id', context.jobId);
+    const { error: jobErr } = await jobUpdate;
 
     if (jobErr) throw jobErr;
   }
 
-  await logInvoiceEvent({
-    supabase: context.supabase,
-    userId: context.userId,
-    jobId: context.jobId,
-    eventType: 'internal_invoice_voided',
-    invoice: {
-      ...context.invoice,
-      status: 'void',
-      void_reason: voidReason,
-    },
-  });
-
-  if (wasIssued) {
-    await recomputeOpsAfterInvoiceMutation({
+  for (const memberJob of memberJobs) {
+    await logInvoiceEvent({
       supabase: context.supabase,
-      jobId: context.jobId,
       userId: context.userId,
-      accountOwnerUserId: context.internalUser.account_owner_user_id,
-      jobType: context.job.job_type ?? null,
-      serviceCaseId: context.job.service_case_id ?? null,
-      previousOpsStatus,
-      source: 'internal_invoice_void_recompute',
+      jobId: String(memberJob.id),
+      eventType: 'internal_invoice_voided',
+      invoice: { ...context.invoice, status: 'void', void_reason: voidReason },
+      extraMeta: context.invoiceJobIds.length > 1 ? { consolidated: true, included_job_count: context.invoiceJobIds.length } : undefined,
     });
+
+    if (wasIssued) {
+      await recomputeOpsAfterInvoiceMutation({
+        supabase: context.supabase,
+        jobId: String(memberJob.id),
+        userId: context.userId,
+        accountOwnerUserId: context.internalUser.account_owner_user_id,
+        jobType: memberJob.job_type ?? null,
+        serviceCaseId: memberJob.service_case_id ?? null,
+        previousOpsStatus: String(memberJob.ops_status ?? '').trim() || (String(memberJob.id) === context.jobId ? previousOpsStatus : null),
+        source: 'internal_invoice_void_recompute',
+      });
+    }
   }
 
   revalidatePath(`/jobs/${context.jobId}`);

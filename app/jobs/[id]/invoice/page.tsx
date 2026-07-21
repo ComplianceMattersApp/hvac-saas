@@ -524,7 +524,7 @@ export default async function InternalInvoiceWorkspacePage({
   const canUseRequestedInvoice = Boolean(
     requestedInvoice
     && requestedInvoice.account_owner_user_id === internalUser.account_owner_user_id
-    && requestedInvoice.job_id === jobId,
+    && (requestedInvoice.member_job_ids?.length ? requestedInvoice.member_job_ids : [requestedInvoice.job_id]).includes(jobId),
   );
   const invoice = canUseRequestedInvoice ? requestedInvoice : currentPrimaryInvoice;
   const invalidRequestedInvoiceSelection = Boolean(requestedInvoiceId && !canUseRequestedInvoice);

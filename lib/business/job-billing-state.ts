@@ -220,6 +220,29 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
         issued_at: row?.issued_at ?? null,
       });
     }
+
+    const unresolvedJobIds = jobIds.filter((jobId) => !internalInvoiceByJobId.has(jobId));
+    if (unresolvedJobIds.length > 0) {
+      const { data: memberships, error: membershipError } = await params.supabase
+        .from("internal_invoice_jobs")
+        .select("job_id, internal_invoices!inner(status, invoice_number, issued_at, invoice_kind)")
+        .in("job_id", unresolvedJobIds)
+        .eq("internal_invoices.invoice_kind", "primary")
+        .neq("internal_invoices.status", "void");
+      if (membershipError) throw membershipError;
+      for (const membership of memberships ?? []) {
+        const jobId = String(membership?.job_id ?? "").trim();
+        const joined = Array.isArray(membership?.internal_invoices)
+          ? membership.internal_invoices[0]
+          : membership?.internal_invoices;
+        if (!jobId || !joined || internalInvoiceByJobId.has(jobId)) continue;
+        internalInvoiceByJobId.set(jobId, {
+          status: joined.status ?? null,
+          invoice_number: joined.invoice_number ?? null,
+          issued_at: joined.issued_at ?? null,
+        });
+      }
+    }
   }
 
   const _t_mapBuild = isOpsTimingEnabled() ? Date.now() : 0;

@@ -1830,21 +1830,14 @@ export default async function JobDetailPage({
           billing_email: string | null;
           line_item_count: number;
           visit_scope_source_ids: string[];
+          member_job_count: number;
         } | null,
         internalInvoicePaymentSummaryTruth: null as InternalInvoiceCollectedPaymentSummary | null,
         internalInvoicePaymentRowsTruth: [] as InternalInvoicePaymentRow[],
       };
     }
 
-    const { data: invoiceTruthRow, error: invoiceTruthErr } = await supabase
-      .from("internal_invoices")
-      .select("id, status, invoice_display_number, invoice_number, issued_at, total_cents, billing_name, billing_email")
-      .eq("job_id", jobId)
-      .eq("invoice_kind", "primary")
-      .neq("status", "void")
-      .maybeSingle();
-
-    if (invoiceTruthErr) throw invoiceTruthErr;
+    const invoiceTruthRow = await resolveInternalInvoiceByJobId({ supabase, jobId });
 
     if (!invoiceTruthRow) {
       return {
@@ -1855,13 +1848,8 @@ export default async function JobDetailPage({
     }
 
     const [
-      { data: invoiceLineRows, error: invoiceLineRowsErr },
       internalInvoicePaymentLedger,
     ] = await Promise.all([
-      supabase
-        .from("internal_invoice_line_items")
-        .select("id, source_kind, source_visit_scope_item_id")
-        .eq("invoice_id", invoiceTruthRow.id),
       resolveInvoiceCollectedPaymentLedger(
         internalUser.account_owner_user_id,
         String(invoiceTruthRow.id),
@@ -1869,8 +1857,7 @@ export default async function JobDetailPage({
       ),
     ]);
 
-    if (invoiceLineRowsErr) throw invoiceLineRowsErr;
-    const invoiceLineItems = Array.isArray(invoiceLineRows) ? invoiceLineRows : [];
+    const invoiceLineItems = invoiceTruthRow.line_items ?? [];
     const visitScopeSourceIds = invoiceLineItems
       .filter((lineItem: any) => lineItem?.source_kind === "visit_scope")
       .map((lineItem: any) => sanitizeVisitScopeItemId(lineItem?.source_visit_scope_item_id))
@@ -1888,6 +1875,7 @@ export default async function JobDetailPage({
         billing_email: String(invoiceTruthRow.billing_email ?? "").trim() || null,
         line_item_count: invoiceLineItems.length,
         visit_scope_source_ids: visitScopeSourceIds,
+        member_job_count: Math.max(1, invoiceTruthRow.member_job_ids?.length ?? 1),
       },
       internalInvoicePaymentSummaryTruth: internalInvoicePaymentLedger.summary,
       internalInvoicePaymentRowsTruth: internalInvoicePaymentLedger.rows,
@@ -3309,6 +3297,9 @@ const jobPageInvoiceSummaryText = internalInvoiceTruth
         ].join(" ")
       : [
       jobPageInvoiceDisplayReference,
+      internalInvoiceTruth.member_job_count > 1
+        ? `Consolidated contractor invoice - included with ${internalInvoiceTruth.member_job_count - 1} additional ${internalInvoiceTruth.member_job_count === 2 ? "job" : "jobs"}`
+        : null,
       `${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"}`,
       formatCurrencyFromCents(internalInvoiceTruth.total_cents),
       jobPageInvoicePaymentSummaryText,

@@ -334,4 +334,29 @@ describe("job billing state read model", () => {
       certs_complete: false,
     });
   });
+
+  it("projects an issued consolidated invoice onto a non-anchor member job", async () => {
+    const supabase = {
+      from: (table: string) => {
+        if (table === "internal_business_profiles") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { account_owner_user_id: "owner-1", display_name: "EveryStep FieldWorks", billing_mode: "internal_invoicing", created_at: "2026-01-01", updated_at: "2026-01-01" }, error: null }) }) }) };
+        if (table === "internal_invoices") return { select: () => ({ neq: () => ({ in: async () => ({ data: [], error: null }) }) }) };
+        if (table === "internal_invoice_jobs") return {
+          select: () => ({
+            in: () => ({
+              eq: () => ({
+                neq: async () => ({ data: [{ job_id: "member-job", internal_invoices: { status: "issued", invoice_number: "INV-C", issued_at: "2026-07-20" } }], error: null }),
+              }),
+            }),
+          }),
+        };
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+    const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      jobs: [{ id: "member-job", field_complete: true, job_type: "service", invoice_complete: false }],
+    });
+    expect(projectionsByJobId.get("member-job")?.billingState).toMatchObject({ internalInvoiceStatus: "issued", billedTruthSatisfied: true });
+  });
 });

@@ -253,6 +253,18 @@ function buildSupabaseFixture() {
           return query;
         }
 
+        if (table === "internal_invoice_jobs") {
+          const query: any = {
+            select: vi.fn(() => query),
+            eq: vi.fn(() => query),
+            order: vi.fn(async () => ({
+              data: [{ internal_invoice_id: "inv-primary", job_id: "job-1", inclusion_order: 1 }],
+              error: null,
+            })),
+          };
+          return query;
+        }
+
         throw new Error(`Unexpected table: ${table}`);
       },
     },

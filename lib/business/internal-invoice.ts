@@ -73,6 +73,13 @@ export type InternalInvoiceRecord = {
   qbo_sync_status: "pending" | "synced" | "error" | "skipped" | null;
   qbo_sync_error: string | null;
   line_items: InternalInvoiceLineItemRecord[];
+  member_job_ids?: string[];
+};
+
+export type InternalInvoiceJobMembership = {
+  internal_invoice_id: string;
+  job_id: string;
+  inclusion_order: number;
 };
 
 export type InternalInvoiceFamilySummaryRecord = {
@@ -247,6 +254,7 @@ export async function resolveInternalInvoiceById(params: {
     supabase: params.supabase,
     invoiceId: String(data.id ?? ""),
   });
+  const memberships = await listInternalInvoiceJobMemberships({ supabase: params.supabase, invoiceId });
 
   return {
     ...data,
@@ -257,6 +265,7 @@ export async function resolveInternalInvoiceById(params: {
     subtotal_cents: Number(data.subtotal_cents ?? 0) || 0,
     total_cents: Number(data.total_cents ?? 0) || 0,
     line_items: lineItems,
+    member_job_ids: memberships.map((row) => row.job_id),
   } as InternalInvoiceRecord;
 }
 
@@ -276,9 +285,29 @@ export async function resolveInternalInvoiceByJobId(params: {
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) return null;
+  if (!data) {
+    const { data: membership, error: membershipError } = await params.supabase
+      .from("internal_invoice_jobs")
+      .select("internal_invoice_id, inclusion_order, internal_invoices!inner(status, invoice_kind)")
+      .eq("job_id", jobId)
+      .eq("internal_invoices.invoice_kind", "primary")
+      .neq("internal_invoices.status", "void")
+      .limit(1)
+      .maybeSingle();
+    if (membershipError) throw membershipError;
+    const invoiceId = String(membership?.internal_invoice_id ?? "").trim();
+    if (!invoiceId) return null;
+    const invoice = await resolveInternalInvoiceById({ supabase: params.supabase, invoiceId });
+    if (!invoice) return null;
+    const memberships = await listInternalInvoiceJobMemberships({ supabase: params.supabase, invoiceId });
+    return { ...invoice, member_job_ids: memberships.map((row) => row.job_id) };
+  }
 
   const lineItems = await listInternalInvoiceLineItems({
+    supabase: params.supabase,
+    invoiceId: String(data.id ?? ""),
+  });
+  const memberships = await listInternalInvoiceJobMemberships({
     supabase: params.supabase,
     invoiceId: String(data.id ?? ""),
   });
@@ -292,6 +321,7 @@ export async function resolveInternalInvoiceByJobId(params: {
     subtotal_cents: Number(data.subtotal_cents ?? 0) || 0,
     total_cents: Number(data.total_cents ?? 0) || 0,
     line_items: lineItems,
+    member_job_ids: memberships.map((row) => row.job_id),
   } as InternalInvoiceRecord;
 }
 
@@ -314,7 +344,23 @@ export async function resolveLatestVoidedInternalInvoiceByJobId(params: {
     .maybeSingle();
 
   if (error) throw error;
-  if (!data) return null;
+  if (!data) {
+    const { data: memberships, error: membershipError } = await params.supabase
+      .from("internal_invoice_jobs")
+      .select("internal_invoice_id, inclusion_order, internal_invoices!inner(status, invoice_kind, voided_at, created_at)")
+      .eq("job_id", jobId)
+      .eq("internal_invoices.invoice_kind", "primary")
+      .eq("internal_invoices.status", "void");
+    if (membershipError) throw membershipError;
+    const candidates = Array.isArray(memberships) ? memberships : [];
+    const latest = candidates.sort((left: any, right: any) => {
+      const leftInvoice = Array.isArray(left.internal_invoices) ? left.internal_invoices[0] : left.internal_invoices;
+      const rightInvoice = Array.isArray(right.internal_invoices) ? right.internal_invoices[0] : right.internal_invoices;
+      return String(rightInvoice?.voided_at ?? rightInvoice?.created_at ?? "").localeCompare(String(leftInvoice?.voided_at ?? leftInvoice?.created_at ?? ""));
+    })[0];
+    const invoiceId = String(latest?.internal_invoice_id ?? "").trim();
+    return invoiceId ? resolveInternalInvoiceById({ supabase: params.supabase, invoiceId }) : null;
+  }
 
   const lineItems = await listInternalInvoiceLineItems({
     supabase: params.supabase,
@@ -453,4 +499,23 @@ export async function resolveInternalInvoiceFamilySummaryByJobId(params: {
     supplementalInvoices: allInvoices.filter((invoice) => invoice.invoice_kind === "supplemental"),
     allInvoices,
   };
+}
+
+export async function listInternalInvoiceJobMemberships(params: {
+  supabase: any;
+  invoiceId: string;
+}): Promise<InternalInvoiceJobMembership[]> {
+  const invoiceId = String(params.invoiceId ?? "").trim();
+  if (!invoiceId) return [];
+  const { data, error } = await params.supabase
+    .from("internal_invoice_jobs")
+    .select("internal_invoice_id, job_id, inclusion_order")
+    .eq("internal_invoice_id", invoiceId)
+    .order("inclusion_order", { ascending: true });
+  if (error) throw error;
+  return (Array.isArray(data) ? data : []).map((row: any) => ({
+    internal_invoice_id: String(row.internal_invoice_id),
+    job_id: String(row.job_id),
+    inclusion_order: Number(row.inclusion_order),
+  }));
 }
