@@ -58,7 +58,7 @@ import {
 import {
   listCloseoutQueueJobs,
 } from "@/lib/ops/closeout-queue";
-import { buildWaitingQueueRows } from "@/lib/ops/focused-queues";
+import { buildWaitingQueueRows, type FocusedQueueJob } from "@/lib/ops/focused-queues";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
@@ -1097,12 +1097,13 @@ export default async function OpsPage({
       const historyFilteredRows = workspaceKey === "exceptions" || workspaceKey === "waiting"
         ? excludeHistoricalRetestParents(queueRes.data ?? [], retestContinuationParentIds)
         : queueRes.data ?? [];
+      const typedHistoryFilteredRows = historyFilteredRows as FocusedQueueJob[];
       const currentRows = workspaceKey === "waiting"
         ? [
-            ...buildWaitingQueueRows(historyFilteredRows.filter((row: any) => row?.ops_status !== "pending_office_review")),
-            ...historyFilteredRows.filter((row: any) => row?.ops_status === "pending_office_review"),
+            ...buildWaitingQueueRows(typedHistoryFilteredRows.filter((row) => row.ops_status !== "pending_office_review")),
+            ...typedHistoryFilteredRows.filter((row) => row.ops_status === "pending_office_review"),
           ]
-        : historyFilteredRows;
+        : typedHistoryFilteredRows;
       return sortOpsBoardRows(currentRows, boardSort);
     }
 

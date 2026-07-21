@@ -656,8 +656,30 @@ describe("releaseAndReevaluate", () => {
     const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
 
     await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=permit_needed");
-    expect(jobUpdates).toEqual([]);
-    expect(jobEvents).toEqual([]);
+    expect(jobUpdates).toEqual([
+      {
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Needed",
+      },
+    ]);
+    expect(jobUpdates).not.toContainEqual({ certs_complete: true });
+    expect(jobEvents).toEqual([
+      {
+        job_id: "job-1",
+        user_id: "internal-user-1",
+        event_type: "ops_update",
+        message: "Permit number needed",
+        meta: {
+          timeline_v: 2,
+          event_family: "ecc_permit",
+          source_action: "markCertsCompleteFromForm",
+          changes: [
+            { field: "ops_status", from: "closed", to: "pending_info" },
+            { field: "pending_info_reason", from: null, to: "Permit Needed" },
+          ],
+        },
+      },
+    ]);
   });
 
   it("marks ECC certs sent and closes out when existing internal invoice truth is satisfied", async () => {
