@@ -79,7 +79,7 @@ export async function createConsolidatedInvoiceDraftFromForm(formData: FormData)
 
     const { data: jobRows, error: jobsError } = await supabase
       .from("jobs")
-      .select("id, account_owner_user_id, title, status, lifecycle_state, deleted_at, field_complete, billing_disposition, customer_id, contractor_id, location_id, service_case_id, billing_recipient, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, scheduled_date, window_start, job_display_number, visit_scope_items")
+      .select("id, account_owner_user_id, title, status, lifecycle_state, deleted_at, field_complete, invoice_complete, ops_status, billing_disposition, customer_id, contractor_id, location_id, service_case_id, billing_recipient, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, scheduled_date, window_start, job_display_number, visit_scope_items")
       .in("id", selectedJobIds);
     if (jobsError) throw jobsError;
     const jobs = (jobRows ?? []) as ConsolidatedInvoiceJob[];

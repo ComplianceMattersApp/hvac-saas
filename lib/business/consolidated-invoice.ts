@@ -12,6 +12,8 @@ export type ConsolidatedInvoiceJob = {
   lifecycle_state?: string | null;
   deleted_at?: string | null;
   field_complete?: boolean | null;
+  invoice_complete?: boolean | null;
+  ops_status?: string | null;
   billing_disposition?: string | null;
   customer_id?: string | null;
   contractor_id?: string | null;
@@ -108,6 +110,9 @@ export function validateConsolidatedInvoiceJobs(params: {
     }
     if (job.billing_disposition) {
       throw new ConsolidatedInvoiceValidationError("external_billing", "A selected job is already resolved through external billing or no-charge.");
+    }
+    if (Boolean(job.invoice_complete) || String(job.ops_status ?? "").trim().toLowerCase() === "closed") {
+      throw new ConsolidatedInvoiceValidationError("billing_already_resolved", "A selected job is already marked billed or closed.");
     }
     if (String(job.billing_recipient ?? "").toLowerCase() !== "contractor") {
       throw new ConsolidatedInvoiceValidationError("recipient_mismatch", "Every selected job must bill the contractor.");

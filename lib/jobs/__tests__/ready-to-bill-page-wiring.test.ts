@@ -35,4 +35,11 @@ describe("Ready to Bill page wiring", () => {
     expect(selection).toContain("manual_quantity_");
     expect(selection).toContain("manual_unit_price_");
   });
+
+  it("excludes legacy billed and closed jobs as well as modern billing dispositions", () => {
+    const readModel = readFileSync(resolve(process.cwd(), "lib/business/ready-to-bill.ts"), "utf8");
+    expect(readModel).toContain('invoice_complete.is.null,invoice_complete.eq.false');
+    expect(readModel).toContain('ops_status.is.null,ops_status.neq.closed');
+    expect(readModel).toContain('.is("billing_disposition", null)');
+  });
 });

@@ -23,6 +23,8 @@ function job(id: string, number: number, date: string, price: number): Consolida
     lifecycle_state: "active",
     deleted_at: null,
     field_complete: true,
+    invoice_complete: false,
+    ops_status: "paperwork_required",
     billing_disposition: null,
     customer_id: customerId,
     contractor_id: contractorId,
@@ -67,6 +69,8 @@ describe("consolidated invoice creation model", () => {
     expect(() => validateConsolidatedInvoiceJobs({ jobs: [base[0], { ...base[1], status: "cancelled" }], selectedJobIds: base.map((row) => row.id), accountOwnerUserId: ownerId })).toThrow("Cancelled");
     expect(() => validateConsolidatedInvoiceJobs({ jobs: [base[0], { ...base[1], deleted_at: "2026-07-20" }], selectedJobIds: base.map((row) => row.id), accountOwnerUserId: ownerId })).toThrow("Archived");
     expect(() => validateConsolidatedInvoiceJobs({ jobs: [base[0], { ...base[1], billing_disposition: "externally_billed" }], selectedJobIds: base.map((row) => row.id), accountOwnerUserId: ownerId })).toThrow("external billing");
+    expect(() => validateConsolidatedInvoiceJobs({ jobs: [base[0], { ...base[1], invoice_complete: true }], selectedJobIds: base.map((row) => row.id), accountOwnerUserId: ownerId })).toThrow("marked billed");
+    expect(() => validateConsolidatedInvoiceJobs({ jobs: [base[0], { ...base[1], ops_status: "closed" }], selectedJobIds: base.map((row) => row.id), accountOwnerUserId: ownerId })).toThrow("marked billed");
   });
 
   it("composes three jobs deterministically while preserving each existing line", () => {

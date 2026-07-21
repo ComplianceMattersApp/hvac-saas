@@ -14,6 +14,8 @@ export type ReadyToBillJobRow = {
   window_start: string | null;
   job_display_number: number | string | null;
   visit_scope_items: unknown;
+  invoice_complete: boolean | null;
+  ops_status: string | null;
 };
 
 export type ReadyToBillJob = {
@@ -141,13 +143,15 @@ export async function listReadyToBillContractorGroups(params: {
 }): Promise<{ groups: ReadyToBillContractorGroup[]; truncated: boolean }> {
   const { data: jobs, error: jobsError } = await params.supabase
     .from("jobs")
-    .select("id, account_owner_user_id, contractor_id, customer_first_name, customer_last_name, title, job_address, scheduled_date, window_start, job_display_number, visit_scope_items")
+    .select("id, account_owner_user_id, contractor_id, customer_first_name, customer_last_name, title, job_address, scheduled_date, window_start, job_display_number, visit_scope_items, invoice_complete, ops_status")
     .eq("account_owner_user_id", params.accountOwnerUserId)
     .eq("status", "completed")
     .eq("field_complete", true)
     .eq("lifecycle_state", "active")
     .eq("billing_recipient", "contractor")
     .is("billing_disposition", null)
+    .or("invoice_complete.is.null,invoice_complete.eq.false")
+    .or("ops_status.is.null,ops_status.neq.closed")
     .is("deleted_at", null)
     .not("contractor_id", "is", null)
     .order("scheduled_date", { ascending: true, nullsFirst: false })

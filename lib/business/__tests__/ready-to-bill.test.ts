@@ -24,6 +24,8 @@ function row(id: string, price: number | null) {
       expected_quantity: 2,
       expected_unit_price: price,
     }],
+    invoice_complete: false,
+    ops_status: "paperwork_required",
   };
 }
 
