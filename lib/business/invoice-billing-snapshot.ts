@@ -51,6 +51,26 @@ export function buildDraftBillingSnapshot(params: {
     contractorBilling: params.contractorBilling,
     jobBilling: params.jobBilling,
   });
+  const billingRecipient = String(params.billingRecipient ?? '').trim().toLowerCase();
+
+  if (billingRecipient === 'contractor') {
+    return {
+      billing_name: firstNonEmpty(
+        billing.billing_name,
+        params.contractorBilling?.billing_name,
+        params.contractorBilling?.name,
+      ),
+      billing_email: optionalText(billing.billing_email),
+      billing_phone: optionalText(billing.billing_phone),
+      billing_address_line1: optionalText(billing.billing_address_line1),
+      billing_address_line2: optionalText(billing.billing_address_line2),
+      billing_city: optionalText(billing.billing_city),
+      billing_state: optionalText(billing.billing_state),
+      billing_zip: optionalText(billing.billing_zip),
+      billing_country: optionalText(billing.billing_country),
+      qbo_customer_name: optionalText(billing.qbo_customer_name),
+    };
+  }
 
   const customerFallbackName = firstNonEmpty(
     params.customerBilling?.billing_name,

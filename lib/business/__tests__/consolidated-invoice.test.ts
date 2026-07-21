@@ -169,4 +169,27 @@ describe("consolidated invoice creation model", () => {
       invoiceDate: "2026-07-20",
     })).toThrow("positive unit price");
   });
+
+  it("keeps contractor identity compatible when selected jobs have different homeowners", () => {
+    const first = job(scopeIds[0], 1, "2026-07-20", 100);
+    const second = { ...job(scopeIds[1], 2, "2026-07-20", 100), customer_id: "customer-2" };
+    const payload = composeConsolidatedInvoiceCreationPayload({
+      jobs: [first, second],
+      accountOwnerUserId: ownerId,
+      actorUserId: ownerId,
+      contractorBilling: { name: "Same Day Heating and Air" },
+      customerBillingById: new Map([
+        [customerId, { full_name: "First Homeowner", billing_email: "first@example.com", billing_phone: "555-1000" }],
+        ["customer-2", { full_name: "Second Homeowner", billing_email: "second@example.com", billing_phone: "555-2000" }],
+      ]),
+      pricebookUnitPriceById: new Map(),
+      invoiceNumber: "INV-compatible",
+      invoiceDate: "2026-07-20",
+    });
+    expect(payload.invoice).toMatchObject({
+      billing_name: "Same Day Heating and Air",
+      billing_email: null,
+      billing_phone: null,
+    });
+  });
 });

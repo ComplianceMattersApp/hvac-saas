@@ -95,4 +95,33 @@ describe("internal invoice per-job source builder", () => {
       updated_by_user_id: "billing-1",
     });
   });
+
+  it("does not borrow homeowner contact details for a contractor-billed invoice", () => {
+    const source = buildInternalInvoiceDraftSource({
+      accountOwnerUserId: "owner-1",
+      actorUserId: "billing-1",
+      jobId: "job-1",
+      job: {
+        customer_id: "customer-1",
+        contractor_id: "contractor-1",
+        billing_recipient: "contractor",
+        billing_email: "legacy-job@example.com",
+        billing_phone: "555-9999",
+      },
+      customerBilling: {
+        full_name: "Home Owner",
+        billing_email: "homeowner@example.com",
+        billing_phone: "555-1111",
+      },
+      contractorBilling: { name: "Same Day Heating and Air" },
+      invoiceNumber: "INV-fixed",
+      invoiceDate: "2026-07-20",
+    });
+
+    expect(source.header).toMatchObject({
+      billing_name: "Same Day Heating and Air",
+      billing_email: null,
+      billing_phone: null,
+    });
+  });
 });
