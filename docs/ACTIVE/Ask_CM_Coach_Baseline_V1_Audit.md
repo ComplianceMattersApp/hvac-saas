@@ -48,6 +48,7 @@ Every curated intent carries machine-reviewable `sources.docs` and `sources.code
 - Ask CM remains non-mutating. It does not create jobs, invoices, payments, customers, support cases, or any other operational record.
 - Unknown questions use a friendly Needs review fallback, link to Training Room and support guidance, and use the existing Help Gap path when enabled.
 - A small owner-approved Easter egg catalog uses exact local triggers only. It contains no family names, external links, provider calls, or mutation behavior, and cannot override ordinary workflow phrasing.
+- The mobile launcher opens with a compact capability helper, three example questions, and the question field in immediate view. Example sets rotate on each reopen so they demonstrate breadth without becoming a long fixed catalog.
 
 ## Docs/code mismatches found
 

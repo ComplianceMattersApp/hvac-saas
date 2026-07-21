@@ -34,15 +34,11 @@ type AskComplianceMattersLauncherProps = {
   globalInternalSurface?: boolean;
 };
 
-const quickQuestions = [
-  "How do I create and schedule a job?",
-  "What happens after a tech finishes?",
-  "How do I build an estimate?",
-  "How do Good, Better, Best options work?",
-  "Where do I add equipment details?",
-  "Why can't I see billing?",
-  "How do I record parts needed?",
-  "How does an ECC retest work?",
+const quickQuestionSets = [
+  ["How do I create and schedule a job?", "How do I create an invoice?", "How do I record a payment?"],
+  ["How do I build an estimate?", "Where do I add equipment details?", "How do I add notes or photos?"],
+  ["How do I close out a job?", "How does an ECC retest work?", "How do I use Training Room?"],
+  ["How do I add a customer?", "Why can't I see billing?", "How do I use the Payments report?"],
 ];
 
 const modeButtonClass =
@@ -99,11 +95,13 @@ export function AskComplianceMattersLauncher({
   const [isAnswering, setIsAnswering] = useState(false);
   const [trainerUnsupported, setTrainerUnsupported] = useState(false);
   const [trainerGapLogged, setTrainerGapLogged] = useState(false);
+  const [quickQuestionSetIndex, setQuickQuestionSetIndex] = useState(quickQuestionSets.length - 1);
   const safeContext = useMemo(
     () => buildHelpAssistantSafeContext({ ...context, pathname: pathname ?? context.pathname }),
     [context, pathname],
   );
   const setupCoach = getSetupCoachAnswer();
+  const quickQuestions = quickQuestionSets[quickQuestionSetIndex] ?? quickQuestionSets[0];
 
   if (globalInternalSurface && !isGlobalInternalTrainerPath(pathname ?? "/")) return null;
 
@@ -243,6 +241,13 @@ export function AskComplianceMattersLauncher({
     });
   }
 
+  function toggleAssistant() {
+    if (!isOpen) {
+      setQuickQuestionSetIndex((current) => (current + 1) % quickQuestionSets.length);
+    }
+    setIsOpen((value) => !value);
+  }
+
   return (
     <div className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-1.5rem)] flex-col items-end gap-2 sm:max-w-[calc(100vw-2rem)]">
       {isOpen ? (
@@ -285,19 +290,12 @@ export function AskComplianceMattersLauncher({
 
             {mode === "ask" ? (
               <div className="mt-4 space-y-3.5">
-                {!answer ? (
-                  <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-                    <div className="text-sm font-semibold text-slate-950">Ask about EveryStep</div>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">
-                      Ask in your own words about customers, jobs, scheduling, field work, estimates, equipment, billing, payments, ECC/HERS, setup, or roles.
-                    </p>
-                  </div>
-                ) : null}
-
                 <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Examples — not the limit
-                  </div>
+                  <div className="text-sm font-semibold text-slate-950">Ask about anything in EveryStep</div>
+                  <p className="mt-1 text-sm leading-5 text-slate-600">
+                    Ask in your own words. If I do not have a good answer yet, I will flag the question for review so Ask CM can keep improving.
+                  </p>
+                  <div className="mb-2 mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Try one</div>
                   <div className="flex flex-wrap gap-2">
                     {quickQuestions.map((item) => (
                       <button
@@ -436,7 +434,7 @@ export function AskComplianceMattersLauncher({
 
       <button
         type="button"
-        onClick={() => setIsOpen((value) => !value)}
+        onClick={toggleAssistant}
         className="rounded-full border border-slate-700 bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-[0_18px_40px_-20px_rgba(15,23,42,0.65)] hover:bg-slate-800"
       >
         Ask CM

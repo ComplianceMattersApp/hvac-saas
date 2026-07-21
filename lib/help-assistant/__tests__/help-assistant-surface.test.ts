@@ -27,6 +27,15 @@ describe("help assistant surface wiring", () => {
     expect(trainingPageSource).not.toContain("<AskComplianceMattersLauncher");
   });
 
+  it("keeps the mobile opening state compact with rotating examples", () => {
+    expect(launcherSource).toContain("Ask about anything in EveryStep");
+    expect(launcherSource).toContain("flag the question for review so Ask CM can keep improving");
+    expect(launcherSource).toContain("quickQuestionSets");
+    expect(launcherSource).toContain("setQuickQuestionSetIndex");
+    expect(launcherSource).toContain("current + 1");
+    expect(launcherSource).not.toContain("Examples — not the limit");
+  });
+
   it("wires help-gap persistence through the sanctioned server action only", () => {
     expect(launcherSource).toContain("answerAskComplianceMatters");
     expect(launcherSource).toContain("persistHelpGapEventFromAssistantAction");
