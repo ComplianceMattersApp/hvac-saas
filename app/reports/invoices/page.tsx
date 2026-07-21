@@ -196,6 +196,9 @@ export default async function InvoiceLedgerPage({
       ) : (
         <>
           <div className="flex flex-wrap gap-2">
+            <Link href="/billing/ready-to-bill" className={reportActionClass("primary")}>
+              Ready to Bill
+            </Link>
             <Link
               href={openInvoicesHref}
               className={reportActionClass(filters.view === "open" ? "primary" : "secondary")}
