@@ -135,7 +135,7 @@ describe("closeout queue projection", () => {
     ).toBe(true);
   });
 
-  it("keeps permit-missing jobs in closeout after billing is complete", () => {
+  it("routes permit-missing jobs to waiting after billing is complete", () => {
     expect(
       isInCloseoutQueue({
         field_complete: true,
@@ -145,7 +145,7 @@ describe("closeout queue projection", () => {
         invoice_complete: true,
         certs_complete: true,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("keeps status-blocked rows in closeout when invoice remains pending", () => {
@@ -294,7 +294,7 @@ describe("closeout queue projection", () => {
     expect(isInCloseoutQueue(job)).toBe(true);
   });
 
-  it("keeps permit-placeholder cert-only rows in closeout with a permit action", () => {
+  it("keeps permit-placeholder cert-only rows out of closeout while preserving the permit action", () => {
     const job = {
       field_complete: true,
       job_type: "ecc",
@@ -310,7 +310,7 @@ describe("closeout queue projection", () => {
       needsPermit: true,
       isPermitBlockingCerts: true,
     });
-    expect(isInCloseoutQueue(job)).toBe(true);
+    expect(isInCloseoutQueue(job)).toBe(false);
     expect(getCloseoutQueueNextStepLabel(job)).toBe("Add permit number");
     expect(getJobDetailCloseoutReadinessMessage(job)).toBe(
       "Add the permit number before sending certs and closing this job.",

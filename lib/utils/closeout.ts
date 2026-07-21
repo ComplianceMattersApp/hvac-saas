@@ -54,9 +54,11 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
 
   const opsStatus = String(job.ops_status ?? "").toLowerCase();
   const needs = getCloseoutNeeds(job);
-  if (opsStatus === "closed" && !needs.needsPermit) return false;
+  if (opsStatus === "closed") return false;
 
-  const hasCloseoutWork = needs.needsInvoice || needs.needsCerts || needs.needsPermit;
+  // The Closeout queue contains work that can be completed now. A missing permit
+  // remains a job-detail blocker, but by itself belongs in Waiting / Pending Info.
+  const hasCloseoutWork = needs.needsInvoice || needs.needsCerts;
   if (!hasCloseoutWork) return false;
 
   // Invoice-needed closeout is status-invariant for active statuses.

@@ -163,7 +163,6 @@ describe("listCloseoutQueueJobs", () => {
       "failed-ecc-needs-invoice",
       "retest-needed-needs-invoice",
       "correction-review-needs-invoice",
-      "permit-missing-no-closeout-blocker",
     ]);
     expect(rows[0]?.pending_info_reason).toBe("Permit Missing");
   });
@@ -245,7 +244,7 @@ describe("listCloseoutQueueJobs", () => {
     expect(rows.map((row) => row.id)).toEqual(["permit-missing-needs-invoice-and-certs"]);
   });
 
-  it("keeps both missing-permit and cert follow-up rows visible", () => {
+  it("keeps cert follow-up visible while routing permit-only work to waiting", () => {
     const rows = listCloseoutQueueJobs([
       {
         id: "permit-placeholder-certs-only",
@@ -268,7 +267,6 @@ describe("listCloseoutQueueJobs", () => {
     ], (job) => job);
 
     expect(rows.map((row) => row.id)).toEqual([
-      "permit-placeholder-certs-only",
       "permit-present-certs-only",
     ]);
   });
