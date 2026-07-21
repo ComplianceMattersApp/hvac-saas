@@ -11,6 +11,7 @@ import {
   normalizeConsolidatedInvoiceJobIds,
   validateConsolidatedInvoiceJobs,
   type ConsolidatedInvoiceJob,
+  type ConsolidatedManualJobLine,
 } from "@/lib/business/consolidated-invoice";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,9 +32,28 @@ function errorResult(error: unknown) {
   return { ok: false as const, code: "creation_failed", message };
 }
 
+function manualLineBySelectedJob(formData: FormData, selectedJobIds: string[]) {
+  const lines = new Map<string, ConsolidatedManualJobLine>();
+  for (const jobId of selectedJobIds) {
+    const title = String(formData.get(`manual_title_${jobId}`) ?? "").trim();
+    const quantityRaw = String(formData.get(`manual_quantity_${jobId}`) ?? "").trim();
+    const unitPriceRaw = String(formData.get(`manual_unit_price_${jobId}`) ?? "").trim();
+    const details = String(formData.get(`manual_details_${jobId}`) ?? "").trim() || null;
+    if (!title && !quantityRaw && !unitPriceRaw && !details) continue;
+    lines.set(jobId, {
+      title,
+      details,
+      quantity: Number(quantityRaw),
+      unitPrice: Number(unitPriceRaw),
+    });
+  }
+  return lines;
+}
+
 export async function createConsolidatedInvoiceDraftFromForm(formData: FormData) {
   try {
     const selectedJobIds = normalizeConsolidatedInvoiceJobIds(formData.getAll("job_id"));
+    const manualLineByJobId = manualLineBySelectedJob(formData, selectedJobIds);
     const requestKey = String(formData.get("request_key") ?? "").trim();
     if (requestKey.length < 16 || requestKey.length > 200) {
       throw new ConsolidatedInvoiceValidationError("request_key_invalid", "Refresh the page and try creating the invoice again.");
@@ -118,6 +138,7 @@ export async function createConsolidatedInvoiceDraftFromForm(formData: FormData)
       contractorBilling: contractorResult.data,
       customerBillingById,
       pricebookUnitPriceById,
+      manualLineByJobId,
       invoiceNumber: buildInvoiceNumber(),
       invoiceDate: new Date().toISOString().slice(0, 10),
     });

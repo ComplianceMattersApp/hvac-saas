@@ -125,4 +125,44 @@ describe("consolidated invoice creation model", () => {
     expect(build([first, second]).memberships).toEqual(build([second, first]).memberships);
     expect(build([first, second]).lineItems).toEqual(build([second, first]).lineItems);
   });
+
+  it("creates source-job-provenanced manual lines when completed jobs have no Work Items", () => {
+    const first = { ...job(scopeIds[0], 1, "2026-07-20", 100), visit_scope_items: [] };
+    const second = { ...job(scopeIds[1], 2, "2026-07-20", 100), visit_scope_items: [] };
+    const payload = composeConsolidatedInvoiceCreationPayload({
+      jobs: [second, first],
+      accountOwnerUserId: ownerId,
+      actorUserId: ownerId,
+      contractorBilling,
+      customerBillingById: new Map([[customerId, { full_name: "Home Owner" }]]),
+      pricebookUnitPriceById: new Map(),
+      manualLineByJobId: new Map([
+        [first.id, { title: "ECC Alteration Test", details: "Job #1", quantity: 1, unitPrice: 250 }],
+        [second.id, { title: "ECC Alteration Test", details: "Job #2", quantity: 2, unitPrice: 175 }],
+      ]),
+      invoiceNumber: "INV-manual",
+      invoiceDate: "2026-07-20",
+    });
+    expect(payload.lineItems).toEqual([
+      expect.objectContaining({ source_job_id: first.id, source_kind: "manual", source_visit_scope_item_id: null, quantity: "1.00", unit_price: "250.00", line_subtotal: "250.00" }),
+      expect.objectContaining({ source_job_id: second.id, source_kind: "manual", source_visit_scope_item_id: null, quantity: "2.00", unit_price: "175.00", line_subtotal: "350.00" }),
+    ]);
+    expect(payload.totalCents).toBe(60000);
+  });
+
+  it("rejects incomplete manual details for a selected job without Work Items", () => {
+    const first = { ...job(scopeIds[0], 1, "2026-07-20", 100), visit_scope_items: [] };
+    const second = job(scopeIds[1], 2, "2026-07-20", 100);
+    expect(() => composeConsolidatedInvoiceCreationPayload({
+      jobs: [first, second],
+      accountOwnerUserId: ownerId,
+      actorUserId: ownerId,
+      contractorBilling,
+      customerBillingById: new Map([[customerId, { full_name: "Home Owner" }]]),
+      pricebookUnitPriceById: new Map(),
+      manualLineByJobId: new Map([[first.id, { title: "ECC test", quantity: 1, unitPrice: 0 }]]),
+      invoiceNumber: "INV-invalid",
+      invoiceDate: "2026-07-20",
+    })).toThrow("positive unit price");
+  });
 });

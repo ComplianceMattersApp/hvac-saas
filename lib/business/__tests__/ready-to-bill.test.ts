@@ -39,7 +39,7 @@ describe("Ready to Bill grouping", () => {
     expect(groups[0]).toMatchObject({ contractorName: "Coaches HVAC", readyJobCount: 2, expectedTotalCents: 40000, expectedTotalDisplay: "$400.00" });
   });
 
-  it("shows active-invoice and missing-price blockers without counting those jobs", () => {
+  it("keeps jobs needing manual invoice details actionable while blocking active invoices", () => {
     const groups = buildReadyToBillGroups({
       jobs: [row("job-ready", 100), row("job-invoiced", 100), row("job-unpriced", null)],
       contractorNameById: new Map([[contractorId, "Coaches HVAC"]]),
@@ -47,9 +47,26 @@ describe("Ready to Bill grouping", () => {
       pricebookUnitPriceById: new Map(),
     });
     expect(groups[0].readyJobCount).toBe(1);
-    expect(groups[0].blockedJobCount).toBe(2);
+    expect(groups[0].blockedJobCount).toBe(1);
+    expect(groups[0].invoiceDetailsJobCount).toBe(1);
     expect(groups[0].jobs.find((job) => job.id === "job-invoiced")?.blocker).toContain("active invoice");
-    expect(groups[0].jobs.find((job) => job.id === "job-unpriced")?.blocker).toContain("pricing");
+    expect(groups[0].jobs.find((job) => job.id === "job-unpriced")).toMatchObject({
+      eligible: true,
+      manualDetailsRequired: true,
+    });
+  });
+
+  it("keeps a contractor group visible when every available job needs invoice details", () => {
+    const missingItems = { ...row("job-empty", null), visit_scope_items: [] };
+    const groups = buildReadyToBillGroups({
+      jobs: [missingItems],
+      contractorNameById: new Map([[contractorId, "Coaches HVAC"]]),
+      activeInvoiceJobIds: new Set(),
+      pricebookUnitPriceById: new Map(),
+    });
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ readyJobCount: 0, invoiceDetailsJobCount: 1 });
+    expect(groups[0].jobs[0]).toMatchObject({ eligible: true, manualDetailsRequired: true });
   });
 
   it("keeps the dedicated read capped", () => {

@@ -42,6 +42,7 @@ export default async function ReadyToBillPage({ searchParams }: { searchParams?:
             <Link key={group.contractorId} href={`/billing/ready-to-bill?contractor=${encodeURIComponent(group.contractorId)}`} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-300 hover:shadow-md">
               <h2 className="text-lg font-semibold text-slate-950">{group.contractorName}</h2>
               <p className="mt-2 text-sm text-slate-600">{group.readyJobCount} {group.readyJobCount === 1 ? "job" : "jobs"} ready to bill</p>
+              {group.invoiceDetailsJobCount ? <p className="mt-1 text-sm font-semibold text-amber-700">{group.invoiceDetailsJobCount} {group.invoiceDetailsJobCount === 1 ? "job needs" : "jobs need"} invoice details</p> : null}
               <p className="mt-1 text-xl font-bold text-slate-950">{group.expectedTotalDisplay}</p>
               {group.blockedJobCount ? <p className="mt-2 text-xs font-semibold text-amber-700">{group.blockedJobCount} additional {group.blockedJobCount === 1 ? "job has" : "jobs have"} a blocker</p> : null}
             </Link>

@@ -139,3 +139,37 @@ export function buildVisitScopeInvoiceLineSource(params: {
     updated_by_user_id: params.actorUserId,
   };
 }
+
+export function buildManualJobInvoiceLineSource(params: {
+  invoiceId: string;
+  sourceJobId: string;
+  sortOrder: number;
+  title: unknown;
+  details?: unknown;
+  quantityHundredths: number;
+  unitPriceCents: number;
+  actorUserId: string;
+}) {
+  const lineSubtotalCents = Math.round(
+    (params.quantityHundredths * params.unitPriceCents) / 100,
+  );
+
+  return {
+    invoice_id: params.invoiceId,
+    source_job_id: params.sourceJobId,
+    sort_order: params.sortOrder,
+    source_kind: "manual" as const,
+    source_pricebook_item_id: null,
+    source_visit_scope_item_id: null,
+    item_name_snapshot: String(params.title ?? "").trim(),
+    description_snapshot: optionalText(params.details),
+    item_type_snapshot: "service" as InternalInvoiceItemType,
+    category_snapshot: null,
+    unit_label_snapshot: "job",
+    quantity: formatScaledInt(params.quantityHundredths, 2),
+    unit_price: formatScaledInt(params.unitPriceCents, 2),
+    line_subtotal: formatScaledInt(lineSubtotalCents, 2),
+    created_by_user_id: params.actorUserId,
+    updated_by_user_id: params.actorUserId,
+  };
+}

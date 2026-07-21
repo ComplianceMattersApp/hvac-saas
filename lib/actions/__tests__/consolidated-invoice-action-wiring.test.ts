@@ -27,4 +27,10 @@ describe("consolidated invoice action wiring", () => {
     expect(source).not.toContain("internal_invoice_payments");
     expect(source).not.toContain("stripe");
   });
+
+  it("passes selected manual job lines into the same atomic creation payload", () => {
+    expect(source).toContain("manualLineBySelectedJob");
+    expect(source).toContain("manualLineByJobId");
+    expect(source).toContain("manual_unit_price_");
+  });
 });

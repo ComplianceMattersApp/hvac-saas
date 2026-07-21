@@ -27,6 +27,7 @@ export type ReadyToBillJob = {
   expectedTotalDisplay: string;
   eligible: boolean;
   blocker: string | null;
+  manualDetailsRequired: boolean;
 };
 
 export type ReadyToBillContractorGroup = {
@@ -35,6 +36,7 @@ export type ReadyToBillContractorGroup = {
   jobs: ReadyToBillJob[];
   readyJobCount: number;
   blockedJobCount: number;
+  invoiceDetailsJobCount: number;
   expectedTotalCents: number;
   expectedTotalDisplay: string;
 };
@@ -84,7 +86,15 @@ export function buildReadyToBillGroups(params: {
     if (!contractorId) continue;
     const total = jobTotal({ row, pricebookUnitPriceById: params.pricebookUnitPriceById });
     const alreadyInvoiced = params.activeInvoiceJobIds.has(row.id);
-    const blocker = alreadyInvoiced ? "Already linked to an active invoice." : total.blocker;
+    const manualDetailsRequired = !alreadyInvoiced && (
+      total.blocker === "No invoice-ready Work Items." ||
+      total.blocker === "Add pricing before consolidating this job."
+    );
+    const blocker = alreadyInvoiced
+      ? "Already linked to an active invoice."
+      : manualDetailsRequired
+        ? "Enter invoice details before consolidating."
+        : total.blocker;
     const job: ReadyToBillJob = {
       id: row.id,
       jobReference: row.job_display_number ? `Job #${row.job_display_number}` : `Job ${row.id.slice(0, 8)}`,
@@ -94,8 +104,9 @@ export function buildReadyToBillGroups(params: {
       title: String(row.title ?? "").trim() || "Service visit",
       expectedTotalCents: total.cents,
       expectedTotalDisplay: currency(total.cents),
-      eligible: !blocker,
+      eligible: !blocker || manualDetailsRequired,
       blocker,
+      manualDetailsRequired,
     };
     const group = groups.get(contractorId) ?? {
       contractorId,
@@ -103,11 +114,14 @@ export function buildReadyToBillGroups(params: {
       jobs: [],
       readyJobCount: 0,
       blockedJobCount: 0,
+      invoiceDetailsJobCount: 0,
       expectedTotalCents: 0,
       expectedTotalDisplay: currency(0),
     };
     group.jobs.push(job);
-    if (job.eligible) {
+    if (job.manualDetailsRequired) {
+      group.invoiceDetailsJobCount += 1;
+    } else if (job.eligible) {
       group.readyJobCount += 1;
       group.expectedTotalCents += job.expectedTotalCents;
     } else {
@@ -117,7 +131,7 @@ export function buildReadyToBillGroups(params: {
     groups.set(contractorId, group);
   }
   return [...groups.values()]
-    .filter((group) => group.readyJobCount > 0)
+    .filter((group) => group.readyJobCount > 0 || group.invoiceDetailsJobCount > 0)
     .sort((left, right) => left.contractorName.localeCompare(right.contractorName));
 }
 

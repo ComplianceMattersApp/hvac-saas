@@ -1,4 +1,4 @@
-import { buildInternalInvoiceDraftSource, buildVisitScopeInvoiceLineSource } from "@/lib/business/internal-invoice-source";
+import { buildInternalInvoiceDraftSource, buildManualJobInvoiceLineSource, buildVisitScopeInvoiceLineSource } from "@/lib/business/internal-invoice-source";
 import type { ContractorBillingSource, CustomerBillingSource } from "@/lib/business/job-billing-source";
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 
@@ -38,6 +38,13 @@ export type ConsolidatedInvoiceCreationPayload = {
   lineItems: Array<Record<string, unknown>>;
   orderedJobs: ConsolidatedInvoiceJob[];
   totalCents: number;
+};
+
+export type ConsolidatedManualJobLine = {
+  title: string;
+  details?: string | null;
+  quantity: number;
+  unitPrice: number;
 };
 
 export class ConsolidatedInvoiceValidationError extends Error {
@@ -125,6 +132,16 @@ function moneyToCents(value: unknown): number {
   return Math.round(amount * 100);
 }
 
+function toRpcInvoiceLine(line: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(line).filter(([key]) => ![
+      "invoice_id",
+      "created_by_user_id",
+      "updated_by_user_id",
+    ].includes(key)),
+  );
+}
+
 function recipientFingerprint(header: Record<string, unknown>) {
   return JSON.stringify([
     header.bill_to_kind,
@@ -149,6 +166,7 @@ export function composeConsolidatedInvoiceCreationPayload(params: {
   contractorBilling: ContractorBillingSource;
   customerBillingById: Map<string, CustomerBillingSource>;
   pricebookUnitPriceById: Map<string, unknown>;
+  manualLineByJobId?: Map<string, ConsolidatedManualJobLine>;
   invoiceNumber: string;
   invoiceDate: string;
 }): ConsolidatedInvoiceCreationPayload {
@@ -180,8 +198,30 @@ export function composeConsolidatedInvoiceCreationPayload(params: {
     } catch {
       throw new ConsolidatedInvoiceValidationError("invalid_invoice_source", "A selected job has invalid Work Item invoice information.");
     }
-    if (scopeItems.length === 0) {
-      throw new ConsolidatedInvoiceValidationError("invoice_source_missing", "Every selected job must have invoice-ready Work Items.");
+    const manualLine = params.manualLineByJobId?.get(job.id);
+    if (scopeItems.length === 0 && !manualLine) {
+      throw new ConsolidatedInvoiceValidationError("invoice_source_missing", "Enter invoice details for every selected job without invoice-ready Work Items.");
+    }
+
+    if (manualLine) {
+      const title = String(manualLine.title ?? "").trim();
+      const quantity = Number(manualLine.quantity);
+      const unitPrice = Number(manualLine.unitPrice);
+      if (!title || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+        throw new ConsolidatedInvoiceValidationError("manual_invoice_details_invalid", "Enter a description, quantity, and positive unit price for every selected job that needs invoice details.");
+      }
+      const line = buildManualJobInvoiceLineSource({
+        invoiceId: "00000000-0000-0000-0000-000000000000",
+        sourceJobId: job.id,
+        sortOrder: lineItems.length + 1,
+        title,
+        details: manualLine.details,
+        quantityHundredths: Math.round(quantity * 100),
+        unitPriceCents: moneyToCents(unitPrice),
+        actorUserId: params.actorUserId,
+      });
+      lineItems.push(toRpcInvoiceLine(line));
+      continue;
     }
 
     for (const scopeItem of scopeItems) {
@@ -209,8 +249,7 @@ export function composeConsolidatedInvoiceCreationPayload(params: {
         unitPriceCents: moneyToCents(unitPriceValue),
         actorUserId: params.actorUserId,
       });
-      const { invoice_id: _invoiceId, created_by_user_id: _createdBy, updated_by_user_id: _updatedBy, ...rpcLine } = line;
-      lineItems.push({ ...rpcLine, source_pricebook_item_id: pricebookId });
+      lineItems.push({ ...toRpcInvoiceLine(line), source_pricebook_item_id: pricebookId });
     }
   }
 

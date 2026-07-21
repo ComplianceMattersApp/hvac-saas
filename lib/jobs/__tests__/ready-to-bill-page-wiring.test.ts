@@ -27,4 +27,12 @@ describe("Ready to Bill page wiring", () => {
     expect(selection).not.toContain("Send Invoice");
     expect(selection).not.toContain("Charge");
   });
+
+  it("collects per-job manual invoice details when Work Items are unavailable", () => {
+    expect(page).toContain("invoiceDetailsJobCount");
+    expect(selection).toContain("manualDetailsRequired");
+    expect(selection).toContain("manual_title_");
+    expect(selection).toContain("manual_quantity_");
+    expect(selection).toContain("manual_unit_price_");
+  });
 });
