@@ -39,6 +39,7 @@ const styles = StyleSheet.create({
   headerText: { fontSize: 7, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 },
   itemName: { fontWeight: 700, color: "#0f172a", marginBottom: 2 },
   itemDescription: { fontSize: 8, lineHeight: 1.35, color: "#64748b" },
+  itemContext: { fontSize: 7, lineHeight: 1.3, color: "#475569", marginBottom: 2 },
   totals: { alignSelf: "flex-end", width: 240, borderTopWidth: 1, borderTopColor: "#cbd5e1", paddingTop: 8 },
   totalRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 5 },
   totalStrong: { fontSize: 11, fontWeight: 700, color: "#0f172a", paddingTop: 5, borderTopWidth: 1, borderTopColor: "#e2e8f0" },
@@ -93,6 +94,8 @@ function InvoicePdfDocument({ model, logoSource }: { model: InternalInvoiceDocum
             <View key={item.key} style={styles.tableRow} wrap={false}>
               <View style={styles.descriptionCol}>
                 <Text style={styles.itemName}>{item.name}</Text>
+                {item.jobReference ? <Text style={styles.itemContext}>{item.jobReference} · {item.jobTitle}</Text> : null}
+                {item.serviceLocation ? <Text style={styles.itemContext}>{item.serviceLocation}</Text> : null}
                 {item.description ? <Text style={styles.itemDescription}>{item.description}</Text> : null}
               </View>
               <Text style={styles.quantityCol}>{item.quantityLabel}</Text>

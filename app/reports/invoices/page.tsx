@@ -366,6 +366,7 @@ export default async function InvoiceLedgerPage({
                           {row.invoiceHref ? (
                             <Link href={row.invoiceHref} className="font-medium text-blue-700 hover:underline">
                               {row.invoiceNumber}
+                              {row.isConsolidated ? <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">Consolidated</span> : null}
                             </Link>
                           ) : (
                             <span className="font-medium text-slate-900">{row.invoiceNumber}</span>

@@ -99,6 +99,7 @@ export type InvoiceLedgerRow = {
   paymentStatusLabel: string;
   lastPaymentDateDisplay: string;
   paymentCountDisplay: string;
+  isConsolidated?: boolean;
 };
 
 export type InvoiceLedgerSummary = {
@@ -144,6 +145,7 @@ type InvoiceRow = {
   billing_state: string | null;
   billing_zip: string | null;
   created_at: string;
+  consolidated_request_key: string | null;
 };
 
 type CustomerRow = {
@@ -604,7 +606,7 @@ export async function listInvoiceLedgerRows(params: {
   let query = params.supabase
     .from("internal_invoices")
     .select(
-      "id, job_id, customer_id, bill_to_kind, bill_to_contractor_id, location_id, service_case_id, invoice_display_number, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at"
+      "id, job_id, customer_id, bill_to_kind, bill_to_contractor_id, location_id, service_case_id, invoice_display_number, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at, consolidated_request_key"
     )
     .eq("account_owner_user_id", params.accountOwnerUserId);
 
@@ -805,6 +807,7 @@ export async function listInvoiceLedgerRows(params: {
       paymentStatusLabel,
       lastPaymentDateDisplay: formatTimestampDisplay(paymentSummary?.lastPaymentDate ?? null),
       paymentCountDisplay: paymentSummary && paymentSummary.paymentCount > 0 ? String(paymentSummary.paymentCount) : "-",
+      isConsolidated: Boolean(String(invoice.consolidated_request_key ?? "").trim()),
     } satisfies InvoiceLedgerRow;
   });
   const viewRows = params.filters.view === "open"
@@ -824,6 +827,7 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     "Invoice Number",
     "Status",
     "Source Type",
+    "Invoice Scope",
     "Customer",
     "Location",
     "Job Ref",
@@ -850,6 +854,7 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     row.invoiceNumber,
     row.invoiceStatusLabel,
     row.sourceTypeLabel,
+    row.isConsolidated ? "Consolidated" : "Single job",
     row.customerDisplay,
     row.locationDisplay,
     row.jobReference,

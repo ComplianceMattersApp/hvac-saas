@@ -152,4 +152,31 @@ describe("internal invoice document model", () => {
     expect(model.serviceLocation).toBe("Scoped Location Label");
     expect(model.lineItems[0]?.serviceLocation).toBe("Scoped Location Label");
   });
+
+  it("renders each consolidated line with its immutable source-job context", () => {
+    const consolidated = invoice({
+      member_job_ids: ["job-1", "job-2"],
+      line_items: [
+        { ...invoice().line_items[0], id: "line-1", source_job_id: "job-1" },
+        { ...invoice().line_items[0], id: "line-2", source_job_id: "job-2", item_name_snapshot: "Repair" },
+      ],
+    });
+    const memberContextByJobId = new Map([
+      ["job-1", { jobId: "job-1", jobTitle: "North unit", jobReference: "Job #101", customerName: "Alpha Customer", serviceLocation: "101 Alpha St" }],
+      ["job-2", { jobId: "job-2", jobTitle: "South unit", jobReference: "Job #102", customerName: "Beta Customer", serviceLocation: "202 Beta St" }],
+    ]);
+
+    const model = buildInternalInvoiceDocumentModel({
+      invoice: consolidated,
+      job: { title: "North unit" },
+      paymentSummary: {},
+      tenantIdentity: { displayName: "EveryStep HVAC", supportEmail: null, supportPhone: null, logoUrl: null },
+      memberContextByJobId,
+    });
+
+    expect(model.lineItems).toMatchObject([
+      { jobReference: "Job #101", customerName: "Alpha Customer", serviceLocation: "101 Alpha St" },
+      { jobReference: "Job #102", customerName: "Beta Customer", serviceLocation: "202 Beta St" },
+    ]);
+  });
 });

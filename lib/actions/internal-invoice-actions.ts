@@ -26,6 +26,8 @@ import {
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE } from '@/lib/business/internal-invoice-delivery';
 import { buildInternalInvoiceDocumentModel } from '@/lib/business/internal-invoice-document';
+import { loadInternalInvoiceMemberPresentationContexts } from '@/lib/business/internal-invoice-member-context';
+import type { InternalInvoiceDocumentModel } from '@/lib/business/internal-invoice-document';
 import { buildInternalInvoicePdfAttachment } from '@/lib/pdf/internal-invoice-pdf';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
 import { buildDraftBillingSnapshot } from '@/lib/business/invoice-billing-snapshot';
@@ -753,6 +755,7 @@ function buildInternalInvoiceEmailBody(args: {
   amountPaidCents: number;
   balanceDueCents: number;
   paymentStatus: 'unpaid' | 'partial' | 'paid';
+  documentModel?: InternalInvoiceDocumentModel;
 }) {
   const lineItems = args.invoice.line_items ?? [];
   const totalDisplay = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
@@ -772,11 +775,15 @@ function buildInternalInvoiceEmailBody(args: {
   const serviceLocationText = String(args.serviceLocation ?? '').trim() || 'Service location unavailable';
   const customerNameText = String(args.customerName ?? '').trim() || 'Customer unavailable';
   const lineItemsHtml = lineItems
-    .map((lineItem) => {
+    .map((lineItem, index) => {
+      const documentLine = args.documentModel?.lineItems[index];
       const name = escapeHtml(String(lineItem.item_name_snapshot ?? '').trim() || 'Line item');
       const description = escapeHtml(String(lineItem.description_snapshot ?? '').trim());
-      const serviceLocation = escapeHtml(serviceLocationText);
-      const customerName = escapeHtml(customerNameText);
+      const serviceLocation = escapeHtml(documentLine?.serviceLocation || serviceLocationText);
+      const customerName = escapeHtml(documentLine?.customerName || customerNameText);
+      const jobContext = documentLine?.jobReference
+        ? `<div style="margin-top: 4px; color: #475569; font-size: 12px;">${escapeHtml(documentLine.jobReference)} · ${escapeHtml(documentLine.jobTitle ?? 'Service visit')}</div>`
+        : '';
       const quantity = escapeHtml(String(lineItem.quantity ?? '0'));
       const unitPrice = escapeHtml(formatCurrencyFromCents(Math.round(Number(lineItem.unit_price ?? 0) * 100)));
       const subtotal = escapeHtml(formatCurrencyFromCents(Math.round(Number(lineItem.line_subtotal ?? 0) * 100)));
@@ -785,6 +792,7 @@ function buildInternalInvoiceEmailBody(args: {
         <tr>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
             <div style="font-weight: 600; color: #111827;">${name}</div>
+            ${jobContext}
             ${description ? `<div style="margin-top: 4px; color: #4b5563; font-size: 13px;">${description}</div>` : ''}
           </td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; vertical-align: top;">${serviceLocation}</td>
@@ -921,6 +929,7 @@ function buildInternalInvoiceEmailText(args: {
   amountPaidCents: number;
   balanceDueCents: number;
   paymentStatus: 'unpaid' | 'partial' | 'paid';
+  documentModel?: InternalInvoiceDocumentModel;
 }) {
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: args.invoice.invoice_display_number,
@@ -945,11 +954,13 @@ function buildInternalInvoiceEmailText(args: {
 
   const lineItems = (args.invoice.line_items ?? [])
     .map((lineItem, index) => {
+      const documentLine = args.documentModel?.lineItems[index];
       const itemName = String(lineItem.item_name_snapshot ?? '').trim() || `Line item ${index + 1}`;
       const quantity = String(lineItem.quantity ?? '0').trim() || '0';
       const unitPrice = formatCurrencyFromCents(Math.round(Number(lineItem.unit_price ?? 0) * 100));
       const subtotal = formatCurrencyFromCents(Math.round(Number(lineItem.line_subtotal ?? 0) * 100));
-      return `${index + 1}. ${itemName} | Service Location: ${serviceLocation} | Customer: ${customerName} | Qty: ${quantity} | Unit: ${unitPrice} | Subtotal: ${subtotal}`;
+      const sourceJob = documentLine?.jobReference ? ` | ${documentLine.jobReference}: ${documentLine.jobTitle}` : '';
+      return `${index + 1}. ${itemName}${sourceJob} | Service Location: ${documentLine?.serviceLocation || serviceLocation} | Customer: ${documentLine?.customerName || customerName} | Qty: ${quantity} | Unit: ${unitPrice} | Subtotal: ${subtotal}`;
     })
     .join('\n');
 
@@ -2983,11 +2994,14 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     jobId: context.jobId,
     invoice,
   });
-  const paymentLedger = await resolveInvoiceCollectedPaymentLedger(
-    context.internalUser.account_owner_user_id,
-    invoice.id,
-    context.supabase,
-  );
+  const [paymentLedger, memberContextByJobId] = await Promise.all([
+    resolveInvoiceCollectedPaymentLedger(context.internalUser.account_owner_user_id, invoice.id, context.supabase),
+    loadInternalInvoiceMemberPresentationContexts({
+      supabase: context.supabase,
+      invoice,
+      accountOwnerUserId: context.internalUser.account_owner_user_id,
+    }),
+  ]);
   const paymentSummary = paymentLedger.summary;
 
   const documentModel = buildInternalInvoiceDocumentModel({
@@ -2996,6 +3010,7 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     serviceLocation,
     paymentSummary,
     tenantIdentity,
+    memberContextByJobId,
   });
 
   const invoiceReference = formatInvoiceDisplayReference({
@@ -3018,12 +3033,14 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     amountPaidCents: paymentSummary.amountPaidCents,
     balanceDueCents: paymentSummary.balanceDueCents,
     paymentStatus: paymentSummary.paymentStatus,
+    documentModel,
   });
   const text = buildInternalInvoiceEmailText({
     businessName: tenantIdentity.displayName,
     supportEmail: tenantIdentity.supportEmail,
     supportPhone: tenantIdentity.supportPhone,
     paymentUrl,
+    documentModel,
     invoice,
     greetingName,
     jobTitle: context.job.title ?? null,

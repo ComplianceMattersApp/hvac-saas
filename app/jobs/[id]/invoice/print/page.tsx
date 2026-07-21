@@ -5,10 +5,10 @@ import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-
 import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveInternalInvoiceById, resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
 import { resolveInvoiceCollectedPaymentLedger } from "@/lib/business/internal-invoice-payments";
+import { loadInternalInvoiceMemberPresentationContexts } from "@/lib/business/internal-invoice-member-context";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import {
   buildInternalInvoiceDocumentModel,
-  formatInvoiceDocumentCurrencyFromAmount,
   formatInvoiceDocumentCurrencyFromCents,
 } from "@/lib/business/internal-invoice-document";
 import PrintToolbar from "./PrintToolbar";
@@ -90,7 +90,7 @@ export default async function InternalInvoicePrintPage({
     : null;
   const canUseRequestedInvoice = Boolean(
     requestedInvoice
-    && requestedInvoice.job_id === jobId
+    && (requestedInvoice.member_job_ids ?? [requestedInvoice.job_id]).includes(jobId)
     && requestedInvoice.account_owner_user_id === internalUser.account_owner_user_id,
   );
   const invoice = canUseRequestedInvoice
@@ -98,11 +98,10 @@ export default async function InternalInvoicePrintPage({
     : await resolveInternalInvoiceByJobId({ supabase, jobId });
   if (!invoice?.id) notFound();
 
-  const paymentLedger = await resolveInvoiceCollectedPaymentLedger(
-    internalUser.account_owner_user_id,
-    invoice.id,
-    supabase,
-  );
+  const [paymentLedger, memberContextByJobId] = await Promise.all([
+    resolveInvoiceCollectedPaymentLedger(internalUser.account_owner_user_id, invoice.id, supabase),
+    loadInternalInvoiceMemberPresentationContexts({ supabase, invoice, accountOwnerUserId: internalUser.account_owner_user_id }),
+  ]);
   const paymentSummary = paymentLedger.summary;
 
   const tenantIdentity = await resolveOperationalTenantIdentity({
@@ -124,10 +123,9 @@ export default async function InternalInvoicePrintPage({
     location,
     paymentSummary,
     tenantIdentity,
+    memberContextByJobId,
   });
   const customerFacingStatus = documentModel.statusLabel;
-  const serviceLocationLabel = documentModel.serviceLocation;
-  const customerName = documentModel.customerName;
   const billingName = documentModel.billing.name;
   const billingEmail = documentModel.billing.email;
   const billingPhone = documentModel.billing.phone;
@@ -211,31 +209,31 @@ export default async function InternalInvoicePrintPage({
 
           <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 print:rounded-none print:border-slate-300">
             <div className="divide-y divide-slate-200 md:hidden print:hidden">
-              {invoice.line_items.length === 0 ? (
+              {documentModel.lineItems.length === 0 ? (
                 <div className="px-4 py-4 text-sm text-slate-600">No billed line items were recorded.</div>
-              ) : invoice.line_items.map((lineItem, index) => (
-                <article key={lineItem.id} className="bg-white px-4 py-4">
+              ) : documentModel.lineItems.map((lineItem, index) => (
+                <article key={lineItem.key} className="bg-white px-4 py-4">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Line {index + 1}</div>
-                  <div className="mt-1 font-semibold text-slate-950">{lineItem.item_name_snapshot}</div>
-                  {lineItem.description_snapshot ? (
-                    <div className="mt-1 text-sm leading-5 text-slate-600">{lineItem.description_snapshot}</div>
+                  <div className="mt-1 font-semibold text-slate-950">{lineItem.name}</div>
+                  {lineItem.description ? (
+                    <div className="mt-1 text-sm leading-5 text-slate-600">{lineItem.description}</div>
                   ) : null}
                   <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <div className="col-span-2">
                       <dt className="text-xs text-slate-500">Service Location</dt>
-                      <dd className="mt-0.5 break-words text-slate-800">{serviceLocationLabel || "Service location unavailable"}</dd>
+                      <dd className="mt-0.5 break-words text-slate-800">{lineItem.serviceLocation || "Service location unavailable"}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-slate-500">Quantity</dt>
-                      <dd className="mt-0.5 font-medium text-slate-900">{Number(lineItem.quantity ?? 0).toFixed(2)}</dd>
+                      <dd className="mt-0.5 font-medium text-slate-900">{lineItem.quantityLabel}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-slate-500">Unit Price</dt>
-                      <dd className="mt-0.5 font-medium text-slate-900">{formatInvoiceDocumentCurrencyFromAmount(lineItem.unit_price)}</dd>
+                      <dd className="mt-0.5 font-medium text-slate-900">{lineItem.unitPriceLabel}</dd>
                     </div>
                     <div className="col-span-2 border-t border-slate-100 pt-2">
                       <dt className="text-xs text-slate-500">Subtotal</dt>
-                      <dd className="mt-0.5 text-base font-semibold text-slate-950">{formatInvoiceDocumentCurrencyFromAmount(lineItem.line_subtotal)}</dd>
+                      <dd className="mt-0.5 text-base font-semibold text-slate-950">{lineItem.subtotalLabel}</dd>
                     </div>
                   </dl>
                 </article>
@@ -250,26 +248,27 @@ export default async function InternalInvoicePrintPage({
               <div className="text-right">Unit Price</div>
               <div className="text-right">Subtotal</div>
             </div>
-            {invoice.line_items.length === 0 ? (
+            {documentModel.lineItems.length === 0 ? (
               <div className="px-4 py-4 text-sm text-slate-600">No billed line items were recorded.</div>
             ) : (
               <div className="divide-y divide-slate-200 print:divide-slate-300">
-                {invoice.line_items.map((lineItem) => (
+                {documentModel.lineItems.map((lineItem) => (
                   <div
-                    key={lineItem.id}
+                    key={lineItem.key}
                     className="grid break-inside-avoid grid-cols-[minmax(0,1.65fr)_minmax(0,1.35fr)_minmax(0,0.9fr)_minmax(4.5rem,0.5fr)_minmax(6.5rem,0.65fr)_minmax(6.5rem,0.65fr)] gap-3 bg-white px-4 py-3 text-sm"
                   >
                     <div>
-                      <div className="font-semibold text-slate-900">{lineItem.item_name_snapshot}</div>
-                      {lineItem.description_snapshot ? (
-                        <div className="mt-0.5 text-xs leading-5 text-slate-600">{lineItem.description_snapshot}</div>
+                      <div className="font-semibold text-slate-900">{lineItem.name}</div>
+                      {lineItem.jobReference ? <div className="mt-0.5 text-xs text-slate-500">{lineItem.jobReference} · {lineItem.jobTitle}</div> : null}
+                      {lineItem.description ? (
+                        <div className="mt-0.5 text-xs leading-5 text-slate-600">{lineItem.description}</div>
                       ) : null}
                     </div>
-                    <div className="text-slate-700">{serviceLocationLabel || "Service location unavailable"}</div>
-                    <div className="text-slate-700">{customerName}</div>
-                    <div className="text-right text-slate-700">{Number(lineItem.quantity ?? 0).toFixed(2)}</div>
-                    <div className="text-right text-slate-700">{formatInvoiceDocumentCurrencyFromAmount(lineItem.unit_price)}</div>
-                    <div className="text-right font-semibold text-slate-900">{formatInvoiceDocumentCurrencyFromAmount(lineItem.line_subtotal)}</div>
+                    <div className="text-slate-700">{lineItem.serviceLocation || "Service location unavailable"}</div>
+                    <div className="text-slate-700">{lineItem.customerName}</div>
+                    <div className="text-right text-slate-700">{lineItem.quantityLabel}</div>
+                    <div className="text-right text-slate-700">{lineItem.unitPriceLabel}</div>
+                    <div className="text-right font-semibold text-slate-900">{lineItem.subtotalLabel}</div>
                   </div>
                 ))}
               </div>

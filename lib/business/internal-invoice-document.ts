@@ -9,6 +9,7 @@ import {
   preferredInvoiceReference,
 } from "@/lib/utils/display-references";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import type { InternalInvoiceMemberPresentationContext } from "@/lib/business/internal-invoice-member-context";
 
 export const INTERNAL_INVOICE_PDF_MIME_TYPE = "application/pdf";
 
@@ -18,6 +19,8 @@ export type InternalInvoiceDocumentLineItem = {
   description: string | null;
   serviceLocation: string;
   customerName: string;
+  jobReference?: string | null;
+  jobTitle?: string;
   quantity: number;
   quantityLabel: string;
   unitPrice: number;
@@ -137,6 +140,7 @@ export function buildInternalInvoiceDocumentModel(params: {
   serviceLocation?: string | null;
   paymentSummary: InvoiceDocumentPaymentSummary;
   tenantIdentity: OperationalTenantIdentity;
+  memberContextByJobId?: Map<string, InternalInvoiceMemberPresentationContext>;
 }): InternalInvoiceDocumentModel {
   const { invoice, job, tenantIdentity } = params;
   const paymentStatus = normalizePaymentStatus(params.paymentSummary.paymentStatus);
@@ -184,19 +188,26 @@ export function buildInternalInvoiceDocumentModel(params: {
     },
     serviceLocation,
     customerName,
-    lineItems: invoice.line_items.map((item) => ({
-      key: item.id,
-      name: item.item_name_snapshot,
-      description: item.description_snapshot,
-      serviceLocation,
-      customerName,
-      quantity: item.quantity,
-      quantityLabel: Number(item.quantity ?? 0).toFixed(2),
-      unitPrice: item.unit_price,
-      unitPriceLabel: formatInvoiceDocumentCurrencyFromAmount(item.unit_price),
-      subtotal: item.line_subtotal,
-      subtotalLabel: formatInvoiceDocumentCurrencyFromAmount(item.line_subtotal),
-    })),
+    lineItems: invoice.line_items.map((item) => {
+      const memberContext = item.source_job_id
+        ? params.memberContextByJobId?.get(item.source_job_id)
+        : null;
+      return {
+        key: item.id,
+        name: item.item_name_snapshot,
+        description: item.description_snapshot,
+        serviceLocation: memberContext?.serviceLocation ?? serviceLocation,
+        customerName: memberContext?.customerName ?? customerName,
+        jobReference: memberContext?.jobReference ?? null,
+        jobTitle: memberContext?.jobTitle ?? (String(job.title ?? "").trim() || "Service visit"),
+        quantity: item.quantity,
+        quantityLabel: Number(item.quantity ?? 0).toFixed(2),
+        unitPrice: item.unit_price,
+        unitPriceLabel: formatInvoiceDocumentCurrencyFromAmount(item.unit_price),
+        subtotal: item.line_subtotal,
+        subtotalLabel: formatInvoiceDocumentCurrencyFromAmount(item.line_subtotal),
+      };
+    }),
     subtotalCents: invoice.subtotal_cents,
     subtotalLabel: formatInvoiceDocumentCurrencyFromCents(invoice.subtotal_cents),
     totalCents: invoice.total_cents,

@@ -51,6 +51,7 @@ function makeSupabase(tables: Record<string, { single?: any; list?: any[] }>) {
     eq: vi.fn(() => builder),
     or: vi.fn(() => builder),
     gte: vi.fn(() => builder),
+    in: vi.fn(() => builder),
     order: vi.fn(() => builder),
     maybeSingle: vi.fn(async () => ({ data: tables[builder.__table]?.single ?? null, error: null })),
     update: vi.fn((payload: any) => {
@@ -305,6 +306,32 @@ describe("bill-to-aware QBO customer mapping", () => {
     expect(findOrCreateQboCustomer).toHaveBeenCalledWith(
       expect.objectContaining({ customer: expect.objectContaining({ displayName: "Service Master" }) }),
     );
+  });
+
+  it("creates one QBO invoice with source-job context on each consolidated line", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: { single: {
+        id: "inv-consolidated", status: "issued", account_owner_user_id: "acc", job_id: null,
+        customer_id: null, billing_name: "Service Master", invoice_display_number: 3004,
+        invoice_date: "2026-07-20", qbo_invoice_id: null,
+      } },
+      jobs: { list: [
+        { id: "job-a", job_display_number: "1401", job_address: "10 A St", customer_first_name: "Amy", customer_last_name: "Able" },
+        { id: "job-b", job_display_number: "1402", job_address: "20 B St", customer_first_name: "Ben", customer_last_name: "Baker" },
+      ] },
+      internal_invoice_line_items: { list: [
+        { source_job_id: "job-a", item_name_snapshot: "A service", quantity: 1, unit_price: 10, line_subtotal: 10, sort_order: 1 },
+        { source_job_id: "job-b", item_name_snapshot: "B service", quantity: 1, unit_price: 20, line_subtotal: 20, sort_order: 2 },
+      ] },
+    });
+
+    await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-consolidated" });
+
+    expect(createQboInvoice).toHaveBeenCalledTimes(1);
+    expect(createQboInvoice).toHaveBeenCalledWith(expect.objectContaining({ invoice: expect.objectContaining({ lines: [
+      expect.objectContaining({ description: expect.stringContaining("Job #1401") }),
+      expect.objectContaining({ description: expect.stringContaining("Job #1402") }),
+    ] }) }));
   });
 });
 

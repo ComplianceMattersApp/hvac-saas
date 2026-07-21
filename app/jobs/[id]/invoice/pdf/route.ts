@@ -4,6 +4,7 @@ import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-
 import { buildInternalInvoiceDocumentModel, buildInternalInvoicePdfFilename } from "@/lib/business/internal-invoice-document";
 import { resolveInternalInvoiceById } from "@/lib/business/internal-invoice";
 import { resolveInvoiceCollectedPaymentLedger } from "@/lib/business/internal-invoice-payments";
+import { loadInternalInvoiceMemberPresentationContexts } from "@/lib/business/internal-invoice-member-context";
 import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { renderInternalInvoicePdf } from "@/lib/pdf/internal-invoice-pdf";
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const invoice = await resolveInternalInvoiceById({ supabase, invoiceId });
   if (
     !invoice
-    || invoice.job_id !== jobId
+    || !(invoice.member_job_ids ?? [invoice.job_id]).includes(jobId)
     || invoice.account_owner_user_id !== internalUser.account_owner_user_id
   ) {
     return safeError(404, "Invoice not found.");
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   if (jobError) throw jobError;
   if (!job?.id) return safeError(404, "Invoice not found.");
 
-  const [paymentLedger, tenantIdentity] = await Promise.all([
+  const [paymentLedger, tenantIdentity, memberContextByJobId] = await Promise.all([
     resolveInvoiceCollectedPaymentLedger(
       internalUser.account_owner_user_id,
       invoice.id,
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       accountOwnerUserId: internalUser.account_owner_user_id,
       supabase,
     }),
+    loadInternalInvoiceMemberPresentationContexts({ supabase, invoice, accountOwnerUserId: internalUser.account_owner_user_id }),
   ]);
   const jobWithLocation = job as typeof job & {
     locations?: Array<Record<string, string | null>> | Record<string, string | null> | null;
@@ -101,6 +103,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     location,
     paymentSummary: paymentLedger.summary,
     tenantIdentity,
+    memberContextByJobId,
   });
 
   try {

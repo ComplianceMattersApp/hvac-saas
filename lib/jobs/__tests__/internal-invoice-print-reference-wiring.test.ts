@@ -34,7 +34,7 @@ describe("internal invoice print reference wiring", () => {
   it("uses readable mobile line-item cards while preserving the desktop and print table", () => {
     expect(source).toContain("md:hidden print:hidden");
     expect(source).toContain("hidden md:block print:block");
-    expect(source).toContain("<article key={lineItem.id}");
+    expect(source).toContain("<article key={lineItem.key}");
     expect(source).toContain("Quantity");
     expect(source).toContain("break-words");
   });
@@ -42,7 +42,7 @@ describe("internal invoice print reference wiring", () => {
   it("prints the specifically selected primary or add-on invoice", () => {
     expect(source).toContain("requestedInvoiceIdValue");
     expect(source).toContain("resolveInternalInvoiceById");
-    expect(source).toContain("requestedInvoice.job_id === jobId");
+    expect(source).toContain("(requestedInvoice.member_job_ids ?? [requestedInvoice.job_id]).includes(jobId)");
     expect(source).toContain("requestedInvoice.account_owner_user_id === internalUser.account_owner_user_id");
     expect(source).toContain("invoice_id=${encodeURIComponent(invoice.id)}");
   });
@@ -58,7 +58,7 @@ describe("internal invoice print reference wiring", () => {
   it("keeps billing recipient separate from line-level service details", () => {
     expect(source).toContain('from "@/lib/business/internal-invoice-document";');
     expect(source).toContain("const billingAddress = documentModel.billing.addressLines;");
-    expect(source).toContain("const serviceLocationLabel = documentModel.serviceLocation;");
+    expect(source).toContain("loadInternalInvoiceMemberPresentationContexts");
     expect(source).toContain("Service details are listed by line item below.");
     expect(source).not.toContain("invoiceServiceLocationMatchesBillingAddress");
     expect(source).not.toContain("Same as billing address");
@@ -72,8 +72,9 @@ describe("internal invoice print reference wiring", () => {
     expect(source).toContain("Qty");
     expect(source).toContain("Unit Price");
     expect(source).toContain("Subtotal");
-    expect(source).toContain('{serviceLocationLabel || "Service location unavailable"}');
-    expect(source).toContain("{customerName}");
+    expect(source).toContain('{lineItem.serviceLocation || "Service location unavailable"}');
+    expect(source).toContain("{lineItem.customerName}");
+    expect(source).toContain("{lineItem.jobReference}");
   });
 
   it("removes internal payment notice language while keeping line items and total blocks", () => {

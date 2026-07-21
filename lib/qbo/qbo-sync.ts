@@ -114,6 +114,7 @@ function buildInvoiceInput(
   lineItems: any[],
   customerRef: string,
   jobContext: string | null,
+  jobContextByJobId: Map<string, string> = new Map(),
 ): QboInvoiceInput {
   return {
     docNumber: String(invoiceRow.invoice_display_number ?? invoiceRow.invoice_number ?? ""),
@@ -126,7 +127,9 @@ function buildInvoiceInput(
       const serviceDescription =
         nonEmpty(line.description_snapshot) ?? String(line.item_name_snapshot ?? "Services");
       return {
-        description: jobContext ? `${jobContext}\n${serviceDescription}` : serviceDescription,
+        description: (jobContextByJobId.get(String(line.source_job_id ?? "")) ?? jobContext)
+          ? `${jobContextByJobId.get(String(line.source_job_id ?? "")) ?? jobContext}\n${serviceDescription}`
+          : serviceDescription,
         amount,
         quantity,
         unitPrice,
@@ -223,11 +226,28 @@ async function syncSingleInvoiceWithContext(
       customer: customerInput,
     });
 
+    const sourceJobIds = [...new Set<string>(lineItems.map((line: any) => nonEmpty(line.source_job_id)).filter((id: string | null): id is string => Boolean(id)))];
+    const jobContextByJobId = new Map<string, string>();
+    if (sourceJobIds.length > 1) {
+      const { data: sourceJobs, error: sourceJobsError } = await supabase
+        .from("jobs")
+        .select("id, job_display_number, job_address, customer_first_name, customer_last_name")
+        .eq("account_owner_user_id", accountOwnerUserId)
+        .in("id", sourceJobIds);
+      if (sourceJobsError) throw new Error(sourceJobsError.message);
+      if ((sourceJobs ?? []).length !== sourceJobIds.length) throw new Error("Invoice source-job context is incomplete");
+      for (const sourceJob of sourceJobs ?? []) {
+        const sourceContext = resolveJobContext(null, sourceJob);
+        if (sourceContext) jobContextByJobId.set(String(sourceJob.id), sourceContext);
+      }
+    }
+
     const invoiceInput = buildInvoiceInput(
       invoiceRow,
       lineItems,
       qboCustomer.id,
       resolveJobContext(customerRow, jobRow),
+      jobContextByJobId,
     );
 
     let synced;
