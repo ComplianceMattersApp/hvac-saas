@@ -30,9 +30,9 @@ export default async function StripeReconciliationPage({ searchParams }: { searc
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="text-xs font-semibold uppercase tracking-wider text-blue-700">Read-only financial diagnostic</div>
       <h1 className="mt-2 text-2xl font-semibold text-slate-950">Stripe pending-payment inspector</h1>
-      <p className="mt-2 max-w-3xl text-sm text-slate-600">Checks pending Stripe Checkout rows older than 15 minutes against the connected Stripe account. This page cannot record payments, repair invoices, sync QuickBooks, or send email.</p>
+      <p className="mt-2 max-w-3xl text-sm text-slate-600">Advanced fallback for payments awaiting reconciliation for more than 15 minutes. Exact confirmed matches are normally recovered automatically; this view is for exceptional review.</p>
       <div className="mt-4 flex flex-wrap gap-3">
-        <Link href="/reports/failed-payments" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800">Back to Failed Payments</Link>
+        <Link href="/reports/payments" className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800">Back to Payments</Link>
         <Link href="/reports/stripe-reconciliation?inspect=1" className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Run read-only inspection</Link>
       </div>
     </div>
@@ -46,8 +46,9 @@ export default async function StripeReconciliationPage({ searchParams }: { searc
         <div className="mt-3 flex flex-wrap items-end gap-4"><Link href={`/jobs/${item.jobId}/invoice?invoice_id=${encodeURIComponent(item.invoiceId)}#invoice-workspace`} className="text-sm font-semibold underline">Open invoice workspace</Link>
         {item.diagnosis === "succeeded_match" ? <form action={repairStripePendingPaymentFromForm} className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-white/80 p-3">
           <input type="hidden" name="payment_id" value={item.paymentId} />
-          <label className="flex items-center gap-2 text-xs font-semibold"><input required type="checkbox" name="confirm_repair" value="yes" />I verified this is the one successful session.</label>
-          <SubmitButton loadingText="Repairing…" className="rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white">Repair this payment</SubmitButton>
+          <input type="hidden" name="confirm_repair" value="yes" />
+          <span className="text-xs font-semibold">Stripe payment confirmed; EveryStep will re-check every safety condition.</span>
+          <SubmitButton loadingText="Reconciling…" className="rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white">Reconcile confirmed payment</SubmitButton>
         </form> : null}</div>
         {item.diagnosis === "still_open" ? <form action={closeAbandonedStripeSessionFromForm} className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-300 bg-white/80 p-3">
           <input type="hidden" name="payment_id" value={item.paymentId} />

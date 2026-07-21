@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const recordMock = vi.fn();
@@ -18,19 +19,24 @@ function chain(result: any, single = false) {
 
 function admin(candidates: any[]) {
   const selected = { id: "11111111-1111-4111-8111-111111111111", account_owner_user_id: "owner-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 41000, payment_status: "pending", processor_name: "stripe", payment_method: "card_stripe_online", stripe_checkout_session_id: "cs_paid" };
-  const queries = [chain({ data: selected, error: null }, true), chain({ data: candidates, error: null })];
+  const invoice = { id: "inv-1", job_id: "job-1", status: "issued", billing_email: "payer@example.com" };
+  const queries = [chain({ data: selected, error: null }, true), chain({ data: candidates, error: null }), chain({ data: invoice, error: null }, true)];
   return { from: vi.fn(() => queries.shift()) };
 }
 
 function session(id: string, status: "paid" | "unpaid" = "paid") {
-  return { id, mode: "payment", created: 1000, payment_status: status, status: status === "paid" ? "complete" : "open", amount_total: 41000, payment_intent: "pi_1", metadata: { account_owner_user_id: "owner-1", invoice_id: "inv-1", job_id: "job-1" } };
+  return { id, mode: "payment", created: 1000, payment_status: status, status: status === "paid" ? "complete" : "open", amount_total: 41000, currency: "usd", customer_details: { email: "payer@example.com" }, payment_intent: "pi_1", metadata: { account_owner_user_id: "owner-1", invoice_id: "inv-1", job_id: "job-1" } };
+}
+
+function stripeFor(sessions: (id: string) => any) {
+  return { checkout: { sessions: { retrieve: vi.fn(async (id: string) => sessions(id)) } }, paymentIntents: { retrieve: vi.fn(async () => ({ status: "succeeded", amount_received: 41000, currency: "usd", latest_charge: "ch_1" })) }, charges: { retrieve: vi.fn(async () => ({ paid: true, refunded: false, amount_refunded: 0, disputed: false })) }, events: { list: vi.fn(async () => ({ data: [{ id: "evt_real_1", data: { object: session("cs_paid") } }] })) } };
 }
 
 describe("repairVerifiedStripePendingPayment", () => {
   beforeEach(() => { vi.clearAllMocks(); recordMock.mockResolvedValue({ recorded: true, paymentId: "11111111-1111-4111-8111-111111111111" }); });
 
   it("settles one exactly matched paid session through the webhook truth path", async () => {
-    const stripe: any = { checkout: { sessions: { retrieve: vi.fn(async () => session("cs_paid")) } }, events: { list: vi.fn(async () => ({ data: [{ id: "evt_real_1", data: { object: session("cs_paid") } }] })) } };
+    const stripe: any = stripeFor(() => session("cs_paid"));
     const syncQbo = vi.fn(async () => ({ paymentId: "11111111-1111-4111-8111-111111111111", status: "synced" as const })); const sendReceipt = vi.fn();
     const result = await repairVerifiedStripePendingPayment({ admin: admin([{ id: "11111111-1111-4111-8111-111111111111", amount_cents: 41000, stripe_checkout_session_id: "cs_paid" }]), stripe, accountOwnerUserId: "owner-1", paymentId: "11111111-1111-4111-8111-111111111111", syncQbo, sendReceipt });
     expect(result).toMatchObject({ repaired: true, qboSynced: true, receiptSent: true });
@@ -39,9 +45,9 @@ describe("repairVerifiedStripePendingPayment", () => {
   });
 
   it("refuses two successful sessions before recording any payment", async () => {
-    const stripe: any = { checkout: { sessions: { retrieve: vi.fn(async (id: string) => session(id)) } }, events: { list: vi.fn() } };
+    const stripe: any = stripeFor((id) => session(id));
     const result = await repairVerifiedStripePendingPayment({ admin: admin([{ id: "11111111-1111-4111-8111-111111111111", stripe_checkout_session_id: "cs_paid" }, { id: "22222222-2222-4222-8222-222222222222", stripe_checkout_session_id: "cs_other" }]), stripe, accountOwnerUserId: "owner-1", paymentId: "11111111-1111-4111-8111-111111111111" });
-    expect(result).toEqual({ repaired: false, reason: "multiple_paid_sessions" });
+    expect(result).toMatchObject({ repaired: false, reason: "ambiguous_multiple_successes" });
     expect(recordMock).not.toHaveBeenCalled(); expect(stripe.events.list).not.toHaveBeenCalled();
   });
 });

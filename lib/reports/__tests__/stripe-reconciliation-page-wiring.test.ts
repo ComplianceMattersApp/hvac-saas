@@ -12,11 +12,12 @@ describe("Stripe reconciliation diagnostic wiring", () => {
     expect(source).toContain('inspect === "1"');
   });
 
-  it("contains no repair, QBO, email, or database mutation path", () => {
+  it("keeps inspection read-only while exposing the privileged reconciliation fallback", () => {
     for (const text of [".insert(", ".update(", ".upsert(", ".delete(", "qbo", "sendEmail", "revalidatePath"]) {
       expect(inspector.toLowerCase()).not.toContain(text.toLowerCase());
     }
-    expect(source).toContain("cannot record payments, repair invoices, sync QuickBooks, or send email");
+    expect(source).toContain("Exact confirmed matches are normally recovered automatically");
+    expect(source).toContain("Reconcile confirmed payment");
   });
 
   it("redacts Stripe identities for display", () => {

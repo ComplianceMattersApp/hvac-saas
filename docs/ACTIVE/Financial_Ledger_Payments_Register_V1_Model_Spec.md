@@ -12,6 +12,10 @@ Duplicated closeout sections may be shortened against the evidence ledger when t
 
 ## July 2026 Runtime Consumer Note
 
+### Stripe successful-payment auto-reconciliation V1 (2026-07-21)
+
+Stale tenant-invoice Checkout snapshots now have a protected, bounded automatic safety net. Only a unique, fully verified Stripe success is replayed through the existing webhook payment/allocation writer; ambiguous, mismatched, refunded, disputed, incomplete, or provider-error states remain non-mutating. Invoice projection and QBO downstream boundaries are unchanged. See `Stripe_Successful_Payment_Auto_Reconciliation_V1_Closeout.md`.
+
 This model remains authoritative for payment truth. Current runtime consumers now include signed invoice-specific guest Stripe payment, manual/off-platform payment recording, Stripe webhook dual-write, QBO downstream sync, internal payment-received email, internal contractor financial history, and the strictly contractor-billed portal invoice center. These consumers do not change the invariants below: only recorded payment/allocation truth counts; communication and portal views are projections; QBO is downstream; failed/pending/reversed rows are not collected money. Older deferred lists in phase-closeout prose are historical to those phases and do not override this current posture.
 
 ## Financial Trust Lane Settlement Boundary Note

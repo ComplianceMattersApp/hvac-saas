@@ -1,5 +1,7 @@
 # Payments V2 / Service Plan Billing Foundation Model Spec
 
+> 2026-07-21 current-state note: tenant-invoice Stripe Checkout now includes a bounded exact-match auto-reconciliation safety net. It reuses existing payment/allocation truth and adds no recurring-billing behavior, partial-payment semantics, or QBO authority.
+
 Status: ACTIVE MODEL LOCK (Phase 2 + Phase 3A closeout)
 Owner lane: Payments V2 / Service Plan Billing Foundation
 Scope: docs/model only. No product code, schema, migrations, Supabase commands, Stripe behavior changes, checkout/session changes, env/flag changes, UI build, or provider integrations are authorized by this spec.

@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/cron/attention-email", "schedule": "0 * * * *" }
+    { "path": "/api/cron/attention-email", "schedule": "0 * * * *" },
+    { "path": "/api/cron/stripe-payment-reconciliation", "schedule": "*/10 * * * *" }
   ]
 }
