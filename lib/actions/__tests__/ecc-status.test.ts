@@ -570,7 +570,7 @@ describe("evaluateEccOpsStatus", () => {
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
   });
 
-  it("does not reopen a closed ECC job via field_complete_fallback", async () => {
+  it("keeps a closed ECC job terminal when its permit number remains valid", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
@@ -584,6 +584,7 @@ describe("evaluateEccOpsStatus", () => {
         certs_complete: false,
         invoice_complete: false,
         ops_status: "closed",
+        permit_number: "PERMIT-123",
         scheduled_date: "2026-04-10",
         window_start: "08:00",
         window_end: "10:00",
@@ -622,6 +623,34 @@ describe("evaluateEccOpsStatus", () => {
 
     errorSpy.mockRestore();
     infoSpy.mockRestore();
+  });
+
+  it("reopens a closed ECC job as Permit Needed when its permit number is missing", async () => {
+    const supabase = await runEvaluation({
+      job: {
+        id: "job-closed-missing-permit",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: true,
+        ops_status: "closed",
+        permit_number: null,
+        pending_info_reason: null,
+      },
+    });
+
+    expect((supabase as any).__jobUpdates).toContainEqual({
+      ops_status: "pending_info",
+      pending_info_reason: "Permit Needed",
+    });
+    expect((supabase as any).__jobEvents).toContainEqual(expect.objectContaining({
+      job_id: "job-closed-missing-permit",
+      event_type: "ops_update",
+      message: "Permit number needed",
+      meta: expect.objectContaining({ reason: "closed_missing_permit_revalidation" }),
+    }));
   });
 
   it("preserves manual-lock handling for non-closed field-complete fallback", async () => {

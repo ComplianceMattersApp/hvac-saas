@@ -272,6 +272,17 @@ export async function evaluateEccOpsStatus(
 
   const currentOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
   if (currentOpsStatus === "closed") {
+    if (
+      await applyEccPermitNeededBlocker({
+        supabase,
+        jobId,
+        job,
+        reason: "closed_missing_permit_revalidation",
+        timing: options.timing,
+      })
+    ) {
+      return;
+    }
     console.info("[ECC_EVAL]", {
       jobId,
       current_ops_status: job.ops_status ?? null,

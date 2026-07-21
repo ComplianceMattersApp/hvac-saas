@@ -26,6 +26,7 @@ export function getCloseoutNeeds(job: CloseoutProjectionInput) {
   const isFailureFlow = isEcc && ECC_FAILURE_STATUSES.has(opsStatus);
   const isBlockedForCloseout = isCloseoutBlockingQueueStatus(opsStatus);
   const isPermitBlockingCerts = isEcc && !isValidEccPermitNumber(job.permit_number);
+  const needsPermit = isPermitBlockingCerts && !isFailureFlow;
   // Use lifecycle completion booleans as source-of-truth for closeout queue projection.
   const needsInvoice = !Boolean(job.invoice_complete);
   const needsCerts = isEcc && !isFailureFlow && !isPermitBlockingCerts && !Boolean(job.certs_complete);
@@ -33,6 +34,7 @@ export function getCloseoutNeeds(job: CloseoutProjectionInput) {
   return {
     needsInvoice,
     needsCerts,
+    needsPermit,
     isPermitBlockingCerts,
     isService,
     isEcc,
@@ -51,10 +53,10 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
   if (!job.field_complete) return false;
 
   const opsStatus = String(job.ops_status ?? "").toLowerCase();
-  if (opsStatus === "closed") return false;
-
   const needs = getCloseoutNeeds(job);
-  const hasCloseoutWork = needs.needsInvoice || needs.needsCerts;
+  if (opsStatus === "closed" && !needs.needsPermit) return false;
+
+  const hasCloseoutWork = needs.needsInvoice || needs.needsCerts || needs.needsPermit;
   if (!hasCloseoutWork) return false;
 
   // Invoice-needed closeout is status-invariant for active statuses.
@@ -70,6 +72,7 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
 export function getCloseoutQueueNextStepLabel(job: CloseoutProjectionInput) {
   const needs = getCloseoutNeeds(job);
 
+  if (needs.needsPermit) return "Add permit number";
   if (needs.needsInvoice && needs.needsCerts) return "Invoice and send certs";
   if (needs.needsCerts) return "Send certs";
   if (needs.needsInvoice) return "Invoice";
@@ -83,6 +86,10 @@ export function getJobDetailCloseoutReadinessMessage(job: CloseoutProjectionInpu
     return needs.needsInvoice
       ? "Complete billing; job needs retest or review."
       : "Job needs retest or review before closeout.";
+  }
+
+  if (needs.needsPermit) {
+    return "Add the permit number before sending certs and closing this job.";
   }
 
   if (needs.isEcc && needs.needsInvoice && needs.needsCerts) {

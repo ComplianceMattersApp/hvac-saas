@@ -1,7 +1,6 @@
 export const ECC_PERMIT_NEEDED_REASON = "Permit Needed";
 
 const ECC_PERMIT_BLOCKER_PROTECTED_STATUSES = new Set([
-  "closed",
   "failed",
   "retest_needed",
   "pending_office_review",
@@ -66,8 +65,6 @@ export function shouldApplyEccPermitNeededBlocker(input: {
 }): boolean {
   if (normalize(input.job_type).toLowerCase() !== "ecc") return false;
   if (isValidEccPermitNumber(input.permit_number)) return false;
-  if (Boolean(input.certs_complete)) return false;
-
   const fieldComplete =
     Boolean(input.field_complete) ||
     normalize(input.status).toLowerCase() === "completed";
