@@ -68,6 +68,7 @@ import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 import {
   listJobEquipmentLabelPhotoImages,
   listJobRefrigerantChargeEvidenceImages,
+  listJobDuctAsbestosPhotoImages,
 } from "@/lib/jobs/refrigerant-charge-evidence";
 import { hasMeaningfulRefrigerantChargeDetail } from "@/lib/jobs/refrigerant-charge-report-detail";
 
@@ -1212,15 +1213,25 @@ export default async function JobTestsPage({
     caption: string | null;
     signedUrl: string | null;
   }> = [];
+  let ductAsbestosPhotoAttachments: Awaited<ReturnType<typeof listJobDuctAsbestosPhotoImages>> = [];
   let equipmentLabelPhotoAttachments: Awaited<ReturnType<typeof listJobEquipmentLabelPhotoImages>> = [];
 
   const reportAdminClient =
-    focusedType === "refrigerant_charge" || isCompletionReportFocused
+    focusedType === "refrigerant_charge" || focusedType === "duct_leakage" || isCompletionReportFocused
       ? createAdminClient()
       : null;
 
   if (focusedType === "refrigerant_charge" || isCompletionReportFocused) {
     refrigerantEvidenceAttachments = await listJobRefrigerantChargeEvidenceImages({
+      supabase,
+      admin: reportAdminClient,
+      jobId: id,
+      limit: 20,
+    });
+  }
+
+  if (focusedType === "duct_leakage") {
+    ductAsbestosPhotoAttachments = await listJobDuctAsbestosPhotoImages({
       supabase,
       admin: reportAdminClient,
       jobId: id,
@@ -3235,6 +3246,17 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     initialStatusLabel={ductHasInlineResultStatus ? ductResultLabel : ""}
                     projectType={job.project_type}
                     runId={runDL.id}
+                    asbestosPhotoEvidence={
+                      <RefrigerantChargePhotoEvidencePanel
+                        jobId={job.id}
+                        systemName={selectedSystemName}
+                        evidenceAttachments={ductAsbestosPhotoAttachments}
+                        evidenceContext="duct_asbestos_photo"
+                        evidenceTitle="Optional Asbestos Documentation Photo"
+                        evidenceNote="Duct asbestos exemption photo documentation"
+                        saveWithParentForm
+                      />
+                    }
                   >
 
                     <Disclosure title="Test Setup" subtitle={ductSetupSummary} className="sm:col-span-2">

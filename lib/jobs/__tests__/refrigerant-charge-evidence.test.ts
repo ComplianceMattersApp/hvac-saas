@@ -16,6 +16,7 @@ describe("refrigerant charge evidence helpers", () => {
       "refrigerant_charge_photo",
     );
     expect(normalizeJobAttachmentEvidenceContext("unknown")).toBeNull();
+    expect(normalizeJobAttachmentEvidenceContext("duct_asbestos_photo")).toBe("duct_asbestos_photo");
   });
 
   it("tags caption for refrigerant charge evidence context", () => {
@@ -49,6 +50,13 @@ describe("refrigerant charge evidence helpers", () => {
     const caption = `${REFRIGERANT_CHARGE_ATTACHMENT_TAG} Gauge photo`;
     expect(isRefrigerantChargeEvidenceCaption(caption)).toBe(true);
     expect(stripRefrigerantChargeEvidenceTag(caption)).toBe("Gauge photo");
+  });
+
+  it("tags optional duct asbestos documentation separately", () => {
+    expect(buildAttachmentCaptionWithEvidenceContext({
+      context: "duct_asbestos_photo",
+      caption: "Suspect material at duct boot",
+    })).toBe("[duct-asbestos-photo] Suspect material at duct boot");
   });
 
   it("identifies inline report images by content type", () => {

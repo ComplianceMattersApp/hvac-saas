@@ -19,6 +19,7 @@ type Props = {
   initialStatusLabel: string;
   projectType?: string | null;
   runId: string;
+  asbestosPhotoEvidence?: ReactNode;
 };
 
 type Preview = {
@@ -141,6 +142,7 @@ export default function DuctLeakageEntryFields({
   initialStatusLabel,
   projectType,
   runId,
+  asbestosPhotoEvidence,
 }: Props) {
   const [exceptionValue, setExceptionValue] = useState(initialExceptionValue);
   const [exceptionReason, setExceptionReason] = useState(initialExceptionReason);
@@ -252,6 +254,7 @@ export default function DuctLeakageEntryFields({
             <p className="mt-1">
               Asbestos prevents duct leakage testing under Title 24. Record the exception reason and complete the test without entering results.
             </p>
+            {asbestosPhotoEvidence ? <div className="mt-3">{asbestosPhotoEvidence}</div> : null}
           </section>
         ) : (
         <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] sm:col-span-2 sm:p-4">

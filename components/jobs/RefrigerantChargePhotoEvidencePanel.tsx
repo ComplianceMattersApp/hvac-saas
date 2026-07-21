@@ -22,6 +22,9 @@ type Props = {
   systemName?: string | null;
   evidenceAttachments: EvidenceAttachment[];
   saveWithParentForm?: boolean;
+  evidenceContext?: "refrigerant_charge_photo" | "duct_asbestos_photo";
+  evidenceTitle?: string;
+  evidenceNote?: string;
 };
 
 function formatUploadDate(value: string) {
@@ -35,6 +38,9 @@ export default function RefrigerantChargePhotoEvidencePanel({
   systemName,
   evidenceAttachments,
   saveWithParentForm = false,
+  evidenceContext = "refrigerant_charge_photo",
+  evidenceTitle = "Refrigerant Charge Photo Evidence",
+  evidenceNote = "Refrigerant charge photo evidence",
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -48,9 +54,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
   const [ok, setOk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const defaultLabel = systemName
-    ? `Refrigerant Charge Photo - ${systemName}`
-    : "Refrigerant Charge Photo";
+  const defaultLabel = systemName ? `${evidenceTitle} - ${systemName}` : evidenceTitle;
 
   function pickWith(ref: RefObject<HTMLInputElement | null>) {
     setError(null);
@@ -73,7 +77,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
       contentType: file.type || "application/octet-stream",
       fileSize: file.size,
       caption: defaultLabel,
-      attachmentEvidenceContext: "refrigerant_charge_photo",
+      attachmentEvidenceContext: evidenceContext,
     });
 
     try {
@@ -113,10 +117,10 @@ export default function RefrigerantChargePhotoEvidencePanel({
       await finalizeInternalJobAttachmentUpload({
         jobId,
         caption: defaultLabel,
-        note: "Refrigerant charge photo evidence",
+        note: evidenceNote,
         attachmentIds: uploadedIds,
         fileNames: pendingFiles.map((file) => file.name),
-        attachmentEvidenceContext: "refrigerant_charge_photo",
+        attachmentEvidenceContext: evidenceContext,
       });
 
       setPendingFiles([]);
@@ -194,7 +198,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
         disabled={isPending}
       />
 
-      <div className="font-medium text-slate-900">Refrigerant Charge Photo Evidence</div>
+      <div className="font-medium text-slate-900">{evidenceTitle}</div>
       <div className="mt-1 text-slate-600">
         Photos save to the job attachment library and stay tied to this evidence record.
       </div>
@@ -267,7 +271,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
               className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
             >
               <div className="font-medium text-emerald-900">
-                {attachment.caption || "Refrigerant Charge Photo"}
+                {attachment.caption || evidenceTitle}
               </div>
               <div className="mt-1 break-all text-emerald-800">{attachment.fileName}</div>
               <div className="mt-1 text-emerald-700">
@@ -288,13 +292,13 @@ export default function RefrigerantChargePhotoEvidencePanel({
 
           {evidenceAttachments.length > 3 ? (
             <div className="text-slate-600">
-              +{evidenceAttachments.length - 3} more refrigerant charge evidence file(s) in Attachments.
+              +{evidenceAttachments.length - 3} more evidence file(s) in Attachments.
             </div>
           ) : null}
         </div>
       ) : (
         <div className="mt-3 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-slate-600">
-          No refrigerant charge photo attached yet.
+          No optional photo attached yet.
         </div>
       )}
     </div>

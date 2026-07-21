@@ -104,6 +104,10 @@ describe("job tests page wiring", () => {
     expect(ductLeakageEntryFieldsSource).toContain('{asbestosExempt ? (');
     expect(ductLeakageEntryFieldsSource).toContain('name="measured_duct_leakage_cfm"');
     expect(ductLeakageEntryFieldsSource).toContain(') : (');
+    expect(ductLeakageEntryFieldsSource).toContain('{asbestosPhotoEvidence}');
+    expect(jobTestsPageSource).toContain('evidenceContext="duct_asbestos_photo"');
+    expect(jobTestsPageSource).toContain('evidenceTitle="Optional Asbestos Documentation Photo"');
+    expect(jobTestsPageSource).toContain('listJobDuctAsbestosPhotoImages');
   });
 
   it("keeps Duct Leakage field-first layout without the extra calculated card", () => {
@@ -227,7 +231,7 @@ describe("job tests page wiring", () => {
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('Upload Photo');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('capture="environment"');
     expect(refrigerantChargePhotoEvidencePanelSource.match(/capture=/g) ?? []).toHaveLength(1);
-    expect(refrigerantChargePhotoEvidencePanelSource).toContain('attachmentEvidenceContext: "refrigerant_charge_photo"');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('evidenceContext = "refrigerant_charge_photo"');
     expect(refrigerantBlock).toContain('saveWithParentForm');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('form.addEventListener("submit", handleSubmit)');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('form.requestSubmit(');
