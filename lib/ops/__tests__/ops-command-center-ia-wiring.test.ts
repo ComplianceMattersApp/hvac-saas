@@ -235,6 +235,13 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).not.toContain(").slice(0, 10);");
   });
 
+  it("shows failed-report delivery awareness without changing exception routing", () => {
+    expect(opsPageSource).toContain('event?.event_type ?? "").trim() !== "contractor_report_sent"');
+    expect(opsPageSource).toContain('label: "Failure report sent", tone: "green"');
+    expect(opsPageSource).toContain('label: "Failure report not sent", tone: "amber"');
+    expect(opsPageSource).toContain('queueKey === "exceptions"');
+  });
+
   it("applies contractor filtering to visible board rows without changing row actions", () => {
     expect(opsPageSource).toContain("function filterRowsByContractorFocus(rows: any[])");
     expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows)");

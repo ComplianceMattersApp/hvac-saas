@@ -410,6 +410,7 @@ export default async function OpsPage({
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
   let followUpEnteredAtByJob = new Map<string, string>();
   let latestJobEventByJob = new Map<string, any>();
+  let latestContractorReportSentAtByJob = new Map<string, string>();
   let latestFailedRunByJob = new Map<string, any>();
   let primaryFailureReasonByJob = new Map<string, string>();
   let serviceFollowUpProgressLabelByJob = new Map<string, string>();
@@ -470,6 +471,18 @@ export default async function OpsPage({
       }
     }
     return latestByJob;
+  }
+
+  function buildLatestContractorReportSentAtByJob(events: any[]) {
+    const sentAtByJob = new Map<string, string>();
+    for (const event of Array.isArray(events) ? events : []) {
+      if (String(event?.event_type ?? "").trim() !== "contractor_report_sent") continue;
+      const jobId = String(event?.job_id ?? "").trim();
+      const sentAt = String(event?.meta?.sent_at_iso ?? event?.created_at ?? "").trim();
+      if (!jobId || !sentAt || sentAtByJob.has(jobId)) continue;
+      sentAtByJob.set(jobId, sentAt);
+    }
+    return sentAtByJob;
   }
 
   function buildFollowUpEnteredAtByJob(events: any[]) {
@@ -1306,6 +1319,17 @@ export default async function OpsPage({
 
     if (selectedPreviewCustomerAttemptEventsRes.error) throw selectedPreviewCustomerAttemptEventsRes.error;
 
+    const selectedPreviewContractorReportEventsRes = selectedPreviewJobIds.length
+      ? await supabase
+          .from("job_events")
+          .select("job_id, event_type, created_at, meta")
+          .in("job_id", selectedPreviewJobIds)
+          .eq("event_type", "contractor_report_sent")
+          .order("created_at", { ascending: false })
+      : { data: [], error: null };
+
+    if (selectedPreviewContractorReportEventsRes.error) throw selectedPreviewContractorReportEventsRes.error;
+
     const selectedPreviewJobEventsRes = selectedPreviewJobIds.length
       ? await supabase
           .from("job_events")
@@ -1323,6 +1347,9 @@ export default async function OpsPage({
     );
     followUpEnteredAtByJob = buildFollowUpEnteredAtByJob(selectedPreviewJobEvents);
     latestJobEventByJob = buildLatestJobEventByJob(selectedPreviewJobEvents);
+    latestContractorReportSentAtByJob = buildLatestContractorReportSentAtByJob(
+      selectedPreviewContractorReportEventsRes.data ?? [],
+    );
     latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
     primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
 
@@ -1620,6 +1647,13 @@ export default async function OpsPage({
       const jobId = String(job?.id ?? "").trim();
       const fallbackAssignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
       const fallbackStateChips = deriveOpsQueueStateChips(visibleReason.label, fallbackAssignmentSummary);
+      if (queueKey === "exceptions" && visibleReason.label.trim().toLowerCase().startsWith("failed ecc")) {
+        fallbackStateChips.push(
+          latestContractorReportSentAtByJob.has(jobId)
+            ? { label: "Failure report sent", tone: "green" }
+            : { label: "Failure report not sent", tone: "amber" },
+        );
+      }
 
       return {
         kind: "generic",
