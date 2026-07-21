@@ -1,6 +1,15 @@
 // lib/utils/schedule-la.ts
 const TZ = "America/Los_Angeles";
 
+export function calendarDateKeyLA(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
 // --- Formatting (DB -> UI) ---
 
 // Business-date display: parses YYYY-MM-DD by splitting, never via new Date().
@@ -137,12 +146,7 @@ export function laDateToUtcMidnightIso(dateYYYYMMDD: string): string {
 
 // Query helpers (LA “today” boundaries as UTC ISO instants)
 export function startOfTodayUtcIsoLA(now = new Date()): string {
-  const ymd = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(now); // YYYY-MM-DD
+  const ymd = calendarDateKeyLA(now);
   return laDateToUtcMidnightIso(ymd);
 }
 

@@ -84,6 +84,7 @@ import {
 } from "@/components/maintenance-agreements/CustomerServicePlanWorkspace";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
+import { resolveCustomerVisitSummary } from "@/lib/customers/customer-visit-summary";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 import {
   listContactRecipientsForAccount,
@@ -212,17 +213,6 @@ function formatDate(value?: string | null) {
   if (!raw) return "—";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatDateOnlyDisplay(raw);
   return formatTimestampDateDisplayLA(raw) || "—";
-}
-
-function daysAgoLabel(value?: string | null) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  const then = new Date(raw).getTime();
-  if (!Number.isFinite(then)) return null;
-  const days = Math.max(0, Math.round((Date.now() - then) / 86_400_000));
-  if (days === 0) return "today";
-  if (days === 1) return "1 day ago";
-  return `${days} days ago`;
 }
 
 function formatSavedCardLabel(row: CustomerSavedPaymentMethodRow) {
@@ -965,11 +955,7 @@ export default async function CustomerDetailPage(props: {
     return opsStatus === "closed";
   }).length;
 
-  const lastScheduledActiveDate = activeJobs
-    .map((j) => j.scheduled_date)
-    .filter(Boolean)
-    .sort()
-    .slice(-1)[0] ?? null;
+  const visitSummary = resolveCustomerVisitSummary(jobs);
 
   const callHref = makeTelHref(customer.phone);
   const smsHref = makeSmsHref(customer.phone);
@@ -1735,10 +1721,12 @@ export default async function CustomerDetailPage(props: {
             ) : null}
 
             <div className="rounded-xl border border-slate-200 bg-white/85 p-3 md:w-64">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">Last Visit</div>
-              <div className="mt-1 text-base font-semibold text-navy">{formatDate(lastScheduledActiveDate)}</div>
-              {daysAgoLabel(lastScheduledActiveDate) ? (
-                <div className="text-xs text-slate-500">{daysAgoLabel(lastScheduledActiveDate)}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.09em] text-slate-400">
+                {visitSummary?.heading ?? "LAST VISIT"}
+              </div>
+              <div className="mt-1 text-base font-semibold text-navy">{formatDate(visitSummary?.scheduledDate)}</div>
+              {visitSummary ? (
+                <div className="text-xs text-slate-500">{visitSummary.relativeLabel}</div>
               ) : null}
             </div>
           </div>
