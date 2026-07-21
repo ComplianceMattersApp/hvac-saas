@@ -29,6 +29,10 @@ import { buildInternalInvoiceDocumentModel } from '@/lib/business/internal-invoi
 import { buildInternalInvoicePdfAttachment } from '@/lib/pdf/internal-invoice-pdf';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
 import { buildDraftBillingSnapshot } from '@/lib/business/invoice-billing-snapshot';
+import {
+  buildInternalInvoiceDraftSource,
+  buildVisitScopeInvoiceLineSource,
+} from '@/lib/business/internal-invoice-source';
 import { autoSyncIssuedInvoiceToQbo } from '@/lib/qbo/qbo-auto-sync';
 import { resolveOperationalTenantIdentity } from '@/lib/email/operational-tenant-branding';
 import {
@@ -1306,26 +1310,20 @@ async function importEligibleVisitScopeItemsToDraftInvoice(params: {
       scopeItem.source_pricebook_item_id,
       context.internalUser.account_owner_user_id,
     );
-    const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
-
-    return {
-      invoice_id: invoice.id,
-      sort_order: nextSortOrder + index,
-      source_kind: 'visit_scope',
-      source_visit_scope_item_id: scopeItemId,
-      item_name_snapshot: getTrimmedString(scopeItem.title),
-      description_snapshot: getOptionalText(scopeItem.details),
-      item_type_snapshot: scopeItem.item_type
-        ? normalizeInternalInvoiceItemType(scopeItem.item_type)
-        : 'service',
-      category_snapshot: getOptionalText(scopeItem.category),
-      unit_label_snapshot: getOptionalText(scopeItem.unit_label),
-      quantity: formatScaledInt(quantityHundredths, 2),
-      unit_price: formatScaledInt(unitPriceCents, 2),
-      line_subtotal: formatScaledInt(lineSubtotalCents, 2),
-      created_by_user_id: context.userId,
-      updated_by_user_id: context.userId,
-    };
+    return buildVisitScopeInvoiceLineSource({
+      invoiceId: invoice.id,
+      sourceJobId: context.jobId,
+      sortOrder: nextSortOrder + index,
+      sourceVisitScopeItemId: scopeItemId,
+      title: scopeItem.title,
+      details: scopeItem.details,
+      itemType: scopeItem.item_type,
+      category: scopeItem.category,
+      unitLabel: scopeItem.unit_label,
+      quantityHundredths,
+      unitPriceCents,
+      actorUserId: context.userId,
+    });
   }));
 
   const { error: insertErr } = await context.supabase
@@ -1468,37 +1466,19 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
     job: context.job,
   });
 
-  const jobBilling = buildJobOverrideBillingSnapshot(context.job);
-
-  const draftBilling = buildDraftBillingSnapshot({
-    billingRecipient: context.job.billing_recipient,
+  const draftPayload = buildInternalInvoiceDraftSource({
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    actorUserId: context.userId,
+    jobId: context.jobId,
+    job: {
+      ...context.job,
+      ...buildJobOverrideBillingSnapshot(context.job),
+    },
     customerBilling,
     contractorBilling,
-    jobBilling,
-  });
-
-  const draftPayload = {
-    account_owner_user_id: context.internalUser.account_owner_user_id,
-    job_id: context.jobId,
-    customer_id: context.job.customer_id ?? null,
-    bill_to_kind: String(context.job.billing_recipient ?? '').trim().toLowerCase() || 'customer',
-    bill_to_contractor_id:
-      String(context.job.billing_recipient ?? '').trim().toLowerCase() === 'contractor'
-        ? context.job.contractor_id ?? null
-        : null,
-    location_id: context.job.location_id ?? null,
-    service_case_id: context.job.service_case_id ?? null,
-    invoice_number: buildInternalInvoiceNumber(),
-    status: 'draft',
-    invoice_date: new Date().toISOString().slice(0, 10),
-    source_type: 'job',
-    subtotal_cents: 0,
-    total_cents: 0,
-    notes: null,
-    ...draftBilling,
-    created_by_user_id: context.userId,
-    updated_by_user_id: context.userId,
-  };
+    invoiceNumber: buildInternalInvoiceNumber(),
+    invoiceDate: new Date().toISOString().slice(0, 10),
+  }).header;
 
   const { data, error } = await context.supabase
     .from('internal_invoices')

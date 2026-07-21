@@ -14,6 +14,7 @@ describe('internal invoice line item provenance normalization', () => {
                   {
                     id: 'line-1',
                     invoice_id: 'inv-1',
+                    source_job_id: 'job-1',
                     sort_order: 1,
                     source_kind: null,
                     source_pricebook_item_id: null,
@@ -47,6 +48,7 @@ describe('internal invoice line item provenance normalization', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].source_kind).toBeNull();
+    expect(rows[0].source_job_id).toBe('job-1');
     expect(rows[0].source_pricebook_item_id).toBeNull();
     expect(rows[0].source_visit_scope_item_id).toBeNull();
     expect(rows[0].category_snapshot).toBeNull();
@@ -64,6 +66,7 @@ describe('internal invoice line item provenance normalization', () => {
                   {
                     id: 'line-visit-scope',
                     invoice_id: 'inv-1',
+                    source_job_id: 'job-1',
                     sort_order: 1,
                     source_kind: 'visit_scope',
                     source_pricebook_item_id: null,
@@ -97,6 +100,7 @@ describe('internal invoice line item provenance normalization', () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].source_kind).toBe('visit_scope');
+    expect(rows[0].source_job_id).toBe('job-1');
     expect(rows[0].source_visit_scope_item_id).toBe('8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f');
     expect(rows[0].source_pricebook_item_id).toBeNull();
   });
@@ -112,6 +116,7 @@ describe('internal invoice line item provenance normalization', () => {
                   {
                     id: 'line-manual',
                     invoice_id: 'inv-1',
+                    source_job_id: 'job-1',
                     sort_order: 1,
                     source_kind: 'manual',
                     source_pricebook_item_id: null,
@@ -132,6 +137,7 @@ describe('internal invoice line item provenance normalization', () => {
                   {
                     id: 'line-pricebook',
                     invoice_id: 'inv-1',
+                    source_job_id: 'job-1',
                     sort_order: 2,
                     source_kind: 'pricebook',
                     source_pricebook_item_id: 'pb-1',

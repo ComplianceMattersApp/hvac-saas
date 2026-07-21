@@ -12,6 +12,7 @@ export type InternalInvoiceBillToKind = "customer" | "contractor" | "other";
 export type InternalInvoiceLineItemRecord = {
   id: string;
   invoice_id: string;
+  source_job_id?: string | null;
   sort_order: number;
   source_kind: 'manual' | 'pricebook' | 'visit_scope' | null;
   source_pricebook_item_id: string | null;
@@ -138,6 +139,7 @@ const INTERNAL_INVOICE_SELECT = [
 const INTERNAL_INVOICE_LINE_ITEM_SELECT = [
   "id",
   "invoice_id",
+  "source_job_id",
   "sort_order",
   "source_kind",
   "source_pricebook_item_id",
@@ -187,6 +189,7 @@ function normalizeInternalInvoiceLineItemRow(row: any): InternalInvoiceLineItemR
   return {
     id: String(row?.id ?? "").trim(),
     invoice_id: String(row?.invoice_id ?? "").trim(),
+    source_job_id: String(row?.source_job_id ?? "").trim() || null,
     sort_order: Number(row?.sort_order ?? 0) || 0,
     source_kind: sourceKind,
     source_pricebook_item_id: String(row?.source_pricebook_item_id ?? '').trim() || null,
