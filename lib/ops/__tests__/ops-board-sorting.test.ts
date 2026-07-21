@@ -41,6 +41,26 @@ describe("Operations Board sorting", () => {
     expect(sortOpsBoardRows(rows, "newest").map((row) => row.id)).toEqual(["newest", "middle", "oldest"]);
   });
 
+  it("sorts oldest and newest by queue entry when the active queue supplies it", () => {
+    const rows = [
+      { id: "created-first-entered-last", created_at: "2026-06-01T00:00:00.000Z", entered_at: "2026-06-10T00:00:00.000Z" },
+      { id: "created-last-entered-first", created_at: "2026-06-09T00:00:00.000Z", entered_at: "2026-06-02T00:00:00.000Z" },
+      { id: "middle", created_at: "2026-06-05T00:00:00.000Z", entered_at: "2026-06-06T00:00:00.000Z" },
+    ];
+    const options = { queueEnteredAt: (row: (typeof rows)[number]) => row.entered_at };
+
+    expect(sortOpsBoardRows(rows, "newest", options).map((row) => row.id)).toEqual([
+      "created-first-entered-last",
+      "middle",
+      "created-last-entered-first",
+    ]);
+    expect(sortOpsBoardRows(rows, "oldest", options).map((row) => row.id)).toEqual([
+      "created-last-entered-first",
+      "middle",
+      "created-first-entered-last",
+    ]);
+  });
+
   it("sorts scheduled rows soonest first and leaves unscheduled rows last", () => {
     const rows = [
       { id: "unscheduled", created_at: "2026-06-01T00:00:00.000Z", scheduled_date: null, window_start: null },

@@ -17,6 +17,11 @@ type OpsBoardSortableJob = {
   contractors?: { name?: string | null } | null;
 };
 
+type OpsBoardSortOptions<T> = {
+  /** Timestamp for when a row entered the queue currently being displayed. */
+  queueEnteredAt?: (job: T) => string | null | undefined;
+};
+
 export function normalizeOpsBoardSort(value: unknown): OpsBoardSortKey {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "created") return "oldest";
@@ -71,9 +76,17 @@ function opsBoardScheduledSortParts(job: OpsBoardSortableJob): { dateMs: number;
   };
 }
 
-export function compareOpsBoardRows(left: OpsBoardSortableJob, right: OpsBoardSortableJob, sortKey: OpsBoardSortKey): number {
+export function compareOpsBoardRows<T extends OpsBoardSortableJob>(
+  left: T,
+  right: T,
+  sortKey: OpsBoardSortKey,
+  options: OpsBoardSortOptions<T> = {},
+): number {
+  const leftQueueMs = opsBoardDateMs(options.queueEnteredAt?.(left) ?? left.created_at);
+  const rightQueueMs = opsBoardDateMs(options.queueEnteredAt?.(right) ?? right.created_at);
+
   if (sortKey === "newest") {
-    return opsBoardDateMs(right.created_at) - opsBoardDateMs(left.created_at);
+    return rightQueueMs - leftQueueMs;
   }
 
   if (sortKey === "scheduled_soonest") {
@@ -98,9 +111,13 @@ export function compareOpsBoardRows(left: OpsBoardSortableJob, right: OpsBoardSo
     return opsBoardDateMs(left.created_at) - opsBoardDateMs(right.created_at);
   }
 
-  return opsBoardDateMs(left.created_at) - opsBoardDateMs(right.created_at);
+  return leftQueueMs - rightQueueMs;
 }
 
-export function sortOpsBoardRows<T extends OpsBoardSortableJob>(rows: T[], sortKey: OpsBoardSortKey): T[] {
-  return [...(rows ?? [])].sort((left, right) => compareOpsBoardRows(left, right, sortKey));
+export function sortOpsBoardRows<T extends OpsBoardSortableJob>(
+  rows: T[],
+  sortKey: OpsBoardSortKey,
+  options: OpsBoardSortOptions<T> = {},
+): T[] {
+  return [...(rows ?? [])].sort((left, right) => compareOpsBoardRows(left, right, sortKey, options));
 }

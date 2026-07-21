@@ -1038,6 +1038,7 @@ export default async function OpsPage({
           (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
         ),
         boardSort,
+        { queueEnteredAt: (job) => workspaceQueueEnteredAt(job, "closeout") },
       ).slice(0, 10);
     }
 
@@ -1297,6 +1298,16 @@ export default async function OpsPage({
     );
     followUpEnteredAtByJob = buildFollowUpEnteredAtByJob(selectedPreviewJobEvents);
     latestJobEventByJob = buildLatestJobEventByJob(selectedPreviewJobEvents);
+
+    // Oldest/Newest describe time in the active queue, matching the "In queue"
+    // badge. Status history is only available after the preview rows load, so
+    // apply the queue-aware ordering here for every job-backed workspace.
+    if (selectedWorkspaceSection && selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake") {
+      const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows, boardSort, {
+        queueEnteredAt: (job) => workspaceQueueEnteredAt(job, selectedWorkspaceKey),
+      });
+      selectedWorkspaceSection.previewRows.splice(0, selectedWorkspaceSection.previewRows.length, ...queueSortedRows);
+    }
 
     latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
     primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
