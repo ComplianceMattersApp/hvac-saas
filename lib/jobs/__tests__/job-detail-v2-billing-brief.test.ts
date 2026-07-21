@@ -147,6 +147,11 @@ describe("desktop job detail V2 billing brief", () => {
     expect(readyInvoiceSlice).not.toContain('href={`/jobs/${jobId}/invoice`}');
   });
 
+  it("opens desktop charge entry immediately from the right-rail invoice action", () => {
+    expect(source).toContain('href={`/jobs/${jobId}/invoice?add_charge=1#invoice-workspace`}');
+    expect(source).toContain('value={`/jobs/${jobId}/invoice?add_charge=1#invoice-workspace`}');
+  });
+
   it("keeps external billing completion behind external lightweight billing mode", () => {
     const readyInvoiceIndex = source.indexOf("Ready to invoice");
     const readyInvoiceSlice = source.slice(readyInvoiceIndex, readyInvoiceIndex + 3200);

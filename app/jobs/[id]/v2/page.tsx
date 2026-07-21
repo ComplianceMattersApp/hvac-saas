@@ -931,7 +931,7 @@ export default async function JobDetailV2Page({
     if (billingState.internalInvoicePanelEnabled) {
       if (primaryInvoiceRaw) {
         return (
-          <Link href={`/jobs/${jobId}/invoice#invoice-workspace`} style={commonStyle}>
+          <Link href={`/jobs/${jobId}/invoice?add_charge=1#invoice-workspace`} style={commonStyle}>
             Continue Invoice
           </Link>
         );
@@ -940,7 +940,7 @@ export default async function JobDetailV2Page({
       return (
         <form action={createInternalInvoiceDraftFromForm}>
           <input type="hidden" name="job_id" value={jobId} />
-          <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice#invoice-workspace`} />
+          <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice?add_charge=1#invoice-workspace`} />
           <input type="hidden" name="auto_import_visit_scope_items" value="1" />
           <ImmediateSubmitButton pendingText="Starting..." className="" style={commonStyle}>
             Create Invoice

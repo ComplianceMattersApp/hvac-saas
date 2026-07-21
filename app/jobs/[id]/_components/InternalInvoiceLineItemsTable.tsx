@@ -66,6 +66,8 @@ type InternalInvoiceLineItemsTableProps = {
   // desktop card. This changes layout only; mobile-only field behavior remains
   // controlled by isMobileWorkspace.
   compactWorkspace?: boolean;
+  // Opens charge entry when the user arrives from an explicit Add/Create Invoice action.
+  initialAddFormOpen?: boolean;
   // Slice C: optional field "save custom charge to Pricebook" actions. Only used on
   // the mobile workspace; desktop never calls them.
   saveFieldItemToPricebookAction?: (formData: FormData) => Promise<FieldPricebookSaveResult>;
@@ -593,13 +595,14 @@ export default function InternalInvoiceLineItemsTable({
   secondaryButtonClass,
   isMobileWorkspace = false,
   compactWorkspace = false,
+  initialAddFormOpen = false,
   saveFieldItemToPricebookAction,
   checkFieldPricebookItemNameExistsAction,
 }: InternalInvoiceLineItemsTableProps) {
   const router = useRouter();
   const useCompactLayout = isMobileWorkspace || compactWorkspace;
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
-  const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+  const [isAddFormOpen, setIsAddFormOpen] = useState(initialAddFormOpen);
   const [feedback, setFeedback] = useState<InlineFeedback | null>(null);
   const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>('');
   const [pricebookSearchQuery, setPricebookSearchQuery] = useState('');

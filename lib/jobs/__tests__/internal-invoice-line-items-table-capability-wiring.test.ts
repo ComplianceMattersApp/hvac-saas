@@ -34,6 +34,15 @@ describe("internal invoice line items table capability wiring", () => {
     expect(invoicePageSource).toContain("compactWorkspace");
   });
 
+  it("can expand desktop charge entry when an invoice action requests it", () => {
+    expect(invoicePageSource).toContain('const shouldOpenChargeEntry = firstSearchValue(sp.add_charge) === "1";');
+    expect(invoicePageSource).toContain('<details open={shouldOpenChargeEntry}');
+    expect(invoicePageSource).toContain('initialAddFormOpen={shouldOpenChargeEntry}');
+    expect(source).toContain('initialAddFormOpen?: boolean');
+    expect(source).toContain('initialAddFormOpen = false');
+    expect(source).toContain('useState(initialAddFormOpen)');
+  });
+
   it("gates draft-line editor controls by granular capabilities", () => {
     expect(source).toContain("disabled={!canEditDescription}");
     expect(source).toContain("disabled={!canEditQuantity}");

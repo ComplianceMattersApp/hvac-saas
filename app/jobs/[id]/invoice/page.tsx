@@ -394,6 +394,7 @@ export default async function InternalInvoiceWorkspacePage({
   const checkoutSessionId = firstSearchValue(sp.checkout_session_id);
   const checkoutSessionUrl = firstSearchValue(sp.checkout_session_url);
   const workspaceView = firstSearchValue(sp.view);
+  const shouldOpenChargeEntry = firstSearchValue(sp.add_charge) === "1";
   // Slice B: compressed mobile workspace gate. Desktop is untouched when false.
   const isMobileWorkspace = firstSearchValue(sp.mobileLayout) === "v2";
   const supabase = await createClient();
@@ -1152,7 +1153,7 @@ export default async function InternalInvoiceWorkspacePage({
               </div>
 
               {canAccessDraftLineWorkspace ? (
-                <details className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3">
+                <details open={shouldOpenChargeEntry} className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-800">Edit charges or add work</summary>
                   <div className="mt-3 border-t border-slate-200 pt-3">
                     <InternalInvoiceLineItemsTable
@@ -1178,6 +1179,7 @@ export default async function InternalInvoiceWorkspacePage({
                       secondaryButtonClass={secondaryButtonClass}
                       isMobileWorkspace={isMobileWorkspace}
                       compactWorkspace
+                      initialAddFormOpen={shouldOpenChargeEntry}
                       saveFieldItemToPricebookAction={saveFieldItemToPricebookFromForm}
                       checkFieldPricebookItemNameExistsAction={checkFieldPricebookItemNameExistsFromForm}
                     />
@@ -1427,6 +1429,7 @@ export default async function InternalInvoiceWorkspacePage({
                   primaryButtonClass={primaryButtonClass}
                   secondaryButtonClass={secondaryButtonClass}
                   isMobileWorkspace={isMobileWorkspace}
+                  initialAddFormOpen={shouldOpenChargeEntry}
                   saveFieldItemToPricebookAction={saveFieldItemToPricebookFromForm}
                   checkFieldPricebookItemNameExistsAction={checkFieldPricebookItemNameExistsFromForm}
                 />
