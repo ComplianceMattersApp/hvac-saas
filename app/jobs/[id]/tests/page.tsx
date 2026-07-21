@@ -3069,13 +3069,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={focusedCustomRun.id} />
                   <input type="hidden" name="system_id" value={selectedSystemId} />
-                  <button
-                    type="submit"
+                  <SubmitButton
+                    loadingText="Completing..."
                     className={eccPrimaryButtonClass}
                     disabled={!!focusedCustomRun.is_completed}
                   >
                     {focusedCustomRun.is_completed ? "Completed" : "Complete Test"}
-                  </button>
+                  </SubmitButton>
                 </form>
 
                 <form action={deleteEccTestRunFromForm}>

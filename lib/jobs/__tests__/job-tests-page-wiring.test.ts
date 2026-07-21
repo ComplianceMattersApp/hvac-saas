@@ -73,6 +73,11 @@ const refrigerantChargePhotoEvidencePanelSource = readFileSync(
 );
 
 describe("job tests page wiring", () => {
+  it("uses responsive submit controls for configured and ad hoc test completion", () => {
+    expect(jobTestsPageSource).toContain('loadingText="Completing..."');
+    expect(jobTestsPageSource).not.toMatch(/<button[\s\S]{0,180}Complete Test[\s\S]{0,40}<\/button>/);
+  });
+
   it("keeps Mobile V2 as the only mobile default with the classic surface retired", () => {
     // Slice B: unconditional V2 selection; classic surface retired but file retained.
     expect(jobPageSource).toContain("const MobileJobDetailMobileComponent = MobileJobDetailV2Preview;");
