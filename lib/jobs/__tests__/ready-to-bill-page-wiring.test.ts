@@ -5,11 +5,15 @@ import { describe, expect, it } from "vitest";
 const page = readFileSync(resolve(process.cwd(), "app/billing/ready-to-bill/page.tsx"), "utf8");
 const selection = readFileSync(resolve(process.cwd(), "app/billing/ready-to-bill/ReadyToBillSelection.tsx"), "utf8");
 const invoiceReport = readFileSync(resolve(process.cwd(), "app/reports/invoices/page.tsx"), "utf8");
+const closeoutQueue = readFileSync(resolve(process.cwd(), "app/ops/closeout-queue/page.tsx"), "utf8");
 
 describe("Ready to Bill page wiring", () => {
-  it("is discoverable from invoices without adding work to ops or today", () => {
-    expect(invoiceReport).toContain('href="/billing/ready-to-bill"');
-    expect(invoiceReport).toContain("Ready to Bill");
+  it("is discoverable from ECC closeout instead of the invoice report", () => {
+    expect(closeoutQueue).toContain("Batch Contractor Invoice");
+    expect(closeoutQueue).toContain("/billing/ready-to-bill");
+    expect(closeoutQueue).toContain('productMode === "ecc_hers" || productMode === "hybrid"');
+    expect(closeoutQueue).toContain('billingMode === "internal_invoicing"');
+    expect(invoiceReport).not.toContain('href="/billing/ready-to-bill"');
   });
 
   it("groups first and requires deliberate job selection", () => {

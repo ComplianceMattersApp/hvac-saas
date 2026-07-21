@@ -10,7 +10,8 @@ import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
-import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
@@ -187,10 +188,12 @@ export default async function CloseoutQueuePage({
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
-  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
-  });
+  const accountOwnerUserId = actorContext.internalUser.account_owner_user_id;
+  const [internalBusinessIdentity, billingMode, productMode] = await Promise.all([
+    resolveInternalBusinessIdentityByAccountOwnerId({ supabase, accountOwnerUserId }),
+    resolveBillingModeByAccountOwnerId({ supabase, accountOwnerUserId }),
+    resolveProductModeForAccountOwnerId({ supabase, accountOwnerUserId }),
+  ]);
   const internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
   const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
@@ -205,12 +208,17 @@ export default async function CloseoutQueuePage({
     explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
-  const canViewFieldPaymentReconciliationAttention =
-    canViewFinancialRegister({
+  const canViewFinancialRegisterForAccount = canViewFinancialRegister({
       actorUserId: user.id,
       internalUser: actorContext.internalUser,
-      resourceAccountOwnerUserId: actorContext.internalUser.account_owner_user_id,
-    }) || fieldBillingCapabilities.can_verify_non_card_collection;
+      resourceAccountOwnerUserId: accountOwnerUserId,
+    });
+  const canViewFieldPaymentReconciliationAttention =
+    canViewFinancialRegisterForAccount || fieldBillingCapabilities.can_verify_non_card_collection;
+  const canCreateEccBatchInvoice =
+    canViewFinancialRegisterForAccount &&
+    billingMode === "internal_invoicing" &&
+    (productMode === "ecc_hers" || productMode === "hybrid");
 
   const fieldPaymentReconciliationAttention = canViewFieldPaymentReconciliationAttention
     ? await listFieldPaymentCollectionReportsForReconciliation({
@@ -347,6 +355,9 @@ export default async function CloseoutQueuePage({
 
   const baseHref = contractor ? `/ops/closeout-queue?contractor=${encodeURIComponent(contractor)}` : "/ops/closeout-queue";
   const currentQueueHref = `${baseHref}${contractor ? "&" : "?"}filter=${filter}&sort=${sort}`;
+  const batchInvoiceHref = contractor
+    ? `/billing/ready-to-bill?contractor=${encodeURIComponent(contractor)}`
+    : "/billing/ready-to-bill";
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -368,6 +379,14 @@ export default async function CloseoutQueuePage({
             Jobs that need billing, paperwork, report, or completion follow-up before they can fully close.
           </p>
         </div>
+        {canCreateEccBatchInvoice ? (
+          <Link
+            href={batchInvoiceHref}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+          >
+            Batch Contractor Invoice
+          </Link>
+        ) : null}
       </div>
 
       {notice === "external_billing_complete" || notice === "external_invoice_sent" ? (
