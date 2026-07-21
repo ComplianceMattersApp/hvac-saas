@@ -79,7 +79,13 @@ export default function EquipmentLabelPhotoEvidencePanel({
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     setPendingFiles(files);
+    onSavedChange?.(files.length > 0 || savedCount > 0);
     event.target.value = "";
+  }
+
+  function clearPendingFiles() {
+    setPendingFiles([]);
+    onSavedChange?.(savedCount > 0);
   }
 
   async function uploadOne(file: File) {
@@ -276,7 +282,7 @@ export default function EquipmentLabelPhotoEvidencePanel({
           </button>
           <button
             type="button"
-            onClick={() => setPendingFiles([])}
+            onClick={clearPendingFiles}
             disabled={isPending}
             className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
