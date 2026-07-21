@@ -117,7 +117,7 @@ export default function ContractorFocusSelector({
 
       {open ? (
         <div className="fixed inset-0 z-50 bg-slate-950/35 p-3 sm:flex sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Contractor Focus selector">
-          <div className="ml-auto flex h-full max-h-[calc(100vh-1.5rem)] w-full max-w-xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl sm:h-auto sm:max-h-[78vh]">
+          <div className="ml-auto flex h-[calc(100dvh-7rem)] max-h-[calc(100dvh-7rem)] w-full max-w-xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl sm:h-auto sm:max-h-[78vh]">
             <div className="border-b border-slate-200 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -226,7 +226,7 @@ export default function ContractorFocusSelector({
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-3 py-2.5">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-3 py-2.5">
               <button type="button" onClick={() => setDraftIds([])} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                 Clear
               </button>
