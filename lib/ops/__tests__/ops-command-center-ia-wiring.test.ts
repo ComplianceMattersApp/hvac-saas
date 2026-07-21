@@ -215,6 +215,19 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).not.toContain("visibleWorkspaceSections.map((section)");
   });
 
+  it("assembles exception failure evidence before queue-age sorting", () => {
+    const failedEvidenceIndex = opsPageSource.indexOf(
+      "latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);",
+    );
+    const queueSortIndex = opsPageSource.indexOf(
+      "const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows, boardSort",
+    );
+
+    expect(failedEvidenceIndex).toBeGreaterThan(-1);
+    expect(queueSortIndex).toBeGreaterThan(failedEvidenceIndex);
+    expect(opsPageSource).toContain("queueEnteredAt: (job) => workspaceQueueEnteredAt(job, selectedWorkspaceKey)");
+  });
+
   it("applies contractor filtering to visible board rows without changing row actions", () => {
     expect(opsPageSource).toContain("function filterRowsByContractorFocus(rows: any[])");
     expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows)");
@@ -290,6 +303,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("pending_info_reason: job?.pending_info_reason");
     expect(opsPageSource).toContain("on_hold_reason: job?.on_hold_reason");
     expect(opsPageSource).toContain("listCloseoutQueueJobs(");
+    expect(opsPageSource).toContain("const closeoutEnteredAtByJob = buildOpsStatusEnteredAtByJob");
     expect(opsPageSource).toContain("buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
     expect(opsPageSource).toContain("filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key })");
   });

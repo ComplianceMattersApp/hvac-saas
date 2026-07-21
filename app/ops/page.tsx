@@ -1032,13 +1032,38 @@ export default async function OpsPage({
         jobs: closeoutProjectionInputs(closeoutSourceRows),
       });
 
+      const closeoutJobIds = closeoutSourceRows
+        .map((job: any) => String(job?.id ?? "").trim())
+        .filter(Boolean);
+      const closeoutStatusEventsRes = closeoutJobIds.length
+        ? await supabase
+            .from("job_events")
+            .select("job_id, created_at, meta")
+            .in("job_id", closeoutJobIds)
+            .eq("event_type", "ops_update")
+            .order("created_at", { ascending: false })
+        : { data: [], error: null };
+      if (closeoutStatusEventsRes.error) throw closeoutStatusEventsRes.error;
+      const closeoutEnteredAtByJob = buildOpsStatusEnteredAtByJob(closeoutStatusEventsRes.data ?? []);
+
       return sortOpsBoardRows(
         listCloseoutQueueJobs(
           closeoutSourceRows,
           (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
         ),
         boardSort,
-        { queueEnteredAt: (job) => workspaceQueueEnteredAt(job, "closeout") },
+        {
+          queueEnteredAt: (job) => {
+            const jobId = String(job?.id ?? "").trim();
+            const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+            return (
+              String(job?.field_complete_at ?? "").trim() ||
+              (jobId ? closeoutEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) ||
+              String(job?.created_at ?? "").trim() ||
+              null
+            );
+          },
+        },
       ).slice(0, 10);
     }
 
@@ -1298,10 +1323,12 @@ export default async function OpsPage({
     );
     followUpEnteredAtByJob = buildFollowUpEnteredAtByJob(selectedPreviewJobEvents);
     latestJobEventByJob = buildLatestJobEventByJob(selectedPreviewJobEvents);
+    latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
+    primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
 
     // Oldest/Newest describe time in the active queue, matching the "In queue"
-    // badge. Status history is only available after the preview rows load, so
-    // apply the queue-aware ordering here for every job-backed workspace.
+    // badge. Assemble status and failed-test evidence before applying the
+    // queue-aware ordering so the sort and rendered badge use identical data.
     if (selectedWorkspaceSection && selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake") {
       const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows, boardSort, {
         queueEnteredAt: (job) => workspaceQueueEnteredAt(job, selectedWorkspaceKey),
@@ -1309,8 +1336,6 @@ export default async function OpsPage({
       selectedWorkspaceSection.previewRows.splice(0, selectedWorkspaceSection.previewRows.length, ...queueSortedRows);
     }
 
-    latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
-    primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
     const selectedPreviewLatestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
       (selectedPreviewCustomerAttemptEventsRes.data ?? []) as Array<{ job_id: string; created_at: string }>,
     );
