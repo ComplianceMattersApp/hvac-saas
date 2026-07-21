@@ -1389,3 +1389,10 @@ Group 5 (Production Migration / Enablement Gates) is closed inline through migra
 Phase 5G billing-period invoice link/unlink, sandbox smoke, Stripe payment identity dedupe/conflict recovery, linked billing-period smoke, and normal invoice regression smoke are closed for historical evidence purposes. Detailed proof now lives in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md).
 
 Current durable billing-period and service-plan invoice relationship contracts live in [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md). Payment register, allocation, failed-payment, and invoice paid/balance truth live in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md). Maintenance/service-plan lifecycle and visit/next-due boundaries live in [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md).
+## Consolidated Contractor Invoicing V1 — local implementation closeout (2026-07-20)
+
+- Added the manual `/billing/ready-to-bill` workflow for deliberate same-contractor job selection and one consolidated draft invoice.
+- Preserved `internal_invoices` as commercial/payment/QBO truth, retained `job_id` as the compatibility anchor, and added durable multi-job membership plus line-level source-job provenance.
+- Extended existing job resolution, closeout, issue/void, print/PDF, email, report, payment, and QBO paths without creating parallel invoice or payment systems.
+- Local schema/runtime regression coverage and TypeScript validation are complete. No migration or provider mutation has been run.
+- Rollout remains gated on explicit approval and verification of a non-production environment. See `Consolidated_Contractor_Invoicing_V1_Model_Spec.md` for invariants and the sandbox smoke checklist.
