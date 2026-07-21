@@ -58,6 +58,7 @@ import {
 import {
   listCloseoutQueueJobs,
 } from "@/lib/ops/closeout-queue";
+import { buildWaitingQueueRows } from "@/lib/ops/focused-queues";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
@@ -721,7 +722,12 @@ export default async function OpsPage({
     }).format(new Date());
 
     const needToScheduleCountQ = opsStatusCountQuery("need_to_schedule", { requireOpenStatus: true });
-    const pendingInfoCountQ = opsStatusCountQuery("pending_info");
+    const pendingInfoRowsQ = supabase
+      .from("jobs")
+      .select("id, ops_status, pending_info_reason, on_hold_reason, field_complete, job_type, permit_number, invoice_complete, created_at")
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("ops_status", "pending_info");
     const onHoldCountQ = opsStatusCountQuery("on_hold");
     const waitingStatusCountQ = opsStatusCountQuery("waiting");
     const exceptionStatusRowsQ = supabase
@@ -776,7 +782,7 @@ export default async function OpsPage({
 
     const [
       needToScheduleCountRes,
-      pendingInfoCountRes,
+      pendingInfoRowsRes,
       onHoldCountRes,
       waitingStatusCountRes,
       exceptionStatusRowsRes,
@@ -791,7 +797,7 @@ export default async function OpsPage({
       activePermitRequestsResult,
     ] = await Promise.all([
       needToScheduleCountQ,
-      pendingInfoCountQ,
+      pendingInfoRowsQ,
       onHoldCountQ,
       waitingStatusCountQ,
       exceptionStatusRowsQ,
@@ -818,7 +824,7 @@ export default async function OpsPage({
     ]);
 
     if (needToScheduleCountRes.error) throw needToScheduleCountRes.error;
-    if (pendingInfoCountRes.error) throw pendingInfoCountRes.error;
+    if (pendingInfoRowsRes.error) throw pendingInfoRowsRes.error;
     if (onHoldCountRes.error) throw onHoldCountRes.error;
     if (waitingStatusCountRes.error) throw waitingStatusCountRes.error;
     if (exceptionStatusRowsRes.error) throw exceptionStatusRowsRes.error;
@@ -835,7 +841,7 @@ export default async function OpsPage({
     );
     const countsWs = new Map<string, number>([
       ["need_to_schedule", needToScheduleCountRes.count ?? 0],
-      ["pending_info", pendingInfoCountRes.count ?? 0],
+      ["pending_info", buildWaitingQueueRows(pendingInfoRowsRes.data ?? []).length],
       ["on_hold", onHoldCountRes.count ?? 0],
       ["waiting", waitingStatusCountRes.count ?? 0],
       ["pending_office_review", currentExceptionCounts.get("pending_office_review") ?? 0],
@@ -1088,9 +1094,15 @@ export default async function OpsPage({
 
       const queueRes = await queueQ;
       if (queueRes.error) throw queueRes.error;
-      const currentRows = workspaceKey === "exceptions" || workspaceKey === "waiting"
+      const historyFilteredRows = workspaceKey === "exceptions" || workspaceKey === "waiting"
         ? excludeHistoricalRetestParents(queueRes.data ?? [], retestContinuationParentIds)
         : queueRes.data ?? [];
+      const currentRows = workspaceKey === "waiting"
+        ? [
+            ...buildWaitingQueueRows(historyFilteredRows.filter((row: any) => row?.ops_status !== "pending_office_review")),
+            ...historyFilteredRows.filter((row: any) => row?.ops_status === "pending_office_review"),
+          ]
+        : historyFilteredRows;
       return sortOpsBoardRows(currentRows, boardSort);
     }
 

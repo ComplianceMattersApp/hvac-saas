@@ -74,6 +74,40 @@ describe("focused ops queue filtering", () => {
     expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3"]);
   });
 
+  it("moves automatic permit waits into Waiting only after invoicing is complete", () => {
+    const rows = buildWaitingQueueRows([
+      {
+        id: "permit-needs-invoice",
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Needed",
+        field_complete: true,
+        job_type: "ecc",
+        invoice_complete: false,
+      },
+      {
+        id: "permit-invoiced",
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Needed",
+        field_complete: true,
+        job_type: "ecc",
+        invoice_complete: true,
+      },
+      {
+        id: "manual-hold-needs-invoice",
+        ops_status: "on_hold",
+        on_hold_reason: "Customer requested a hold",
+        field_complete: true,
+        job_type: "ecc",
+        invoice_complete: false,
+      },
+    ]);
+
+    expect(rows.map((row) => row.id)).toEqual([
+      "manual-hold-needs-invoice",
+      "permit-invoiced",
+    ]);
+  });
+
   it("suppresses service follow-up parents already continued through a linked child", () => {
     const rows = buildWaitingQueueRows([
       {
@@ -560,6 +594,9 @@ describe("focused ops queue pages", () => {
   it("waiting page reads both pending info and on-hold reasons", () => {
     expect(waitingQueuePageSource).toContain("pending_info_reason");
     expect(waitingQueuePageSource).toContain("on_hold_reason");
+    expect(waitingQueuePageSource).toContain("invoice_complete");
+    expect(waitingQueuePageSource).toContain("field_complete");
+    expect(waitingQueuePageSource).toContain("job_type");
   });
 
   it("waiting and exception pages use focused queue display labels", () => {
@@ -571,6 +608,12 @@ describe("focused ops queue pages", () => {
     expect(waitingQueuePageSource).toContain("#next-service-action");
     expect(waitingQueuePageSource).toContain("Create Return Visit");
     expect(exceptionsQueuePageSource).toContain("getExceptionQueueDisplayLabel");
+  });
+
+  it("uses the same waiting predicate for the Operations count and preview", () => {
+    expect(opsPageSource).toContain('["pending_info", buildWaitingQueueRows(pendingInfoRowsRes.data ?? []).length]');
+    expect(opsPageSource).toContain('const currentRows = workspaceKey === "waiting"');
+    expect(opsPageSource).toContain("...buildWaitingQueueRows(");
   });
 
   it("waiting page includes safe empty state and return navigation", () => {

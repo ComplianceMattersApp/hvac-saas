@@ -14,7 +14,7 @@ import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils
 import { buildRetestContinuationParentIds, excludeHistoricalRetestParents } from "@/lib/ops/retest-queue-exclusivity";
 
 const waitingSelect =
-  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, created_at";
+  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, field_complete, job_type, permit_number, invoice_complete, created_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;

@@ -45,6 +45,8 @@ export type FocusedQueueJob = {
   service_follow_up_progress?: string | null;
   service_follow_up_progress_label?: string | null;
   service_follow_up_continued?: boolean | null;
+  permit_number?: string | null;
+  invoice_complete?: boolean | null;
 };
 
 type AssignmentDisplayInput = WithoutTechAssignmentInput & {
@@ -89,6 +91,13 @@ export function buildWaitingQueueRows(jobs: FocusedQueueJob[]): FocusedQueueJob[
     .filter((job) => {
       if (!String(job?.id ?? "").trim()) return false;
       if (job?.service_follow_up_continued) return false;
+      const isAutomaticPermitWait =
+        normalize(job?.ops_status) === "pending_info" &&
+        job?.field_complete === true &&
+        normalize(job?.job_type) === "ecc" &&
+        isEccPermitNeededReason(job?.pending_info_reason) &&
+        job?.invoice_complete === false;
+      if (isAutomaticPermitWait) return false;
       return isWaitingQueueStatus(job?.ops_status);
     })
     .sort(compareByCreatedAtOldest);

@@ -81,7 +81,7 @@ describe("listCloseoutQueueJobs", () => {
     expect(count).toBe(2);
   });
 
-  it("includes status-blocked jobs when invoice closeout is still needed", () => {
+  it("keeps automatic permit invoicing in closeout but routes manual waits and holds elsewhere", () => {
     const jobs = [
       {
         id: "permit-missing-needs-invoice",
@@ -157,8 +157,6 @@ describe("listCloseoutQueueJobs", () => {
 
     expect(rows.map((row) => row.id)).toEqual([
       "permit-missing-needs-invoice",
-      "generic-approval-needs-invoice",
-      "generic-on-hold-needs-invoice",
       "need-to-schedule-needs-invoice",
       "failed-ecc-needs-invoice",
       "retest-needed-needs-invoice",

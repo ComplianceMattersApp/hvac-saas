@@ -56,14 +56,22 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
   const needs = getCloseoutNeeds(job);
   if (opsStatus === "closed") return false;
 
+  if (needs.isBlockedForCloseout) {
+    const isAutomaticPermitWait =
+      opsStatus === "pending_info" &&
+      needs.needsPermit &&
+      isPermitMissingCloseoutReason(job);
+    if (!isAutomaticPermitWait) return false;
+  }
+
   // The Closeout queue contains work that can be completed now. A missing permit
   // remains a job-detail blocker, but by itself belongs in Waiting / Pending Info.
   const hasCloseoutWork = needs.needsInvoice || needs.needsCerts;
   if (!hasCloseoutWork) return false;
 
-  // Invoice-needed closeout is status-invariant for active statuses.
-  // Failed/on-hold/pending status may add exception routing, but must not
-  // suppress closeout invoice reminders. Closed remains terminal.
+  // Invoice-needed closeout remains visible across active workflow statuses.
+  // Manual pending/hold states were routed out above; automatic permit waiting
+  // stays here only until its invoice is complete.
   if (needs.needsInvoice) return true;
 
   if (opsStatus === "invoice_required" || opsStatus === "paperwork_required") return true;
