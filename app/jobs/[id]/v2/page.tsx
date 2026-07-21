@@ -3649,18 +3649,18 @@ export default async function JobDetailV2Page({
                     : "Mark On the Way"}
               </FieldStatusAdvanceForm>
             ) : fieldComplete && closeoutNeeds.needsPermit ? (
-              <Link
-                href="#compliance"
-                style={{
+              <PermitForm
+                jobId={jobId}
+                returnTo={returnTo}
+                currentPermitNumber={null}
+                action={markEccPermitAvailableFromForm}
+                triggerStyle={{
                   ...(S.primaryBtn as React.CSSProperties),
                   display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
-                  textDecoration: "none",
                 }}
-              >
-                Add permit number
-              </Link>
+              />
             ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton ? (
               <form action={markCertsCompleteFromForm}>
                 <input type="hidden" name="job_id" value={jobId} />

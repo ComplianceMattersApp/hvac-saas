@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { useFormStatus } from "react-dom";
 
 type PermitFormProps = {
@@ -8,6 +8,7 @@ type PermitFormProps = {
   returnTo: string;
   currentPermitNumber: string | null;
   action: (formData: FormData) => Promise<void>;
+  triggerStyle?: CSSProperties;
 };
 
 function SaveButton() {
@@ -40,6 +41,7 @@ export default function PermitForm({
   returnTo,
   currentPermitNumber,
   action,
+  triggerStyle,
 }: PermitFormProps) {
   const [open, setOpen] = useState(false);
   const hasPermit = Boolean(currentPermitNumber);
@@ -62,6 +64,7 @@ export default function PermitForm({
           color: "oklch(0.32 0.02 262)",
           display: "inline-flex",
           alignItems: "center",
+          ...triggerStyle,
         }}
       >
         {hasPermit ? "Update Permit" : "Add Permit Number"}

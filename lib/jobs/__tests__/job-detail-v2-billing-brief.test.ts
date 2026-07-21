@@ -199,8 +199,10 @@ describe("desktop job detail V2 billing brief", () => {
     expect(permitBranch).toBeGreaterThan(-1);
     expect(permitBranch).toBeLessThan(allDoneBranch);
     expect(source).toContain('fieldComplete && closeoutNeeds.needsPermit ? (');
-    expect(source).toContain('href="#compliance"');
-    expect(source).toContain('Add permit number');
+    const permitRailBranch = source.slice(source.indexOf('fieldComplete && closeoutNeeds.needsPermit ? ('), source.indexOf('fieldComplete && closeoutNeeds.needsCerts'));
+    expect(permitRailBranch).toContain('<PermitForm');
+    expect(permitRailBranch).toContain('triggerStyle={{');
+    expect(permitRailBranch).not.toContain('href="#compliance"');
     expect(source).toContain('isFailedUnresolved || hasCloseoutNeeds');
   });
 
