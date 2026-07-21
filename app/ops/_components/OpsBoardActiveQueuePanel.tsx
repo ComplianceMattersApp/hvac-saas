@@ -15,6 +15,7 @@ export type OpsBoardActiveQueueRow = {
   reasonKey: string | null;
   sortable: {
     created_at: string | null;
+    queue_entered_at: string | null;
     scheduled_date: string | null;
     window_start: string | null;
     customer_first_name: string | null;
@@ -56,6 +57,7 @@ type Props = {
   hiddenTodayChips: OpsBoardHiddenChip[];
   contractorFocusSelector?: React.ReactNode;
   initialBucket: string;
+  initialSort: OpsBoardSortKey;
   initialPanel: OpsBoardPanelData;
   contractorParam: string;
   hasContractorFilter: boolean;
@@ -77,6 +79,7 @@ export default function OpsBoardActiveQueuePanel({
   hiddenTodayChips,
   contractorFocusSelector,
   initialBucket,
+  initialSort,
   initialPanel,
   contractorParam,
   hasContractorFilter,
@@ -88,7 +91,7 @@ export default function OpsBoardActiveQueuePanel({
   // server-provided panel directly. Reason/Sort stay client-side within the
   // current bucket.
   const [reasonKey, setReasonKey] = React.useState("");
-  const [sort, setSort] = React.useState<OpsBoardSortKey>("oldest");
+  const [sort, setSort] = React.useState<OpsBoardSortKey>(initialSort);
 
   const panel = initialPanel;
 
@@ -96,7 +99,8 @@ export default function OpsBoardActiveQueuePanel({
     const filtered = reasonKey ? panel.rows.filter((row) => row.reasonKey === reasonKey) : panel.rows;
     return sortOpsBoardRows(
       filtered.map((row) => ({ ...row.sortable, __row: row })),
-      sort
+      sort,
+      { queueEnteredAt: (row) => row.queue_entered_at },
     ).map((entry: any) => entry.__row as OpsBoardActiveQueueRow);
   }, [panel, reasonKey, sort]);
 

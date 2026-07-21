@@ -226,6 +226,13 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(failedEvidenceIndex).toBeGreaterThan(-1);
     expect(queueSortIndex).toBeGreaterThan(failedEvidenceIndex);
     expect(opsPageSource).toContain("queueEnteredAt: (job) => workspaceQueueEnteredAt(job, selectedWorkspaceKey)");
+    expect(opsPageSource).toContain("queue_entered_at: workspaceQueueEnteredAt(job, selectedWorkspaceSection.key)");
+    expect(opsActiveQueuePanelSource).toContain("{ queueEnteredAt: (row) => row.queue_entered_at }");
+  });
+
+  it("does not cap active operations queues to ten preview rows", () => {
+    expect(opsPageSource).toContain("previewLimit: Math.max(scheduledOpenRows.length, 1)");
+    expect(opsPageSource).not.toContain(").slice(0, 10);");
   });
 
   it("applies contractor filtering to visible board rows without changing row actions", () => {

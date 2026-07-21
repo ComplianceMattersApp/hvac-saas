@@ -864,7 +864,7 @@ export default async function OpsPage({
     const scheduledWithoutTechSnapshot = buildScheduledWithoutTechSnapshot({
       jobs: scheduledOpenRows,
       assignmentDisplayMap: scheduledAssignmentMap,
-      previewLimit: 10,
+      previewLimit: Math.max(scheduledOpenRows.length, 1),
     });
 
     const waitingCount =
@@ -1064,7 +1064,7 @@ export default async function OpsPage({
             );
           },
         },
-      ).slice(0, 10);
+      );
     }
 
     async function loadWorkspacePreviewRows(workspaceKey: string) {
@@ -1691,6 +1691,7 @@ export default async function OpsPage({
               reasonKey: getOpsBoardReasonLabel(workspaceReasonInput(job), { queueKey: selectedWorkspaceSection.key })?.key ?? null,
               sortable: {
                 created_at: job?.created_at ?? null,
+                queue_entered_at: workspaceQueueEnteredAt(job, selectedWorkspaceSection.key),
                 scheduled_date: job?.scheduled_date ?? null,
                 window_start: job?.window_start ?? null,
                 customer_first_name: job?.customer_first_name ?? null,
@@ -2674,6 +2675,7 @@ export default async function OpsPage({
                 ) : null
               }
               initialBucket={effectiveBoardBucketFilter}
+              initialSort={boardSort}
               initialPanel={{
                 queueLabel: selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label,
                 itemNoun: selectedWorkspaceItemNoun,
