@@ -186,6 +186,19 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).not.toContain("Failed test unresolved - review the failed reason and contractor report.");
   });
 
+  it("keeps a field-complete ECC job pending while its permit number is missing", () => {
+    const permitBranch = source.indexOf('if (closeoutNeeds.needsPermit) return "Permit number needed');
+    const allDoneBranch = source.indexOf('return "All done');
+
+    expect(source).toContain("const hasCloseoutNeeds = closeoutNeeds.needsPermit || closeoutNeeds.needsCerts || closeoutNeeds.needsInvoice;");
+    expect(permitBranch).toBeGreaterThan(-1);
+    expect(permitBranch).toBeLessThan(allDoneBranch);
+    expect(source).toContain('fieldComplete && closeoutNeeds.needsPermit ? (');
+    expect(source).toContain('href="#compliance"');
+    expect(source).toContain('Add permit number');
+    expect(source).toContain('isFailedUnresolved || hasCloseoutNeeds');
+  });
+
   it("keeps the failed ECC banner separate from the follow-up reminder surface", () => {
     expect(source).toContain("const canShowEccFailedReasonBanner = isEccJob");
     expect(source).toContain("const failedReasonBannerText = failedReasonBannerNote");

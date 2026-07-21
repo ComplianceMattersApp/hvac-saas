@@ -802,6 +802,7 @@ export default async function JobDetailV2Page({
     invoice_complete: billedTruthSatisfied,
     certs_complete: job.certs_complete,
   });
+  const hasCloseoutNeeds = closeoutNeeds.needsPermit || closeoutNeeds.needsCerts || closeoutNeeds.needsInvoice;
   const canShowCertsButton =
     isEccJob &&
     !certsComplete &&
@@ -864,6 +865,7 @@ export default async function JobDetailV2Page({
       if (opsStatus === "pending_office_review") return "Field complete - pending office review.";
       return "Field complete - pending closeout.";
     }
+    if (closeoutNeeds.needsPermit) return "Permit number needed before certs can be sent and this job can close.";
     if (closeoutNeeds.needsCerts && closeoutNeeds.needsInvoice) return "Field work complete — send certs and invoice to close this job.";
     if (closeoutNeeds.needsCerts) return "Field work complete — send certs to close this job.";
     if (closeoutNeeds.needsInvoice) return "Invoice needed — send to close out billing.";
@@ -3646,6 +3648,19 @@ export default async function JobDetailV2Page({
                     ? "Mark On Site"
                     : "Mark On the Way"}
               </FieldStatusAdvanceForm>
+            ) : fieldComplete && closeoutNeeds.needsPermit ? (
+              <Link
+                href="#compliance"
+                style={{
+                  ...(S.primaryBtn as React.CSSProperties),
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  textDecoration: "none",
+                }}
+              >
+                Add permit number
+              </Link>
             ) : fieldComplete && closeoutNeeds.needsCerts && canShowCertsButton ? (
               <form action={markCertsCompleteFromForm}>
                 <input type="hidden" name="job_id" value={jobId} />
@@ -3670,24 +3685,24 @@ export default async function JobDetailV2Page({
                 style={{
                   padding: "9px 13px",
                   borderRadius: "9px",
-                  border: isFailedUnresolved
+                  border: isFailedUnresolved || hasCloseoutNeeds
                     ? "1px solid oklch(0.88 0.05 75)"
                     : "1px solid oklch(0.88 0.06 150)",
-                  background: isFailedUnresolved
+                  background: isFailedUnresolved || hasCloseoutNeeds
                     ? "oklch(0.97 0.025 75)"
                     : "oklch(0.97 0.03 150)",
                   fontSize: "13px",
                   fontWeight: 600,
-                  color: isFailedUnresolved
+                  color: isFailedUnresolved || hasCloseoutNeeds
                     ? "oklch(0.42 0.09 75)"
                     : "oklch(0.42 0.1 150)",
                   textAlign: "center",
                 }}
               >
-                {isFailedUnresolved
+                {isFailedUnresolved || closeoutNeeds.needsPermit
                   ? "Field Complete - Pending"
                   : closeoutNeeds.needsInvoice || closeoutNeeds.needsCerts
-                  ? "Field Complete"
+                    ? "Field Complete"
                   : "Closed out"}
               </div>
             ) : null}
