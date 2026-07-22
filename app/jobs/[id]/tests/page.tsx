@@ -2425,6 +2425,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                             <div>Required Total Airflow: {fmtValue(sys.runAirflow?.computed?.required_total_cfm, "CFM")}</div>
                             <div>Measured Airflow: {fmtValue(sys.runAirflow?.data?.measured_total_cfm, "CFM")}</div>
                             <div>Result: {sys.runAirflow ? getEffectiveResultLabel(sys.runAirflow) : "No run"}</div>
+                            {sys.runAirflow?.override_pass != null ? (
+                              <div>Override reason / notes: {fallbackText(sys.runAirflow?.override_reason)}</div>
+                            ) : null}
                           </>
                         )}
                       </div>
@@ -2508,6 +2511,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                             <div>Max Allowed Leakage: {fmtValue(sys.runDuct?.computed?.max_leakage_cfm, "CFM")}</div>
                             <div>Entered duct leakage value: {fmtValue(sys.runDuct?.data?.measured_duct_leakage_cfm, "CFM")}</div>
                             <div>Result: {sys.runDuct ? getEffectiveResultLabel(sys.runDuct) : "No run"}</div>
+                            {sys.runDuct?.override_pass != null ? (
+                              <div>Override reason / notes: {fallbackText(sys.runDuct?.override_reason)}</div>
+                            ) : null}
                           </>
                         )}
                       </div>
