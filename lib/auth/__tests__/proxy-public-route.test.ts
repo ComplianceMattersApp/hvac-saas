@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPublicAssetPath, isUnauthedPublicRoute } from "@/proxy";
+import { isCronRoute, isPublicAssetPath, isUnauthedPublicRoute } from "@/proxy";
 
 describe("isUnauthedPublicRoute", () => {
   it("allows /signup without auth", () => {
@@ -42,5 +42,14 @@ describe("isUnauthedPublicRoute", () => {
 
   it("allows the push service worker through as a public asset", () => {
     expect(isPublicAssetPath("/sw.js")).toBe(true);
+  });
+});
+
+describe("isCronRoute", () => {
+  it("allows only cron API paths to bypass browser-session authentication", () => {
+    expect(isCronRoute("/api/cron/stripe-payment-reconciliation")).toBe(true);
+    expect(isCronRoute("/api/cron/attention-email")).toBe(true);
+    expect(isCronRoute("/api/stripe/webhook")).toBe(false);
+    expect(isCronRoute("/reports/attention")).toBe(false);
   });
 });

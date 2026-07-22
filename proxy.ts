@@ -2,9 +2,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-function classifyProxyRoute(pathname: string): "public_asset" | "webhook" | "auth_route" | "protected_route" {
+function classifyProxyRoute(pathname: string): "public_asset" | "webhook" | "cron" | "auth_route" | "protected_route" {
   if (isPublicAssetPath(pathname)) return "public_asset";
   if (pathname === "/api/stripe/webhook") return "webhook";
+  if (isCronRoute(pathname)) return "cron";
   if (isUnauthedPublicRoute(pathname)) return "auth_route";
   return "protected_route";
 }
@@ -54,6 +55,13 @@ export async function proxy(req: NextRequest) {
   // Allow Stripe webhook to bypass auth — signature verification happens inside the route.
   if (pathname === "/api/stripe/webhook") {
     emitTimingLog("webhook_bypass");
+    return NextResponse.next();
+  }
+
+  // Vercel cron requests do not carry a Supabase browser session. Each cron
+  // handler authenticates the machine request with CRON_SECRET instead.
+  if (isCronRoute(pathname)) {
+    emitTimingLog("public_bypass");
     return NextResponse.next();
   }
 
@@ -116,6 +124,10 @@ export function isUnauthedPublicRoute(pathname: string) {
     // and writes with the admin client — no user session gate needed.
     pathname === "/api/qbo/callback"
   );
+}
+
+export function isCronRoute(pathname: string) {
+  return pathname.startsWith("/api/cron/");
 }
 
 export function isPublicAssetPath(pathname: string) {
