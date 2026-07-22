@@ -93,8 +93,8 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("selectedWorkspacePreviewCount");
     expect(opsPageSource).toContain("selectedWorkspaceTotalCount");
     expect(opsPageSource).toContain("Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount}");
-    expect(opsPageSource).toContain("/ops/closeout-queue${contractorScopeFilter");
-    expect(opsPageSource).toContain("View all");
+    expect(opsPageSource).toContain('label: "Batch Contractor Invoice"');
+    expect(opsPageSource).toContain('"/billing/ready-to-bill"');
   });
 
   it("renders an Excel-style Contractor Focus selector for ECC/hybrid while queue chips own bucket selection", () => {

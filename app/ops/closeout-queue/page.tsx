@@ -10,8 +10,7 @@ import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
-import { resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
-import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode-defaults";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
@@ -189,11 +188,7 @@ export default async function CloseoutQueuePage({
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
   const accountOwnerUserId = actorContext.internalUser.account_owner_user_id;
-  const [internalBusinessIdentity, billingMode, productMode] = await Promise.all([
-    resolveInternalBusinessIdentityByAccountOwnerId({ supabase, accountOwnerUserId }),
-    resolveBillingModeByAccountOwnerId({ supabase, accountOwnerUserId }),
-    resolveProductModeForAccountOwnerId({ supabase, accountOwnerUserId }),
-  ]);
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({ supabase, accountOwnerUserId });
   const internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
   const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
@@ -215,11 +210,6 @@ export default async function CloseoutQueuePage({
     });
   const canViewFieldPaymentReconciliationAttention =
     canViewFinancialRegisterForAccount || fieldBillingCapabilities.can_verify_non_card_collection;
-  const canCreateEccBatchInvoice =
-    canViewFinancialRegisterForAccount &&
-    billingMode === "internal_invoicing" &&
-    (productMode === "ecc_hers" || productMode === "hybrid");
-
   const fieldPaymentReconciliationAttention = canViewFieldPaymentReconciliationAttention
     ? await listFieldPaymentCollectionReportsForReconciliation({
         admin: supabase,
@@ -355,10 +345,6 @@ export default async function CloseoutQueuePage({
 
   const baseHref = contractor ? `/ops/closeout-queue?contractor=${encodeURIComponent(contractor)}` : "/ops/closeout-queue";
   const currentQueueHref = `${baseHref}${contractor ? "&" : "?"}filter=${filter}&sort=${sort}`;
-  const batchInvoiceHref = contractor
-    ? `/billing/ready-to-bill?contractor=${encodeURIComponent(contractor)}`
-    : "/billing/ready-to-bill";
-
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
       <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-end sm:justify-between">
@@ -379,14 +365,12 @@ export default async function CloseoutQueuePage({
             Jobs that need billing, paperwork, report, or completion follow-up before they can fully close.
           </p>
         </div>
-        {canCreateEccBatchInvoice ? (
-          <Link
-            href={batchInvoiceHref}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
-          >
-            Batch Contractor Invoice
-          </Link>
-        ) : null}
+        <Link
+          href={`/ops?bucket=closeout${contractor ? `&contractor=${encodeURIComponent(contractor)}` : ""}#ops-workspace`}
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          Back to Operations
+        </Link>
       </div>
 
       {notice === "external_billing_complete" || notice === "external_invoice_sent" ? (

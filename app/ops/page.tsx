@@ -61,7 +61,7 @@ import {
 } from "@/lib/ops/closeout-queue";
 import { buildWaitingQueueRows, type FocusedQueueJob } from "@/lib/ops/focused-queues";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
-import { resolveAccountTimeZoneByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveAccountTimeZoneByAccountOwnerId, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
@@ -274,12 +274,13 @@ export default async function OpsPage({
     explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
-  const canViewFieldPaymentVerificationAttention =
-    canViewFinancialRegister({
+  const canViewFinancialRegisterForAccount = canViewFinancialRegister({
       actorUserId: user.id,
       internalUser,
       resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-    }) || fieldBillingCapabilities.can_verify_non_card_collection;
+    });
+  const canViewFieldPaymentVerificationAttention =
+    canViewFinancialRegisterForAccount || fieldBillingCapabilities.can_verify_non_card_collection;
 
   const fieldPaymentReconciliationAttention = canViewFieldPaymentVerificationAttention
     ? await listFieldPaymentCollectionReportsForReconciliation({
@@ -360,7 +361,15 @@ export default async function OpsPage({
   });
 
   const productMode: ProductMode = await resolvedProductModePromise;
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
   const isHvacServiceMode = productMode === "hvac_service";
+  const canCreateEccBatchInvoice =
+    canViewFinancialRegisterForAccount &&
+    billingMode === "internal_invoicing" &&
+    (productMode === "ecc_hers" || productMode === "hybrid");
   const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";
   const contractorIntakeQueueAvailable = isContractorIntakeQueueAvailableForProductMode(productMode);
   const contractorFocusIds = showContractorFocusSelection ? contractorFocusIdsFromQuery : [];
@@ -941,7 +950,7 @@ export default async function OpsPage({
         key: "closeout",
         label: "Closeout & Review",
         count: closeoutCount,
-        href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+        href: `/ops${buildQueryString({ bucket: "closeout", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
       },
       {
         key: "follow_ups",
@@ -1745,12 +1754,16 @@ export default async function OpsPage({
       unassigned: queueHealthUnassigned,
       breakdown: Array.from(queueHealthBreakdown.entries()).map(([label, count]) => ({ label, count })),
     };
-    const opsBoardHeaderRightActionByBucket: Partial<Record<string, { label: string; href: string }>> = {
-      closeout: {
-        label: "View all",
-        href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
-      },
-    };
+    const opsBoardHeaderRightActionByBucket: Partial<Record<string, { label: string; href: string }>> = canCreateEccBatchInvoice
+      ? {
+          closeout: {
+            label: "Batch Contractor Invoice",
+            href: contractorScopeFilter
+              ? `/billing/ready-to-bill?contractor=${encodeURIComponent(contractorScopeFilter)}`
+              : "/billing/ready-to-bill",
+          },
+        }
+      : {};
     // Every queue chip navigates (server round-trip) rather than switching the
     // panel purely client-side. The board's SSR-only surfaces — the Contractor
     // Focus picker and Queue Health — are computed for whichever bucket the

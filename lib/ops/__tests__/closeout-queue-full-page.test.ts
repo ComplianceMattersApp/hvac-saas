@@ -62,7 +62,8 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toContain("canViewFinancialRegisterForAccount");
     expect(closeoutQueuePageSource).toContain("resolveBillingModeByAccountOwnerId");
     expect(closeoutQueuePageSource).toContain("resolveProductModeForAccountOwnerId");
-    expect(closeoutQueuePageSource).toContain("Batch Contractor Invoice");
+    expect(closeoutQueuePageSource).not.toContain("Batch Contractor Invoice");
+    expect(closeoutQueuePageSource).toContain("Back to Operations");
     expect(closeoutQueuePageSource).toContain("encodeURIComponent(contractor)");
   });
 
