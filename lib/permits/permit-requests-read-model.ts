@@ -38,6 +38,8 @@ type RawPermitRequestQueueRow = {
   request_label: string | null;
   customer_first_name_snapshot: string | null;
   customer_last_name_snapshot: string | null;
+  customer_email_snapshot: string | null;
+  customer_phone_snapshot: string | null;
   service_address_text_snapshot: string | null;
   address_line1_snapshot: string | null;
   address_line2_snapshot: string | null;
@@ -88,6 +90,8 @@ export type PermitRequestQueueRow = {
   requestLabel: string | null;
   customerFirstNameSnapshot: string | null;
   customerLastNameSnapshot: string | null;
+  customerEmailSnapshot: string | null;
+  customerPhoneSnapshot: string | null;
   serviceAddressTextSnapshot: string | null;
   addressLine1Snapshot: string | null;
   addressLine2Snapshot: string | null;
@@ -142,6 +146,8 @@ export async function listActivePermitRequestQueueRows(params: {
         "request_label",
         "customer_first_name_snapshot",
         "customer_last_name_snapshot",
+        "customer_email_snapshot",
+        "customer_phone_snapshot",
         "service_address_text_snapshot",
         "address_line1_snapshot",
         "address_line2_snapshot",
@@ -269,6 +275,8 @@ function toPermitRequestQueueRow(
     requestLabel: getTrimmedValue(row.request_label),
     customerFirstNameSnapshot: getTrimmedValue(row.customer_first_name_snapshot),
     customerLastNameSnapshot: getTrimmedValue(row.customer_last_name_snapshot),
+    customerEmailSnapshot: getTrimmedValue(row.customer_email_snapshot),
+    customerPhoneSnapshot: getTrimmedValue(row.customer_phone_snapshot),
     serviceAddressTextSnapshot: getTrimmedValue(row.service_address_text_snapshot),
     addressLine1Snapshot: getTrimmedValue(row.address_line1_snapshot) ?? getTrimmedValue(row.service_address_text_snapshot),
     addressLine2Snapshot: getTrimmedValue(row.address_line2_snapshot),

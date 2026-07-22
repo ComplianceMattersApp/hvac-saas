@@ -22,6 +22,8 @@ export type InternalManualPermitRequestInput = {
   intakeNote?: string | null;
   customerFirstName?: string | null;
   customerLastName?: string | null;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
   serviceAddressText?: string | null;
   addressLine2?: string | null;
   city?: string | null;
@@ -43,6 +45,8 @@ export type InternalPermitRequestIntakeInput = {
   requestLabel?: string | null;
   customerFirstName?: string | null;
   customerLastName?: string | null;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
   serviceAddressText?: string | null;
   addressLine2?: string | null;
   city?: string | null;
@@ -117,6 +121,8 @@ function readManualPermitRequestInput(input: FormData | InternalManualPermitRequ
       intakeNote: getTrimmedValue(input.get("intake_note"), 4000),
       customerFirstName: getTrimmedValue(input.get("customer_first_name"), 120),
       customerLastName: getTrimmedValue(input.get("customer_last_name"), 120),
+      customerEmail: getTrimmedValue(input.get("customer_email"), 240),
+      customerPhone: getTrimmedValue(input.get("customer_phone"), 80),
       serviceAddressText: getTrimmedValue(input.get("service_address_text"), 500),
       addressLine2: getTrimmedValue(input.get("address_line2"), 240),
       city: getTrimmedValue(input.get("city"), 120),
@@ -132,6 +138,8 @@ function readManualPermitRequestInput(input: FormData | InternalManualPermitRequ
     intakeNote: getTrimmedValue(input.intakeNote, 4000),
     customerFirstName: getTrimmedValue(input.customerFirstName, 120),
     customerLastName: getTrimmedValue(input.customerLastName, 120),
+    customerEmail: getTrimmedValue(input.customerEmail, 240),
+    customerPhone: getTrimmedValue(input.customerPhone, 80),
     serviceAddressText: getTrimmedValue(input.serviceAddressText, 500),
     addressLine2: getTrimmedValue(input.addressLine2, 240),
     city: getTrimmedValue(input.city, 120),
@@ -190,6 +198,8 @@ function readPermitRequestIntakeInput(input: FormData | InternalPermitRequestInt
       requestLabel: getTrimmedValue(input.get("request_label"), 160),
       customerFirstName: getTrimmedValue(input.get("customer_first_name_snapshot"), 120),
       customerLastName: getTrimmedValue(input.get("customer_last_name_snapshot"), 120),
+      customerEmail: getTrimmedValue(input.get("customer_email_snapshot"), 240),
+      customerPhone: getTrimmedValue(input.get("customer_phone_snapshot"), 80),
       serviceAddressText: getTrimmedValue(input.get("service_address_text_snapshot"), 500),
       addressLine2: getTrimmedValue(input.get("address_line2_snapshot"), 240),
       city: getTrimmedValue(input.get("city_snapshot"), 120),
@@ -208,6 +218,8 @@ function readPermitRequestIntakeInput(input: FormData | InternalPermitRequestInt
     requestLabel: getTrimmedValue(input.requestLabel, 160),
     customerFirstName: getTrimmedValue(input.customerFirstName, 120),
     customerLastName: getTrimmedValue(input.customerLastName, 120),
+    customerEmail: getTrimmedValue(input.customerEmail, 240),
+    customerPhone: getTrimmedValue(input.customerPhone, 80),
     serviceAddressText: getTrimmedValue(input.serviceAddressText, 500),
     addressLine2: getTrimmedValue(input.addressLine2, 240),
     city: getTrimmedValue(input.city, 120),
@@ -372,6 +384,8 @@ type ActivePermitRequestForMutation = {
   request_label: string | null;
   customer_first_name_snapshot: string | null;
   customer_last_name_snapshot: string | null;
+  customer_email_snapshot: string | null;
+  customer_phone_snapshot: string | null;
   service_address_text_snapshot: string | null;
   address_line1_snapshot: string | null;
   address_line2_snapshot: string | null;
@@ -403,6 +417,8 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
       "request_label",
       "customer_first_name_snapshot",
       "customer_last_name_snapshot",
+      "customer_email_snapshot",
+      "customer_phone_snapshot",
       "service_address_text_snapshot",
       "address_line1_snapshot",
       "address_line2_snapshot",
@@ -432,6 +448,8 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     request_label?: unknown;
     customer_first_name_snapshot?: unknown;
     customer_last_name_snapshot?: unknown;
+    customer_email_snapshot?: unknown;
+    customer_phone_snapshot?: unknown;
     service_address_text_snapshot?: unknown;
     address_line1_snapshot?: unknown;
     address_line2_snapshot?: unknown;
@@ -468,6 +486,8 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     request_label?: unknown;
     customer_first_name_snapshot?: unknown;
     customer_last_name_snapshot?: unknown;
+    customer_email_snapshot?: unknown;
+    customer_phone_snapshot?: unknown;
     service_address_text_snapshot?: unknown;
     address_line1_snapshot?: unknown;
     address_line2_snapshot?: unknown;
@@ -493,6 +513,8 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     request_label: getTrimmedValue(activeRow.request_label, 160),
     customer_first_name_snapshot: getTrimmedValue(activeRow.customer_first_name_snapshot, 120),
     customer_last_name_snapshot: getTrimmedValue(activeRow.customer_last_name_snapshot, 120),
+    customer_email_snapshot: getTrimmedValue(activeRow.customer_email_snapshot, 240),
+    customer_phone_snapshot: getTrimmedValue(activeRow.customer_phone_snapshot, 80),
     service_address_text_snapshot: getTrimmedValue(activeRow.service_address_text_snapshot, 500),
     address_line1_snapshot: getTrimmedValue(activeRow.address_line1_snapshot, 240),
     address_line2_snapshot: getTrimmedValue(activeRow.address_line2_snapshot, 240),
@@ -1141,6 +1163,8 @@ function buildChangedPermitIntakeFields(
     ["request_label", current.request_label, next.requestLabel],
     ["customer_first_name_snapshot", current.customer_first_name_snapshot, next.customerFirstName],
     ["customer_last_name_snapshot", current.customer_last_name_snapshot, next.customerLastName],
+    ["customer_email_snapshot", current.customer_email_snapshot, next.customerEmail],
+    ["customer_phone_snapshot", current.customer_phone_snapshot, next.customerPhone],
     ["service_address_text_snapshot", current.service_address_text_snapshot, next.serviceAddressText],
     ["address_line2_snapshot", current.address_line2_snapshot, next.addressLine2],
     ["city_snapshot", current.city_snapshot, next.city],
@@ -1197,6 +1221,8 @@ export async function createInternalManualPermitRequest(
       request_label: parsed.requestLabel,
       customer_first_name_snapshot: parsed.customerFirstName,
       customer_last_name_snapshot: parsed.customerLastName,
+      customer_email_snapshot: parsed.customerEmail,
+      customer_phone_snapshot: parsed.customerPhone,
       service_address_text_snapshot: parsed.serviceAddressText,
       address_line1_snapshot: parsed.serviceAddressText,
       address_line2_snapshot: parsed.addressLine2,
@@ -1231,6 +1257,8 @@ export async function createInternalManualPermitRequest(
         note_snippet: buildNoteSnippet(parsed.intakeNote),
         customer_first_name: parsed.customerFirstName,
         customer_last_name: parsed.customerLastName,
+        customer_email: parsed.customerEmail,
+        customer_phone: parsed.customerPhone,
         service_address_text: parsed.serviceAddressText,
         address_line2: parsed.addressLine2,
         city: parsed.city,
@@ -1449,6 +1477,8 @@ export async function updateInternalPermitRequestIntake(
     request_label: parsed.requestLabel,
     customer_first_name_snapshot: parsed.customerFirstName,
     customer_last_name_snapshot: parsed.customerLastName,
+    customer_email_snapshot: parsed.customerEmail,
+    customer_phone_snapshot: parsed.customerPhone,
     service_address_text_snapshot: parsed.serviceAddressText,
     address_line1_snapshot: parsed.serviceAddressText,
     address_line2_snapshot: parsed.addressLine2,

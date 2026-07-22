@@ -2121,6 +2121,14 @@ export default async function OpsPage({
                         className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
                       />
                     </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Customer email
+                      <input name="customer_email" type="email" autoComplete="email" maxLength={240} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Customer phone
+                      <input name="customer_phone" type="tel" autoComplete="tel" maxLength={80} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
+                    </label>
                     <label className="grid gap-1 text-xs font-semibold text-slate-600 lg:col-span-2">
                       Street address
                       <input
@@ -2138,14 +2146,14 @@ export default async function OpsPage({
                       City
                       <input name="city" maxLength={120} required className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
                     </label>
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-2">
-                      <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-2">
+                      <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
                         State
-                        <input name="state" maxLength={40} required className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium uppercase text-slate-900" />
+                        <input name="state" maxLength={40} required className="min-h-10 min-w-0 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium uppercase text-slate-900" />
                       </label>
-                      <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
                         ZIP
-                        <input name="zip" inputMode="numeric" autoComplete="postal-code" maxLength={40} required className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
+                        <input name="zip" inputMode="numeric" autoComplete="postal-code" maxLength={40} required className="min-h-10 min-w-0 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
                       </label>
                     </div>
                     <label className="grid gap-1 text-xs font-semibold text-slate-600">
@@ -2218,6 +2226,12 @@ export default async function OpsPage({
                                   .join(" "),
                               },
                             ]
+                          : []),
+                        ...(permitRequest.customerEmailSnapshot
+                          ? [{ label: "Email", value: permitRequest.customerEmailSnapshot }]
+                          : []),
+                        ...(permitRequest.customerPhoneSnapshot
+                          ? [{ label: "Phone", value: permitRequest.customerPhoneSnapshot }]
                           : []),
                         ...(permitRequest.addressLine1Snapshot
                           ? [{ label: "Address", value: [permitRequest.addressLine1Snapshot, permitRequest.citySnapshot, permitRequest.stateSnapshot, permitRequest.zipSnapshot].filter(Boolean).join(", ") }]
@@ -2336,6 +2350,14 @@ export default async function OpsPage({
                               className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
                             />
                           </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Customer email
+                            <input name="customer_email_snapshot" type="email" autoComplete="email" defaultValue={permitRequest.customerEmailSnapshot ?? ""} maxLength={240} className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900" />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Customer phone
+                            <input name="customer_phone_snapshot" type="tel" autoComplete="tel" defaultValue={permitRequest.customerPhoneSnapshot ?? ""} maxLength={80} className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900" />
+                          </label>
                           <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
                             Street address
                             <input
@@ -2353,9 +2375,9 @@ export default async function OpsPage({
                             City
                             <input name="city_snapshot" defaultValue={permitRequest.citySnapshot ?? ""} maxLength={120} className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900" />
                           </label>
-                          <div className="grid grid-cols-2 gap-2">
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">State<input name="state_snapshot" defaultValue={permitRequest.stateSnapshot ?? ""} maxLength={40} className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium uppercase text-slate-900" /></label>
-                            <label className="grid gap-1 text-xs font-semibold text-slate-600">ZIP<input name="zip_snapshot" defaultValue={permitRequest.zipSnapshot ?? ""} inputMode="numeric" maxLength={40} className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900" /></label>
+                          <div className="grid min-w-0 grid-cols-2 gap-2">
+                            <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">State<input name="state_snapshot" defaultValue={permitRequest.stateSnapshot ?? ""} maxLength={40} className="min-h-9 min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium uppercase text-slate-900" /></label>
+                            <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">ZIP<input name="zip_snapshot" defaultValue={permitRequest.zipSnapshot ?? ""} inputMode="numeric" maxLength={40} className="min-h-9 min-w-0 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900" /></label>
                           </div>
                           <label className="grid gap-1 text-xs font-semibold text-slate-600">
                             Permit number
@@ -2526,6 +2548,8 @@ export default async function OpsPage({
                             <input type="hidden" name="customer_location_mode" value="new_new" />
                             <input type="hidden" name="customer_first_name" value={permitRequest.customerFirstNameSnapshot ?? ""} />
                             <input type="hidden" name="customer_last_name" value={permitRequest.customerLastNameSnapshot ?? ""} />
+                            <input type="hidden" name="customer_email" value={permitRequest.customerEmailSnapshot ?? ""} />
+                            <input type="hidden" name="customer_phone" value={permitRequest.customerPhoneSnapshot ?? ""} />
                             <input type="hidden" name="address_line1" value={permitRequest.addressLine1Snapshot ?? ""} />
                             <input type="hidden" name="address_line2" value={permitRequest.addressLine2Snapshot ?? ""} />
                             <input type="hidden" name="city" value={permitRequest.citySnapshot ?? ""} />

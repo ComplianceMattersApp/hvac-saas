@@ -26,6 +26,8 @@ type Row = {
   request_label: string | null;
   customer_first_name_snapshot: string | null;
   customer_last_name_snapshot: string | null;
+  customer_email_snapshot: string | null;
+  customer_phone_snapshot: string | null;
   service_address_text_snapshot: string | null;
   address_line1_snapshot: string | null;
   address_line2_snapshot: string | null;
@@ -67,6 +69,8 @@ function makeRow(overrides: Partial<Row>): Row {
     request_label: null,
     customer_first_name_snapshot: null,
     customer_last_name_snapshot: null,
+    customer_email_snapshot: null,
+    customer_phone_snapshot: null,
     service_address_text_snapshot: null,
     address_line1_snapshot: null,
     address_line2_snapshot: null,
@@ -165,6 +169,8 @@ describe("permit request active queue read model", () => {
         request_label: "Signed contract permit",
         customer_first_name_snapshot: "Grace",
         customer_last_name_snapshot: "Hopper",
+        customer_email_snapshot: "grace@example.com",
+        customer_phone_snapshot: "555-0199",
         service_address_text_snapshot: "20 Snapshot Ave",
         address_line1_snapshot: "20 Snapshot Ave",
         address_line2_snapshot: "Unit 4",
@@ -210,6 +216,8 @@ describe("permit request active queue read model", () => {
       requestLabel: "Signed contract permit",
       customerFirstNameSnapshot: "Grace",
       customerLastNameSnapshot: "Hopper",
+      customerEmailSnapshot: "grace@example.com",
+      customerPhoneSnapshot: "555-0199",
       serviceAddressTextSnapshot: "20 Snapshot Ave",
       addressLine1Snapshot: "20 Snapshot Ave",
       addressLine2Snapshot: "Unit 4",
