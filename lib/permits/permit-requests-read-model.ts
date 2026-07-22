@@ -39,6 +39,11 @@ type RawPermitRequestQueueRow = {
   customer_first_name_snapshot: string | null;
   customer_last_name_snapshot: string | null;
   service_address_text_snapshot: string | null;
+  address_line1_snapshot: string | null;
+  address_line2_snapshot: string | null;
+  city_snapshot: string | null;
+  state_snapshot: string | null;
+  zip_snapshot: string | null;
   internal_intake_note: string | null;
   created_at: string;
   updated_at: string;
@@ -84,6 +89,11 @@ export type PermitRequestQueueRow = {
   customerFirstNameSnapshot: string | null;
   customerLastNameSnapshot: string | null;
   serviceAddressTextSnapshot: string | null;
+  addressLine1Snapshot: string | null;
+  addressLine2Snapshot: string | null;
+  citySnapshot: string | null;
+  stateSnapshot: string | null;
+  zipSnapshot: string | null;
   internalIntakeNote: string | null;
   jobContext: {
     id: string;
@@ -133,6 +143,11 @@ export async function listActivePermitRequestQueueRows(params: {
         "customer_first_name_snapshot",
         "customer_last_name_snapshot",
         "service_address_text_snapshot",
+        "address_line1_snapshot",
+        "address_line2_snapshot",
+        "city_snapshot",
+        "state_snapshot",
+        "zip_snapshot",
         "internal_intake_note",
         "created_at",
         "updated_at",
@@ -255,6 +270,11 @@ function toPermitRequestQueueRow(
     customerFirstNameSnapshot: getTrimmedValue(row.customer_first_name_snapshot),
     customerLastNameSnapshot: getTrimmedValue(row.customer_last_name_snapshot),
     serviceAddressTextSnapshot: getTrimmedValue(row.service_address_text_snapshot),
+    addressLine1Snapshot: getTrimmedValue(row.address_line1_snapshot) ?? getTrimmedValue(row.service_address_text_snapshot),
+    addressLine2Snapshot: getTrimmedValue(row.address_line2_snapshot),
+    citySnapshot: getTrimmedValue(row.city_snapshot),
+    stateSnapshot: getTrimmedValue(row.state_snapshot),
+    zipSnapshot: getTrimmedValue(row.zip_snapshot),
     internalIntakeNote: getTrimmedValue(row.internal_intake_note),
     jobContext: getJobContext(row.jobs),
     createdAt: row.created_at,

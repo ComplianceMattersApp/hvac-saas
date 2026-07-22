@@ -37,7 +37,10 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain("permitQueueContext(permitRequest)");
     expect(branch).toContain("permitRequest.contractorName || permitRequest.contractorId");
     expect(branch).toContain("permitRequest.submittedAgeDays");
-    expect(branch).toContain("permitRequest.serviceAddressTextSnapshot");
+    expect(branch).toContain("permitRequest.addressLine1Snapshot");
+    expect(branch).toContain("permitRequest.citySnapshot");
+    expect(branch).toContain("permitRequest.stateSnapshot");
+    expect(branch).toContain("permitRequest.zipSnapshot");
     expect(branch).toContain("permitRequest.jurisdiction");
   });
 

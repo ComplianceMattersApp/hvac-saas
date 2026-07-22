@@ -27,6 +27,11 @@ type Row = {
   customer_first_name_snapshot: string | null;
   customer_last_name_snapshot: string | null;
   service_address_text_snapshot: string | null;
+  address_line1_snapshot: string | null;
+  address_line2_snapshot: string | null;
+  city_snapshot: string | null;
+  state_snapshot: string | null;
+  zip_snapshot: string | null;
   internal_intake_note: string | null;
   created_at: string;
   updated_at: string;
@@ -63,6 +68,11 @@ function makeRow(overrides: Partial<Row>): Row {
     customer_first_name_snapshot: null,
     customer_last_name_snapshot: null,
     service_address_text_snapshot: null,
+    address_line1_snapshot: null,
+    address_line2_snapshot: null,
+    city_snapshot: null,
+    state_snapshot: null,
+    zip_snapshot: null,
     internal_intake_note: null,
     created_at: "2026-06-10T00:00:00.000Z",
     updated_at: "2026-06-10T00:00:00.000Z",
@@ -156,6 +166,11 @@ describe("permit request active queue read model", () => {
         customer_first_name_snapshot: "Grace",
         customer_last_name_snapshot: "Hopper",
         service_address_text_snapshot: "20 Snapshot Ave",
+        address_line1_snapshot: "20 Snapshot Ave",
+        address_line2_snapshot: "Unit 4",
+        city_snapshot: "Fresno",
+        state_snapshot: "CA",
+        zip_snapshot: "93720",
         internal_intake_note: "Reviewed text message request.",
         contractor_note: "Uploaded contract and title 24.",
         jobs: {
@@ -196,6 +211,11 @@ describe("permit request active queue read model", () => {
       customerFirstNameSnapshot: "Grace",
       customerLastNameSnapshot: "Hopper",
       serviceAddressTextSnapshot: "20 Snapshot Ave",
+      addressLine1Snapshot: "20 Snapshot Ave",
+      addressLine2Snapshot: "Unit 4",
+      citySnapshot: "Fresno",
+      stateSnapshot: "CA",
+      zipSnapshot: "93720",
       internalIntakeNote: "Reviewed text message request.",
       jobContext: {
         id: "job-1",

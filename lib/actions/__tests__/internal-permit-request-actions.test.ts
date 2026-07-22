@@ -368,6 +368,10 @@ describe("internal manual permit request actions", () => {
       customerFirstName: "Ada",
       customerLastName: "Lovelace",
       serviceAddressText: "10 Main St",
+      addressLine2: "Suite 2",
+      city: "Fresno",
+      state: "CA",
+      zip: "93720",
       jurisdiction: "Fresno",
     });
 
@@ -381,6 +385,11 @@ describe("internal manual permit request actions", () => {
         customer_first_name_snapshot: "Ada",
         customer_last_name_snapshot: "Lovelace",
         service_address_text_snapshot: "10 Main St",
+        address_line1_snapshot: "10 Main St",
+        address_line2_snapshot: "Suite 2",
+        city_snapshot: "Fresno",
+        state_snapshot: "CA",
+        zip_snapshot: "93720",
         internal_intake_note: [
           "Request: Texted signed contract",
           "Note: Customer sent permit packet by text.",
@@ -409,6 +418,10 @@ describe("internal manual permit request actions", () => {
     await createInternalManualPermitRequest({
       contractorId: "ctr-1",
       intakeNote: "Office received photo.",
+      serviceAddressText: "10 Main St",
+      city: "Fresno",
+      state: "CA",
+      zip: "93720",
     });
 
     expect(fixture.calls.permitEventInsertPayloads).toEqual([
@@ -507,6 +520,10 @@ describe("internal manual permit request actions", () => {
     await createInternalManualPermitRequest({
       contractorId: "ctr-1",
       requestLabel: "Manual intake",
+      serviceAddressText: "10 Main St",
+      city: "Fresno",
+      state: "CA",
+      zip: "93720",
     });
 
     expect(fixture.calls.jobMutations).toBe(0);
@@ -781,6 +798,10 @@ describe("internal manual permit request actions", () => {
         customerFirstName: "Ada",
         customerLastName: "Lovelace",
         serviceAddressText: "10 Main St",
+        addressLine2: "Suite 2",
+        city: "Fresno",
+        state: "CA",
+        zip: "93720",
         jurisdiction: "Fresno",
         internalIntakeNote: "Need to verify parcel number.",
         contractorNote: "Contractor uploaded contract photo.",
@@ -799,6 +820,11 @@ describe("internal manual permit request actions", () => {
         customer_first_name_snapshot: "Ada",
         customer_last_name_snapshot: "Lovelace",
         service_address_text_snapshot: "10 Main St",
+        address_line1_snapshot: "10 Main St",
+        address_line2_snapshot: "Suite 2",
+        city_snapshot: "Fresno",
+        state_snapshot: "CA",
+        zip_snapshot: "93720",
         jurisdiction: "Fresno",
         internal_intake_note: "Need to verify parcel number.",
         contractor_note: "Contractor uploaded contract photo.",
@@ -1259,7 +1285,9 @@ describe("internal manual permit request actions", () => {
       customerEmail: "maya@example.com",
       customerPhone: "555-1212",
       addressLine1: "200 Permit Way",
+      city: "Fresno",
       state: "CA",
+      zip: "93720",
     });
 
     expect(result).toEqual({
@@ -1285,8 +1313,8 @@ describe("internal manual permit request actions", () => {
         address_line1: "200 Permit Way",
         city: "Fresno",
         state: "CA",
-        zip: null,
-        postal_code: null,
+        zip: "93720",
+        postal_code: "93720",
         owner_user_id: "owner-1",
       }),
     ]);
@@ -1445,6 +1473,7 @@ describe("internal manual permit request actions", () => {
       existingCustomerId: "customer-1",
       addressLine1: "300 New Address",
       city: "Fresno",
+      state: "CA",
       zip: "93721",
     });
 
@@ -1547,7 +1576,7 @@ describe("internal manual permit request actions", () => {
         city: "Fresno",
         zip: "93720",
       }),
-    ).rejects.toThrow("Service address and city are required to create a job.");
+    ).rejects.toThrow("Street address, city, state, and ZIP are required to create a job.");
 
     expect(fixture.calls.customerInsertPayloads).toHaveLength(0);
     expect(fixture.calls.locationInsertPayloads).toHaveLength(0);

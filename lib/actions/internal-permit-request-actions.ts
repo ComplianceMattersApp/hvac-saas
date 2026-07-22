@@ -23,6 +23,10 @@ export type InternalManualPermitRequestInput = {
   customerFirstName?: string | null;
   customerLastName?: string | null;
   serviceAddressText?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
   jurisdiction?: string | null;
 };
 
@@ -40,6 +44,10 @@ export type InternalPermitRequestIntakeInput = {
   customerFirstName?: string | null;
   customerLastName?: string | null;
   serviceAddressText?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
   jurisdiction?: string | null;
   internalIntakeNote?: string | null;
   contractorNote?: string | null;
@@ -110,6 +118,10 @@ function readManualPermitRequestInput(input: FormData | InternalManualPermitRequ
       customerFirstName: getTrimmedValue(input.get("customer_first_name"), 120),
       customerLastName: getTrimmedValue(input.get("customer_last_name"), 120),
       serviceAddressText: getTrimmedValue(input.get("service_address_text"), 500),
+      addressLine2: getTrimmedValue(input.get("address_line2"), 240),
+      city: getTrimmedValue(input.get("city"), 120),
+      state: getTrimmedValue(input.get("state"), 40),
+      zip: getTrimmedValue(input.get("zip"), 40),
       jurisdiction: getTrimmedValue(input.get("jurisdiction"), 160),
     };
   }
@@ -121,6 +133,10 @@ function readManualPermitRequestInput(input: FormData | InternalManualPermitRequ
     customerFirstName: getTrimmedValue(input.customerFirstName, 120),
     customerLastName: getTrimmedValue(input.customerLastName, 120),
     serviceAddressText: getTrimmedValue(input.serviceAddressText, 500),
+    addressLine2: getTrimmedValue(input.addressLine2, 240),
+    city: getTrimmedValue(input.city, 120),
+    state: getTrimmedValue(input.state, 40),
+    zip: getTrimmedValue(input.zip, 40),
     jurisdiction: getTrimmedValue(input.jurisdiction, 160),
   };
 }
@@ -175,6 +191,10 @@ function readPermitRequestIntakeInput(input: FormData | InternalPermitRequestInt
       customerFirstName: getTrimmedValue(input.get("customer_first_name_snapshot"), 120),
       customerLastName: getTrimmedValue(input.get("customer_last_name_snapshot"), 120),
       serviceAddressText: getTrimmedValue(input.get("service_address_text_snapshot"), 500),
+      addressLine2: getTrimmedValue(input.get("address_line2_snapshot"), 240),
+      city: getTrimmedValue(input.get("city_snapshot"), 120),
+      state: getTrimmedValue(input.get("state_snapshot"), 40),
+      zip: getTrimmedValue(input.get("zip_snapshot"), 40),
       jurisdiction: getTrimmedValue(input.get("jurisdiction"), 160),
       internalIntakeNote: getTrimmedValue(input.get("internal_intake_note"), 4000),
       contractorNote: getTrimmedValue(input.get("contractor_note"), 4000),
@@ -189,6 +209,10 @@ function readPermitRequestIntakeInput(input: FormData | InternalPermitRequestInt
     customerFirstName: getTrimmedValue(input.customerFirstName, 120),
     customerLastName: getTrimmedValue(input.customerLastName, 120),
     serviceAddressText: getTrimmedValue(input.serviceAddressText, 500),
+    addressLine2: getTrimmedValue(input.addressLine2, 240),
+    city: getTrimmedValue(input.city, 120),
+    state: getTrimmedValue(input.state, 40),
+    zip: getTrimmedValue(input.zip, 40),
     jurisdiction: getTrimmedValue(input.jurisdiction, 160),
     internalIntakeNote: getTrimmedValue(input.internalIntakeNote, 4000),
     contractorNote: getTrimmedValue(input.contractorNote, 4000),
@@ -349,6 +373,11 @@ type ActivePermitRequestForMutation = {
   customer_first_name_snapshot: string | null;
   customer_last_name_snapshot: string | null;
   service_address_text_snapshot: string | null;
+  address_line1_snapshot: string | null;
+  address_line2_snapshot: string | null;
+  city_snapshot: string | null;
+  state_snapshot: string | null;
+  zip_snapshot: string | null;
   jurisdiction: string | null;
   internal_intake_note: string | null;
   contractor_note: string | null;
@@ -375,6 +404,11 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
       "customer_first_name_snapshot",
       "customer_last_name_snapshot",
       "service_address_text_snapshot",
+      "address_line1_snapshot",
+      "address_line2_snapshot",
+      "city_snapshot",
+      "state_snapshot",
+      "zip_snapshot",
       "jurisdiction",
       "internal_intake_note",
       "contractor_note",
@@ -399,6 +433,11 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     customer_first_name_snapshot?: unknown;
     customer_last_name_snapshot?: unknown;
     service_address_text_snapshot?: unknown;
+    address_line1_snapshot?: unknown;
+    address_line2_snapshot?: unknown;
+    city_snapshot?: unknown;
+    state_snapshot?: unknown;
+    zip_snapshot?: unknown;
     jurisdiction?: unknown;
     internal_intake_note?: unknown;
     contractor_note?: unknown;
@@ -430,6 +469,11 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     customer_first_name_snapshot?: unknown;
     customer_last_name_snapshot?: unknown;
     service_address_text_snapshot?: unknown;
+    address_line1_snapshot?: unknown;
+    address_line2_snapshot?: unknown;
+    city_snapshot?: unknown;
+    state_snapshot?: unknown;
+    zip_snapshot?: unknown;
     jurisdiction?: unknown;
     internal_intake_note?: unknown;
     contractor_note?: unknown;
@@ -450,6 +494,11 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     customer_first_name_snapshot: getTrimmedValue(activeRow.customer_first_name_snapshot, 120),
     customer_last_name_snapshot: getTrimmedValue(activeRow.customer_last_name_snapshot, 120),
     service_address_text_snapshot: getTrimmedValue(activeRow.service_address_text_snapshot, 500),
+    address_line1_snapshot: getTrimmedValue(activeRow.address_line1_snapshot, 240),
+    address_line2_snapshot: getTrimmedValue(activeRow.address_line2_snapshot, 240),
+    city_snapshot: getTrimmedValue(activeRow.city_snapshot, 120),
+    state_snapshot: getTrimmedValue(activeRow.state_snapshot, 40),
+    zip_snapshot: getTrimmedValue(activeRow.zip_snapshot, 40),
     jurisdiction: getTrimmedValue(activeRow.jurisdiction, 160),
     internal_intake_note: getTrimmedValue(activeRow.internal_intake_note, 4000),
     contractor_note: getTrimmedValue(activeRow.contractor_note, 4000),
@@ -708,25 +757,18 @@ type PermitJobLocation = {
 };
 
 function requireStructuredAddress(input: ReturnType<typeof readCreateJobFromPermitRequestInput>) {
-  const city = input.city || cityFromPermitJurisdiction(input.jurisdiction);
-  if (!input.addressLine1 || !city) {
-    throw new Error("Service address and city are required to create a job.");
+  if (!input.addressLine1 || !input.city || !input.state || !input.zip) {
+    throw new Error("Street address, city, state, and ZIP are required to create a job.");
   }
 
   return {
     addressLine1: input.addressLine1,
     addressLine2: input.addressLine2,
-    city,
-    state: input.state ?? "CA",
+    city: input.city,
+    state: input.state,
     zip: input.zip,
     nickname: input.locationNickname,
   };
-}
-
-function cityFromPermitJurisdiction(value: string | null | undefined) {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  return raw.replace(/^city\s+of\s+/i, "").trim() || null;
 }
 
 function normalizeCustomerRow(row: any, fallbackId: string): PermitJobCustomer {
@@ -1100,6 +1142,10 @@ function buildChangedPermitIntakeFields(
     ["customer_first_name_snapshot", current.customer_first_name_snapshot, next.customerFirstName],
     ["customer_last_name_snapshot", current.customer_last_name_snapshot, next.customerLastName],
     ["service_address_text_snapshot", current.service_address_text_snapshot, next.serviceAddressText],
+    ["address_line2_snapshot", current.address_line2_snapshot, next.addressLine2],
+    ["city_snapshot", current.city_snapshot, next.city],
+    ["state_snapshot", current.state_snapshot, next.state],
+    ["zip_snapshot", current.zip_snapshot, next.zip],
     ["jurisdiction", current.jurisdiction, next.jurisdiction],
     ["internal_intake_note", current.internal_intake_note, next.internalIntakeNote],
     ["contractor_note", current.contractor_note, next.contractorNote],
@@ -1123,7 +1169,6 @@ export async function createInternalManualPermitRequest(
   if (!parsed.requestLabel && !parsed.intakeNote) {
     throw new Error("Add a short request label or intake note.");
   }
-
   const supabase = await createClient();
   const admin = createAdminClient();
   const {
@@ -1138,6 +1183,9 @@ export async function createInternalManualPermitRequest(
     contractorId: parsed.contractorId,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+  if (!parsed.serviceAddressText || !parsed.city || !parsed.state || !parsed.zip) {
+    throw new Error("Street address, city, state, and ZIP are required.");
+  }
 
   const internalIntakeNote = buildManualPermitRequestNote(parsed);
   const { data: permitRequestRow, error: requestInsertErr } = await admin
@@ -1150,6 +1198,11 @@ export async function createInternalManualPermitRequest(
       customer_first_name_snapshot: parsed.customerFirstName,
       customer_last_name_snapshot: parsed.customerLastName,
       service_address_text_snapshot: parsed.serviceAddressText,
+      address_line1_snapshot: parsed.serviceAddressText,
+      address_line2_snapshot: parsed.addressLine2,
+      city_snapshot: parsed.city,
+      state_snapshot: parsed.state,
+      zip_snapshot: parsed.zip,
       internal_intake_note: internalIntakeNote,
       jurisdiction: parsed.jurisdiction,
       submitted_by_user_id: userId,
@@ -1179,6 +1232,10 @@ export async function createInternalManualPermitRequest(
         customer_first_name: parsed.customerFirstName,
         customer_last_name: parsed.customerLastName,
         service_address_text: parsed.serviceAddressText,
+        address_line2: parsed.addressLine2,
+        city: parsed.city,
+        state: parsed.state,
+        zip: parsed.zip,
         jurisdiction: parsed.jurisdiction,
       },
     });
@@ -1393,6 +1450,11 @@ export async function updateInternalPermitRequestIntake(
     customer_first_name_snapshot: parsed.customerFirstName,
     customer_last_name_snapshot: parsed.customerLastName,
     service_address_text_snapshot: parsed.serviceAddressText,
+    address_line1_snapshot: parsed.serviceAddressText,
+    address_line2_snapshot: parsed.addressLine2,
+    city_snapshot: parsed.city,
+    state_snapshot: parsed.state,
+    zip_snapshot: parsed.zip,
     jurisdiction: parsed.jurisdiction,
     internal_intake_note: parsed.internalIntakeNote,
     contractor_note: parsed.contractorNote,
