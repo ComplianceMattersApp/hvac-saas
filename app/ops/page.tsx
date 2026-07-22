@@ -1869,27 +1869,31 @@ export default async function OpsPage({
     async function markPermitCreatedFromOps(formData: FormData) {
       "use server";
 
+      let jobId = "";
       try {
-        await markInternalPermitCreated(formData);
+        const result = await markInternalPermitCreated(formData);
+        jobId = result.jobId;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Permit could not be marked created.";
         redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
       }
 
-      redirect("/ops?bucket=permits#ops-workspace");
+      redirect(`/jobs/${jobId}`);
     }
 
     async function createJobAndMarkPermitCreatedFromOps(formData: FormData) {
       "use server";
 
+      let jobId = "";
       try {
-        await createJobFromPermitRequestAndMarkCreated(formData);
+        const result = await createJobFromPermitRequestAndMarkCreated(formData);
+        jobId = result.jobId;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Permit job could not be created.";
         redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
       }
 
-      redirect("/ops?bucket=permits#ops-workspace");
+      redirect(`/jobs/${jobId}`);
     }
 
     return (
@@ -2534,6 +2538,17 @@ export default async function OpsPage({
                                 Moves the linked job to Waiting / Pending Info as On Hold: Permit pulled and waiting for install.
                               </div>
                             </div>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                              Internal job note <span className="font-normal text-slate-400">(optional)</span>
+                              <textarea
+                                name="internal_note"
+                                rows={3}
+                                maxLength={4000}
+                                defaultValue={permitRequest.internalIntakeNote ?? ""}
+                                placeholder="Add or correct the internal note that should appear on the job."
+                                className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-900"
+                              />
+                            </label>
                             <div className="flex justify-end md:col-span-2">
                               <ImmediateSubmitButton
                                 pendingText="Creating permit..."
@@ -2650,6 +2665,17 @@ export default async function OpsPage({
                                 Creates an ECC testing job and places it in Waiting / Pending Info as On Hold: Permit pulled and waiting for install.
                               </div>
                             </div>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                              Internal job note <span className="font-normal text-slate-400">(optional)</span>
+                              <textarea
+                                name="internal_note"
+                                rows={3}
+                                maxLength={4000}
+                                defaultValue={permitRequest.internalIntakeNote ?? ""}
+                                placeholder="Add or correct the internal note that should appear on the job."
+                                className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-900"
+                              />
+                            </label>
                             <div className="flex justify-end md:col-span-2">
                               <ImmediateSubmitButton
                                 pendingText="Creating job..."

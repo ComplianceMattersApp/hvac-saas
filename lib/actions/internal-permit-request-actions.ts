@@ -65,6 +65,7 @@ export type InternalMarkPermitCreatedInput = {
   permitNumber: string;
   jurisdiction?: string | null;
   permitDate?: string | null;
+  internalNote?: string | null;
 };
 
 export type PermitRequestJobCustomerLocationMode =
@@ -94,6 +95,7 @@ export type InternalCreateJobFromPermitRequestInput = {
   zip?: string | null;
   locationNickname?: string | null;
   jobTitle?: string | null;
+  internalNote?: string | null;
 };
 
 const PENDING_INSTALL_REASON = "Permit pulled and waiting for install";
@@ -241,6 +243,7 @@ function readMarkPermitCreatedInput(input: FormData | InternalMarkPermitCreatedI
       permitNumber: getTrimmedValue(input.get("permit_number"), 160) ?? "",
       jurisdiction: getTrimmedValue(input.get("jurisdiction"), 160),
       permitDate: getNormalizedPermitDate(input.get("permit_date")),
+      internalNote: getTrimmedValue(input.get("internal_note"), 4000),
     };
   }
 
@@ -250,6 +253,7 @@ function readMarkPermitCreatedInput(input: FormData | InternalMarkPermitCreatedI
     permitNumber: getTrimmedValue(input.permitNumber, 160) ?? "",
     jurisdiction: getTrimmedValue(input.jurisdiction, 160),
     permitDate: getNormalizedPermitDate(input.permitDate),
+    internalNote: getTrimmedValue(input.internalNote, 4000),
   };
 }
 
@@ -296,6 +300,7 @@ function readCreateJobFromPermitRequestInput(input: FormData | InternalCreateJob
       zip: getTrimmedValue(input.get("zip"), 40),
       locationNickname: getTrimmedValue(input.get("location_nickname"), 160),
       jobTitle: getTrimmedValue(input.get("job_title"), 160),
+      internalNote: getTrimmedValue(input.get("internal_note"), 4000),
     };
   }
 
@@ -321,6 +326,7 @@ function readCreateJobFromPermitRequestInput(input: FormData | InternalCreateJob
     zip: getTrimmedValue(input.zip, 40),
     locationNickname: getTrimmedValue(input.locationNickname, 160),
     jobTitle: getTrimmedValue(input.jobTitle, 160),
+    internalNote: getTrimmedValue(input.internalNote, 4000),
   };
 }
 
@@ -751,6 +757,30 @@ async function insertLinkedJobPermitCreatedEvent(admin: any, input: {
         created_job_id: input.createdJobId ?? null,
         customer_location_mode: input.customerLocationMode ?? null,
         timeline_v: 1,
+      },
+    });
+
+  if (error) throw error;
+}
+
+async function insertPermitCompletionInternalNote(admin: any, input: {
+  jobId: string;
+  actorUserId: string;
+  permitRequestId: string;
+  note: string | null;
+}) {
+  if (!input.note) return;
+
+  const { error } = await admin
+    .from("job_events")
+    .insert({
+      job_id: input.jobId,
+      event_type: "internal_note",
+      user_id: input.actorUserId,
+      message: input.note,
+      meta: {
+        source: "permit_completion",
+        permit_request_id: input.permitRequestId,
       },
     });
 
@@ -1640,6 +1670,13 @@ export async function markInternalPermitCreated(
     jobOpsStatusAfter,
   });
 
+  await insertPermitCompletionInternalNote(context.admin, {
+    jobId: linkedJob.id,
+    actorUserId: context.userId,
+    permitRequestId: context.permitRequest.id,
+    note: parsed.internalNote,
+  });
+
   revalidatePath("/ops");
   revalidatePath(`/jobs/${linkedJob.id}`);
 
@@ -1772,6 +1809,13 @@ export async function createJobFromPermitRequestAndMarkCreated(
     sourceAction: "create_job_from_permit_request_and_mark_created",
     createdJobId: createdJob.jobId,
     customerLocationMode: customerLocation.mode,
+  });
+
+  await insertPermitCompletionInternalNote(context.admin, {
+    jobId: createdJob.jobId,
+    actorUserId: context.userId,
+    permitRequestId: context.permitRequest.id,
+    note: parsed.internalNote,
   });
 
   revalidatePath("/ops");

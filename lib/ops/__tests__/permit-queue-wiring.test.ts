@@ -95,6 +95,9 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain('name="reason"');
     expect(branch).toContain("Mark Not Needed");
     expect(branch).toContain("preserves its history");
+    expect(branch).toContain('name="internal_note"');
+    expect(branch).toContain("Add or correct the internal note that should appear on the job.");
+    expect(opsPageSource).toContain("redirect(`/jobs/${jobId}`)");
   });
 
   it("renders create-job-and-mark-created UI for unlinked active permit requests", () => {

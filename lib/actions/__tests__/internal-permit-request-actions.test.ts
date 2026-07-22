@@ -915,6 +915,7 @@ describe("internal manual permit request actions", () => {
         permitNumber: "P-123",
         jurisdiction: "Fresno",
         permitDate: "2026-06-16",
+        internalNote: "Permit confirmed with the jurisdiction.",
       }),
     ).resolves.toMatchObject({
       permitRequestId: "permit-1",
@@ -979,6 +980,16 @@ describe("internal manual permit request actions", () => {
           job_ops_status_after: "need_to_schedule",
           timeline_v: 1,
         }),
+      }),
+      expect.objectContaining({
+        job_id: "job-1",
+        event_type: "internal_note",
+        user_id: "internal-user-1",
+        message: "Permit confirmed with the jurisdiction.",
+        meta: {
+          source: "permit_completion",
+          permit_request_id: "permit-1",
+        },
       }),
     ]);
     expect(revalidatePathMock).toHaveBeenCalledWith("/ops");
