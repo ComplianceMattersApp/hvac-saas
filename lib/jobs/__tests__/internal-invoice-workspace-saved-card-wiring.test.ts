@@ -57,6 +57,14 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain('stage: "Issued and paid"');
   });
 
+  it("keeps a back-to-job action visible in every desktop and mobile invoice state", () => {
+    expect(source).toContain("const jobReturnHref = isMobileWorkspace");
+    expect(source).toContain("? `/jobs/${jobId}?tab=ops`");
+    expect(source).toContain(": `/jobs/${jobId}?tab=info#internal-invoice-panel`");
+    expect(source).toContain('<Link href={jobReturnHref} className={secondaryButtonClass}>');
+    expect(source).not.toContain("{!showPostSendCompletion && !showGuidedDraft && !showGuidedIssued ? (\n              <Link");
+  });
+
   it("shows supplemental invoice family context as read-only when supplemental invoices exist", () => {
     expect(source).toContain("resolveInternalInvoiceFamilySummaryByJobId");
     expect(source).toContain("const supplementalInvoiceFamilyItems =");

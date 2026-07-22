@@ -759,6 +759,9 @@ export default async function InternalInvoiceWorkspacePage({
   const returnTo = invoice
     ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}#invoice-workspace`
     : `/jobs/${jobId}/invoice#invoice-workspace`;
+  const jobReturnHref = isMobileWorkspace
+    ? `/jobs/${jobId}?tab=ops`
+    : `/jobs/${jobId}?tab=info#internal-invoice-panel`;
   // Slice B: keep the mobile workspace gate through action redirects.
   const mobileReturnTo = invoice
     ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}&mobileLayout=v2#invoice-workspace`
@@ -938,14 +941,9 @@ export default async function InternalInvoiceWorkspacePage({
             </div>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
-            {!showPostSendCompletion && !showGuidedDraft && !showGuidedIssued ? (
-              <Link
-                href={isMobileWorkspace ? `/jobs/${jobId}?tab=ops` : `/jobs/${jobId}?tab=info#internal-invoice-panel`}
-                className={secondaryButtonClass}
-              >
-                Back to Job
-              </Link>
-            ) : null}
+            <Link href={jobReturnHref} className={secondaryButtonClass}>
+              Back to Job
+            </Link>
             {invoice ? (
               <Link
                 href={`/jobs/${jobId}/invoice/pdf?invoice_id=${encodeURIComponent(invoice.id)}`}
