@@ -3,6 +3,7 @@ import Link from "next/link";
 import ContractorFocusSelector from "./_components/ContractorFocusSelector";
 import QueueCard from "@/components/ops/QueueCard";
 import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
+import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import { redirect } from "next/navigation";
 import { updateJobScheduleFromForm } from "@/lib/actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
@@ -2176,13 +2177,13 @@ export default async function OpsPage({
                     </label>
                     <div className="flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
                       <div className="text-xs text-slate-500">Add a short label or note to create the request.</div>
-                      <button
-                        type="submit"
+                      <ImmediateSubmitButton
                         disabled={workspaceContractors.length === 0}
+                        pendingText="Creating permit..."
                         className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
                       >
                         Create Permit Request
-                      </button>
+                      </ImmediateSubmitButton>
                     </div>
                   </form>
                 </div>
@@ -2250,34 +2251,34 @@ export default async function OpsPage({
                           {permitRequest.status === "permit_request" ? (
                             <form action={acceptPermitRequestFromOps}>
                               <input type="hidden" name="permit_request_id" value={permitRequest.id} />
-                              <button
-                                type="submit"
+                              <ImmediateSubmitButton
+                                pendingText="Starting..."
                                 className="inline-flex min-h-8 items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[12px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
                               >
                                 Accept / Start Permit
-                              </button>
+                              </ImmediateSubmitButton>
                             </form>
                           ) : null}
                           {permitRequest.status === "permit_request" || permitRequest.status === "accepted_in_process" ? (
                             <form action={holdPermitRequestFromOps}>
                               <input type="hidden" name="permit_request_id" value={permitRequest.id} />
-                              <button
-                                type="submit"
+                              <ImmediateSubmitButton
+                                pendingText="Updating..."
                                 className="inline-flex min-h-8 items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[12px] font-semibold text-amber-800 transition-colors hover:bg-amber-100"
                               >
                                 Put On Hold
-                              </button>
+                              </ImmediateSubmitButton>
                             </form>
                           ) : null}
                           {permitRequest.status === "on_hold_additional_info_needed" ? (
                             <form action={resumePermitRequestFromOps}>
                               <input type="hidden" name="permit_request_id" value={permitRequest.id} />
-                              <button
-                                type="submit"
+                              <ImmediateSubmitButton
+                                pendingText="Resuming..."
                                 className="inline-flex min-h-8 items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[12px] font-semibold text-blue-800 transition-colors hover:bg-blue-100"
                               >
                                 Resume / In Process
-                              </button>
+                              </ImmediateSubmitButton>
                             </form>
                           ) : null}
                       </div>
@@ -2302,9 +2303,9 @@ export default async function OpsPage({
                           <div className="text-xs text-slate-500">
                             This removes the request from the active queue and preserves its history.
                           </div>
-                          <button type="submit" className="justify-self-start rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">
+                          <ImmediateSubmitButton pendingText="Removing..." className="justify-self-start rounded-md border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">
                             Mark Not Needed
-                          </button>
+                          </ImmediateSubmitButton>
                         </form>
                       </details>
 
@@ -2418,12 +2419,12 @@ export default async function OpsPage({
                             />
                           </label>
                           <div className="flex justify-end md:col-span-2">
-                            <button
-                              type="submit"
+                            <ImmediateSubmitButton
+                              pendingText="Saving intake..."
                               className="inline-flex min-h-9 items-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
                             >
                               Save Intake Details
-                            </button>
+                            </ImmediateSubmitButton>
                           </div>
                         </form>
                         <div className="mt-3 border-t border-slate-200 pt-2">
@@ -2534,12 +2535,12 @@ export default async function OpsPage({
                               </div>
                             </div>
                             <div className="flex justify-end md:col-span-2">
-                              <button
-                                type="submit"
+                              <ImmediateSubmitButton
+                                pendingText="Creating permit..."
                                 className="inline-flex min-h-9 items-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-800"
                               >
                                 Mark Permit Created
-                              </button>
+                              </ImmediateSubmitButton>
                             </div>
                           </form>
                         ) : (
@@ -2650,12 +2651,12 @@ export default async function OpsPage({
                               </div>
                             </div>
                             <div className="flex justify-end md:col-span-2">
-                              <button
-                                type="submit"
+                              <ImmediateSubmitButton
+                                pendingText="Creating job..."
                                 className="inline-flex min-h-9 items-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-800"
                               >
                                 Create Job From Permit Intake
-                              </button>
+                              </ImmediateSubmitButton>
                             </div>
                           </form>
                         )}

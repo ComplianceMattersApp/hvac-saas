@@ -15,6 +15,21 @@ function permitRenderBranch() {
 }
 
 describe("Ops workspace permit queue wiring", () => {
+  it("locks permit workflow submissions and shows immediate pending feedback", () => {
+    expect(opsPageSource).toContain('import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";');
+    for (const pendingText of [
+      "Creating permit...",
+      "Starting...",
+      "Updating...",
+      "Resuming...",
+      "Removing...",
+      "Saving intake...",
+      "Creating job...",
+    ]) {
+      expect(opsPageSource).toContain(`pendingText="${pendingText}"`);
+    }
+  });
+
   it("adds an allowlist-and-schema-guarded Permits chip to the Operations Workspace", () => {
     expect(opsPageSource).toContain("listActivePermitRequestQueueRowsIfAvailable");
     expect(opsPageSource).toContain("isPermitWorkflowEnabledForAccountOwner");
