@@ -57,11 +57,7 @@ describe("/ops/closeout-queue page", () => {
     );
   });
 
-  it("offers financially authorized ECC accounts a contractor-aware batch invoice action", () => {
-    expect(closeoutQueuePageSource).toContain("canCreateEccBatchInvoice");
-    expect(closeoutQueuePageSource).toContain("canViewFinancialRegisterForAccount");
-    expect(closeoutQueuePageSource).toContain("resolveBillingModeByAccountOwnerId");
-    expect(closeoutQueuePageSource).toContain("resolveProductModeForAccountOwnerId");
+  it("demotes batch invoicing to the primary Operations workspace", () => {
     expect(closeoutQueuePageSource).not.toContain("Batch Contractor Invoice");
     expect(closeoutQueuePageSource).toContain("Back to Operations");
     expect(closeoutQueuePageSource).toContain("encodeURIComponent(contractor)");
