@@ -1985,6 +1985,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <p className="text-sm text-slate-600">Print-ready ECC report for {customerName}.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Link href={`/jobs/${job.id}`} className={eccSecondaryButtonClass}>
+            Back to Job
+          </Link>
           {canShowCompletionReportCertsSentAction ? (
             <form action={markCertsCompleteFromForm}>
               <input type="hidden" name="job_id" value={job.id} />

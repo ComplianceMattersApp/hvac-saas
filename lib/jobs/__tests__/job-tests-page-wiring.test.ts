@@ -339,6 +339,8 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain('href={withS("completion_report", selectedSystemId)}');
     expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "space-y-4 print:space-y-0"');
     expect(jobTestsPageSource).toContain('Completion Report');
+    expect(jobTestsPageSource).toContain('href={`/jobs/${job.id}`}');
+    expect(jobTestsPageSource).toContain('Back to Job');
     expect(jobTestsPageSource).toContain('label="Print"');
     expect(jobTestsPageSource).toContain('label="Download"');
     expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "block space-y-4 print:block print:space-y-0"');
