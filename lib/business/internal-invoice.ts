@@ -187,6 +187,21 @@ export function normalizeInternalInvoiceItemType(value: unknown): InternalInvoic
   return "service";
 }
 
+export function resolveInternalInvoiceJobShareCents(
+  invoice: Pick<InternalInvoiceRecord, "job_id" | "total_cents" | "line_items" | "member_job_ids">,
+  jobId: string,
+): number {
+  const normalizedJobId = String(jobId ?? "").trim();
+  const memberJobIds = invoice.member_job_ids ?? [];
+  if (!normalizedJobId || memberJobIds.length <= 1) {
+    return Number(invoice.total_cents ?? 0) || 0;
+  }
+
+  return (invoice.line_items ?? [])
+    .filter((lineItem) => String(lineItem.source_job_id ?? "").trim() === normalizedJobId)
+    .reduce((total, lineItem) => total + (Number(lineItem.line_subtotal ?? 0) || 0), 0);
+}
+
 function normalizeInternalInvoiceLineItemRow(row: any): InternalInvoiceLineItemRecord {
   const sourceKindRaw = String(row?.source_kind ?? '').trim().toLowerCase();
   const sourceKind = sourceKindRaw === 'manual' || sourceKindRaw === 'pricebook' || sourceKindRaw === 'visit_scope'

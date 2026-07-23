@@ -185,6 +185,9 @@ export default function DuctLeakageEntryFields({
 
   const exceptionActive = Boolean(selectedException);
   const asbestosExempt = selectedException?.value === "asbestos";
+  const underFortyFeetExempt = selectedException?.value === "under_40_ft_ducting";
+  const measurementExempt = asbestosExempt || underFortyFeetExempt;
+  const exceptionNotesOptional = measurementExempt;
   const statusLabel =
     exceptionActive
       ? "Exception"
@@ -228,7 +231,7 @@ export default function DuctLeakageEntryFields({
           {exceptionActive ? (
             <div className="grid gap-1">
               <label className="text-sm font-medium" htmlFor={`ovr-reason-${runId}`}>
-                Exception reason
+                {exceptionNotesOptional ? "Notes (optional)" : "Exception reason"}
               </label>
               <input
                 id={`ovr-reason-${runId}`}
@@ -236,9 +239,9 @@ export default function DuctLeakageEntryFields({
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-950 sm:rounded-md sm:py-2"
                 value={exceptionReason}
                 onChange={(event) => setExceptionReason(event.target.value)}
-                placeholder="Required when an exception is selected"
+                placeholder={exceptionNotesOptional ? "Add optional notes" : "Required when this exception is selected"}
                 autoComplete="off"
-                required
+                required={!exceptionNotesOptional}
               />
             </div>
           ) : null}
@@ -248,11 +251,13 @@ export default function DuctLeakageEntryFields({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {children}
 
-        {asbestosExempt ? (
+        {measurementExempt ? (
           <section className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 sm:col-span-2 sm:p-4">
             <div className="font-semibold">Duct leakage test exempt</div>
             <p className="mt-1">
-              Asbestos prevents duct leakage testing under Title 24. Record the exception reason and complete the test without entering results.
+              {asbestosExempt
+                ? "Asbestos prevents duct leakage testing under Title 24. Add optional notes and complete the test without entering results."
+                : "Less than 40 feet of ductwork is exempt from duct leakage testing. Add optional notes and complete the test without entering results."}
             </p>
             {asbestosPhotoEvidence ? <div className="mt-3">{asbestosPhotoEvidence}</div> : null}
           </section>

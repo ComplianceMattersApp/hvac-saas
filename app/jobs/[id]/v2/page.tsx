@@ -55,6 +55,10 @@ import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode
 import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
+import {
+  resolveInternalInvoiceByJobId,
+  resolveInternalInvoiceJobShareCents,
+} from "@/lib/business/internal-invoice";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
@@ -477,13 +481,10 @@ export default async function JobDetailV2Page({
           .order("created_at", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
     resolveBillingModeByAccountOwnerId({ supabase, accountOwnerUserId }),
-    supabase
-      .from("internal_invoices")
-      .select("id, status, invoice_display_number, invoice_number, issued_at, total_cents")
-      .eq("job_id", jobId)
-      .eq("invoice_kind", "primary")
-      .neq("status", "void")
-      .maybeSingle(),
+    (async () => ({
+      data: await resolveInternalInvoiceByJobId({ supabase, jobId }),
+      error: null,
+    }))(),
     supabase
       .from("job_events")
       .select("created_at", { count: "exact" })
@@ -582,7 +583,9 @@ export default async function JobDetailV2Page({
   const billedTruthSatisfied = billingState.billedTruthSatisfied;
 
   // invoice display helpers
-  const invoiceCents = Number(primaryInvoiceRaw?.total_cents ?? 0);
+  const invoiceCents = primaryInvoiceRaw
+    ? resolveInternalInvoiceJobShareCents(primaryInvoiceRaw, jobId)
+    : 0;
   const invoiceTotalFormatted = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(invoiceCents / 100);
   const invoiceDisplayRef = primaryInvoiceRaw?.invoice_display_number
     ? `Invoice #${primaryInvoiceRaw.invoice_display_number}`

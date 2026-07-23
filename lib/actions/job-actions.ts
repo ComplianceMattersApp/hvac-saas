@@ -2415,10 +2415,12 @@ function resolveOverrideSelectionFromForm(formData: FormData) {
   const ductExceptionLabel = DUCT_LEAKAGE_EXCEPTION_LABELS[ductException] ?? null;
   if (ductExceptionLabel) {
     const reasonRaw = String(formData.get("override_reason") || "").trim();
+    const reasonOptional = ductException === "asbestos" || ductException === "under_40_ft_ducting";
     return {
       overridePass: true,
-      overrideReason: reasonRaw ? `${ductExceptionLabel}: ${reasonRaw}` : null,
-      missingReason: !reasonRaw,
+      // Keep the selected exception durable even when its optional notes are blank.
+      overrideReason: reasonRaw ? `${ductExceptionLabel}: ${reasonRaw}` : ductExceptionLabel,
+      missingReason: !reasonOptional && !reasonRaw,
       ductExceptionSelected: true,
     };
   }

@@ -97,16 +97,19 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain('{ value: "other", label: "Other" }');
     expect(ductLeakageEntryFieldsSource).toContain('name="duct_exception"');
     expect(ductLeakageEntryFieldsSource).toContain('name="override_reason"');
-    expect(ductLeakageEntryFieldsSource).toContain('required');
+    expect(ductLeakageEntryFieldsSource).toContain('required={!exceptionNotesOptional}');
+    expect(ductLeakageEntryFieldsSource).toContain('"Notes (optional)"');
     expect(jobTestsPageSource).not.toContain('<option value="fail">Asbestos</option>');
     expect(ductLeakageEntryFieldsSource).toContain('autoComplete="off"');
     expect(jobTestsPageSource).not.toContain('<datalist id={`ovr-reason-list-${runDL.id}`}>');
   });
 
-  it("hides duct leakage result entry only for the asbestos exemption", () => {
+  it("hides duct leakage result entry for asbestos and under-40-foot exemptions", () => {
     expect(ductLeakageEntryFieldsSource).toContain('const asbestosExempt = selectedException?.value === "asbestos";');
+    expect(ductLeakageEntryFieldsSource).toContain('const underFortyFeetExempt = selectedException?.value === "under_40_ft_ducting";');
+    expect(ductLeakageEntryFieldsSource).toContain('const measurementExempt = asbestosExempt || underFortyFeetExempt;');
     expect(ductLeakageEntryFieldsSource).toContain('Asbestos prevents duct leakage testing under Title 24.');
-    expect(ductLeakageEntryFieldsSource).toContain('{asbestosExempt ? (');
+    expect(ductLeakageEntryFieldsSource).toContain('{measurementExempt ? (');
     expect(ductLeakageEntryFieldsSource).toContain('name="measured_duct_leakage_cfm"');
     expect(ductLeakageEntryFieldsSource).toContain(') : (');
     expect(ductLeakageEntryFieldsSource).toContain('{asbestosPhotoEvidence}');

@@ -91,6 +91,7 @@ import {
   type InternalInvoiceItemType,
   resolveLatestVoidedInternalInvoiceByJobId,
   resolveInternalInvoiceByJobId,
+  resolveInternalInvoiceJobShareCents,
   resolveInternalInvoiceFamilySummaryByJobId,
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
@@ -1870,7 +1871,7 @@ export default async function JobDetailPage({
         invoice_display_number: String(invoiceTruthRow.invoice_display_number ?? "").trim() || null,
         invoice_number: String(invoiceTruthRow.invoice_number ?? "").trim(),
         issued_at: invoiceTruthRow.issued_at ?? null,
-        total_cents: Number(invoiceTruthRow.total_cents ?? 0) || 0,
+        total_cents: resolveInternalInvoiceJobShareCents(invoiceTruthRow, jobId),
         billing_name: String(invoiceTruthRow.billing_name ?? "").trim() || null,
         billing_email: String(invoiceTruthRow.billing_email ?? "").trim() || null,
         line_item_count: invoiceLineItems.length,

@@ -171,18 +171,21 @@ describe("duct leakage required measured result hardening", () => {
     expect(evaluateEccOpsStatusMock).toHaveBeenCalledWith("job-1");
   });
 
-  it("completion redirects with notice when Duct Leakage exception is selected without a reason", async () => {
+  it("completion succeeds for an Asbestos exception without required notes or measured leakage", async () => {
+    const { supabase, updates } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
     const fd = buildSaveAndCompleteDuctFormData();
     fd.set("duct_exception", "asbestos");
 
     const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=override_reason_required",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
     );
 
-    expect(createClientMock).not.toHaveBeenCalled();
-    expect(evaluateEccOpsStatusMock).not.toHaveBeenCalled();
+    const update = updates.find((call) => call.table === "ecc_test_runs");
+    expect(update?.payload.override_pass).toBe(true);
+    expect(update?.payload.override_reason).toBe("Asbestos");
   });
 
   it("completion succeeds for an Asbestos exception without measured leakage when reason is present", async () => {
@@ -227,6 +230,23 @@ describe("duct leakage required measured result hardening", () => {
     expect(update?.payload.override_pass).toBe(true);
     expect(update?.payload.override_reason).toBe("< 40' of ducting: Less than 40 feet of ducting present.");
     expect(update?.payload.override_pass).not.toBe(false);
+  });
+
+  it("allows < 40' of ducting without required notes or measured leakage", async () => {
+    const { supabase, updates } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+    const fd = buildSaveAndCompleteDuctFormData();
+    fd.set("duct_exception", "under_40_ft_ducting");
+
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
+    );
+
+    const update = updates.find((call) => call.table === "ecc_test_runs");
+    expect(update?.payload.override_pass).toBe(true);
+    expect(update?.payload.override_reason).toBe("< 40' of ducting");
   });
 
   it("Save Draft still succeeds without measured duct leakage value", async () => {
