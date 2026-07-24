@@ -850,10 +850,15 @@ export default async function JobTestsPage({
       contractors (
         owner_user_id
       ),
+      customer_id,
       customer_first_name,
       customer_last_name,
       customer_phone,
       customer_email,
+      customers:customer_id (
+        phone,
+        email
+      ),
       locations:location_id (
         address_line1,
         city,
@@ -991,6 +996,13 @@ export default async function JobTestsPage({
       .map((value: unknown) => String(value ?? "").trim())
       .filter(Boolean)
       .join(" ") || "—";
+
+  const customerPhone =
+    String((job as any)?.customers?.phone ?? "").trim() ||
+    String(job.customer_phone ?? "").trim();
+  const customerEmail =
+    String((job as any)?.customers?.email ?? "").trim() ||
+    String(job.customer_email ?? "").trim();
 
   const locationSnapshot = Array.isArray((job as any)?.locations)
     ? ((job as any).locations.find((row: any) => row) ?? null)
@@ -1132,6 +1144,8 @@ export default async function JobTestsPage({
   const completedReportRunCount = (job.ecc_test_runs ?? []).filter((run: any) => run?.is_completed === true).length;
   const reportHeaderFields = reportFieldRows([
     { label: "Customer", value: customerName },
+    { label: "Customer Phone", value: customerPhone },
+    { label: "Customer Email", value: customerEmail },
     { label: "Service Location", value: [reportAddress, reportCityStateZip].filter(Boolean).join(", ") },
     { label: reportBusinessLabel, value: reportBusinessName },
     { label: "Job", value: normalizeRetestLinkedJobTitle(job.title) },

@@ -374,6 +374,14 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain("Certs sent");
   });
 
+  it("includes the linked customer's phone and email in the completion report", () => {
+    expect(jobTestsPageSource).toContain("customers:customer_id (");
+    expect(jobTestsPageSource).toContain("String((job as any)?.customers?.phone ?? \"\").trim()");
+    expect(jobTestsPageSource).toContain("String((job as any)?.customers?.email ?? \"\").trim()");
+    expect(jobTestsPageSource).toContain('{ label: "Customer Phone", value: customerPhone }');
+    expect(jobTestsPageSource).toContain('{ label: "Customer Email", value: customerEmail }');
+  });
+
   it("suppresses completion-report cert closeout for failed, retest, and correction-review states", () => {
     expect(jobTestsPageSource).toContain(
       'const isFailedOrRetestState = ["failed", "retest_needed", "pending_office_review"].includes(normalizedOpsStatus);',
