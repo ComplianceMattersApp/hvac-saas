@@ -30,6 +30,7 @@ export type ReadyToBillJob = {
   eligible: boolean;
   blocker: string | null;
   manualDetailsRequired: boolean;
+  preparedDraft: boolean;
 };
 
 export type ReadyToBillContractorGroup = {
@@ -80,13 +81,18 @@ export function buildReadyToBillGroups(params: {
   jobs: ReadyToBillJobRow[];
   contractorNameById: Map<string, string>;
   activeInvoiceJobIds: Set<string>;
+  preparedDraftTotalCentsByJobId?: Map<string, number>;
   pricebookUnitPriceById: Map<string, unknown>;
 }): ReadyToBillContractorGroup[] {
   const groups = new Map<string, ReadyToBillContractorGroup>();
   for (const row of params.jobs) {
     const contractorId = String(row.contractor_id ?? "").trim();
     if (!contractorId) continue;
-    const total = jobTotal({ row, pricebookUnitPriceById: params.pricebookUnitPriceById });
+    const preparedTotalCents = params.preparedDraftTotalCentsByJobId?.get(row.id);
+    const preparedDraft = preparedTotalCents != null;
+    const total = preparedDraft
+      ? { cents: preparedTotalCents, blocker: preparedTotalCents > 0 ? null : "Add pricing before consolidating this job." }
+      : jobTotal({ row, pricebookUnitPriceById: params.pricebookUnitPriceById });
     const alreadyInvoiced = params.activeInvoiceJobIds.has(row.id);
     const manualDetailsRequired = !alreadyInvoiced && (
       total.blocker === "No invoice-ready Work Items." ||
@@ -109,6 +115,7 @@ export function buildReadyToBillGroups(params: {
       eligible: !blocker || manualDetailsRequired,
       blocker,
       manualDetailsRequired,
+      preparedDraft,
     };
     const group = groups.get(contractorId) ?? {
       contractorId,
@@ -170,7 +177,7 @@ export async function listReadyToBillContractorGroups(params: {
     .filter(Boolean))));
   const [membershipResult, contractorResult, pricebookResult] = await Promise.all([
     params.supabase.from("internal_invoice_jobs")
-      .select("job_id, internal_invoices!inner(status, invoice_kind)")
+      .select("job_id, internal_invoice_id, internal_invoices!inner(status, invoice_kind)")
       .in("job_id", jobIds)
       .neq("internal_invoices.status", "void")
       .eq("internal_invoices.invoice_kind", "primary"),
@@ -190,10 +197,57 @@ export async function listReadyToBillContractorGroups(params: {
   if (contractorResult.error) throw contractorResult.error;
   if (pricebookResult.error) throw pricebookResult.error;
 
+  const membershipRows = membershipResult.data ?? [];
+  const draftCandidateInvoiceByJobId = new Map<string, string>();
+  const activeInvoiceJobIds = new Set<string>();
+  for (const row of membershipRows as any[]) {
+    const invoice = Array.isArray(row.internal_invoices) ? row.internal_invoices[0] : row.internal_invoices;
+    if (String(invoice?.status ?? "").toLowerCase() === "draft") {
+      draftCandidateInvoiceByJobId.set(String(row.job_id), String(row.internal_invoice_id));
+    } else {
+      activeInvoiceJobIds.add(String(row.job_id));
+    }
+  }
+  const draftCandidateInvoiceIds = [...new Set(draftCandidateInvoiceByJobId.values())];
+  const preparedDraftInvoiceByJobId = new Map<string, string>();
+  if (draftCandidateInvoiceIds.length) {
+    const { data: allDraftMemberships, error: allDraftMembershipsError } = await params.supabase
+      .from("internal_invoice_jobs")
+      .select("internal_invoice_id")
+      .in("internal_invoice_id", draftCandidateInvoiceIds);
+    if (allDraftMembershipsError) throw allDraftMembershipsError;
+    const membershipCountByInvoiceId = new Map<string, number>();
+    for (const membership of allDraftMemberships ?? []) {
+      const invoiceId = String(membership.internal_invoice_id);
+      membershipCountByInvoiceId.set(invoiceId, (membershipCountByInvoiceId.get(invoiceId) ?? 0) + 1);
+    }
+    for (const [jobId, invoiceId] of draftCandidateInvoiceByJobId) {
+      if (membershipCountByInvoiceId.get(invoiceId) === 1) preparedDraftInvoiceByJobId.set(jobId, invoiceId);
+      else activeInvoiceJobIds.add(jobId);
+    }
+  }
+  const preparedInvoiceIds = [...new Set(preparedDraftInvoiceByJobId.values())];
+  const preparedDraftTotalCentsByJobId = new Map<string, number>();
+  if (preparedInvoiceIds.length) {
+    const { data: preparedLines, error: preparedLinesError } = await params.supabase
+      .from("internal_invoice_line_items")
+      .select("invoice_id, line_subtotal")
+      .in("invoice_id", preparedInvoiceIds);
+    if (preparedLinesError) throw preparedLinesError;
+    const jobByInvoiceId = new Map([...preparedDraftInvoiceByJobId].map(([jobId, invoiceId]) => [invoiceId, jobId]));
+    for (const line of preparedLines ?? []) {
+      const jobId = jobByInvoiceId.get(String(line.invoice_id));
+      if (!jobId) continue;
+      const cents = Math.round(Number(line.line_subtotal ?? 0) * 100);
+      preparedDraftTotalCentsByJobId.set(jobId, (preparedDraftTotalCentsByJobId.get(jobId) ?? 0) + cents);
+    }
+  }
+
   return {
     groups: buildReadyToBillGroups({
       jobs: rows,
-      activeInvoiceJobIds: new Set((membershipResult.data ?? []).map((row: any) => String(row.job_id))),
+      activeInvoiceJobIds,
+      preparedDraftTotalCentsByJobId,
       contractorNameById: new Map((contractorResult.data ?? []).map((row: any) => [String(row.id), String(row.name ?? "Contractor")])),
       pricebookUnitPriceById: new Map((pricebookResult.data ?? []).map((row: any) => [String(row.id), row.default_unit_price])),
     }),

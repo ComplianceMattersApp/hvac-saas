@@ -60,7 +60,7 @@ export default function ReadyToBillSelection({
             <span className="text-sm">{job.jobDate}</span>
             <span className="text-sm">{job.customerName}</span>
             <span className="text-sm">{job.serviceAddress}</span>
-            <span className="text-sm"><span className="font-medium text-slate-900">{job.title}</span>{job.blocker ? <span className="mt-1 block text-xs font-semibold text-amber-700">{job.blocker}</span> : null}</span>
+            <span className="text-sm"><span className="font-medium text-slate-900">{job.title}</span>{job.preparedDraft ? <span className="mt-1 block text-xs font-semibold text-emerald-700">Saved billing details ready.</span> : job.blocker ? <span className="mt-1 block text-xs font-semibold text-amber-700">{job.blocker}</span> : null}</span>
             <span className="text-right font-semibold text-slate-900">{job.manualDetailsRequired ? "Enter below" : job.expectedTotalDisplay}</span>
             {job.manualDetailsRequired ? (
               <div className="col-span-full ml-0 grid gap-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 lg:ml-[2.5rem] lg:grid-cols-[2fr_2fr_0.7fr_1fr]">

@@ -12,6 +12,7 @@ import {
   validateConsolidatedInvoiceJobs,
   type ConsolidatedInvoiceJob,
   type ConsolidatedManualJobLine,
+  type ConsolidatedPreparedInvoiceLine,
 } from "@/lib/business/consolidated-invoice";
 import { createClient } from "@/lib/supabase/server";
 
@@ -89,6 +90,53 @@ export async function createConsolidatedInvoiceDraftFromForm(formData: FormData)
       accountOwnerUserId: internalUser.account_owner_user_id,
     });
 
+    const { data: draftMemberships, error: draftMembershipError } = await supabase
+      .from("internal_invoice_jobs")
+      .select("job_id, internal_invoice_id, internal_invoices!inner(status, invoice_kind)")
+      .in("job_id", selectedJobIds)
+      .eq("internal_invoices.status", "draft")
+      .eq("internal_invoices.invoice_kind", "primary");
+    if (draftMembershipError) throw draftMembershipError;
+    const draftCandidates = new Map((draftMemberships ?? []).map((row: any) => [
+      String(row.job_id),
+      String(row.internal_invoice_id),
+    ]));
+    const candidateDraftInvoiceIds = [...new Set(draftCandidates.values())];
+    const draftInvoiceByJobId = new Map<string, string>();
+    if (candidateDraftInvoiceIds.length) {
+      const { data: allDraftMemberships, error: allDraftMembershipsError } = await supabase
+        .from("internal_invoice_jobs")
+        .select("internal_invoice_id")
+        .in("internal_invoice_id", candidateDraftInvoiceIds);
+      if (allDraftMembershipsError) throw allDraftMembershipsError;
+      const membershipCountByInvoiceId = new Map<string, number>();
+      for (const membership of allDraftMemberships ?? []) {
+        const invoiceId = String(membership.internal_invoice_id);
+        membershipCountByInvoiceId.set(invoiceId, (membershipCountByInvoiceId.get(invoiceId) ?? 0) + 1);
+      }
+      for (const [jobId, invoiceId] of draftCandidates) {
+        if (membershipCountByInvoiceId.get(invoiceId) === 1) draftInvoiceByJobId.set(jobId, invoiceId);
+      }
+    }
+    const preparedLinesByJobId = new Map<string, ConsolidatedPreparedInvoiceLine[]>();
+    const draftInvoiceIds = [...new Set(draftInvoiceByJobId.values())];
+    if (draftInvoiceIds.length) {
+      const { data: draftLines, error: draftLinesError } = await supabase
+        .from("internal_invoice_line_items")
+        .select("invoice_id, item_name_snapshot, description_snapshot, item_type_snapshot, category_snapshot, unit_label_snapshot, quantity, unit_price, line_subtotal, source_kind, source_pricebook_item_id, source_visit_scope_item_id, sort_order")
+        .in("invoice_id", draftInvoiceIds)
+        .order("sort_order", { ascending: true });
+      if (draftLinesError) throw draftLinesError;
+      const jobByInvoiceId = new Map([...draftInvoiceByJobId].map(([jobId, invoiceId]) => [invoiceId, jobId]));
+      for (const line of draftLines ?? []) {
+        const jobId = jobByInvoiceId.get(String(line.invoice_id));
+        if (!jobId) continue;
+        const current = preparedLinesByJobId.get(jobId) ?? [];
+        current.push(line as ConsolidatedPreparedInvoiceLine);
+        preparedLinesByJobId.set(jobId, current);
+      }
+    }
+
     const customerIds = Array.from(new Set(jobs.map((job) => String(job.customer_id ?? "")).filter(Boolean)));
     const pricebookIds = Array.from(new Set(jobs.flatMap((job) => {
       try {
@@ -139,11 +187,12 @@ export async function createConsolidatedInvoiceDraftFromForm(formData: FormData)
       customerBillingById,
       pricebookUnitPriceById,
       manualLineByJobId,
+      preparedLinesByJobId,
       invoiceNumber: buildInvoiceNumber(),
       invoiceDate: new Date().toISOString().slice(0, 10),
     });
 
-    const { data: invoiceId, error: createError } = await supabase.rpc("create_consolidated_invoice_draft_v1", {
+    const { data: invoiceId, error: createError } = await supabase.rpc("create_consolidated_invoice_from_prepared_drafts_v1", {
       p_account_owner_user_id: internalUser.account_owner_user_id,
       p_request_key: requestKey,
       p_invoice: payload.invoice,

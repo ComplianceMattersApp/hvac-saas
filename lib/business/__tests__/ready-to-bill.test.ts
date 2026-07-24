@@ -71,6 +71,28 @@ describe("Ready to Bill grouping", () => {
     expect(groups[0].jobs[0]).toMatchObject({ eligible: true, manualDetailsRequired: true });
   });
 
+  it("keeps a saved single-job draft eligible as prepared billing details", () => {
+    const groups = buildReadyToBillGroups({
+      jobs: [{ ...row("job-prepared", null), visit_scope_items: [] }],
+      contractorNameById: new Map([[contractorId, "Coaches HVAC"]]),
+      activeInvoiceJobIds: new Set(),
+      preparedDraftTotalCentsByJobId: new Map([["job-prepared", 37500]]),
+      pricebookUnitPriceById: new Map(),
+    });
+
+    expect(groups[0]).toMatchObject({
+      readyJobCount: 1,
+      blockedJobCount: 0,
+      expectedTotalCents: 37500,
+    });
+    expect(groups[0].jobs[0]).toMatchObject({
+      eligible: true,
+      preparedDraft: true,
+      manualDetailsRequired: false,
+      expectedTotalDisplay: "$375.00",
+    });
+  });
+
   it("keeps the dedicated read capped", () => {
     expect(READY_TO_BILL_CANDIDATE_LIMIT).toBe(250);
   });

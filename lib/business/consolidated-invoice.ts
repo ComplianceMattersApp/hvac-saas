@@ -49,6 +49,20 @@ export type ConsolidatedManualJobLine = {
   unitPrice: number;
 };
 
+export type ConsolidatedPreparedInvoiceLine = {
+  item_name_snapshot: string;
+  description_snapshot?: string | null;
+  item_type_snapshot: string;
+  category_snapshot?: string | null;
+  unit_label_snapshot?: string | null;
+  quantity: number;
+  unit_price: number;
+  line_subtotal: number;
+  source_kind?: string | null;
+  source_pricebook_item_id?: string | null;
+  source_visit_scope_item_id?: string | null;
+};
+
 export class ConsolidatedInvoiceValidationError extends Error {
   constructor(public readonly code: string, message: string) {
     super(message);
@@ -172,6 +186,7 @@ export function composeConsolidatedInvoiceCreationPayload(params: {
   customerBillingById: Map<string, CustomerBillingSource>;
   pricebookUnitPriceById: Map<string, unknown>;
   manualLineByJobId?: Map<string, ConsolidatedManualJobLine>;
+  preparedLinesByJobId?: Map<string, ConsolidatedPreparedInvoiceLine[]>;
   invoiceNumber: string;
   invoiceDate: string;
 }): ConsolidatedInvoiceCreationPayload {
@@ -197,6 +212,35 @@ export function composeConsolidatedInvoiceCreationPayload(params: {
 
   const lineItems: Array<Record<string, unknown>> = [];
   for (const job of orderedJobs) {
+    const preparedLines = params.preparedLinesByJobId?.get(job.id) ?? [];
+    if (preparedLines.length > 0) {
+      for (const prepared of preparedLines) {
+        const title = String(prepared.item_name_snapshot ?? "").trim();
+        const itemType = String(prepared.item_type_snapshot ?? "").trim();
+        const quantity = Number(prepared.quantity);
+        const unitPrice = Number(prepared.unit_price);
+        const subtotal = Number(prepared.line_subtotal);
+        if (!title || !itemType || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0 || !Number.isFinite(subtotal) || subtotal < 0) {
+          throw new ConsolidatedInvoiceValidationError("prepared_invoice_details_invalid", "A selected draft contains invalid billing details.");
+        }
+        lineItems.push({
+          source_job_id: job.id,
+          sort_order: lineItems.length + 1,
+          source_kind: prepared.source_kind ?? "manual",
+          source_pricebook_item_id: prepared.source_pricebook_item_id ?? null,
+          source_visit_scope_item_id: prepared.source_visit_scope_item_id ?? null,
+          item_name_snapshot: title,
+          description_snapshot: prepared.description_snapshot ?? null,
+          item_type_snapshot: itemType,
+          category_snapshot: prepared.category_snapshot ?? null,
+          unit_label_snapshot: prepared.unit_label_snapshot ?? null,
+          quantity,
+          unit_price: unitPrice,
+          line_subtotal: subtotal,
+        });
+      }
+      continue;
+    }
     let scopeItems;
     try {
       scopeItems = sanitizeVisitScopeItems(job.visit_scope_items ?? []);
