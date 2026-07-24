@@ -199,7 +199,7 @@ export function resolveInternalInvoiceJobShareCents(
 
   return (invoice.line_items ?? [])
     .filter((lineItem) => String(lineItem.source_job_id ?? "").trim() === normalizedJobId)
-    .reduce((total, lineItem) => total + (Number(lineItem.line_subtotal ?? 0) || 0), 0);
+    .reduce((total, lineItem) => total + Math.round((Number(lineItem.line_subtotal ?? 0) || 0) * 100), 0);
 }
 
 function normalizeInternalInvoiceLineItemRow(row: any): InternalInvoiceLineItemRecord {

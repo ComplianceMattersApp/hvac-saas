@@ -8,8 +8,8 @@ describe("job-scoped consolidated invoice totals", () => {
       total_cents: 50_000,
       member_job_ids: ["job-1", "job-2"],
       line_items: [
-        { source_job_id: "job-1", line_subtotal: 25_000 },
-        { source_job_id: "job-2", line_subtotal: 25_000 },
+        { source_job_id: "job-1", line_subtotal: 250 },
+        { source_job_id: "job-2", line_subtotal: 250 },
       ],
     } as any, "job-2")).toBe(25_000);
   });
