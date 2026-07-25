@@ -17,10 +17,6 @@ const rowCardSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsQueueRowCard.tsx"),
   "utf8",
 );
-const queueCardSource = fs.readFileSync(
-  path.join(repoRoot, "components", "ops", "QueueCard.tsx"),
-  "utf8",
-);
 const globalStylesSource = fs.readFileSync(path.join(repoRoot, "app", "globals.css"), "utf8");
 const desktopContractSource = fs.readFileSync(
   path.join(repoRoot, "docs", "OPS_DESKTOP_QUEUE_CONTRACT.md"),
@@ -69,29 +65,23 @@ describe("Ops mobile queue switcher", () => {
   });
 
   it("raises mobile card readability and touch targets without replacing card data", () => {
-    expect(queueCardSource).toContain("text-base font-semibold");
-    expect(queueCardSource).toContain("inline-flex min-h-11 items-center text-base");
-    expect(queueCardSource).toContain("xl:min-h-0");
-    expect(queueCardSource).toContain("grid-cols-[minmax(0,1fr)_auto]");
-    expect(queueCardSource).toContain("contents xl:flex");
-    expect(queueCardSource).toContain("col-span-2 inline-flex min-h-11 w-full");
-    expect(queueCardSource).toContain('text-[11px] font-semibold uppercase');
-    expect(queueCardSource).toContain("inline-flex min-h-11");
     expect(rowCardSource).toContain('className="xl:hidden">{richCard}</div>');
+    expect(rowCardSource).toContain("data-ops-mobile-row={view.kind}");
+    expect(rowCardSource).toContain("border-b-8 border-slate-100 bg-white");
     expect(rowCardSource).toContain("compactContactActionClass");
     expect(rowCardSource).toContain("min-h-11 min-w-14");
     expect(rowCardSource).toContain("xl:min-h-8");
-    expect(rowCardSource).toContain('{ label: "Last Attempt", value: view.recentAttemptText }');
-    expect(rowCardSource).toContain('{ label: "Reason", value: view.reasonLabel');
+    expect(rowCardSource).toContain('{ label: "Last Attempt", value: view.recentAttemptText, fullWidth: true }');
+    expect(rowCardSource).toContain("const reason = ledgerReason(view)");
   });
 
   it("renders the complete mobile card identity and attempt projection for every standard card kind", () => {
-    expect(queueCardSource).toContain("eyebrow?: ReactNode");
-    expect(rowCardSource.match(/eyebrow=\{view\.jobTypeLabel\}/g)).toHaveLength(4);
-    expect(rowCardSource.match(/title=\{view\.customerName\}/g)).toHaveLength(4);
-    expect(rowCardSource.match(/subtitle=\{view\.address\}/g)).toHaveLength(4);
-    expect(rowCardSource.match(/\{ label: "Job", value: view\.title \}/g)).toHaveLength(4);
-    expect(rowCardSource.match(/\{ label: "Last Attempt", value: view\.recentAttemptText \}/g)).toHaveLength(4);
+    expect(rowCardSource).toContain("{view.jobTypeLabel}");
+    expect(rowCardSource).toContain("{view.customerName}");
+    expect(rowCardSource).toContain("{view.address}");
+    expect(rowCardSource).toContain("{view.title}");
+    expect(rowCardSource.match(/<MobileOpsCard/g)).toHaveLength(4);
+    expect(rowCardSource.match(/\{ label: "Last Attempt", value: view\.recentAttemptText/g)).toHaveLength(4);
   });
 
   it("suppresses duplicate closeout Needs and Next Step text on mobile", () => {

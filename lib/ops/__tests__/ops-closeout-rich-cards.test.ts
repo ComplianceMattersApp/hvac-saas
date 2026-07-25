@@ -62,13 +62,15 @@ describe("/ops Closeout rich card contractor visibility", () => {
 
   it("renders contractor name in always-visible closeout card metadata when present", () => {
     expect(buildCloseoutSource).toContain("contractorName: workspaceContractorName(job)");
-    expect(closeoutCardSource).toContain('...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : [])');
-    expect(closeoutCardSource).toContain('variant="closeout-rich"');
+    expect(closeoutCardSource).toContain(
+      '{ label: "Contractor", value: view.contractorName || view.assignmentSummary || "Internal work" }',
+    );
+    expect(closeoutCardSource).toContain("<MobileOpsCard");
   });
 
   it("uses a compact closeout summary row without an expandable action area", () => {
     expect(closeoutCardSource).not.toContain("<QueueCardOpenAndAct>");
-    expect(closeoutCardSource).toContain("sm:grid-cols-3");
+    expect(closeoutCardSource).toContain("grid-cols-2");
     expect(closeoutCardSource).toContain(">Scheduled<");
     expect(closeoutCardSource).toContain(">Assignment<");
     expect(closeoutCardSource).toContain(">Next Step<");
@@ -78,8 +80,7 @@ describe("/ops Closeout rich card contractor visibility", () => {
   });
 
   it("omits contractor metadata quietly when the closeout job has no contractor", () => {
-    expect(closeoutCardSource).toContain("view.contractorName ? ");
-    expect(closeoutCardSource).toContain(": [])");
+    expect(closeoutCardSource).toContain('view.contractorName || view.assignmentSummary || "Internal work"');
     expect(buildCloseoutSource).not.toContain("operationalTenantIdentity.displayName");
     expect(closeoutCardSource).not.toContain("Unassigned contractor");
   });

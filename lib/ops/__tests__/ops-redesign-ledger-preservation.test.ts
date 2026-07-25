@@ -27,16 +27,21 @@ describe("ops redesign ledger preservation", () => {
   it("keeps contact shortcuts on the mobile scheduling card but not the desktop ledger", () => {
     const desktopStart = rowSource.indexOf("function DesktopLedgerRow");
     const desktopEnd = rowSource.indexOf("function LedgerDetail", desktopStart);
-    const mobileStart = rowSource.indexOf("function NeedsSchedulingCard");
-    const mobileEnd = rowSource.indexOf("function CloseoutCard", mobileStart);
+    const mobileStart = rowSource.indexOf("function MobileOpsCard");
+    const mobileEnd = rowSource.indexOf("function NeedsSchedulingCard", mobileStart);
+    const schedulingStart = mobileEnd;
+    const schedulingEnd = rowSource.indexOf("function CloseoutCard", schedulingStart);
 
     const desktopSource = rowSource.slice(desktopStart, desktopEnd);
     const mobileSource = rowSource.slice(mobileStart, mobileEnd);
+    const schedulingSource = rowSource.slice(schedulingStart, schedulingEnd);
 
     expect(desktopSource).not.toContain(">Call</a>");
     expect(desktopSource).not.toContain(">Text</a>");
     expect(mobileSource).toContain(">Call</a>");
     expect(mobileSource).toContain(">Text</a>");
+    expect(schedulingSource).toContain("phoneHref={phoneHref}");
+    expect(schedulingSource).toContain("textHref={textHref}");
   });
 
   it("keeps the desktop ledger and mobile rich cards as separate presentations", () => {

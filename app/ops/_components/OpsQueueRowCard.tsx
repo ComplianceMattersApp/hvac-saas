@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import QueueCard, { type QueueCardStateChip, type QueueCardTone } from "@/components/ops/QueueCard";
+import type { QueueCardStateChip, QueueCardTone } from "@/components/ops/QueueCard";
 import {
   rejectFieldPaymentCollectionReportFromForm,
   verifyFieldPaymentCollectionReportFromForm,
@@ -317,55 +317,117 @@ function LedgerDetail({ label, value }: { label: string; value: string }) {
   );
 }
 
+type MobileField = {
+  label: string;
+  value: React.ReactNode;
+  detail?: React.ReactNode;
+  fullWidth?: boolean;
+};
+
+function mobileAgeClass(ageDays: number | null) {
+  if (ageDays != null && ageDays > 30) return "text-rose-700";
+  if (ageDays != null && ageDays > 14) return "text-amber-700";
+  return "text-navy";
+}
+
+function MobileOpsCard({
+  view,
+  actionLabel,
+  fields,
+  phoneHref,
+  textHref,
+  children,
+}: {
+  view: LedgerRowView;
+  actionLabel: string;
+  fields: MobileField[];
+  phoneHref?: string | null;
+  textHref?: string | null;
+  children?: React.ReactNode;
+}) {
+  const reason = ledgerReason(view);
+  const stateChips =
+    view.kind === "follow_ups"
+      ? [{ label: view.urgencyLabel, tone: view.urgencyTone }]
+      : view.stateChips;
+
+  return (
+    <article
+      id={"cardDomId" in view ? view.cardDomId : undefined}
+      data-ops-mobile-row={view.kind}
+      className="border-b-8 border-slate-100 bg-white px-4 py-4 last:border-b-0"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+            {view.jobTypeLabel}
+            {view.title ? <span className="text-slate-400"> · {view.title}</span> : null}
+          </div>
+          {stateChips.length ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {stateChips.map((chip, index) => (
+                <span
+                  key={`${chip.label}-${index}`}
+                  className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.03em] ${LEDGER_CHIP_TONE_CLASS[chip.tone]}`}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className={`shrink-0 font-mono text-[13px] font-semibold tabular-nums ${mobileAgeClass(view.ageDays)}`}>
+          {view.ageDays == null ? view.ageLabel : `${view.ageDays}d`}
+        </div>
+      </div>
+
+      <Link href={view.href} className="mt-2 flex min-h-11 items-center text-base font-semibold leading-5 text-navy hover:text-blue-700 hover:underline">
+        {view.customerName}
+      </Link>
+      <div className="text-[13px] leading-5 text-slate-500">{view.address}</div>
+      <div className="mt-1 text-[13px] leading-5 text-slate-700">
+        <span className="mr-1 text-slate-500">Reason</span>
+        {reason.label}
+        {reason.detail ? <span className="text-slate-600"> · {reason.detail}</span> : null}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-sand-200 pt-3 text-[13px] leading-5">
+        {fields.map((field, index) => (
+          <div key={`${field.label}-${index}`} className={field.fullWidth ? "col-span-2" : "min-w-0"}>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">{field.label}</div>
+            <div className="mt-0.5 font-medium text-slate-900">{field.value}</div>
+            {field.detail ? <div className="text-[12.5px] text-slate-500">{field.detail}</div> : null}
+          </div>
+        ))}
+      </div>
+
+      {children}
+
+      <div className={`mt-3 grid gap-2 border-t border-sand-200 pt-3 ${phoneHref || textHref ? "grid-cols-[minmax(0,1fr)_78px_78px]" : "grid-cols-1"}`}>
+        <Link href={view.href} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
+          {actionLabel}
+        </Link>
+        {phoneHref ? <a href={phoneHref} className={compactContactActionClass}>Call</a> : null}
+        {textHref ? <a href={textHref} className={compactContactActionClass}>Text</a> : null}
+      </div>
+    </article>
+  );
+}
+
 function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
   const phoneHref = telHref(view.phone);
   const textHref = smsHref(view.phone);
 
   return (
-    <QueueCard
-      key={view.jobId}
-      variant="needs-scheduling-rich"
-      href={view.href}
-      eyebrow={view.jobTypeLabel}
-      title={view.customerName}
-      subtitle={view.address}
+    <MobileOpsCard
+      view={view}
       actionLabel="Open Job"
-      tone={view.tone}
-      stateChips={view.stateChips}
-      ageLabel={view.ageLabel}
-      ageDays={view.ageDays}
-      tagsColumns={4}
-      headerContent={
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-sand-200 bg-sand-50 px-3 py-2.5">
-          <div className="min-w-0">
-            <div className={utilityLabelClass}>Phone</div>
-            {view.phone ? (
-              phoneHref || textHref ? (
-                <a
-                  href={phoneHref || textHref}
-                  className="mt-0.5 flex min-h-11 items-center truncate text-[14px] font-semibold text-slate-900 hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                >
-                  {view.phone}
-                </a>
-              ) : (
-                <span className="mt-0.5 block text-[14px] font-semibold text-slate-900">{view.phone}</span>
-              )
-            ) : (
-              <span className="mt-0.5 block text-[12.5px] text-slate-400">No phone on file</span>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {phoneHref ? <a href={phoneHref} className={compactContactActionClass}>Call</a> : null}
-            {textHref ? <a href={textHref} className={compactContactActionClass}>Text</a> : null}
-          </div>
-        </div>
-      }
-      tags={[
-        { label: "Job", value: view.title },
-        { label: "Reason", value: view.reasonLabel, detail: view.reasonDetail || undefined },
+      phoneHref={phoneHref}
+      textHref={textHref}
+      fields={[
+        { label: "Contractor", value: view.contractorName || "Internal work", detail: view.phone || "No phone on file" },
         { label: "Last Action", value: view.lastActionText },
-        { label: "Last Attempt", value: view.recentAttemptText },
-        ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
+        { label: "Last Attempt", value: view.recentAttemptText, fullWidth: true },
       ]}
     />
   );
@@ -382,77 +444,47 @@ function CloseoutCard({ view }: { view: CloseoutRowView }) {
     nextStepComparison !== needsComparison;
 
   return (
-    <QueueCard
-      key={view.jobId}
-      id={view.cardDomId}
-      variant="closeout-rich"
-      href={view.href}
-      eyebrow={view.jobTypeLabel}
-      title={view.customerName}
-      subtitle={view.address}
+    <MobileOpsCard
+      view={view}
       actionLabel="Open Job"
-      tone={view.tone}
-      stateChips={view.stateChips}
-      ageLabel={view.ageLabel}
-      ageDays={view.ageDays}
-      tagsColumns={4}
-      tags={[
-        { label: "Job", value: view.title },
-        { label: "Reason", value: view.reasonLabel, detail: view.reasonDetail || undefined },
+      fields={[
+        { label: "Contractor", value: view.contractorName || view.assignmentSummary || "Internal work" },
         { label: "Last Action", value: view.lastActionText },
-        { label: "Last Attempt", value: view.recentAttemptText },
+        { label: "Last Attempt", value: view.recentAttemptText, fullWidth: true },
         ...(showNeeds ? [{ label: "Needs", value: view.needsLabel }] : []),
-        ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
       ]}
     >
-      <div className="mt-2 grid grid-cols-1 gap-2 border-t border-slate-200 pt-2 sm:grid-cols-3">
+      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-sand-200 pt-3">
         <div className="min-w-0">
           <div className={utilityLabelClass}>Scheduled</div>
-          <div className="mt-0.5 truncate text-[12.5px] text-slate-800">{view.scheduledText || "Not scheduled"}</div>
+          <div className="mt-0.5 text-[12.5px] text-slate-800">{view.scheduledText || "Not scheduled"}</div>
         </div>
         <div className="min-w-0">
           <div className={utilityLabelClass}>Assignment</div>
-          <div className="mt-0.5 truncate text-[12.5px] text-slate-800">{view.assignmentSummary}</div>
+          <div className="mt-0.5 text-[12.5px] text-slate-800">{view.assignmentSummary}</div>
         </div>
         {showNext ? (
-          <div className="min-w-0">
+          <div className="col-span-2 min-w-0">
             <div className={utilityLabelClass}>Next Step</div>
             <div className="mt-0.5 text-[12.5px] leading-5 text-slate-800">{view.nextStepText}</div>
           </div>
         ) : null}
       </div>
-    </QueueCard>
+    </MobileOpsCard>
   );
 }
 
 function FollowUpCard({ view }: { view: FollowUpRowView }) {
   return (
-    <QueueCard
-      key={view.jobId}
-      id={view.cardDomId}
-      variant={
-        view.urgencyTone === "rose"
-          ? "follow-up-overdue"
-          : view.urgencyTone === "amber"
-          ? "follow-up-soon"
-          : "follow-up-future"
-      }
-      href={view.href}
-      eyebrow={view.jobTypeLabel}
-      title={view.customerName}
-      subtitle={view.address}
+    <MobileOpsCard
+      view={view}
       actionLabel="Open Follow Up"
-      stateChips={[{ label: view.urgencyLabel, tone: view.urgencyTone }]}
-      ageLabel={view.ageLabel}
-      ageDays={view.ageDays}
-      tagsColumns={4}
-      tags={[
-        { label: "Job", value: view.title },
+      fields={[
         { label: "Due", value: view.dueText },
         { label: "Last Action", value: view.lastActionText },
-        { label: "Last Attempt", value: view.recentAttemptText },
         { label: "Owner", value: view.owner },
         { label: "Status", value: view.statusLabel },
+        { label: "Last Attempt", value: view.recentAttemptText, fullWidth: true },
         { label: "Reminder", value: view.note, fullWidth: true },
       ]}
     />
@@ -461,26 +493,13 @@ function FollowUpCard({ view }: { view: FollowUpRowView }) {
 
 function GenericCard({ view }: { view: GenericRowView }) {
   return (
-    <QueueCard
-      key={view.jobId}
-      href={view.href}
-      eyebrow={view.jobTypeLabel}
-      title={view.customerName}
-      subtitle={view.address}
+    <MobileOpsCard
+      view={view}
       actionLabel="Open Job"
-      tone={view.tone}
-      stateChips={view.stateChips}
-      ageLabel={view.ageLabel}
-      ageDays={view.ageDays}
-      quote={view.reasonDetail || undefined}
-      tagsColumns={4}
-      tags={[
-        { label: "Job", value: view.title },
-        { label: "Reason", value: view.reasonLabel },
+      fields={[
+        { label: "Contractor", value: view.contractorName || view.assignmentSummary || "Internal work" },
         { label: "Last Action", value: view.lastActionText },
-        { label: "Last Attempt", value: view.recentAttemptText },
-        { label: "Assignment", value: view.assignmentSummary },
-        ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
+        { label: "Last Attempt", value: view.recentAttemptText, fullWidth: true },
       ]}
     />
   );
