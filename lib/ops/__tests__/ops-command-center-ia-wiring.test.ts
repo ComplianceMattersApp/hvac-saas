@@ -6,6 +6,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const mobileQueueSwitcherSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_components/OpsMobileQueueSwitcher.tsx"),
+  "utf-8",
+);
 
 const waitingQueuePageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/queues/waiting/page.tsx"),
@@ -175,9 +179,10 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(clearContactAttemptAutoFollowupsMigrationSource).toContain("next_action_note");
   });
 
-  it("restores fixed queue chips as the primary Ops queue selector", () => {
-    expect(opsPageSource).toContain('aria-label="Operations queue selector"');
-    expect(opsPageSource).toContain('aria-current={chip.isSelected ? "page" : undefined}');
+  it("uses the existing queue projection for desktop rail and mobile queue sheet", () => {
+    expect(opsPageSource).toContain("<OpsMobileQueueSwitcher queues={opsRailQueueRows} />");
+    expect(mobileQueueSwitcherSource).toContain('aria-label="Switch queue"');
+    expect(mobileQueueSwitcherSource).toContain('aria-current={queue.active ? "page" : undefined}');
     expect(opsPageSource).toContain("workspaceQueueChips.map");
     expect(opsPageSource).toContain("coreBoardWorkspaceKeys.map");
     expect(opsPageSource).toContain("bucket: chipBucket");
@@ -185,15 +190,16 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('label: "Field Work"');
     expect(opsPageSource).toContain('label: "Contractor Intake"');
     expect(opsPageSource).toContain('? "Intake"');
-    expect(opsPageSource).toContain("{chip.mobileLabel} · {chip.count}");
-    expect(opsPageSource).toContain("{chip.label} · {chip.count}");
+    expect(mobileQueueSwitcherSource).toContain("queue.label");
+    expect(mobileQueueSwitcherSource).toContain("queue.count");
   });
 
-  it("keeps mobile fixed queue chips visible without hidden horizontal overflow", () => {
-    expect(opsPageSource).toContain('className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector"');
-    expect(opsPageSource).not.toContain('className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Operations queue selector"');
-    expect(opsPageSource).toContain("flex-[1_1_calc(50%-0.5rem)]");
-    expect(opsPageSource).toContain("min-h-10");
+  it("keeps the mobile queue sheet touch-safe without horizontal overflow", () => {
+    expect(mobileQueueSwitcherSource).toContain('className="xl:hidden"');
+    expect(mobileQueueSwitcherSource).toContain("min-h-11");
+    expect(mobileQueueSwitcherSource).toContain("min-h-12");
+    expect(mobileQueueSwitcherSource).not.toContain("overflow-x-auto");
+    expect(mobileQueueSwitcherSource).not.toContain("setActiveQueue");
   });
 
   it("restores Field Work through the existing scheduled field-work read model", () => {

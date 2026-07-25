@@ -40,6 +40,17 @@ export default function ContractorFocusSelector({
     if (open) setDraftIds(selectedIds);
   }, [open, selectedIds]);
 
+  React.useEffect(() => {
+    if (!open) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   const selectedSet = React.useMemo(() => new Set(selectedIds), [selectedIds]);
   const draftSet = React.useMemo(() => new Set(draftIds), [draftIds]);
 
@@ -95,8 +106,8 @@ export default function ContractorFocusSelector({
         onClick={() => setOpen(true)}
         aria-label="Filter by contractor"
         className={[
-          "inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors",
-          "sm:min-h-9 sm:w-auto sm:justify-center sm:rounded-full sm:py-1.5",
+          "inline-flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors",
+          "xl:min-h-9 xl:w-auto xl:justify-center xl:rounded-full xl:py-1.5",
           // Always outlined in blue so it reads as a distinct control next to
           // the neutral bucket chips; fills in stronger once a contractor is
           // actively selected.
@@ -117,8 +128,17 @@ export default function ContractorFocusSelector({
       </button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 bg-slate-950/35 p-3 sm:flex sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Contractor Focus selector">
-          <div className="ml-auto flex h-[calc(100dvh-7rem)] max-h-[calc(100dvh-7rem)] w-full max-w-xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl sm:h-auto sm:max-h-[78vh]">
+        <div className="fixed inset-0 z-[70] flex items-end bg-slate-950/35 xl:items-center xl:justify-center xl:p-3" role="dialog" aria-modal="true" aria-label="Contractor Focus selector">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="absolute inset-0 cursor-default"
+            aria-label="Close Contractor Focus selector"
+          />
+          <div className="relative z-10 flex max-h-[86dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[18px] border border-slate-200 bg-white shadow-2xl xl:ml-auto xl:h-auto xl:max-h-[78vh] xl:rounded-2xl">
+            <div className="flex justify-center py-2 xl:hidden" aria-hidden="true">
+              <span className="h-1 w-12 rounded-full bg-sand-200" />
+            </div>
             <div className="border-b border-slate-200 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -128,7 +148,7 @@ export default function ContractorFocusSelector({
                   </div>
                   <div className="text-sm font-semibold text-slate-950">{draftIds.length || "All"} selected</div>
                 </div>
-                <button type="button" onClick={() => setOpen(false)} className="rounded-full px-2 py-1 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+                <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 xl:min-h-9 xl:text-xs">
                   Close
                 </button>
               </div>
@@ -136,7 +156,7 @@ export default function ContractorFocusSelector({
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search contractors"
-                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
               />
             </div>
 
@@ -145,7 +165,7 @@ export default function ContractorFocusSelector({
                 type="button"
                 onClick={() => setDraftIds([])}
                 className={[
-                  "mb-1 flex min-h-10 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-semibold",
+                  "mb-1 flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-semibold xl:min-h-10",
                   draftIds.length === 0 ? "border-navy bg-navy text-white" : "border-slate-200 bg-white text-slate-800 hover:bg-sand-50",
                 ].join(" ")}
               >
@@ -165,7 +185,7 @@ export default function ContractorFocusSelector({
 
               <label
                 className={[
-                  "mb-1 flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-sand-50",
+                  "mb-1 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-sand-50 xl:min-h-10",
                   draftSet.has(internalWorkId) ? "border-slate-200 bg-sand-50" : "border-slate-200 bg-white",
                 ].join(" ")}
               >
@@ -199,7 +219,7 @@ export default function ContractorFocusSelector({
                       <label
                         key={option.id}
                         className={[
-                          "flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-sand-50",
+                          "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-sand-50 xl:min-h-10",
                           isSelected ? "border-slate-200 bg-sand-50 text-slate-900" : "border-slate-200 bg-white text-slate-800",
                           option.count === 0 && !isSelected ? "text-slate-400" : "",
                         ].join(" ")}
@@ -227,15 +247,15 @@ export default function ContractorFocusSelector({
               )}
             </div>
 
-            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-3 py-2.5">
-              <button type="button" onClick={() => setDraftIds([])} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-sand-50">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5">
+              <button type="button" onClick={() => setDraftIds([])} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-sand-50 xl:min-h-9 xl:text-xs">
                 Clear
               </button>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-sand-50">
+                <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-sand-50 xl:min-h-9 xl:text-xs">
                   Cancel
                 </button>
-                <button type="button" onClick={() => apply()} className="inline-flex min-h-9 items-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
+                <button type="button" onClick={() => apply()} className="inline-flex min-h-11 items-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 xl:min-h-9 xl:text-xs">
                   Apply
                 </button>
               </div>

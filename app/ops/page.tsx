@@ -91,6 +91,7 @@ import {
 import OpsBoardActiveQueuePanel, {
   type OpsBoardActiveQueueRow,
 } from "./_components/OpsBoardActiveQueuePanel";
+import OpsMobileQueueSwitcher from "./_components/OpsMobileQueueSwitcher";
 import type {
   CloseoutRowView,
   FieldPaymentReviewRowView,
@@ -1805,20 +1806,6 @@ export default async function OpsPage({
     // server renders, so a client-only switch left them showing the wrong
     // bucket's contractor counts. Server-nav chips keep the rendered bucket and
     // those facets in sync.
-    const opsBoardClientChips = workspaceQueueChips.map((chip) => ({
-      key: chip.key,
-      href: chip.href,
-      label: chip.label,
-      mobileLabel: chip.mobileLabel,
-      count: chip.count,
-      active: chip.isSelected,
-    }));
-    const opsBoardHiddenTodayChips = hiddenTodayWorkspaceTabs.map((tab) => ({
-      key: tab.key,
-      label: tab.label,
-      count: tab.count,
-      href: tab.href,
-    }));
     const activeWorkspaceQueueKey = boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter];
     const opsRailQueueOrder = [
       "need_to_schedule",
@@ -1994,7 +1981,8 @@ export default async function OpsPage({
           data-ops-sticky-header
           className="sticky top-14 z-30 -mx-2.5 border-b border-slate-200 bg-sand-100 px-4 py-3 shadow-[0_6px_14px_-12px_rgba(15,31,53,0.22)] sm:-mx-4 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6"
         >
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <OpsMobileQueueSwitcher queues={opsRailQueueRows} />
+          <div className="hidden flex-wrap items-start justify-between gap-3 xl:flex">
             <div className="min-w-0">
               <div className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                 {operationalTenantIdentity.displayName} · Operations
@@ -2018,8 +2006,12 @@ export default async function OpsPage({
 
         <div className="grid grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_288px] xl:items-start">
         <div className="min-w-0 space-y-3 sm:space-y-4">
-        <section id="ops-workspace" className="rounded-3xl border border-slate-300/80 bg-white p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+        <section
+          id="ops-workspace"
+          data-ops-specialized-mobile={canShowJobQueueExport ? undefined : ""}
+          className="border-0 bg-transparent p-0 shadow-none ring-0 xl:rounded-3xl xl:border xl:border-slate-300/80 xl:bg-white xl:p-4 xl:shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] xl:ring-1 xl:ring-slate-200/70"
+        >
+          <div className="mb-3 hidden flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3 xl:flex">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Board Filters</div>
               <div className="text-lg font-semibold tracking-tight text-slate-950">Operations workbench</div>
@@ -2033,41 +2025,6 @@ export default async function OpsPage({
 
           {!canShowJobQueueExport ? (
           <>
-          <div className="xl:hidden">
-          <div className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector">
-            {workspaceQueueChips.map((chip) => (
-              <Link
-                key={chip.key}
-                href={chip.href}
-                aria-current={chip.isSelected ? "page" : undefined}
-                className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
-                  chip.isSelected
-                    ? "border-navy bg-navy text-white"
-                    : chip.count === 0
-                    ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
-                }`}
-              >
-                <span className="sm:hidden">{chip.mobileLabel} · {chip.count}</span>
-                <span className="hidden sm:inline">{chip.label} · {chip.count}</span>
-              </Link>
-            ))}
-            {hiddenTodayWorkspaceTabs.map((tab) => (
-              <Link
-                key={tab.key}
-                href={tab.href}
-                className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
-                  tab.count === 0
-                    ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
-                }`}
-              >
-                <span>{tab.label} · {tab.count}</span>
-              </Link>
-            ))}
-          </div>
-          </div>
-
           {showWorkspaceContractorFilter ? (
             <ContractorFocusSelector
               allCount={contractorFocusAllCount}
@@ -2127,9 +2084,11 @@ export default async function OpsPage({
             ) : null}
           </div>
 
-          <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
-            <div>
+          <article className="border-0 bg-transparent p-0 shadow-none ring-0 xl:rounded-2xl xl:border xl:border-slate-300/80 xl:bg-white xl:p-3.5 xl:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] xl:ring-1 xl:ring-slate-200/70">
+            <div className={`mb-2 flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 ${
+              selectedWorkspaceKey === "contractor_intake" ? "flex" : "hidden xl:flex"
+            }`}>
+            <div className="hidden xl:block">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
               <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
               <div className="text-xs text-slate-600">
@@ -2141,7 +2100,7 @@ export default async function OpsPage({
                 href={`/ops/contractor-intake/export${buildQueryString({
                   contractor: contractorFocusFilter ?? "",
                 })}`}
-                className="inline-flex items-center rounded-md border border-slate-200/90 bg-sand-50 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 xl:min-h-0 xl:w-auto xl:rounded-md xl:border-slate-200/90 xl:bg-sand-50 xl:px-2 xl:py-1 xl:text-[12px]"
               >
                 Export CSV
               </Link>
@@ -2848,8 +2807,6 @@ export default async function OpsPage({
               // its useState-seeded activeBucket/panelCache would keep serving
               // the previously rendered bucket's (or pre-filter) rows.
               key={`ops-panel-${effectiveBoardBucketFilter}-${contractorFocusFilter ?? "all"}`}
-              chips={opsBoardClientChips}
-              hiddenTodayChips={opsBoardHiddenTodayChips}
               contractorFocusSelector={
                 showWorkspaceContractorFilter ? (
                   <ContractorFocusSelector
@@ -2963,13 +2920,13 @@ export default async function OpsPage({
               <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Workshare</div>
               <div className="space-y-2 text-[12.5px]">
                 {returnedWorkshareCount > 0 ? (
-                  <Link href="/ops/workshare/returned" className="flex items-center justify-between gap-2 text-blue-700 hover:underline">
+                  <Link href="/ops/workshare/returned" className="flex min-h-11 items-center justify-between gap-2 rounded-lg text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:rounded-none xl:text-[12.5px] xl:font-normal">
                     <span>{returnedWorkshareCount} returned · needs action</span>
                     <span aria-hidden="true">&rarr;</span>
                   </Link>
                 ) : null}
                 {hasActiveIncomingWorkshareConnection ? (
-                  <Link href="/ops/workshare/incoming" className="flex items-center justify-between gap-2 text-blue-700 hover:underline">
+                  <Link href="/ops/workshare/incoming" className="flex min-h-11 items-center justify-between gap-2 rounded-lg text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:rounded-none xl:text-[12.5px] xl:font-normal">
                     <span>Incoming ECC/HERS requests</span>
                     <span aria-hidden="true">&rarr;</span>
                   </Link>
@@ -2983,16 +2940,19 @@ export default async function OpsPage({
               <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Quick Links</div>
               <div className="space-y-2 text-[12.5px]">
                 {showTeamClockStatusCard ? (
-                  <Link href="/time-clock" className="block text-blue-700 hover:underline">Open time clock</Link>
+                  <Link href="/time-clock" className="flex min-h-11 items-center text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:text-[12.5px] xl:font-normal">Open time clock</Link>
                 ) : null}
                 {canShowJobQueueExport ? (
-                  <a href="#ops-export-menu" className="block text-blue-700 hover:underline">Export this queue</a>
+                  <>
+                    <a href="#ops-export-menu-mobile" className="flex min-h-11 items-center text-sm font-medium text-blue-700 hover:underline xl:hidden">Export this queue</a>
+                    <a href="#ops-export-menu" className="hidden text-blue-700 hover:underline xl:block">Export this queue</a>
+                  </>
                 ) : null}
               </div>
 
               {showTeamClockStatusCard && teamClockStatusRows.length > 0 ? (
                 <details className="mt-3 border-t border-slate-200 pt-3">
-                  <summary className="cursor-pointer list-none text-[11.5px] font-semibold text-slate-600 hover:text-navy [&::-webkit-details-marker]:hidden">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-slate-700 hover:text-navy xl:min-h-0 xl:text-[11.5px] [&::-webkit-details-marker]:hidden">
                     Clocked-in team · {teamClockStatusRows.length}
                   </summary>
                   <div className="mt-2 space-y-1.5">

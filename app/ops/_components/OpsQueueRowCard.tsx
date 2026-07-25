@@ -10,11 +10,11 @@ import { telHref, smsHref } from "@/lib/ops/phone-links";
 
 const utilityLabelClass = "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
 const inlineActionClass =
-  "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
+  "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99] xl:min-h-8 xl:text-[11px]";
 const compactContactActionClass =
-  "inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
+  "inline-flex min-h-11 min-w-14 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
 const primaryActionClass =
-  "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
+  "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99] xl:min-h-8 xl:text-[11px]";
 const chipClass = "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
 const inputClass = "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900";
 
@@ -326,8 +326,9 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
       key={view.jobId}
       variant="needs-scheduling-rich"
       href={view.href}
-      title={view.title}
-      subtitle={view.subtitle}
+      eyebrow={view.jobTypeLabel}
+      title={view.customerName}
+      subtitle={view.address}
       actionLabel="Open Job"
       tone={view.tone}
       stateChips={view.stateChips}
@@ -335,14 +336,14 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
       ageDays={view.ageDays}
       tagsColumns={4}
       headerContent={
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-sand-200 bg-sand-50 px-3 py-2.5">
           <div className="min-w-0">
             <div className={utilityLabelClass}>Phone</div>
             {view.phone ? (
               phoneHref || textHref ? (
                 <a
                   href={phoneHref || textHref}
-                  className="mt-0.5 block truncate text-[14px] font-semibold text-slate-900 hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                  className="mt-0.5 flex min-h-11 items-center truncate text-[14px] font-semibold text-slate-900 hover:text-blue-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                 >
                   {view.phone}
                 </a>
@@ -360,6 +361,7 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
         </div>
       }
       tags={[
+        { label: "Job", value: view.title },
         { label: "Reason", value: view.reasonLabel, detail: view.reasonDetail || undefined },
         { label: "Last Action", value: view.lastActionText },
         { label: "Last Attempt", value: view.recentAttemptText },
@@ -370,14 +372,24 @@ function NeedsSchedulingCard({ view }: { view: NeedsSchedulingRowView }) {
 }
 
 function CloseoutCard({ view }: { view: CloseoutRowView }) {
+  const reasonComparison = normalizeLedgerComparison([view.reasonLabel, view.reasonDetail].filter(Boolean).join(" "));
+  const needsComparison = normalizeLedgerComparison(view.needsLabel);
+  const nextStepComparison = normalizeLedgerComparison(view.nextStepText);
+  const showNeeds = Boolean(needsComparison) && !reasonComparison.includes(needsComparison);
+  const showNext =
+    Boolean(nextStepComparison) &&
+    !reasonComparison.includes(nextStepComparison) &&
+    nextStepComparison !== needsComparison;
+
   return (
     <QueueCard
       key={view.jobId}
       id={view.cardDomId}
       variant="closeout-rich"
       href={view.href}
-      title={view.title}
-      subtitle={view.subtitle}
+      eyebrow={view.jobTypeLabel}
+      title={view.customerName}
+      subtitle={view.address}
       actionLabel="Open Job"
       tone={view.tone}
       stateChips={view.stateChips}
@@ -385,9 +397,11 @@ function CloseoutCard({ view }: { view: CloseoutRowView }) {
       ageDays={view.ageDays}
       tagsColumns={4}
       tags={[
+        { label: "Job", value: view.title },
         { label: "Reason", value: view.reasonLabel, detail: view.reasonDetail || undefined },
         { label: "Last Action", value: view.lastActionText },
-        { label: "Needs", value: view.needsLabel },
+        { label: "Last Attempt", value: view.recentAttemptText },
+        ...(showNeeds ? [{ label: "Needs", value: view.needsLabel }] : []),
         ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
       ]}
     >
@@ -400,10 +414,12 @@ function CloseoutCard({ view }: { view: CloseoutRowView }) {
           <div className={utilityLabelClass}>Assignment</div>
           <div className="mt-0.5 truncate text-[12.5px] text-slate-800">{view.assignmentSummary}</div>
         </div>
-        <div className="min-w-0">
-          <div className={utilityLabelClass}>Next Step</div>
-          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-800">{view.nextStepText}</div>
-        </div>
+        {showNext ? (
+          <div className="min-w-0">
+            <div className={utilityLabelClass}>Next Step</div>
+            <div className="mt-0.5 text-[12.5px] leading-5 text-slate-800">{view.nextStepText}</div>
+          </div>
+        ) : null}
       </div>
     </QueueCard>
   );
@@ -422,16 +438,19 @@ function FollowUpCard({ view }: { view: FollowUpRowView }) {
           : "follow-up-future"
       }
       href={view.href}
-      title={view.title}
-      subtitle={view.subtitle}
+      eyebrow={view.jobTypeLabel}
+      title={view.customerName}
+      subtitle={view.address}
       actionLabel="Open Follow Up"
       stateChips={[{ label: view.urgencyLabel, tone: view.urgencyTone }]}
       ageLabel={view.ageLabel}
       ageDays={view.ageDays}
       tagsColumns={4}
       tags={[
+        { label: "Job", value: view.title },
         { label: "Due", value: view.dueText },
         { label: "Last Action", value: view.lastActionText },
+        { label: "Last Attempt", value: view.recentAttemptText },
         { label: "Owner", value: view.owner },
         { label: "Status", value: view.statusLabel },
         { label: "Reminder", value: view.note, fullWidth: true },
@@ -445,8 +464,9 @@ function GenericCard({ view }: { view: GenericRowView }) {
     <QueueCard
       key={view.jobId}
       href={view.href}
-      title={view.title}
-      subtitle={view.subtitle}
+      eyebrow={view.jobTypeLabel}
+      title={view.customerName}
+      subtitle={view.address}
       actionLabel="Open Job"
       tone={view.tone}
       stateChips={view.stateChips}
@@ -455,8 +475,10 @@ function GenericCard({ view }: { view: GenericRowView }) {
       quote={view.reasonDetail || undefined}
       tagsColumns={4}
       tags={[
+        { label: "Job", value: view.title },
         { label: "Reason", value: view.reasonLabel },
         { label: "Last Action", value: view.lastActionText },
+        { label: "Last Attempt", value: view.recentAttemptText },
         { label: "Assignment", value: view.assignmentSummary },
         ...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : []),
       ]}
@@ -499,7 +521,7 @@ function FieldPaymentReviewCard({ view }: { view: FieldPaymentReviewRowView }) {
       </div>
 
       <details className="group border-t border-[#eceeea]">
-        <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 bg-sand-50 px-4 py-2 text-[12px] font-semibold text-blue-700 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-200 [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 bg-sand-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-200 xl:min-h-10 xl:text-[12px] [&::-webkit-details-marker]:hidden">
           <span>Open &amp; Act</span>
           <span className="text-[10px] text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
         </summary>

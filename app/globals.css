@@ -69,3 +69,24 @@ details summary .disclosure-icon {
 details[open] summary .disclosure-icon {
   transform: rotate(90deg);
 }
+
+/*
+ * Permit and Contractor Intake retain their established server-action forms.
+ * Below the frozen Ops desktop breakpoint, raise their legacy compact controls
+ * to the shared mobile touch floor without altering desktop sizing or wiring.
+ */
+@media (max-width: 1279px) {
+  [data-ops-specialized-mobile] :is(
+    button,
+    summary,
+    select,
+    input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])
+  ),
+  [data-ops-specialized-mobile] a[class*="inline-flex"] {
+    min-height: 44px;
+  }
+
+  [data-ops-specialized-mobile] textarea {
+    min-height: 88px;
+  }
+}

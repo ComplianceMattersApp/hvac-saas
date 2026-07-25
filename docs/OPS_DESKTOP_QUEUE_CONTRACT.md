@@ -144,3 +144,6 @@ Completed July 25, 2026 on branch `ops-visual-redesign`:
 The desktop contract is frozen at `xl` and wider. The next approved phase is a
 mobile-only audit below `xl`; mobile work must not alter desktop queue
 membership, row-view data, actions, rail behavior, or ledger presentation.
+
+The active mobile reconciliation is documented in
+`docs/OPS_MOBILE_ENGINEERING_RESOLUTION.md`.
