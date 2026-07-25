@@ -8,10 +8,22 @@ const selectorSource = readFileSync(
 );
 
 describe("Contractor Focus mobile clearance", () => {
-  it("keeps the filter action footer above the fixed CM assistant launcher", () => {
-    expect(selectorSource).toContain("h-[calc(100dvh-7rem)] max-h-[calc(100dvh-7rem)]");
-    expect(selectorSource).toContain("sm:h-auto sm:max-h-[78vh]");
+  it("keeps the filter action footer touch-safe and above the mobile safe area", () => {
+    expect(selectorSource).toContain("max-h-[86dvh]");
+    expect(selectorSource).toContain("xl:h-auto xl:max-h-[78vh]");
     expect(selectorSource).toContain('className="flex shrink-0 items-center justify-between');
+    expect(selectorSource).toContain("env(safe-area-inset-bottom)");
+    expect(selectorSource).toContain("min-h-11");
     expect(selectorSource).toContain("onClick={() => apply()}");
+  });
+
+  it("uses a mobile bottom sheet without changing the existing selection wiring", () => {
+    expect(selectorSource).toContain("flex items-end");
+    expect(selectorSource).toContain("rounded-t-[18px]");
+    expect(selectorSource).toContain("xl:rounded-2xl");
+    expect(selectorSource).toContain("new URLSearchParams(searchParams.toString())");
+    expect(selectorSource).toContain('params.set("contractor", nextIds.join(","))');
+    expect(selectorSource).toContain("setDraftValue(internalWorkId");
+    expect(selectorSource).toContain('event.key === "Escape"');
   });
 });

@@ -9,6 +9,10 @@ const panelSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsBoardActiveQueuePanel.tsx"),
   "utf8",
 );
+const mobileSwitcherSource = fs.readFileSync(
+  path.join(repoRoot, "app", "ops", "_components", "OpsMobileQueueSwitcher.tsx"),
+  "utf8",
+);
 
 describe("ops redesign right rail preservation", () => {
   it("builds the desktop queue index from the existing queue destinations", () => {
@@ -25,15 +29,12 @@ describe("ops redesign right rail preservation", () => {
     expect(opsPageSource).not.toContain("queue.count > 0 &&");
   });
 
-  it("keeps the compact queue selector below the desktop-ledger breakpoint", () => {
-    expect(panelSource).toContain('<div className="xl:hidden">');
-    expect(panelSource).toContain(
-      'className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector"',
-    );
-    expect(opsPageSource).toContain('<div className="xl:hidden">');
-    expect(opsPageSource).toContain(
-      'className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector"',
-    );
+  it("uses the mobile queue sheet below the desktop-ledger breakpoint", () => {
+    expect(opsPageSource).toContain("<OpsMobileQueueSwitcher queues={opsRailQueueRows} />");
+    expect(mobileSwitcherSource).toContain('className="xl:hidden"');
+    expect(mobileSwitcherSource).toContain('aria-label="Switch queue"');
+    expect(mobileSwitcherSource).toContain("populatedQueues.map(queueRow)");
+    expect(mobileSwitcherSource).toContain("emptyQueues.map(queueRow)");
     expect(opsPageSource).toContain('aria-label="Operations queue index"');
   });
 

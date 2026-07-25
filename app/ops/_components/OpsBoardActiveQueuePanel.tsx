@@ -7,7 +7,6 @@ import {
   sortOpsBoardRows,
   type OpsBoardSortKey,
 } from "@/lib/ops/ops-board-sorting";
-import { normalizeOpsWorkspaceHref } from "@/lib/ops/ops-workspace-href";
 import OpsQueueRowCard, { type FieldPaymentReviewRowView, type OpsQueueRowView } from "./OpsQueueRowCard";
 
 export type OpsBoardActiveQueueRow = {
@@ -36,25 +35,7 @@ export type OpsBoardPanelData = {
   canExportContractorSafeCsv: boolean;
 };
 
-export type OpsBoardChip = {
-  key: string;
-  href: string;
-  label: string;
-  mobileLabel: string;
-  count: number;
-  active?: boolean;
-};
-
-export type OpsBoardHiddenChip = {
-  key: string;
-  label: string;
-  count: number;
-  href: string;
-};
-
 type Props = {
-  chips: OpsBoardChip[];
-  hiddenTodayChips: OpsBoardHiddenChip[];
   contractorFocusSelector?: React.ReactNode;
   initialBucket: string;
   initialSort: OpsBoardSortKey;
@@ -75,8 +56,6 @@ function buildQueryString(params: Record<string, string | undefined | null>) {
 }
 
 export default function OpsBoardActiveQueuePanel({
-  chips,
-  hiddenTodayChips,
   contractorFocusSelector,
   initialBucket,
   initialSort,
@@ -138,44 +117,9 @@ export default function OpsBoardActiveQueuePanel({
 
   return (
     <>
-      <div className="xl:hidden">
-      <div className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector">
-        {chips.map((chip) => (
-          <Link
-            key={chip.key}
-            href={normalizeOpsWorkspaceHref(chip.href)}
-            aria-current={chip.active ? "page" : undefined}
-            className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
-              chip.active
-                ? "border-navy bg-navy text-white"
-                : chip.count === 0
-                ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
-                : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
-            }`}
-          >
-            <span className="sm:hidden">{chip.mobileLabel} · {chip.count}</span>
-            <span className="hidden sm:inline">{chip.label} · {chip.count}</span>
-          </Link>
-        ))}
-        {hiddenTodayChips.map((chip) => (
-          <Link
-            key={chip.key}
-            href={normalizeOpsWorkspaceHref(chip.href)}
-            className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
-              chip.count === 0
-                ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
-                : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
-            }`}
-          >
-            <span>{chip.label} · {chip.count}</span>
-          </Link>
-        ))}
-      </div>
-      </div>
-
       {contractorFocusSelector}
 
-      <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+      <div className="mb-3 hidden gap-2 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
         <label className="grid gap-1">
           <span className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Reason</span>
           <select
@@ -218,8 +162,90 @@ export default function OpsBoardActiveQueuePanel({
         ) : null}
       </div>
 
+      <div className="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2 xl:hidden">
+        <label className="min-w-0">
+          <span className="sr-only">Reason</span>
+          <select
+            aria-label="Reason"
+            value={reasonKey}
+            onChange={(event) => setReasonKey(event.target.value)}
+            disabled={!panel}
+            className="min-h-11 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-2.5 text-[13px] font-semibold text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+          >
+            <option value="">All reasons</option>
+            {(panel?.reasonOptions ?? []).map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="min-w-0">
+          <span className="sr-only">Sort</span>
+          <select
+            aria-label="Sort"
+            value={sort}
+            onChange={(event) => setSort(event.target.value as OpsBoardSortKey)}
+            disabled={!panel}
+            className="min-h-11 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-2.5 text-[13px] font-semibold text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+          >
+            {OPS_BOARD_SORT_OPTIONS.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {canShowExport ? (
+          <details id="ops-export-menu-mobile" className="group relative">
+            <summary className="inline-flex min-h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 [&::-webkit-details-marker]:hidden">
+              Export
+              <span className="text-[10px] transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
+            </summary>
+            <div className="absolute right-0 z-10 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-[0_18px_38px_-20px_rgba(15,23,42,0.35)]">
+              <div className="mb-2 text-xs text-slate-600">
+                <div className="font-semibold text-slate-800">Exports the current queue and filters.</div>
+                <div>Contractor-safe CSV excludes internal notes, billing, and payment details.</div>
+                {!panel?.canExportContractorSafeCsv ? (
+                  <div className="mt-1 font-semibold text-amber-700">Choose a contractor to create a contractor-safe CSV.</div>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Link
+                  href={internalExportHref}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                >
+                  Internal CSV
+                </Link>
+                {panel?.canExportContractorSafeCsv ? (
+                  <Link
+                    href={contractorSafeExportHref}
+                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-sand-50"
+                  >
+                    Contractor-Safe CSV
+                  </Link>
+                ) : (
+                  <span className="inline-flex min-h-11 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-400">
+                    Contractor-Safe CSV
+                  </span>
+                )}
+              </div>
+            </div>
+          </details>
+        ) : null}
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="col-span-full inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)]"
+          >
+            Clear filters
+          </button>
+        ) : null}
+      </div>
+
       {canShowExport ? (
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 hidden justify-end xl:flex">
           <details id="ops-export-menu" className="group relative">
             <summary className="inline-flex min-h-9 cursor-pointer list-none items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 [&::-webkit-details-marker]:hidden">
               Export
@@ -258,8 +284,8 @@ export default function OpsBoardActiveQueuePanel({
         </div>
       ) : null}
 
-      <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+      <article className="border-0 bg-transparent p-0 shadow-none ring-0 xl:rounded-2xl xl:border xl:border-slate-300/80 xl:bg-white xl:p-3.5 xl:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] xl:ring-1 xl:ring-slate-200/70">
+        <div className="mb-2 hidden flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 xl:flex">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
             <div className="text-[15px] font-semibold tracking-tight text-slate-950">{panel?.queueLabel ?? ""}</div>
@@ -274,6 +300,17 @@ export default function OpsBoardActiveQueuePanel({
             </Link>
           ) : null}
         </div>
+
+        {headerRightAction ? (
+          <div className="mb-3 flex xl:hidden">
+            <Link
+              href={headerRightAction.href}
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              {headerRightAction.label}
+            </Link>
+          </div>
+        ) : null}
 
         {panel.pinnedViews.length === 0 && visibleRows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-sand-50 px-3 py-3 text-sm text-slate-600">
