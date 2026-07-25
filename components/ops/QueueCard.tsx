@@ -164,7 +164,7 @@ export default function QueueCard({
       ) : null}
 
       <div
-        className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-sand-200 pt-3 text-[13px] leading-5 ${
+        className={`mt-3 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-200 pt-3 text-[13px] leading-5 ${
           tagsColumns === 4 ? "sm:grid-cols-4" : tagsColumns === 2 ? "sm:grid-cols-2" : "sm:grid-cols-1"
         }`}
       >

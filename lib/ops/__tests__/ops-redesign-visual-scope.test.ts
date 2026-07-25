@@ -28,8 +28,8 @@ describe("ops redesign visual scope", () => {
 
   it("applies the canvas only at the operations workspace boundary", () => {
     expect(opsPageSource).toContain("data-ops-visual-scope");
-    expect(opsPageSource).toContain("bg-sand-100");
-    expect(rootLayoutSource).not.toContain("bg-sand-100");
+    expect(opsPageSource).toContain("bg-slate-50/45");
+    expect(rootLayoutSource).not.toContain("bg-slate-50/45");
     expect(rootLayoutSource).not.toContain("data-ops-visual-scope");
   });
 
@@ -44,7 +44,7 @@ describe("ops redesign visual scope", () => {
   it("uses one sticky header band while retaining conditional operational notices", () => {
     expect(opsPageSource).toContain("data-ops-sticky-header");
     expect(opsPageSource).toContain("sticky top-14 z-30");
-    expect(opsPageSource).toContain("border-b border-slate-200 bg-sand-100");
+    expect(opsPageSource).toContain("border-b border-slate-200 bg-gray-100/95");
     expect(opsPageSource).toContain("notice === \"estimates_unavailable\"");
     expect(opsPageSource.match(/Operations Workspace/g)?.length).toBe(1);
   });
@@ -60,13 +60,13 @@ describe("ops redesign visual scope", () => {
     expect(headerSource).toContain('href="/ops/workshare/returned"');
   });
 
-  it("uses warm-neutral interaction fills on the redesigned Ops surfaces", () => {
-    expect(opsPageSource).not.toContain("hover:bg-slate-50");
-    expect(panelSource).not.toContain("hover:bg-slate-50");
-    expect(contractorFocusSource).not.toContain("hover:bg-slate-50");
-    expect(opsPageSource).toContain("hover:bg-sand-50");
-    expect(panelSource).toContain("bg-sand-150");
-    expect(contractorFocusSource).toContain("bg-sand-50");
+  it("uses the shared neutral interaction fills on Ops surfaces", () => {
+    expect(opsPageSource).toContain("hover:bg-slate-50");
+    expect(panelSource).toContain("hover:bg-slate-50");
+    expect(contractorFocusSource).toContain("hover:bg-slate-50");
+    expect(opsPageSource).not.toContain("sand-");
+    expect(panelSource).not.toContain("sand-");
+    expect(contractorFocusSource).not.toContain("sand-");
   });
 });
 

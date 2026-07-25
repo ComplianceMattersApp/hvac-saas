@@ -164,6 +164,9 @@ than a mobile-only visual decision.
   destinations.
 - The `xl` desktop ledger and the specialized field-payment review workflow
   remain separate render paths and are not restyled by this treatment.
+- The Ops page background follows the existing Today/job neutral slate-gray
+  shell. Any future palette change should be applied through a coordinated
+  global design-system pass rather than as another Ops-only color treatment.
 
 ## Mobile Contractor Focus selector slice
 
@@ -203,19 +206,19 @@ than a mobile-only visual decision.
 - The mobile Export shortcut targets `#ops-export-menu-mobile`; the desktop
   shortcut continues to target `#ops-export-menu`.
 
-## Approved post-mobile desktop backlog
+## Post-mobile desktop revision
 
-These changes are intentionally deferred until the mobile phase is frozen:
+The deferred desktop presentation pass now:
 
-- Use more of the available desktop viewport while retaining readable line
-  lengths and the frozen queue/workshare structure.
-- Audit body, label, metadata, and control font sizes for users with reduced
-  eyesight.
-- Increase low-contrast text where pale type meets the sand and white surfaces.
-- Place desktop Export inline with Reason and Sort so it does not consume a
-  separate row.
-- Preserve function, queue definitions, permissions, actions, and export
-  wiring before applying any visual adjustment.
+- uses the job-detail `104rem` maximum workspace width while retaining the
+  queue/workshare structure;
+- increases desktop ledger, control, metadata, and right-rail readability;
+- replaces the Ops-only beige/sand treatment with the shared neutral
+  slate-gray surfaces; and
+- places desktop Export inline with Reason and Sort.
+
+Queue definitions, permissions, actions, sorting semantics, and export wiring
+remain unchanged.
 
 ## Verification gates
 

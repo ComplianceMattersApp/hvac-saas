@@ -119,14 +119,14 @@ export default function OpsBoardActiveQueuePanel({
     <>
       {contractorFocusSelector}
 
-      <div className="mb-3 hidden gap-2 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
+      <div className="mb-3 hidden gap-2 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] xl:items-end">
         <label className="grid gap-1">
           <span className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Reason</span>
           <select
             value={reasonKey}
             onChange={(event) => setReasonKey(event.target.value)}
             disabled={!panel}
-            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-[15px] font-medium text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
           >
             <option value="">All reasons</option>
             {(panel?.reasonOptions ?? []).map((option) => (
@@ -142,7 +142,7 @@ export default function OpsBoardActiveQueuePanel({
             value={sort}
             onChange={(event) => setSort(event.target.value as OpsBoardSortKey)}
             disabled={!panel}
-            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-[15px] font-medium text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
           >
             {OPS_BOARD_SORT_OPTIONS.map((option) => (
               <option key={option.key} value={option.key}>
@@ -151,11 +151,42 @@ export default function OpsBoardActiveQueuePanel({
             ))}
           </select>
         </label>
+        {canShowExport ? (
+          <details id="ops-export-menu" className="group relative">
+            <summary className="inline-flex min-h-[42px] cursor-pointer list-none items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 [&::-webkit-details-marker]:hidden">
+              Export
+              <span className="text-[10px] transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
+            </summary>
+            <div className="absolute right-0 z-10 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_18px_38px_-20px_rgba(15,23,42,0.35)]">
+              <div className="mb-2 text-sm text-slate-700">
+                <div className="font-semibold text-slate-900">Exports the current queue and filters.</div>
+                <div>Contractor-safe CSV excludes internal notes, billing, and payment details.</div>
+                {!panel?.canExportContractorSafeCsv ? (
+                  <div className="mt-1 font-semibold text-amber-700">Choose a contractor to create a contractor-safe CSV.</div>
+                ) : null}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Link href={internalExportHref} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700">
+                  Internal CSV
+                </Link>
+                {panel?.canExportContractorSafeCsv ? (
+                  <Link href={contractorSafeExportHref} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                    Contractor-Safe CSV
+                  </Link>
+                ) : (
+                  <span className="inline-flex min-h-10 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-500">
+                    Contractor-Safe CSV
+                  </span>
+                )}
+              </div>
+            </div>
+          </details>
+        ) : null}
         {hasActiveFilters ? (
           <button
             type="button"
             onClick={clearFilters}
-            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-sand-50"
+            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50"
           >
             Clear filters
           </button>
@@ -220,7 +251,7 @@ export default function OpsBoardActiveQueuePanel({
                 {panel?.canExportContractorSafeCsv ? (
                   <Link
                     href={contractorSafeExportHref}
-                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-sand-50"
+                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
                     Contractor-Safe CSV
                   </Link>
@@ -244,46 +275,6 @@ export default function OpsBoardActiveQueuePanel({
         ) : null}
       </div>
 
-      {canShowExport ? (
-        <div className="mb-3 hidden justify-end xl:flex">
-          <details id="ops-export-menu" className="group relative">
-            <summary className="inline-flex min-h-9 cursor-pointer list-none items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 [&::-webkit-details-marker]:hidden">
-              Export
-              <span className="text-[10px] transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
-            </summary>
-            <div className="absolute right-0 z-10 mt-2 w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_18px_38px_-20px_rgba(15,23,42,0.35)]">
-              <div className="mb-2 text-xs text-slate-600">
-                <div className="font-semibold text-slate-800">Exports the current queue and filters.</div>
-                <div>Contractor-safe CSV excludes internal notes, billing, and payment details.</div>
-                {!panel?.canExportContractorSafeCsv ? (
-                  <div className="mt-1 font-semibold text-amber-700">Choose a contractor to create a contractor-safe CSV.</div>
-                ) : null}
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Link
-                  href={internalExportHref}
-                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
-                >
-                  Internal CSV
-                </Link>
-                {panel?.canExportContractorSafeCsv ? (
-                  <Link
-                    href={contractorSafeExportHref}
-                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-sand-50"
-                  >
-                    Contractor-Safe CSV
-                  </Link>
-                ) : (
-                  <span className="inline-flex min-h-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-400">
-                    Contractor-Safe CSV
-                  </span>
-                )}
-              </div>
-            </div>
-          </details>
-        </div>
-      ) : null}
-
       <article className="border-0 bg-transparent p-0 shadow-none ring-0 xl:rounded-2xl xl:border xl:border-slate-300/80 xl:bg-white xl:p-3.5 xl:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] xl:ring-1 xl:ring-slate-200/70">
         <div className="mb-2 hidden flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 xl:flex">
           <div>
@@ -294,7 +285,7 @@ export default function OpsBoardActiveQueuePanel({
           {headerRightAction ? (
             <Link
               href={headerRightAction.href}
-              className="inline-flex items-center rounded-md border border-slate-200/90 bg-sand-50 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+              className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50 px-2 py-1 text-[13px] font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
             >
               {headerRightAction.label}
             </Link>
@@ -313,7 +304,7 @@ export default function OpsBoardActiveQueuePanel({
         ) : null}
 
         {panel.pinnedViews.length === 0 && visibleRows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-sand-50 px-3 py-3 text-sm text-slate-600">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
             <div>{hasActiveFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
             {hasActiveFilters ? (
               <button type="button" onClick={clearFilters} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
@@ -332,8 +323,8 @@ export default function OpsBoardActiveQueuePanel({
             ) : null}
 
             {visibleRows.length ? (
-              <div className="overflow-hidden rounded-[18px] border border-sand-200 bg-white xl:rounded-xl xl:border-slate-200">
-                <div className="hidden grid-cols-[3px_minmax(220px,1fr)_168px_72px_158px_158px_132px] border-b border-slate-200 bg-sand-150 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 xl:grid">
+              <div className="overflow-hidden rounded-[18px] border border-slate-200 bg-white xl:rounded-xl">
+                <div className="hidden grid-cols-[3px_minmax(190px,1fr)_140px_62px_130px_130px_110px] border-b border-slate-200 bg-slate-50 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-600 xl:grid 2xl:grid-cols-[3px_minmax(220px,1fr)_168px_72px_158px_158px_132px]">
                   <div />
                   <div className="px-4 py-2.5">Customer / Job</div>
                   <div className="border-l border-slate-200 px-4 py-2.5">Contractor</div>

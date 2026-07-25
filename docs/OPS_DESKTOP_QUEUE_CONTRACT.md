@@ -70,12 +70,18 @@ or inferred workflow semantics.
 
 ## Approved desktop presentation
 
-- The sand canvas is scoped to `/ops`; shared application navigation is not
-  redesigned.
+- The Ops canvas follows the shared Today/job neutral slate-gray treatment;
+  shared application navigation is not redesigned.
 - The Operations header band is sticky beneath shared navigation.
 - The duplicate header-level Go to Today link is removed because Today already
   exists in shared sticky navigation.
 - Returned Work remains visible when its existing count requires it.
+- The workspace may use the same `104rem` maximum width as job details so
+  available desktop space is not artificially discarded. The right rail
+  remains a separate sticky `304px` operational column.
+- Reason, Sort, and Export share one desktop control row. Export retains both
+  internal and contractor-safe destinations and their existing permission
+  behavior.
 - At `xl` and wider, generic job work renders as a flat ruled ledger with:
   Customer / Job, Contractor, Age, Last Action, Last Attempt, and Actions.
 - The primary Open Job or Open Follow Up action is permanently visible and
@@ -93,6 +99,9 @@ or inferred workflow semantics.
   into the generic ledger.
 - The desktop right rail contains the existing queue destinations and counts,
   Queue Health, conditional Workshare, and authorized quick links.
+- Desktop ledger, control, and right-rail text uses the stronger shared slate
+  contrast and an accessible compact size; do not restore pale 9–10px metadata
+  as the primary way operators identify work.
 
 ## Explicitly rejected or superseded concepts
 
@@ -147,3 +156,16 @@ membership, row-view data, actions, rail behavior, or ledger presentation.
 
 The active mobile reconciliation is documented in
 `docs/OPS_MOBILE_ENGINEERING_RESOLUTION.md`.
+
+## Post-mobile desktop accessibility revision
+
+Approved for the next desktop publication after the mobile flat-row change:
+
+- neutral slate-gray surfaces replace the Ops-only beige/sand treatment;
+- the workspace width aligns with job details;
+- desktop ledger and rail typography is larger and higher contrast; and
+- desktop Export is inline with Reason and Sort.
+
+This revision is presentation-only. Queue membership, definitions, counts,
+reason derivation, sorting semantics, actions, permissions, exports, and
+destinations remain governed by the same authoritative engine.

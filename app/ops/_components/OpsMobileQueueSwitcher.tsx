@@ -19,7 +19,7 @@ function queueTickClass(queue: OpsMobileQueueLink) {
   if (queue.active) return "bg-blue-600";
   if (queue.key === "exceptions") return "bg-rose-600";
   if (queue.key === "waiting") return "bg-amber-500";
-  return "bg-sand-200";
+  return "bg-slate-200";
 }
 
 export default function OpsMobileQueueSwitcher({ queues }: Props) {
@@ -51,7 +51,7 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
         onClick={() => setOpen(false)}
         className={[
           "grid min-h-12 grid-cols-[2px_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 text-left transition-colors",
-          queue.active ? "bg-blue-50" : "hover:bg-sand-50 focus-visible:bg-sand-50",
+          queue.active ? "bg-blue-50" : "hover:bg-slate-50 focus-visible:bg-slate-50",
           queue.count === 0 ? "text-slate-400" : "text-slate-700",
         ].join(" ")}
       >
@@ -117,9 +117,9 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
             className="absolute inset-0 cursor-default"
             aria-label="Close queue switcher"
           />
-          <section className="relative z-10 max-h-[min(86dvh,760px)] w-full overflow-hidden rounded-t-[18px] border border-sand-200 bg-white shadow-2xl">
+          <section className="relative z-10 max-h-[min(86dvh,760px)] w-full overflow-hidden rounded-t-[18px] border border-slate-200 bg-white shadow-2xl">
             <div className="flex justify-center py-2" aria-hidden="true">
-              <span className="h-1 w-12 rounded-full bg-sand-200" />
+              <span className="h-1 w-12 rounded-full bg-slate-200" />
             </div>
             <div className="flex min-h-14 items-center justify-between px-4 pb-1">
               <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
@@ -134,7 +134,7 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
               </button>
             </div>
             <div className="max-h-[calc(min(86dvh,760px)-5rem)] overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <div className="divide-y divide-sand-200">
+              <div className="divide-y divide-slate-200">
                 {populatedQueues.map(queueRow)}
               </div>
               {emptyQueues.length > 0 ? (
@@ -142,7 +142,7 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
                   <div className="px-4 pb-1 pt-5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400">
                     Clear
                   </div>
-                  <div className="divide-y divide-sand-200">
+                  <div className="divide-y divide-slate-200">
                     {emptyQueues.map(queueRow)}
                   </div>
                 </>

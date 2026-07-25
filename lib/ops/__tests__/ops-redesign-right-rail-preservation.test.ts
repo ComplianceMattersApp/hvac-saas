@@ -51,7 +51,7 @@ describe("ops redesign right rail preservation", () => {
   });
 
   it("uses the approved wide-screen rail without removing smaller-screen support", () => {
-    expect(opsPageSource).toContain("xl:grid-cols-[minmax(0,1fr)_288px]");
+    expect(opsPageSource).toContain("xl:grid-cols-[minmax(0,1fr)_304px]");
     expect(opsPageSource).toContain("xl:sticky xl:top-44 xl:self-start");
     expect(opsPageSource).toContain("hidden rounded-xl");
     expect(opsPageSource).toContain("xl:block");

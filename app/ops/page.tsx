@@ -1966,7 +1966,7 @@ export default async function OpsPage({
     return (
       <div
         data-ops-visual-scope
-        className="mx-auto max-w-[92rem] space-y-3 rounded-[1.75rem] bg-sand-100 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6"
+        className="mx-auto max-w-[104rem] space-y-3 bg-slate-50/45 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6"
       >
         {notice === "estimates_unavailable" ? (
           <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.24)]">
@@ -1979,7 +1979,7 @@ export default async function OpsPage({
 
         <header
           data-ops-sticky-header
-          className="sticky top-14 z-30 -mx-2.5 border-b border-slate-200 bg-sand-100 px-4 py-3 shadow-[0_6px_14px_-12px_rgba(15,31,53,0.22)] sm:-mx-4 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6"
+          className="sticky top-14 z-30 -mx-2.5 border-b border-slate-200 bg-gray-100/95 px-4 py-3 shadow-[0_6px_14px_-12px_rgba(15,31,53,0.22)] backdrop-blur-sm sm:-mx-4 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6"
         >
           <OpsMobileQueueSwitcher queues={opsRailQueueRows} />
           <div className="hidden flex-wrap items-start justify-between gap-3 xl:flex">
@@ -1996,7 +1996,7 @@ export default async function OpsPage({
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {returnedWorkshareCount > 0 ? (
-                <Link href="/ops/workshare/returned" className="inline-flex min-h-9 items-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-blue-700 transition-colors hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
+                <Link href="/ops/workshare/returned" className="inline-flex min-h-9 items-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-[13px] font-semibold text-blue-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
                   Returned Work · {returnedWorkshareCount}
                 </Link>
               ) : null}
@@ -2004,7 +2004,7 @@ export default async function OpsPage({
           </div>
         </header>
 
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_288px] xl:items-start">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_304px] xl:items-start">
         <div className="min-w-0 space-y-3 sm:space-y-4">
         <section
           id="ops-workspace"
@@ -2044,7 +2044,7 @@ export default async function OpsPage({
               <select
                 name="reason"
                 defaultValue={effectiveBoardReasonFilter ?? ""}
-                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-[15px] font-medium text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
               >
                 <option value="">All reasons</option>
                 {workspaceReasonOptions.map((option) => (
@@ -2053,7 +2053,7 @@ export default async function OpsPage({
                   </option>
                 ))}
               </select>
-              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-sand-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
+              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white">
                 Apply
               </button>
             </form>
@@ -2065,7 +2065,7 @@ export default async function OpsPage({
               <select
                 name="sort"
                 defaultValue={boardSort}
-                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-[15px] font-medium text-slate-950 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
               >
                 {OPS_BOARD_SORT_OPTIONS.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -2073,12 +2073,12 @@ export default async function OpsPage({
                   </option>
                 ))}
               </select>
-              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-sand-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
+              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-white">
                 Apply
               </button>
             </form>
             {hasActiveOpsBoardFilters ? (
-              <Link href={clearOpsBoardFiltersHref} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-sand-50">
+              <Link href={clearOpsBoardFiltersHref} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50">
                 Clear filters
               </Link>
             ) : null}
@@ -2100,7 +2100,7 @@ export default async function OpsPage({
                 href={`/ops/contractor-intake/export${buildQueryString({
                   contractor: contractorFocusFilter ?? "",
                 })}`}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 xl:min-h-0 xl:w-auto xl:rounded-md xl:border-slate-200/90 xl:bg-sand-50 xl:px-2 xl:py-1 xl:text-[12px]"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 xl:min-h-10 xl:w-auto xl:rounded-lg xl:border-slate-200/90 xl:bg-slate-50 xl:px-3 xl:py-1 xl:text-[13px]"
               >
                 Export CSV
               </Link>
@@ -2111,7 +2111,7 @@ export default async function OpsPage({
               <details
                 id="permit-request-create"
                 open={shouldExpandPermitCreateForm}
-                className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-sand-50"
+                className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50"
               >
                 <summary className="list-none cursor-pointer px-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2239,7 +2239,7 @@ export default async function OpsPage({
 
             {selectedWorkspaceKey === "permits" ? (
               selectedPermitRows.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-sand-50 px-3 py-3 text-sm text-slate-600">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                   <div>No active permit requests.</div>
                 </div>
               ) : (
@@ -2330,7 +2330,7 @@ export default async function OpsPage({
                           ) : null}
                       </div>
 
-                      <details className="mt-2 rounded-xl border border-slate-200 bg-sand-50 px-3 py-2">
+                      <details className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                         <summary className="cursor-pointer text-[12px] font-semibold text-slate-600">
                           Permit No Longer Needed
                         </summary>
@@ -2482,7 +2482,7 @@ export default async function OpsPage({
                             </div>
                           </div>
                           {permitAttachments.length === 0 ? (
-                            <div className="mt-1 rounded-lg border border-dashed border-slate-200 bg-sand-50 px-2.5 py-2 text-xs text-slate-500">
+                            <div className="mt-1 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
                               No files attached.
                             </div>
                           ) : (
@@ -2508,7 +2508,7 @@ export default async function OpsPage({
                                         href={attachment.signedUrl}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="inline-flex min-h-8 items-center rounded-md border border-slate-300 bg-sand-50 px-2 py-1 font-semibold text-slate-700 transition-colors hover:bg-white"
+                                        className="inline-flex min-h-8 items-center rounded-md border border-slate-300 bg-slate-50 px-2 py-1 font-semibold text-slate-700 transition-colors hover:bg-white"
                                       >
                                         Open
                                       </a>
@@ -2571,7 +2571,7 @@ export default async function OpsPage({
                                 <option value="pending_install">Waiting for install</option>
                               </select>
                             </label>
-                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-sand-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-700 md:col-span-2">
                               <div>
                                 <span className="font-semibold text-slate-700">Ready:</span>{" "}
                                 Moves the linked job to scheduling when it is unscheduled, or keeps it scheduled if it already has a time.
@@ -2617,7 +2617,7 @@ export default async function OpsPage({
                             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-medium leading-5 text-amber-950 md:col-span-2">
                               No job is linked yet. This will start the customer/job record from the permit intake below.
                             </div>
-                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-sand-50 px-3 py-2 text-[12px] leading-5 text-slate-700 md:col-span-2">
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] leading-5 text-slate-700 md:col-span-2">
                               <div className="font-semibold text-slate-900">Permit intake draft</div>
                               <div>
                                 <span className="font-medium text-slate-500">Customer:</span>{" "}
@@ -2698,7 +2698,7 @@ export default async function OpsPage({
                                 <option value="pending_install">Waiting for install</option>
                               </select>
                             </label>
-                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-sand-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-700 md:col-span-2">
                               <div>
                                 <span className="font-semibold text-slate-700">Ready:</span>{" "}
                                 Creates an unscheduled ECC testing job and places it in the waiting to be scheduled queue.
@@ -2762,7 +2762,7 @@ export default async function OpsPage({
               )
             ) : selectedWorkspaceKey === "contractor_intake" ? (
               selectedContractorIntakeRows.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-sand-50 px-3 py-3 text-sm text-slate-600">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                   <div>No contractor-submitted work is waiting for review.</div>
                 </div>
               ) : (
@@ -2839,7 +2839,7 @@ export default async function OpsPage({
 
         <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-44 xl:self-start">
           <section className="hidden rounded-xl border border-slate-200 bg-white px-4 py-3 xl:block" aria-label="Operations queue index">
-            <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Queues</div>
+            <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Queues</div>
             <nav className="space-y-0.5">
               {opsRailQueueRows.map((queue) => {
                 const isException = queue.key === "exceptions";
@@ -2864,15 +2864,15 @@ export default async function OpsPage({
                     key={queue.key}
                     href={queue.href}
                     aria-current={queue.active ? "page" : undefined}
-                    className={`grid min-h-9 grid-cols-[2px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-1 py-1.5 transition-colors hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
+                    className={`grid min-h-10 grid-cols-[2px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
                       queue.count === 0 ? "opacity-40" : ""
                     }`}
                   >
                     <span className={`h-3.5 w-0.5 rounded-sm ${tickClass}`} aria-hidden="true" />
-                    <span className={`min-w-0 text-[12.5px] ${queue.active ? "font-bold text-navy" : "font-medium text-slate-600"}`}>
+                    <span className={`min-w-0 text-[13.5px] ${queue.active ? "font-bold text-navy" : "font-medium text-slate-700"}`}>
                       {queue.label}
                     </span>
-                    <span className={`rounded-full font-mono text-[11px] font-semibold tabular-nums ${countClass}`}>
+                    <span className={`rounded-full font-mono text-[12px] font-semibold tabular-nums ${countClass}`}>
                       {queue.count}
                     </span>
                   </Link>
@@ -2882,8 +2882,8 @@ export default async function OpsPage({
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Queue Health</div>
-            <div className="space-y-2 text-[12.5px] text-slate-600">
+            <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Queue Health</div>
+            <div className="space-y-2 text-[13.5px] text-slate-700">
               <div className="flex items-center gap-2">
                 <span className={`h-1.5 w-1.5 rounded-full ${queueHealthStats.agingOver30 > 0 ? "bg-amber-500" : "bg-[#cfd2cd]"}`} aria-hidden="true" />
                 <span><strong className="font-mono font-semibold tabular-nums text-navy">{queueHealthStats.agingOver30}</strong> aging over 30 days</span>
@@ -2917,8 +2917,8 @@ export default async function OpsPage({
 
           {returnedWorkshareCount > 0 || hasActiveIncomingWorkshareConnection ? (
             <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Workshare</div>
-              <div className="space-y-2 text-[12.5px]">
+              <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Workshare</div>
+              <div className="space-y-2 text-[13.5px]">
                 {returnedWorkshareCount > 0 ? (
                   <Link href="/ops/workshare/returned" className="flex min-h-11 items-center justify-between gap-2 rounded-lg text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:rounded-none xl:text-[12.5px] xl:font-normal">
                     <span>{returnedWorkshareCount} returned · needs action</span>
@@ -2937,8 +2937,8 @@ export default async function OpsPage({
 
           {canShowJobQueueExport || showTeamClockStatusCard ? (
             <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Quick Links</div>
-              <div className="space-y-2 text-[12.5px]">
+              <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Quick Links</div>
+              <div className="space-y-2 text-[13.5px]">
                 {showTeamClockStatusCard ? (
                   <Link href="/time-clock" className="flex min-h-11 items-center text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:text-[12.5px] xl:font-normal">Open time clock</Link>
                 ) : null}
@@ -2957,7 +2957,7 @@ export default async function OpsPage({
                   </summary>
                   <div className="mt-2 space-y-1.5">
                     {teamClockStatusRows.slice(0, 8).map((row) => (
-                      <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-md bg-sand-50 px-2 py-1.5">
+                      <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1.5">
                         <div className="min-w-0">
                           <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
                           <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>

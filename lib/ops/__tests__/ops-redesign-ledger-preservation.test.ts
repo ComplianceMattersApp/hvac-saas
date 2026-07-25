@@ -81,7 +81,7 @@ describe("ops redesign ledger preservation", () => {
     expect(rowSource).toContain("showCloseoutNext");
     expect(rowSource).toContain('<span className="text-slate-400">Needs </span>');
     expect(rowSource).toContain('<span className="text-slate-400">Next </span>');
-    expect(rowSource).toContain('<span className="text-slate-400">Due </span>');
+    expect(rowSource).toContain('<span className="text-slate-600">Due </span>');
     expect(rowSource).toContain('view.scheduledText || "Not scheduled"');
   });
 
