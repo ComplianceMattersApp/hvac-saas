@@ -52,16 +52,21 @@ describe("frozen Ops desktop contract", () => {
   it("pins the approved desktop action treatment without changing mobile cards", () => {
     const desktopStart = rowSource.indexOf("function DesktopLedgerRow");
     const desktopEnd = rowSource.indexOf("function LedgerDetail", desktopStart);
-    const mobileStart = rowSource.indexOf("function NeedsSchedulingCard");
-    const mobileEnd = rowSource.indexOf("function CloseoutCard", mobileStart);
+    const mobileStart = rowSource.indexOf("function MobileOpsCard");
+    const mobileEnd = rowSource.indexOf("function NeedsSchedulingCard", mobileStart);
+    const schedulingStart = mobileEnd;
+    const schedulingEnd = rowSource.indexOf("function CloseoutCard", schedulingStart);
     const desktopSource = rowSource.slice(desktopStart, desktopEnd);
     const mobileSource = rowSource.slice(mobileStart, mobileEnd);
+    const schedulingSource = rowSource.slice(schedulingStart, schedulingEnd);
 
     expect(desktopSource).toContain("justify-center");
     expect(desktopSource).not.toContain(">Call</a>");
     expect(desktopSource).not.toContain(">Text</a>");
     expect(mobileSource).toContain(">Call</a>");
     expect(mobileSource).toContain(">Text</a>");
+    expect(schedulingSource).toContain("phoneHref={phoneHref}");
+    expect(schedulingSource).toContain("textHref={textHref}");
     expect(panelSource).toContain('text-center">Actions');
   });
 

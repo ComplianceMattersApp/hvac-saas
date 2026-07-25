@@ -143,8 +143,27 @@ than a mobile-only visual decision.
 - Queue-specific header actions remain visible. In particular, Batch
   Contractor Invoice becomes a full-width 44px mobile action rather than being
   discarded with the duplicate heading.
-- Empty states, Clear Filters, cards, forms, and the desktop shell remain
-  unchanged.
+- Empty states, Clear Filters, forms, and the desktop shell remain unchanged.
+
+## Final standard queue row treatment
+
+- Below `xl`, standard queue work is presented as one white queue container
+  with flat rows separated by a neutral slate band. The band gives every job a
+  clear visual ending without reviving individual rounded card shells, colored
+  left spines, floating age pills, or nested phone cards.
+- Job type and age remain the row's compact orientation line. Existing aging
+  thresholds are preserved through text color rather than a badge.
+- Customer, address, and the canonical formatted Reason remain visible before
+  the operational fields. Queue membership and reason derivation stay in the
+  approved queue engine; this layer only changes presentation.
+- Contractor, Last Action, and Last Attempt remain visible. Needs Scheduling
+  keeps Open Job, Call, and Text together in the bottom action row with the
+  existing phone-link wiring.
+- Closeout continues to suppress Needs or Next Step when either merely repeats
+  Reason. Follow Ups and generic rows retain their queue-specific fields and
+  destinations.
+- The `xl` desktop ledger and the specialized field-payment review workflow
+  remain separate render paths and are not restyled by this treatment.
 
 ## Mobile Contractor Focus selector slice
 

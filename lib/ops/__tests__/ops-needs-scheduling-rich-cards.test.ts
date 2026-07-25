@@ -67,7 +67,7 @@ describe("/ops Needs Scheduling rich cards", () => {
   it("renders rich action cards in the actual visible workspace Needs Scheduling queue", () => {
     expect(opsPageSource).toContain('pending: "need_to_schedule"');
     expect(opsPageSource).toContain('label: "Needs Scheduling"');
-    expect(needsSchedulingCardSource).toContain('variant="needs-scheduling-rich"');
+    expect(needsSchedulingCardSource).toContain("<MobileOpsCard");
     expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "need_to_schedule"');
     expect(activeQueueRowsSource).toContain("buildNeedsSchedulingRowView(job, visibleReason)");
   });
@@ -92,7 +92,7 @@ describe("/ops Needs Scheduling rich cards", () => {
       "workspaceContractorName(job) || operationalTenantIdentity.displayName",
     );
     expect(needsSchedulingCardSource).toContain(
-      '...(view.contractorName ? [{ label: "Contractor", value: view.contractorName }] : [])',
+      '{ label: "Contractor", value: view.contractorName || "Internal work"',
     );
 
     expect(needsSchedulingCardSource).not.toContain("Open & Act");
@@ -100,7 +100,7 @@ describe("/ops Needs Scheduling rich cards", () => {
 
   it("keeps scheduling controls out of the compact card while preserving its job destination", () => {
     expect(opsPageSource).toContain('import { updateJobScheduleFromForm } from "@/lib/actions";');
-    expect(needsSchedulingCardSource).toContain("headerContent={");
+    expect(needsSchedulingCardSource).toContain("phoneHref={phoneHref}");
     expect(needsSchedulingCardSource).not.toContain("form action={updateJobScheduleFromForm}");
     expect(needsSchedulingCardSource).not.toContain('name="scheduled_date"');
     expect(needsSchedulingCardSource).not.toContain("Save Schedule");
@@ -117,7 +117,7 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(needsSchedulingCardSource).not.toContain("form action={logCustomerContactAttemptFromForm}");
     expect(needsSchedulingCardSource).not.toContain("Log Call");
     expect(needsSchedulingCardSource).not.toContain("Log Text Attempt");
-    expect(needsSchedulingCardSource).toContain(">Text<");
+    expect(rowCardSource).toContain('textHref ? <a href={textHref}');
   });
 
   it("preserves compact workspace card rendering for queues that have not been promoted", () => {
@@ -133,7 +133,7 @@ describe("/ops Closeout rich cards", () => {
   it("renders rich closeout cards only from the actual visible closeout workspace key", () => {
     expect(opsPageSource).toContain('closeout: "closeout"');
     expect(opsPageSource).toContain('label: "Closeout & Review"');
-    expect(closeoutCardSource).toContain('variant="closeout-rich"');
+    expect(closeoutCardSource).toContain("<MobileOpsCard");
     expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "closeout"');
     expect(activeQueueRowsSource).toContain("buildCloseoutRowView(job, visibleReason)");
   });

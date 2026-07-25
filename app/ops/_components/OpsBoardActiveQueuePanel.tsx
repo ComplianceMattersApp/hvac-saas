@@ -332,7 +332,7 @@ export default function OpsBoardActiveQueuePanel({
             ) : null}
 
             {visibleRows.length ? (
-              <div className="overflow-hidden xl:rounded-xl xl:border xl:border-slate-200">
+              <div className="overflow-hidden rounded-[18px] border border-sand-200 bg-white xl:rounded-xl xl:border-slate-200">
                 <div className="hidden grid-cols-[3px_minmax(220px,1fr)_168px_72px_158px_158px_132px] border-b border-slate-200 bg-sand-150 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 xl:grid">
                   <div />
                   <div className="px-4 py-2.5">Customer / Job</div>
@@ -342,7 +342,7 @@ export default function OpsBoardActiveQueuePanel({
                   <div className="border-l border-slate-200 px-3 py-2.5">Last Attempt</div>
                   <div className="border-l border-slate-200 px-3 py-2.5 text-center">Actions</div>
                 </div>
-                <div className="space-y-2 xl:space-y-0">
+                <div className="xl:space-y-0">
                   {visibleRows.map((row) => (
                     <OpsQueueRowCard key={row.id} view={row.view} />
                   ))}

@@ -494,7 +494,7 @@ describe("focused queue display labels", () => {
 
   it("Operations Workspace cards use formatted status/reason copy instead of raw Ops Status", () => {
     expect(opsPageSource).toContain("getOpsQueueCardStatusReason");
-    expect(opsRowCardSource).toContain('label: "Reason"');
+    expect(opsRowCardSource).toContain('>Reason</span>');
     expect(opsPageSource).not.toContain("Ops Status:");
   });
 
