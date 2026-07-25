@@ -406,6 +406,26 @@ export default async function OpsPage({
     return customer || location || "Customer / location pending";
   }
 
+  function workspaceCustomerName(job: any) {
+    return (
+      [formatPersonNamePart(job?.customer_first_name), formatPersonNamePart(job?.customer_last_name)]
+        .filter(Boolean)
+        .join(" ") || "Customer pending"
+    );
+  }
+
+  function workspaceLocation(job: any) {
+    return (
+      [String(job?.job_address ?? "").trim(), formatCityNamePart(job?.city)]
+        .filter(Boolean)
+        .join(", ") || "Location pending"
+    );
+  }
+
+  function workspaceJobTypeLabel(job: any) {
+    return String(job?.job_type ?? "Job").trim().replace(/[_-]+/g, " ") || "Job";
+  }
+
   function workspaceContractorName(job: any) {
     return String((job as any)?.contractors?.name ?? "").trim();
   }
@@ -1472,6 +1492,9 @@ export default async function OpsPage({
         href: `/jobs/${jobId}?tab=ops`,
         title: workspaceTitle(job),
         subtitle: workspaceCustomerLocation(job),
+        jobTypeLabel: workspaceJobTypeLabel(job),
+        customerName: workspaceCustomerName(job),
+        address: workspaceLocation(job),
         reasonLabel: visibleReason.label,
         reasonDetail: visibleReason.detail,
         ageLabel: workspaceQueueAgeChipLabel(job, "need_to_schedule"),
@@ -1541,6 +1564,9 @@ export default async function OpsPage({
         href: `/jobs/${jobId}?tab=ops`,
         title: workspaceTitle(job),
         subtitle: workspaceCustomerLocation(job),
+        jobTypeLabel: workspaceJobTypeLabel(job),
+        customerName: workspaceCustomerName(job),
+        address: workspaceLocation(job),
         reasonLabel: visibleReason.label,
         reasonDetail: visibleReason.detail,
         ageLabel: workspaceQueueAgeChipLabel(job, "closeout"),
@@ -1548,6 +1574,7 @@ export default async function OpsPage({
         stateChips: closeoutStateChips,
         tone: deriveOpsQueueCardTone(closeoutStateChips),
         lastActionText: workspaceLastActionTag(job),
+        recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
         needsLabel,
         contractorName: workspaceContractorName(job),
         scheduledText: job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "",
@@ -1627,12 +1654,16 @@ export default async function OpsPage({
         href: `/jobs/${jobId}/v2#followup`,
         title: workspaceTitle(job),
         subtitle: workspaceCustomerLocation(job),
+        jobTypeLabel: workspaceJobTypeLabel(job),
+        customerName: workspaceCustomerName(job),
+        address: workspaceLocation(job),
         dueText: dueDate ? formatBusinessDateUS(dueDate) : "No date set",
         urgencyLabel: urgency.label,
         urgencyTone,
         ageLabel: workspaceQueueAgeChipLabel(job, "follow_ups"),
         ageDays: workspaceQueueAgeDays(job, "follow_ups"),
         lastActionText: workspaceLastActionTag(job),
+        recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
         owner,
         statusLabel,
         note,
@@ -1657,6 +1688,9 @@ export default async function OpsPage({
         href: `/jobs/${jobId}?tab=ops`,
         title: workspaceTitle(job),
         subtitle: workspaceCustomerLocation(job),
+        jobTypeLabel: workspaceJobTypeLabel(job),
+        customerName: workspaceCustomerName(job),
+        address: workspaceLocation(job),
         reasonLabel: visibleReason.label,
         reasonDetail: visibleReason.detail,
         ageLabel: workspaceQueueAgeChipLabel(job, queueKey),
@@ -1664,6 +1698,7 @@ export default async function OpsPage({
         stateChips: fallbackStateChips,
         tone: deriveOpsQueueCardTone(fallbackStateChips),
         lastActionText: workspaceLastActionTag(job),
+        recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
         assignmentSummary: fallbackAssignmentSummary,
         contractorName: workspaceContractorName(job),
       };
@@ -1784,6 +1819,38 @@ export default async function OpsPage({
       count: tab.count,
       href: tab.href,
     }));
+    const activeWorkspaceQueueKey = boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter];
+    const opsRailQueueOrder = [
+      "need_to_schedule",
+      "exceptions",
+      "waiting",
+      "updates",
+      "field_work",
+      "follow_ups",
+      "contractor_intake",
+      "closeout",
+      "permits",
+      "without_tech",
+    ];
+    const opsRailQueueRows = [
+      ...workspaceQueueChips.map((chip) => ({
+        key: chip.key,
+        label: chip.label,
+        count: chip.count,
+        href: chip.href,
+        active: chip.isSelected,
+      })),
+      ...hiddenTodayWorkspaceTabs.map((tab) => ({
+        key: tab.key,
+        label: tab.label,
+        count: tab.count,
+        href: tab.href,
+        active: tab.key === activeWorkspaceQueueKey,
+      })),
+    ].sort(
+      (left, right) =>
+        opsRailQueueOrder.indexOf(left.key) - opsRailQueueOrder.indexOf(right.key),
+    );
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const selectedPermitAttachmentResult = selectedPermitRows.length
@@ -1910,7 +1977,10 @@ export default async function OpsPage({
     }
 
     return (
-      <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6">
+      <div
+        data-ops-visual-scope
+        className="mx-auto max-w-[92rem] space-y-3 rounded-[1.75rem] bg-sand-100 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6"
+      >
         {notice === "estimates_unavailable" ? (
           <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.24)]">
             <div className="font-semibold">Estimates are not enabled for this environment yet.</div>
@@ -1920,35 +1990,34 @@ export default async function OpsPage({
           </section>
         ) : null}
 
-        <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-        <div className="min-w-0 space-y-3 sm:space-y-4">
-        <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_56%,rgba(219,234,254,0.56))] p-4 shadow-[0_22px_54px_-34px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/70 sm:p-5">
+        <header
+          data-ops-sticky-header
+          className="sticky top-14 z-30 -mx-2.5 border-b border-slate-200 bg-sand-100 px-4 py-3 shadow-[0_6px_14px_-12px_rgba(15,31,53,0.22)] sm:-mx-4 sm:px-5 sm:py-4 xl:-mx-6 xl:px-6"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-                <span className="inline-block h-[13px] w-[3px] rounded-full bg-blue-600" aria-hidden="true" />
-                {operationalTenantIdentity.displayName}
+              <div className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                {operationalTenantIdentity.displayName} · Operations
               </div>
-              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-navy sm:text-[2rem]">
+              <h1 className="mt-1 text-[26px] font-bold leading-tight tracking-[-0.02em] text-navy">
                 Operations Workspace
               </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-slate-600">
                 Start with the queue that needs attention now. Then work down through field progress, exceptions, and closeout.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Link href="/today" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
-                Go to Today
-              </Link>
               {returnedWorkshareCount > 0 ? (
-                <Link href="/ops/workshare/returned" className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-[12px] font-semibold text-blue-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
+                <Link href="/ops/workshare/returned" className="inline-flex min-h-9 items-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-blue-700 transition-colors hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
                   Returned Work · {returnedWorkshareCount}
                 </Link>
               ) : null}
             </div>
           </div>
-        </section>
+        </header>
 
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_288px] xl:items-start">
+        <div className="min-w-0 space-y-3 sm:space-y-4">
         <section id="ops-workspace" className="rounded-3xl border border-slate-300/80 bg-white p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
             <div>
@@ -1964,6 +2033,7 @@ export default async function OpsPage({
 
           {!canShowJobQueueExport ? (
           <>
+          <div className="xl:hidden">
           <div className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector">
             {workspaceQueueChips.map((chip) => (
               <Link
@@ -1974,8 +2044,8 @@ export default async function OpsPage({
                   chip.isSelected
                     ? "border-navy bg-navy text-white"
                     : chip.count === 0
-                    ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
                 }`}
               >
                 <span className="sm:hidden">{chip.mobileLabel} · {chip.count}</span>
@@ -1988,13 +2058,14 @@ export default async function OpsPage({
                 href={tab.href}
                 className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
                   tab.count === 0
-                    ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"
-                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                    ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
                 }`}
               >
                 <span>{tab.label} · {tab.count}</span>
               </Link>
             ))}
+          </div>
           </div>
 
           {showWorkspaceContractorFilter ? (
@@ -2016,7 +2087,7 @@ export default async function OpsPage({
               <select
                 name="reason"
                 defaultValue={effectiveBoardReasonFilter ?? ""}
-                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
               >
                 <option value="">All reasons</option>
                 {workspaceReasonOptions.map((option) => (
@@ -2025,7 +2096,7 @@ export default async function OpsPage({
                   </option>
                 ))}
               </select>
-              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
+              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-sand-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
                 Apply
               </button>
             </form>
@@ -2037,7 +2108,7 @@ export default async function OpsPage({
               <select
                 name="sort"
                 defaultValue={boardSort}
-                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
               >
                 {OPS_BOARD_SORT_OPTIONS.map((option) => (
                   <option key={option.key} value={option.key}>
@@ -2045,12 +2116,12 @@ export default async function OpsPage({
                   </option>
                 ))}
               </select>
-              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
+              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-sand-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
                 Apply
               </button>
             </form>
             {hasActiveOpsBoardFilters ? (
-              <Link href={clearOpsBoardFiltersHref} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50">
+              <Link href={clearOpsBoardFiltersHref} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-sand-50">
                 Clear filters
               </Link>
             ) : null}
@@ -2070,7 +2141,7 @@ export default async function OpsPage({
                 href={`/ops/contractor-intake/export${buildQueryString({
                   contractor: contractorFocusFilter ?? "",
                 })}`}
-                className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                className="inline-flex items-center rounded-md border border-slate-200/90 bg-sand-50 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
               >
                 Export CSV
               </Link>
@@ -2081,7 +2152,7 @@ export default async function OpsPage({
               <details
                 id="permit-request-create"
                 open={shouldExpandPermitCreateForm}
-                className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70"
+                className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-sand-50"
               >
                 <summary className="list-none cursor-pointer px-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2209,7 +2280,7 @@ export default async function OpsPage({
 
             {selectedWorkspaceKey === "permits" ? (
               selectedPermitRows.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-sand-50 px-3 py-3 text-sm text-slate-600">
                   <div>No active permit requests.</div>
                 </div>
               ) : (
@@ -2300,7 +2371,7 @@ export default async function OpsPage({
                           ) : null}
                       </div>
 
-                      <details className="mt-2 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                      <details className="mt-2 rounded-xl border border-slate-200 bg-sand-50 px-3 py-2">
                         <summary className="cursor-pointer text-[12px] font-semibold text-slate-600">
                           Permit No Longer Needed
                         </summary>
@@ -2452,7 +2523,7 @@ export default async function OpsPage({
                             </div>
                           </div>
                           {permitAttachments.length === 0 ? (
-                            <div className="mt-1 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-500">
+                            <div className="mt-1 rounded-lg border border-dashed border-slate-200 bg-sand-50 px-2.5 py-2 text-xs text-slate-500">
                               No files attached.
                             </div>
                           ) : (
@@ -2478,7 +2549,7 @@ export default async function OpsPage({
                                         href={attachment.signedUrl}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="inline-flex min-h-8 items-center rounded-md border border-slate-300 bg-slate-50 px-2 py-1 font-semibold text-slate-700 transition-colors hover:bg-white"
+                                        className="inline-flex min-h-8 items-center rounded-md border border-slate-300 bg-sand-50 px-2 py-1 font-semibold text-slate-700 transition-colors hover:bg-white"
                                       >
                                         Open
                                       </a>
@@ -2541,7 +2612,7 @@ export default async function OpsPage({
                                 <option value="pending_install">Waiting for install</option>
                               </select>
                             </label>
-                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-sand-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
                               <div>
                                 <span className="font-semibold text-slate-700">Ready:</span>{" "}
                                 Moves the linked job to scheduling when it is unscheduled, or keeps it scheduled if it already has a time.
@@ -2587,7 +2658,7 @@ export default async function OpsPage({
                             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-medium leading-5 text-amber-950 md:col-span-2">
                               No job is linked yet. This will start the customer/job record from the permit intake below.
                             </div>
-                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] leading-5 text-slate-700 md:col-span-2">
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-sand-50 px-3 py-2 text-[12px] leading-5 text-slate-700 md:col-span-2">
                               <div className="font-semibold text-slate-900">Permit intake draft</div>
                               <div>
                                 <span className="font-medium text-slate-500">Customer:</span>{" "}
@@ -2668,7 +2739,7 @@ export default async function OpsPage({
                                 <option value="pending_install">Waiting for install</option>
                               </select>
                             </label>
-                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-sand-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
                               <div>
                                 <span className="font-semibold text-slate-700">Ready:</span>{" "}
                                 Creates an unscheduled ECC testing job and places it in the waiting to be scheduled queue.
@@ -2732,7 +2803,7 @@ export default async function OpsPage({
               )
             ) : selectedWorkspaceKey === "contractor_intake" ? (
               selectedContractorIntakeRows.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-sand-50 px-3 py-3 text-sm text-slate-600">
                   <div>No contractor-submitted work is waiting for review.</div>
                 </div>
               ) : (
@@ -2809,25 +2880,78 @@ export default async function OpsPage({
         </section>
         </div>
 
-        <aside className="space-y-3 sm:space-y-4">
-          <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Queue Health</div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className={`rounded-xl border px-3 py-2 ${queueHealthStats.agingOver30 > 0 ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-slate-50"}`}>
-                <div className={`text-xl font-semibold ${queueHealthStats.agingOver30 > 0 ? "text-rose-700" : "text-slate-500"}`}>{queueHealthStats.agingOver30}</div>
-                <div className="text-[11px] font-medium text-slate-600">Aging &gt; 30d</div>
+        <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-44 xl:self-start">
+          <section className="hidden rounded-xl border border-slate-200 bg-white px-4 py-3 xl:block" aria-label="Operations queue index">
+            <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Queues</div>
+            <nav className="space-y-0.5">
+              {opsRailQueueRows.map((queue) => {
+                const isException = queue.key === "exceptions";
+                const isWaiting = queue.key === "waiting";
+                const tickClass = queue.active
+                  ? "bg-blue-600"
+                  : isException
+                  ? "bg-rose-600"
+                  : isWaiting
+                  ? "bg-amber-500"
+                  : "bg-[#cfd2cd]";
+                const countClass = queue.active
+                  ? "bg-blue-600 px-2 py-0.5 text-white"
+                  : isException
+                  ? "text-rose-700"
+                  : isWaiting
+                  ? "text-amber-700"
+                  : "text-slate-500";
+
+                return (
+                  <Link
+                    key={queue.key}
+                    href={queue.href}
+                    aria-current={queue.active ? "page" : undefined}
+                    className={`grid min-h-9 grid-cols-[2px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-1 py-1.5 transition-colors hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
+                      queue.count === 0 ? "opacity-40" : ""
+                    }`}
+                  >
+                    <span className={`h-3.5 w-0.5 rounded-sm ${tickClass}`} aria-hidden="true" />
+                    <span className={`min-w-0 text-[12.5px] ${queue.active ? "font-bold text-navy" : "font-medium text-slate-600"}`}>
+                      {queue.label}
+                    </span>
+                    <span className={`rounded-full font-mono text-[11px] font-semibold tabular-nums ${countClass}`}>
+                      {queue.count}
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Queue Health</div>
+            <div className="space-y-2 text-[12.5px] text-slate-600">
+              <div className="flex items-center gap-2">
+                <span className={`h-1.5 w-1.5 rounded-full ${queueHealthStats.agingOver30 > 0 ? "bg-amber-500" : "bg-[#cfd2cd]"}`} aria-hidden="true" />
+                <span><strong className="font-mono font-semibold tabular-nums text-navy">{queueHealthStats.agingOver30}</strong> aging over 30 days</span>
               </div>
-              <div className={`rounded-xl border px-3 py-2 ${queueHealthStats.unassigned > 0 ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
-                <div className={`text-xl font-semibold ${queueHealthStats.unassigned > 0 ? "text-amber-700" : "text-slate-500"}`}>{queueHealthStats.unassigned}</div>
-                <div className="text-[11px] font-medium text-slate-600">Unassigned</div>
+              <div className="flex items-center gap-2">
+                <span className={`h-1.5 w-1.5 rounded-full ${queueHealthStats.unassigned > 0 ? "bg-amber-500" : "bg-[#cfd2cd]"}`} aria-hidden="true" />
+                <span><strong className="font-mono font-semibold tabular-nums text-navy">{queueHealthStats.unassigned}</strong> unassigned</span>
               </div>
+              {showTeamClockStatusCard ? (
+                <div className="flex items-center gap-2">
+                  <span className={`h-1.5 w-1.5 rounded-full ${teamClockStatusRows.length === 0 ? "bg-amber-500" : "bg-[#cfd2cd]"}`} aria-hidden="true" />
+                  <span>
+                    {teamClockStatusRows.length === 0
+                      ? "No team members clocked in"
+                      : `${teamClockStatusRows.length} team member${teamClockStatusRows.length === 1 ? "" : "s"} clocked in`}
+                  </span>
+                </div>
+              ) : null}
             </div>
             {queueHealthStats.breakdown.length > 0 ? (
-              <div className="mt-2 space-y-1 border-t border-slate-200 pt-2">
+              <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3">
                 {queueHealthStats.breakdown.map((entry) => (
-                  <div key={entry.label} className="flex items-center justify-between text-xs">
+                  <div key={entry.label} className="flex items-center justify-between text-[11.5px]">
                     <span className="text-slate-600">{entry.label}</span>
-                    <span className="font-semibold text-slate-800">{entry.count}</span>
+                    <span className="font-mono font-semibold tabular-nums text-navy">{entry.count}</span>
                   </div>
                 ))}
               </div>
@@ -2835,52 +2959,55 @@ export default async function OpsPage({
           </section>
 
           {returnedWorkshareCount > 0 || hasActiveIncomingWorkshareConnection ? (
-            <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Workshare</div>
-              <div className="space-y-2">
+            <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Workshare</div>
+              <div className="space-y-2 text-[12.5px]">
                 {returnedWorkshareCount > 0 ? (
-                  <Link href="/ops/workshare/returned" className="flex items-center justify-between gap-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm transition-colors hover:bg-blue-50">
-                    <span className="font-medium text-blue-900">{returnedWorkshareCount} returned · needs action</span>
-                    <span className="font-semibold text-blue-700">Review &rarr;</span>
+                  <Link href="/ops/workshare/returned" className="flex items-center justify-between gap-2 text-blue-700 hover:underline">
+                    <span>{returnedWorkshareCount} returned · needs action</span>
+                    <span aria-hidden="true">&rarr;</span>
                   </Link>
                 ) : null}
                 {hasActiveIncomingWorkshareConnection ? (
-                  <Link href="/ops/workshare/incoming" className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm transition-colors hover:bg-slate-50">
-                    <span className="font-medium text-slate-700">Incoming ECC/HERS requests</span>
-                    <span className="font-semibold text-blue-700">View &rarr;</span>
+                  <Link href="/ops/workshare/incoming" className="flex items-center justify-between gap-2 text-blue-700 hover:underline">
+                    <span>Incoming ECC/HERS requests</span>
+                    <span aria-hidden="true">&rarr;</span>
                   </Link>
                 ) : null}
               </div>
             </section>
           ) : null}
 
-          {showTeamClockStatusCard ? (
-            <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Operations</div>
-                  <div className="text-[15px] font-semibold tracking-tight text-slate-950">Team Clock Status</div>
-                </div>
-                <Link href="/time-clock" className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
-                  Open time clock
-                </Link>
+          {canShowJobQueueExport || showTeamClockStatusCard ? (
+            <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <div className="mb-2 font-mono text-[9.5px] font-semibold uppercase tracking-[0.14em] text-slate-400">Quick Links</div>
+              <div className="space-y-2 text-[12.5px]">
+                {showTeamClockStatusCard ? (
+                  <Link href="/time-clock" className="block text-blue-700 hover:underline">Open time clock</Link>
+                ) : null}
+                {canShowJobQueueExport ? (
+                  <a href="#ops-export-menu" className="block text-blue-700 hover:underline">Export this queue</a>
+                ) : null}
               </div>
 
-              {teamClockStatusRows.length === 0 ? (
-                <div className="text-xs text-slate-600">No team members are clocked in right now.</div>
-              ) : (
-                <div className="space-y-1.5">
-                  {teamClockStatusRows.slice(0, 8).map((row) => (
-                    <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
-                        <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>
+              {showTeamClockStatusCard && teamClockStatusRows.length > 0 ? (
+                <details className="mt-3 border-t border-slate-200 pt-3">
+                  <summary className="cursor-pointer list-none text-[11.5px] font-semibold text-slate-600 hover:text-navy [&::-webkit-details-marker]:hidden">
+                    Clocked-in team · {teamClockStatusRows.length}
+                  </summary>
+                  <div className="mt-2 space-y-1.5">
+                    {teamClockStatusRows.slice(0, 8).map((row) => (
+                      <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-md bg-sand-50 px-2 py-1.5">
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
+                          <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>
+                        </div>
+                        <span className="shrink-0 text-[11px] font-medium text-slate-700">{row.statusLabel} · {row.elapsed}</span>
                       </div>
-                      <span className="shrink-0 text-[11px] font-medium text-slate-700">{row.statusLabel} · {row.elapsed}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                </details>
+              ) : null}
             </section>
           ) : null}
         </aside>

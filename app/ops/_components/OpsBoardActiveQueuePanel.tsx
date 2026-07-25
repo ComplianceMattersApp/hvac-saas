@@ -138,6 +138,7 @@ export default function OpsBoardActiveQueuePanel({
 
   return (
     <>
+      <div className="xl:hidden">
       <div className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector">
         {chips.map((chip) => (
           <Link
@@ -148,8 +149,8 @@ export default function OpsBoardActiveQueuePanel({
               chip.active
                 ? "border-navy bg-navy text-white"
                 : chip.count === 0
-                ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"
-                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
             }`}
           >
             <span className="sm:hidden">{chip.mobileLabel} · {chip.count}</span>
@@ -162,13 +163,14 @@ export default function OpsBoardActiveQueuePanel({
             href={normalizeOpsWorkspaceHref(chip.href)}
             className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
               chip.count === 0
-                ? "border-slate-200 bg-white text-slate-300 hover:bg-slate-50"
-                : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                ? "border-slate-200 bg-white text-slate-300 hover:bg-sand-50"
+                : "border-slate-300 bg-white text-slate-700 hover:bg-sand-50"
             }`}
           >
             <span>{chip.label} · {chip.count}</span>
           </Link>
         ))}
+      </div>
       </div>
 
       {contractorFocusSelector}
@@ -180,7 +182,7 @@ export default function OpsBoardActiveQueuePanel({
             value={reasonKey}
             onChange={(event) => setReasonKey(event.target.value)}
             disabled={!panel}
-            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
           >
             <option value="">All reasons</option>
             {(panel?.reasonOptions ?? []).map((option) => (
@@ -196,7 +198,7 @@ export default function OpsBoardActiveQueuePanel({
             value={sort}
             onChange={(event) => setSort(event.target.value as OpsBoardSortKey)}
             disabled={!panel}
-            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+            className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
           >
             {OPS_BOARD_SORT_OPTIONS.map((option) => (
               <option key={option.key} value={option.key}>
@@ -209,7 +211,7 @@ export default function OpsBoardActiveQueuePanel({
           <button
             type="button"
             onClick={clearFilters}
-            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50"
+            className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-sand-50"
           >
             Clear filters
           </button>
@@ -218,7 +220,7 @@ export default function OpsBoardActiveQueuePanel({
 
       {canShowExport ? (
         <div className="mb-3 flex justify-end">
-          <details className="group relative">
+          <details id="ops-export-menu" className="group relative">
             <summary className="inline-flex min-h-9 cursor-pointer list-none items-center justify-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 [&::-webkit-details-marker]:hidden">
               Export
               <span className="text-[10px] transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
@@ -241,7 +243,7 @@ export default function OpsBoardActiveQueuePanel({
                 {panel?.canExportContractorSafeCsv ? (
                   <Link
                     href={contractorSafeExportHref}
-                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-sand-50"
                   >
                     Contractor-Safe CSV
                   </Link>
@@ -266,7 +268,7 @@ export default function OpsBoardActiveQueuePanel({
           {headerRightAction ? (
             <Link
               href={headerRightAction.href}
-              className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+              className="inline-flex items-center rounded-md border border-slate-200/90 bg-sand-50 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
             >
               {headerRightAction.label}
             </Link>
@@ -274,7 +276,7 @@ export default function OpsBoardActiveQueuePanel({
         </div>
 
         {panel.pinnedViews.length === 0 && visibleRows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-sand-50 px-3 py-3 text-sm text-slate-600">
             <div>{hasActiveFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
             {hasActiveFilters ? (
               <button type="button" onClick={clearFilters} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
@@ -283,13 +285,33 @@ export default function OpsBoardActiveQueuePanel({
             ) : null}
           </div>
         ) : (
-          <div className="space-y-2">
-            {panel.pinnedViews.map((view) => (
-              <OpsQueueRowCard key={`field-payment-${view.reportId}`} view={view} />
-            ))}
-            {visibleRows.map((row) => (
-              <OpsQueueRowCard key={row.id} view={row.view} />
-            ))}
+          <div className="space-y-3">
+            {panel.pinnedViews.length ? (
+              <div className="space-y-2">
+                {panel.pinnedViews.map((view) => (
+                  <OpsQueueRowCard key={`field-payment-${view.reportId}`} view={view} />
+                ))}
+              </div>
+            ) : null}
+
+            {visibleRows.length ? (
+              <div className="overflow-hidden xl:rounded-xl xl:border xl:border-slate-200">
+                <div className="hidden grid-cols-[3px_minmax(220px,1fr)_168px_72px_158px_158px_132px] border-b border-slate-200 bg-sand-150 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 xl:grid">
+                  <div />
+                  <div className="px-4 py-2.5">Customer / Job</div>
+                  <div className="border-l border-slate-200 px-4 py-2.5">Contractor</div>
+                  <div className="border-l border-slate-200 px-3 py-2.5">Age</div>
+                  <div className="border-l border-slate-200 px-3 py-2.5">Last Action</div>
+                  <div className="border-l border-slate-200 px-3 py-2.5">Last Attempt</div>
+                  <div className="border-l border-slate-200 px-3 py-2.5 text-center">Actions</div>
+                </div>
+                <div className="space-y-2 xl:space-y-0">
+                  {visibleRows.map((row) => (
+                    <OpsQueueRowCard key={row.id} view={row.view} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </article>
