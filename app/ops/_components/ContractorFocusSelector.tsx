@@ -109,7 +109,8 @@ export default function ContractorFocusSelector({
           <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5 shrink-0 opacity-70">
             <path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5v1.086a1.5 1.5 0 0 1-.44 1.06L12.5 10.71v4.79a1.5 1.5 0 0 1-2.17 1.34l-1.5-.75A1.5 1.5 0 0 1 8 14.75v-4.04L3.44 6.646A1.5 1.5 0 0 1 3 5.586V4.5Z" />
           </svg>
-          <span className="text-[10px] font-bold uppercase tracking-[0.11em] opacity-70 sm:hidden">Contractor Focus</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.11em] opacity-70">Contractor Focus</span>
+          <span aria-hidden="true" className="opacity-40">·</span>
           <span className="truncate">{summary || `All Contractors · ${allCount}`}</span>
         </span>
         <span className="text-[10px] opacity-60" aria-hidden="true">▾</span>
@@ -145,7 +146,7 @@ export default function ContractorFocusSelector({
                 onClick={() => setDraftIds([])}
                 className={[
                   "mb-1 flex min-h-10 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-semibold",
-                  draftIds.length === 0 ? "border-navy bg-navy text-white" : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50",
+                  draftIds.length === 0 ? "border-navy bg-navy text-white" : "border-slate-200 bg-white text-slate-800 hover:bg-sand-50",
                 ].join(" ")}
               >
                 <span>All Contractors</span>
@@ -164,8 +165,8 @@ export default function ContractorFocusSelector({
 
               <label
                 className={[
-                  "mb-1 flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50",
-                  draftSet.has(internalWorkId) ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white",
+                  "mb-1 flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-sand-50",
+                  draftSet.has(internalWorkId) ? "border-slate-200 bg-sand-50" : "border-slate-200 bg-white",
                 ].join(" ")}
               >
                 <input
@@ -187,7 +188,7 @@ export default function ContractorFocusSelector({
               </label>
 
               {filteredOptions.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-5 text-sm text-slate-600">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-sand-50 px-3 py-5 text-sm text-slate-600">
                   No contractors match that search.
                 </div>
               ) : (
@@ -198,8 +199,8 @@ export default function ContractorFocusSelector({
                       <label
                         key={option.id}
                         className={[
-                          "flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50",
-                          isSelected ? "border-slate-200 bg-slate-50 text-slate-900" : "border-slate-200 bg-white text-slate-800",
+                          "flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-sand-50",
+                          isSelected ? "border-slate-200 bg-sand-50 text-slate-900" : "border-slate-200 bg-white text-slate-800",
                           option.count === 0 && !isSelected ? "text-slate-400" : "",
                         ].join(" ")}
                       >
@@ -227,11 +228,11 @@ export default function ContractorFocusSelector({
             </div>
 
             <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-3 py-2.5">
-              <button type="button" onClick={() => setDraftIds([])} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+              <button type="button" onClick={() => setDraftIds([])} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-sand-50">
                 Clear
               </button>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-sand-50">
                   Cancel
                 </button>
                 <button type="button" onClick={() => apply()} className="inline-flex min-h-9 items-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
