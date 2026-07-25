@@ -61,7 +61,10 @@ describe("Ops mobile queue switcher", () => {
     expect(panelSource).toContain("href={internalExportHref}");
     expect(panelSource).toContain("href={contractorSafeExportHref}");
     expect(panelSource).toContain("panel?.canExportContractorSafeCsv");
-    expect(panelSource).toContain("mb-3 hidden justify-end xl:flex");
+    expect(panelSource).toContain(
+      "xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]",
+    );
+    expect(panelSource).not.toContain("mb-3 hidden justify-end xl:flex");
   });
 
   it("raises mobile card readability and touch targets without replacing card data", () => {
@@ -128,6 +131,6 @@ describe("Ops mobile queue switcher", () => {
     expect(mobileResolutionSource).toContain("The concept's proposed 1024px breakpoint is rejected");
     expect(mobileResolutionSource).toContain("No disabled zero-count rows");
     expect(mobileResolutionSource).toContain("cross-queue contractor mode");
-    expect(mobileResolutionSource).toContain("Approved post-mobile desktop backlog");
+    expect(mobileResolutionSource).toContain("Post-mobile desktop revision");
   });
 });

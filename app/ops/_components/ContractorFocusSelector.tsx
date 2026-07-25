@@ -137,7 +137,7 @@ export default function ContractorFocusSelector({
           />
           <div className="relative z-10 flex max-h-[86dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-[18px] border border-slate-200 bg-white shadow-2xl xl:ml-auto xl:h-auto xl:max-h-[78vh] xl:rounded-2xl">
             <div className="flex justify-center py-2 xl:hidden" aria-hidden="true">
-              <span className="h-1 w-12 rounded-full bg-sand-200" />
+              <span className="h-1 w-12 rounded-full bg-slate-200" />
             </div>
             <div className="border-b border-slate-200 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
@@ -166,7 +166,7 @@ export default function ContractorFocusSelector({
                 onClick={() => setDraftIds([])}
                 className={[
                   "mb-1 flex min-h-11 w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm font-semibold xl:min-h-10",
-                  draftIds.length === 0 ? "border-navy bg-navy text-white" : "border-slate-200 bg-white text-slate-800 hover:bg-sand-50",
+                  draftIds.length === 0 ? "border-navy bg-navy text-white" : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50",
                 ].join(" ")}
               >
                 <span>All Contractors</span>
@@ -185,8 +185,8 @@ export default function ContractorFocusSelector({
 
               <label
                 className={[
-                  "mb-1 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-sand-50 xl:min-h-10",
-                  draftSet.has(internalWorkId) ? "border-slate-200 bg-sand-50" : "border-slate-200 bg-white",
+                  "mb-1 flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 xl:min-h-10",
+                  draftSet.has(internalWorkId) ? "border-slate-200 bg-slate-50" : "border-slate-200 bg-white",
                 ].join(" ")}
               >
                 <input
@@ -208,7 +208,7 @@ export default function ContractorFocusSelector({
               </label>
 
               {filteredOptions.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-sand-50 px-3 py-5 text-sm text-slate-600">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-5 text-sm text-slate-600">
                   No contractors match that search.
                 </div>
               ) : (
@@ -219,8 +219,8 @@ export default function ContractorFocusSelector({
                       <label
                         key={option.id}
                         className={[
-                          "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-sand-50 xl:min-h-10",
-                          isSelected ? "border-slate-200 bg-sand-50 text-slate-900" : "border-slate-200 bg-white text-slate-800",
+                          "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50 xl:min-h-10",
+                          isSelected ? "border-slate-200 bg-slate-50 text-slate-900" : "border-slate-200 bg-white text-slate-800",
                           option.count === 0 && !isSelected ? "text-slate-400" : "",
                         ].join(" ")}
                       >
@@ -248,11 +248,11 @@ export default function ContractorFocusSelector({
             </div>
 
             <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5">
-              <button type="button" onClick={() => setDraftIds([])} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-sand-50 xl:min-h-9 xl:text-xs">
+              <button type="button" onClick={() => setDraftIds([])} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 xl:min-h-9 xl:text-xs">
                 Clear
               </button>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-sand-50 xl:min-h-9 xl:text-xs">
+                <button type="button" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 xl:min-h-9 xl:text-xs">
                   Cancel
                 </button>
                 <button type="button" onClick={() => apply()} className="inline-flex min-h-11 items-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700 xl:min-h-9 xl:text-xs">

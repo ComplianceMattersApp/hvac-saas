@@ -10,9 +10,9 @@ import { telHref, smsHref } from "@/lib/ops/phone-links";
 
 const utilityLabelClass = "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
 const inlineActionClass =
-  "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99] xl:min-h-8 xl:text-[11px]";
+  "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99] xl:min-h-8 xl:text-[11px]";
 const compactContactActionClass =
-  "inline-flex min-h-11 min-w-14 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-400 hover:bg-sand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
+  "inline-flex min-h-11 min-w-14 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
 const primaryActionClass =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99] xl:min-h-8 xl:text-[11px]";
 const chipClass = "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
@@ -234,10 +234,10 @@ function DesktopLedgerRow({ view }: { view: LedgerRowView }) {
       data-ops-ledger-row={view.kind}
       className="group/ledger hidden border-b border-[#eceeea] bg-white last:border-b-0 xl:block"
     >
-      <div className="grid min-h-[116px] grid-cols-[3px_minmax(220px,1fr)_168px_72px_158px_158px_132px]">
+      <div className="grid min-h-[124px] grid-cols-[3px_minmax(190px,1fr)_140px_62px_130px_130px_110px] 2xl:grid-cols-[3px_minmax(220px,1fr)_168px_72px_158px_158px_132px]">
         <div className={ageTone.rail} aria-hidden="true" />
         <div className="min-w-0 px-4 py-3">
-          <div className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+          <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-600">
             {view.jobTypeLabel}
           </div>
           {stateChips.length ? (
@@ -245,23 +245,23 @@ function DesktopLedgerRow({ view }: { view: LedgerRowView }) {
               {stateChips.map((chip, index) => (
                 <span
                   key={`${chip.label}-${index}`}
-                  className={`rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.03em] ${LEDGER_CHIP_TONE_CLASS[chip.tone]}`}
+                  className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.03em] ${LEDGER_CHIP_TONE_CLASS[chip.tone]}`}
                 >
                   {chip.label}
                 </span>
               ))}
             </div>
           ) : null}
-          <div className="mt-1 truncate text-[14px] font-semibold text-navy">{view.customerName}</div>
-          <div className="mt-0.5 truncate text-[11.5px] leading-4 text-slate-500">{view.address}</div>
-          <div className="mt-0.5 truncate text-[11px] font-medium leading-4 text-slate-500">{view.title}</div>
-          <div className="mt-1 line-clamp-2 text-[11.5px] leading-4 text-slate-600">
-            <span className="text-slate-400">Reason </span>
+          <div className="mt-1 truncate text-[15px] font-semibold text-navy">{view.customerName}</div>
+          <div className="mt-0.5 truncate text-[12.5px] leading-[1.15rem] text-slate-600">{view.address}</div>
+          <div className="mt-0.5 truncate text-[12px] font-medium leading-[1.1rem] text-slate-600">{view.title}</div>
+          <div className="mt-1 line-clamp-2 text-[12.5px] leading-[1.15rem] text-slate-700">
+            <span className="text-slate-600">Reason </span>
             {reason.label}
             {reason.detail ? <span className="text-slate-500"> · {reason.detail}</span> : null}
           </div>
           {view.kind === "closeout" ? (
-            <div className="mt-1 grid gap-0.5 text-[11px] leading-4 text-slate-500">
+            <div className="mt-1 grid gap-0.5 text-[12px] leading-[1.1rem] text-slate-600">
               {showCloseoutNeeds ? (
                 <div className="truncate"><span className="text-slate-400">Needs </span>{view.needsLabel}</div>
               ) : null}
@@ -270,18 +270,18 @@ function DesktopLedgerRow({ view }: { view: LedgerRowView }) {
               ) : null}
             </div>
           ) : view.kind === "follow_ups" ? (
-            <div className="mt-1 truncate text-[11px] leading-4 text-slate-500">
-              <span className="text-slate-400">Due </span>{view.dueText}
+            <div className="mt-1 truncate text-[12px] leading-[1.1rem] text-slate-600">
+              <span className="text-slate-600">Due </span>{view.dueText}
             </div>
           ) : null}
         </div>
         <div className="min-w-0 border-l border-[#eceeea] px-4 py-3">
-          <div className="truncate text-[12.5px] font-medium text-slate-700">{contractor}</div>
-          <div className="mt-1 truncate font-mono text-[11px] tabular-nums text-slate-400">
+          <div className="truncate text-[13.5px] font-medium text-slate-800">{contractor}</div>
+          <div className="mt-1 truncate font-mono text-[12px] tabular-nums text-slate-600">
             {phone || ("assignmentSummary" in view ? view.assignmentSummary : "")}
           </div>
           {view.kind === "closeout" ? (
-            <div className="mt-1 truncate text-[11px] text-slate-500">
+            <div className="mt-1 truncate text-[12px] text-slate-600">
               {view.scheduledText || "Not scheduled"}
             </div>
           ) : null}
@@ -290,15 +290,15 @@ function DesktopLedgerRow({ view }: { view: LedgerRowView }) {
           {view.ageDays == null ? view.ageLabel : `${view.ageDays}d`}
         </div>
         <div className="min-w-0 border-l border-[#eceeea] px-3 py-3">
-          <div className="line-clamp-2 text-[12px] font-medium leading-4 text-slate-700">{view.lastActionText}</div>
+          <div className="line-clamp-3 text-[13px] font-medium leading-[1.15rem] text-slate-800">{view.lastActionText}</div>
         </div>
         <div className="min-w-0 border-l border-[#eceeea] px-3 py-3">
-          <div className="line-clamp-2 text-[12px] font-medium leading-4 text-slate-700">
+          <div className="line-clamp-3 text-[13px] font-medium leading-[1.15rem] text-slate-800">
             {view.recentAttemptText || "No attempts yet"}
           </div>
         </div>
-        <div className="flex flex-wrap content-center items-center justify-center gap-1.5 border-l border-[#eceeea] bg-sand-50 px-2 py-3">
-          <Link href={view.href} className="inline-flex min-h-9 items-center rounded-md bg-blue-600 px-3 text-xs font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
+        <div className="flex flex-wrap content-center items-center justify-center gap-1.5 border-l border-[#eceeea] bg-slate-50 px-2 py-3">
+          <Link href={view.href} className="inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-3 text-[13px] font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
             {view.kind === "follow_ups" ? "Open Follow Up" : "Open Job"}
           </Link>
         </div>
@@ -391,7 +391,7 @@ function MobileOpsCard({
         {reason.detail ? <span className="text-slate-600"> · {reason.detail}</span> : null}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-sand-200 pt-3 text-[13px] leading-5">
+      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-slate-200 pt-3 text-[13px] leading-5">
         {fields.map((field, index) => (
           <div key={`${field.label}-${index}`} className={field.fullWidth ? "col-span-2" : "min-w-0"}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">{field.label}</div>
@@ -403,7 +403,7 @@ function MobileOpsCard({
 
       {children}
 
-      <div className={`mt-3 grid gap-2 border-t border-sand-200 pt-3 ${phoneHref || textHref ? "grid-cols-[minmax(0,1fr)_78px_78px]" : "grid-cols-1"}`}>
+      <div className={`mt-3 grid gap-2 border-t border-slate-200 pt-3 ${phoneHref || textHref ? "grid-cols-[minmax(0,1fr)_78px_78px]" : "grid-cols-1"}`}>
         <Link href={view.href} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
           {actionLabel}
         </Link>
@@ -454,7 +454,7 @@ function CloseoutCard({ view }: { view: CloseoutRowView }) {
         ...(showNeeds ? [{ label: "Needs", value: view.needsLabel }] : []),
       ]}
     >
-      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-sand-200 pt-3">
+      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-slate-200 pt-3">
         <div className="min-w-0">
           <div className={utilityLabelClass}>Scheduled</div>
           <div className="mt-0.5 text-[12.5px] text-slate-800">{view.scheduledText || "Not scheduled"}</div>
@@ -540,7 +540,7 @@ function FieldPaymentReviewCard({ view }: { view: FieldPaymentReviewRowView }) {
       </div>
 
       <details className="group border-t border-[#eceeea]">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 bg-sand-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-200 xl:min-h-10 xl:text-[12px] [&::-webkit-details-marker]:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 bg-slate-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-200 xl:min-h-10 xl:text-[12px] [&::-webkit-details-marker]:hidden">
           <span>Open &amp; Act</span>
           <span className="text-[10px] text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
         </summary>
@@ -554,7 +554,7 @@ function FieldPaymentReviewCard({ view }: { view: FieldPaymentReviewRowView }) {
               Reporter cannot verify their own report.
             </div>
           ) : (
-            <div className="grid gap-3 rounded-lg border border-slate-200 bg-sand-50 p-3 text-[11px] sm:grid-cols-2">
+            <div className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] sm:grid-cols-2">
               <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
                 <input type="hidden" name="field_payment_report_id" value={view.reportId} />
                 <input type="hidden" name="report_id" value={view.reportId} />
