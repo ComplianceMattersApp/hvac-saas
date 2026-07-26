@@ -51,6 +51,10 @@ describe("Ops mobile queue switcher", () => {
     expect(switcherSource).toContain("min-h-12");
     expect(switcherSource).toContain('aria-modal="true"');
     expect(switcherSource).toContain('aria-expanded={open}');
+    expect(switcherSource).toContain("createPortal(");
+    expect(switcherSource).toContain("document.body");
+    expect(switcherSource).toContain("max-h-[min(72dvh,640px)]");
+    expect(switcherSource).toContain("min-h-0 flex-1 overflow-y-auto");
   });
 
   it("keeps the mobile export intentional and inline without changing its workflow", () => {
