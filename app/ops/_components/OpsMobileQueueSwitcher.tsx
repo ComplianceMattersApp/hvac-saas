@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 
 export type OpsMobileQueueLink = {
   key: string;
@@ -104,7 +105,7 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
         </div>
       ) : null}
 
-      {open ? (
+      {open && typeof document !== "undefined" ? createPortal(
         <div
           className="fixed inset-0 z-[70] flex items-end bg-slate-950/40"
           role="dialog"
@@ -117,7 +118,7 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
             className="absolute inset-0 cursor-default"
             aria-label="Close queue switcher"
           />
-          <section className="relative z-10 max-h-[min(86dvh,760px)] w-full overflow-hidden rounded-t-[18px] border border-slate-200 bg-white shadow-2xl">
+          <section className="relative z-10 flex max-h-[min(72dvh,640px)] w-full flex-col overflow-hidden rounded-t-[18px] border border-slate-200 bg-white shadow-2xl">
             <div className="flex justify-center py-2" aria-hidden="true">
               <span className="h-1 w-12 rounded-full bg-slate-200" />
             </div>
@@ -133,7 +134,7 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
                 Done
               </button>
             </div>
-            <div className="max-h-[calc(min(86dvh,760px)-5rem)] overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div className="divide-y divide-slate-200">
                 {populatedQueues.map(queueRow)}
               </div>
@@ -149,7 +150,8 @@ export default function OpsMobileQueueSwitcher({ queues }: Props) {
               ) : null}
             </div>
           </section>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   );
