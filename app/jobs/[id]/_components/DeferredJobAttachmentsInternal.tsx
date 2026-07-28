@@ -66,6 +66,18 @@ export default async function DeferredJobAttachmentsInternal({
   });
   const initialSharedAttachmentIds = getContractorSharedAttachmentIds(reviewEvents ?? [])
     .filter((id) => visibleAttachmentIds.has(id));
+  const { data: primaryEvidenceEvent } = await supabase
+    .from("job_events")
+    .select("meta")
+    .eq("job_id", jobId)
+    .eq("event_type", "refrigerant_evidence_primary_selected")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const primaryEvidenceMeta =
+    primaryEvidenceEvent && typeof primaryEvidenceEvent.meta !== "string"
+      ? primaryEvidenceEvent.meta as Record<string, unknown>
+      : null;
 
   return (
     <JobAttachmentsInternal
@@ -73,6 +85,7 @@ export default async function DeferredJobAttachmentsInternal({
       initialItems={signedAttachmentResult.items}
       summary={summary}
       initialSharedAttachmentIds={initialSharedAttachmentIds}
+      initialPrimaryRefrigerantEvidenceAttachmentId={String(primaryEvidenceMeta?.attachment_id ?? "").trim() || null}
     />
   );
 }

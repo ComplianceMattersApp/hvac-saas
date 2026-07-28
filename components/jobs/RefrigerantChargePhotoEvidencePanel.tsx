@@ -7,6 +7,7 @@ import {
   createJobAttachmentUploadToken,
   discardInternalJobAttachmentUpload,
   finalizeInternalJobAttachmentUpload,
+  setPrimaryRefrigerantEvidencePhoto,
 } from "@/lib/actions/attachment-actions";
 
 type EvidenceAttachment = {
@@ -25,12 +26,40 @@ type Props = {
   evidenceContext?: "refrigerant_charge_photo" | "duct_asbestos_photo";
   evidenceTitle?: string;
   evidenceNote?: string;
+  primaryEvidenceAttachmentId?: string | null;
 };
 
 function formatUploadDate(value: string) {
   const parsed = new Date(value);
   if (!Number.isFinite(parsed.getTime())) return "(date unavailable)";
   return parsed.toLocaleString();
+}
+
+async function normalizeEvidenceImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif" || file.type === "image/svg+xml") return file;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const maxDimension = 2200;
+    const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close();
+      return file;
+    }
+    context.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.84));
+    if (!blob || blob.size >= file.size && scale === 1) return file;
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "refrigerant-evidence";
+    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
 }
 
 export default function RefrigerantChargePhotoEvidencePanel({
@@ -41,6 +70,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
   evidenceContext = "refrigerant_charge_photo",
   evidenceTitle = "Refrigerant Charge Photo Evidence",
   evidenceNote = "Refrigerant charge photo evidence",
+  primaryEvidenceAttachmentId,
 }: Props) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -71,11 +101,12 @@ export default function RefrigerantChargePhotoEvidencePanel({
   }
 
   async function uploadOne(file: File) {
+    const normalizedFile = await normalizeEvidenceImage(file);
     const token = await createJobAttachmentUploadToken({
       jobId,
-      fileName: file.name,
-      contentType: file.type || "application/octet-stream",
-      fileSize: file.size,
+      fileName: normalizedFile.name,
+      contentType: normalizedFile.type || "application/octet-stream",
+      fileSize: normalizedFile.size,
       caption: defaultLabel,
       attachmentEvidenceContext: evidenceContext,
     });
@@ -83,8 +114,8 @@ export default function RefrigerantChargePhotoEvidencePanel({
     try {
       const { error: uploadError } = await supabase.storage
         .from(token.bucket)
-        .uploadToSignedUrl(token.path, token.token, file, {
-          contentType: file.type || "application/octet-stream",
+        .uploadToSignedUrl(token.path, token.token, normalizedFile, {
+          contentType: normalizedFile.type || "application/octet-stream",
         });
 
       if (uploadError) throw new Error(uploadError.message);
@@ -144,6 +175,20 @@ export default function RefrigerantChargePhotoEvidencePanel({
     if (!pendingFiles.length || isPending) return;
     startTransition(async () => {
       await saveSelectedFiles();
+    });
+  }
+
+  function selectPrimaryPhoto(attachmentId: string) {
+    setError(null);
+    setOk(null);
+    startTransition(async () => {
+      try {
+        await setPrimaryRefrigerantEvidencePhoto({ jobId, attachmentId });
+        setOk("Primary failure photo updated.");
+        router.refresh();
+      } catch (selectionError) {
+        setError(selectionError instanceof Error ? selectionError.message : "Could not set primary photo");
+      }
     });
   }
 
@@ -294,6 +339,14 @@ export default function RefrigerantChargePhotoEvidencePanel({
                   Open attachment
                 </a>
               ) : null}
+              <button
+                type="button"
+                onClick={() => selectPrimaryPhoto(attachment.id)}
+                disabled={isPending || primaryEvidenceAttachmentId === attachment.id}
+                className="mt-2 ml-2 inline-flex min-h-9 items-center justify-center rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-800 disabled:bg-emerald-100 disabled:opacity-80"
+              >
+                {primaryEvidenceAttachmentId === attachment.id ? "Primary failure photo" : "Set as primary"}
+              </button>
             </div>
           ))}
 

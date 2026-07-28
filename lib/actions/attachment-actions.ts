@@ -811,3 +811,53 @@ export async function shareJobAttachmentToContractor(input: {
   revalidatePath(`/portal/jobs/${jobId}`);
   revalidatePath("/portal");
 }
+
+export async function setPrimaryRefrigerantEvidencePhoto(input: {
+  jobId: string;
+  attachmentId: string;
+}) {
+  const jobId = String(input.jobId ?? "").trim();
+  const attachmentId = String(input.attachmentId ?? "").trim();
+  if (!jobId) throw new Error("Missing jobId");
+  if (!attachmentId) throw new Error("Missing attachmentId");
+
+  const supabase = await createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!auth.user) throw new Error("Not authenticated");
+
+  const { internalUser } = await requireInternalUser({ supabase, userId: auth.user.id });
+  const scopedAttachment = await loadScopedInternalJobAttachmentForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentId,
+    attachmentSelect: "file_name, caption",
+  });
+  const attachment = scopedAttachment?.attachment as { file_name?: string | null; caption?: string | null } | undefined;
+  if (!attachment || !isRefrigerantChargeEvidenceCaption(attachment.caption)) {
+    throw new Error("Only refrigerant-charge evidence can be selected as the primary failure photo");
+  }
+
+  await requireOperationalAttachmentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const { error: eventError } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "refrigerant_evidence_primary_selected",
+    user_id: auth.user.id,
+    message: "Primary refrigerant evidence photo selected",
+    meta: {
+      source: "internal",
+      attachment_id: attachmentId,
+      attachment_ids: [attachmentId],
+      file_name: String(attachment.file_name ?? "").trim() || null,
+    },
+  });
+  if (eventError) throw new Error(eventError.message);
+
+  revalidateInternalAttachmentConsumers(jobId);
+  revalidatePath(`/portal/jobs/${jobId}/report/print`);
+  return { attachmentId };
+}

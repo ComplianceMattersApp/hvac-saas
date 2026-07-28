@@ -551,7 +551,7 @@ function buildContractorFailureSummaryV1(args: {
 }): ContractorFailureSummaryV1 {
   const whatFailed =
     args.reportKind === "failed"
-      ? "One or more test checks did not pass."
+      ? args.reasons[0] || "One or more test checks did not pass."
       : "Additional information is required before the job can continue.";
 
   return {
@@ -576,6 +576,7 @@ function buildContractorReportEmailHtml(args: {
   contractorSummary?: string | null;
   contractorNote?: string | null;
   portalJobUrl?: string | null;
+  printReportUrl?: string | null;
   supportDisplayName: string;
   companyLogoUrl?: string | null;
   supportPhone?: string | null;
@@ -584,6 +585,7 @@ function buildContractorReportEmailHtml(args: {
   const summary = String(args.contractorSummary ?? "").trim();
   const note = String(args.contractorNote ?? "").trim();
   const portalUrl = String(args.portalJobUrl ?? "").trim();
+  const printUrl = String(args.printReportUrl ?? "").trim();
   const supportDetails = [args.supportPhone, args.supportEmail].filter(Boolean).join(" • ");
   const supportLine = supportDetails
     ? `${escapeHtml(args.supportDisplayName)} (${escapeHtml(supportDetails)})`
@@ -611,6 +613,7 @@ function buildContractorReportEmailHtml(args: {
     ? `
       <p style="margin: 0 0 8px 0;">
         <a href="${escapeHtml(portalUrl)}" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 10px 14px; border-radius: 6px; font-weight: 600;">Open Contractor Portal</a>
+        ${printUrl ? `<a href="${escapeHtml(printUrl)}" style="display: inline-block; margin-left: 8px; border: 1px solid #0f172a; color: #0f172a; text-decoration: none; padding: 9px 14px; border-radius: 6px; font-weight: 600;">View or print failure report</a>` : ""}
       </p>
       <p style="margin: 0; font-size: 13px; color: #475569;">If the button does not open, copy and paste this link: ${escapeHtml(portalUrl)}</p>
     `
@@ -667,6 +670,7 @@ function buildContractorReportEmailText(args: {
   contractorSummary?: string | null;
   contractorNote?: string | null;
   portalJobUrl?: string | null;
+  printReportUrl?: string | null;
   supportDisplayName: string;
   supportPhone?: string | null;
   supportEmail?: string | null;
@@ -674,6 +678,7 @@ function buildContractorReportEmailText(args: {
   const summary = String(args.contractorSummary ?? "").trim();
   const note = String(args.contractorNote ?? "").trim();
   const portalUrl = String(args.portalJobUrl ?? "").trim();
+  const printUrl = String(args.printReportUrl ?? "").trim();
   const supportDetails = [args.supportPhone, args.supportEmail].filter(Boolean).join(" • ");
   const issueBlock = args.failureDetails.length > 0
     ? args.failureDetails
@@ -697,6 +702,7 @@ function buildContractorReportEmailText(args: {
   if (note) sections.push(`Additional Note:\n${note}`);
   if (portalUrl) {
     sections.push(`Open Contractor Portal:\n${portalUrl}`);
+    if (printUrl) sections.push(`View or print failure report:\n${printUrl}`);
   } else {
     sections.push("Please open your contractor portal to review and respond.");
   }
@@ -804,7 +810,7 @@ async function resolveContractorReportForJob(params: {
   if (opsStatus === "failed") {
     const { data: runs, error: runsErr } = await supabase
       .from("ecc_test_runs")
-      .select("created_at, test_type, computed, computed_pass, override_pass, is_completed")
+      .select("created_at, test_type, data, computed, computed_pass, override_pass, is_completed")
       .eq("job_id", jobId)
       .eq("is_completed", true)
       .order("created_at", { ascending: false })
@@ -1160,6 +1166,7 @@ export async function sendContractorReport(input: {
 
   const appUrl = resolveAppUrl();
   const portalJobUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}` : null;
+  const printReportUrl = appUrl ? `${appUrl}/portal/jobs/${jobId}/report/print` : null;
   const emailHtml = buildContractorReportEmailHtml({
     title: resolvedTitle,
     customerName: resolvedCustomerName,
@@ -1172,6 +1179,7 @@ export async function sendContractorReport(input: {
     contractorSummary: contractorFailureSummary?.contractor_safe_summary,
     contractorNote,
     portalJobUrl,
+    printReportUrl,
     supportDisplayName,
     companyLogoUrl: tenantIdentity.logoUrl,
     supportPhone,
@@ -1189,6 +1197,7 @@ export async function sendContractorReport(input: {
     contractorSummary: contractorFailureSummary?.contractor_safe_summary,
     contractorNote,
     portalJobUrl,
+    printReportUrl,
     supportDisplayName,
     supportPhone,
     supportEmail,
