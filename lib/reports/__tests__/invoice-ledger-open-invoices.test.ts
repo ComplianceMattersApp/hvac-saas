@@ -151,6 +151,7 @@ describe("invoice ledger open invoices view", () => {
     expect(ledger.summary.oldestOpenInvoiceDaysOpenDisplay).toMatch(/^\d+ days?$/);
     expect(ledger.summary.oldestOpenInvoiceDateDisplay).toBe("05-02-2026");
     expect(ledger.rows.find((row) => row.invoiceId === "partial")?.balanceDueDisplay).toBe("$75.00");
+    expect(ledger.rows.find((row) => row.invoiceId === "open-unpaid")?.ageDisplay).toMatch(/^\d+ days?$/);
   });
 
   it("keeps paid and draft rows available in the all-invoices ledger", async () => {
@@ -174,6 +175,9 @@ describe("invoice ledger open invoices view", () => {
 
     expect(ledger.rows.map((row) => row.invoiceId)).toEqual(["open-unpaid", "paid", "draft"]);
     expect(ledger.summary.openInvoiceCount).toBe(1);
+    expect(ledger.rows.find((row) => row.invoiceId === "open-unpaid")?.ageDays).not.toBeNull();
+    expect(ledger.rows.find((row) => row.invoiceId === "paid")?.ageDisplay).toBe("-");
+    expect(ledger.rows.find((row) => row.invoiceId === "draft")?.ageDisplay).toBe("-");
   });
 
   it("separates service customer context from the billed party", async () => {

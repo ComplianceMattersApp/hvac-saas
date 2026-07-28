@@ -81,6 +81,8 @@ export type InvoiceLedgerRow = {
   payerKindLabel: string;
   invoiceDateDisplay: string;
   issuedDateDisplay: string;
+  ageDays: number | null;
+  ageDisplay: string;
   lastCommunicationDateDisplay: string;
   recipientEmail: string | null;
   recipientDisplay: string;
@@ -761,6 +763,12 @@ export async function listInvoiceLedgerRows(params: {
           ? "No Charge Recorded"
           : "Externally Billed"
         : formatPaymentStatusLabel(basePaymentStatus);
+    const isOutstanding = String(invoice.status ?? "").trim().toLowerCase() === "issued"
+      && !String(invoice.voided_at ?? "").trim()
+      && balanceDueCents > 0;
+    const ageDays = isOutstanding
+      ? calculateDaysOpen(invoice.issued_at || invoice.invoice_date)
+      : null;
 
     return {
       invoiceId,
@@ -789,6 +797,8 @@ export async function listInvoiceLedgerRows(params: {
       payerKindLabel,
       invoiceDateDisplay: formatTimestampDisplay(invoice.invoice_date),
       issuedDateDisplay: formatTimestampDisplay(invoice.issued_at),
+      ageDays,
+      ageDisplay: ageDays == null ? "-" : `${ageDays} ${ageDays === 1 ? "day" : "days"}`,
       lastCommunicationDateDisplay: formatTimestampDisplay(deliveryMoment(delivery)),
       recipientEmail: delivery?.recipientEmail || String(invoice.billing_email ?? "").trim().toLowerCase() || null,
       recipientDisplay: delivery?.recipientEmail || String(invoice.billing_email ?? "").trim() || "-",
@@ -848,6 +858,7 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     "Payment Status",
     "Last Payment Date",
     "Payment Count",
+    "Age",
   ];
 
   const lines = rows.map((row) => [
@@ -875,6 +886,7 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     row.paymentStatusLabel,
     row.lastPaymentDateDisplay,
     row.paymentCountDisplay,
+    row.ageDisplay,
   ].map((value) => csvEscape(String(value ?? ""))).join(","));
 
   return [header.map(csvEscape).join(","), ...lines].join("\r\n");

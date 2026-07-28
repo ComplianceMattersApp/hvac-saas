@@ -335,6 +335,7 @@ export default async function InvoiceLedgerPage({
                     <th className="px-3 py-3">Job</th>
                     <th className="px-3 py-3">Invoice Date</th>
                     <th className="px-3 py-3">Issued</th>
+                    <th className="px-3 py-3">Age</th>
                     <th className="px-3 py-3">Last Sent</th>
                     <th className="px-3 py-3">Send Status</th>
                     <th className="px-3 py-3">Total</th>
@@ -349,7 +350,7 @@ export default async function InvoiceLedgerPage({
                 <tbody>
                   {ledger.rows.length === 0 ? (
                     <tr>
-                      <td colSpan={16} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={17} className="px-4 py-12 text-center text-sm text-slate-500">
                         <div className="mx-auto max-w-md space-y-2">
                           <div className="font-semibold text-slate-700">{emptyTitle}</div>
                           <div className="text-xs leading-5 text-slate-500">{emptyBody}</div>
@@ -384,6 +385,7 @@ export default async function InvoiceLedgerPage({
                         </td>
                         <td className="px-3 py-3 text-slate-700">{row.invoiceDateDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.issuedDateDisplay}</td>
+                        <td className="px-3 py-3 font-medium text-slate-900">{row.ageDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.lastCommunicationDateDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.communicationStateLabel}</td>
                         <td className="px-3 py-3 text-slate-700">{row.totalDisplay}</td>
