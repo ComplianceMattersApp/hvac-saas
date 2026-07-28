@@ -33,10 +33,31 @@ export const INVOICE_LEDGER_COMMUNICATION_STATE_OPTIONS = [
 
 export const INVOICE_LEDGER_SORT_OPTIONS = [
   { value: "created_desc", label: "Created newest first" },
+  { value: "created_asc", label: "Created oldest first" },
+  { value: "invoice_number_asc", label: "Invoice number A-Z" },
+  { value: "invoice_number_desc", label: "Invoice number Z-A" },
+  { value: "status_asc", label: "Status A-Z" },
+  { value: "status_desc", label: "Status Z-A" },
+  { value: "customer_asc", label: "Customer A-Z" },
+  { value: "customer_desc", label: "Customer Z-A" },
+  { value: "payer_asc", label: "Billed to A-Z" },
+  { value: "payer_desc", label: "Billed to Z-A" },
   { value: "invoice_date_desc", label: "Invoice date newest first" },
+  { value: "invoice_date_asc", label: "Invoice date oldest first" },
   { value: "issued_desc", label: "Issued newest first" },
+  { value: "issued_asc", label: "Issued oldest first" },
+  { value: "age_desc", label: "Age oldest first" },
+  { value: "age_asc", label: "Age newest first" },
   { value: "total_desc", label: "Total highest first" },
   { value: "total_asc", label: "Total lowest first" },
+  { value: "paid_desc", label: "Paid highest first" },
+  { value: "paid_asc", label: "Paid lowest first" },
+  { value: "balance_desc", label: "Still owed highest first" },
+  { value: "balance_asc", label: "Still owed lowest first" },
+  { value: "payment_status_asc", label: "Payment status A-Z" },
+  { value: "payment_status_desc", label: "Payment status Z-A" },
+  { value: "payment_count_desc", label: "Payments highest first" },
+  { value: "payment_count_asc", label: "Payments lowest first" },
 ] as const;
 
 type FilterSource = URLSearchParams | Record<string, string | string[] | undefined>;
@@ -342,14 +363,17 @@ function applyInvoiceLedgerFilters(query: any, filters: InvoiceLedgerFilters) {
     if (filters.toDate) query = query.lt(column, laDateToUtcMidnightIso(addOneDay(filters.toDate)));
   }
 
-  if (filters.sort === "invoice_date_desc") {
-    query = query.order("invoice_date", { ascending: false }).order("created_at", { ascending: false });
-  } else if (filters.sort === "issued_desc") {
-    query = query.order("issued_at", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false });
+  if (filters.sort === "invoice_date_desc" || filters.sort === "invoice_date_asc") {
+    query = query.order("invoice_date", { ascending: filters.sort === "invoice_date_asc" }).order("created_at", { ascending: false });
+  } else if (filters.sort === "issued_desc" || filters.sort === "issued_asc" || filters.sort === "age_desc" || filters.sort === "age_asc") {
+    const ascending = filters.sort === "issued_asc" || filters.sort === "age_desc";
+    query = query.order("issued_at", { ascending, nullsFirst: false }).order("created_at", { ascending: false });
   } else if (filters.sort === "total_desc") {
     query = query.order("total_cents", { ascending: false }).order("created_at", { ascending: false });
   } else if (filters.sort === "total_asc") {
     query = query.order("total_cents", { ascending: true }).order("created_at", { ascending: false });
+  } else if (filters.sort === "created_asc") {
+    query = query.order("created_at", { ascending: true });
   } else {
     query = query.order("created_at", { ascending: false });
   }
@@ -513,6 +537,40 @@ function calculateDaysOpen(value: string | null | undefined) {
   const endMs = ymdToUtcNoonMs(todayYmdLA());
   if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
   return Math.max(0, Math.floor((endMs - startMs) / 86_400_000));
+}
+
+function sortInvoiceLedgerRows(rows: InvoiceLedgerRow[], sort: InvoiceLedgerSort) {
+  const direction = sort.endsWith("_asc") ? 1 : -1;
+  const compareText = (left: string, right: string) =>
+    left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+  const compareNullableNumber = (left: number | null, right: number | null) => {
+    if (left == null && right == null) return 0;
+    if (left == null) return 1;
+    if (right == null) return -1;
+    return left - right;
+  };
+
+  return [...rows].sort((left, right) => {
+    let result = 0;
+    if (sort.startsWith("invoice_number_")) result = compareText(left.invoiceNumber, right.invoiceNumber);
+    else if (sort.startsWith("status_")) result = compareText(left.invoiceStatusLabel, right.invoiceStatusLabel);
+    else if (sort.startsWith("customer_")) result = compareText(left.customerDisplay, right.customerDisplay);
+    else if (sort.startsWith("payer_")) result = compareText(left.payerDisplay, right.payerDisplay);
+    else if (sort.startsWith("invoice_date_")) result = compareText(left.invoiceDateValue ?? "", right.invoiceDateValue ?? "");
+    else if (sort.startsWith("issued_")) result = compareText(left.issuedAtValue ?? "", right.issuedAtValue ?? "");
+    else if (sort.startsWith("age_")) result = compareNullableNumber(left.ageDays, right.ageDays);
+    else if (sort.startsWith("total_")) result = left.totalCents - right.totalCents;
+    else if (sort.startsWith("paid_")) result = left.amountPaidCents - right.amountPaidCents;
+    else if (sort.startsWith("balance_")) result = left.balanceDueCents - right.balanceDueCents;
+    else if (sort.startsWith("payment_status_")) result = compareText(left.paymentStatusLabel, right.paymentStatusLabel);
+    else if (sort.startsWith("payment_count_")) {
+      result = Number(left.paymentCountDisplay === "-" ? 0 : left.paymentCountDisplay)
+        - Number(right.paymentCountDisplay === "-" ? 0 : right.paymentCountDisplay);
+    } else {
+      return 0;
+    }
+    return result === 0 ? compareText(left.invoiceNumber, right.invoiceNumber) : result * direction;
+  });
 }
 
 type PaymentRow = {
@@ -823,12 +881,13 @@ export async function listInvoiceLedgerRows(params: {
   const viewRows = params.filters.view === "open"
     ? rows.filter((row) => row.invoiceStatus === "issued" && !row.voidedAtValue && row.balanceDueCents > 0)
     : rows;
+  const sortedViewRows = sortInvoiceLedgerRows(viewRows, params.filters.sort);
 
   return {
-    rows: viewRows.slice(0, limit),
-    totalCount: viewRows.length,
-    truncated: scanTruncated || viewRows.length > limit,
-    summary: buildInvoiceLedgerSummary(viewRows),
+    rows: sortedViewRows.slice(0, limit),
+    totalCount: sortedViewRows.length,
+    truncated: scanTruncated || sortedViewRows.length > limit,
+    summary: buildInvoiceLedgerSummary(sortedViewRows),
   };
 }
 

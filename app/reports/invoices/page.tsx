@@ -149,6 +149,28 @@ export default async function InvoiceLedgerPage({
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
   });
   const reportReturnTo = `/reports/invoices?${buildInvoiceLedgerSearchParams(filters).toString()}`;
+  const sortableHeader = (
+    label: string,
+    ascendingSort: typeof filters.sort,
+    descendingSort: typeof filters.sort,
+    firstSort: typeof filters.sort = ascendingSort,
+  ) => {
+    const isAscending = filters.sort === ascendingSort;
+    const isDescending = filters.sort === descendingSort;
+    const nextSort = isAscending ? descendingSort : isDescending ? ascendingSort : firstSort;
+    const nextFilters = { ...filters, sort: nextSort };
+    const href = `/reports/invoices?${buildInvoiceLedgerSearchParams(nextFilters).toString()}`;
+    return (
+      <th className="px-3 py-3" aria-sort={isAscending ? "ascending" : isDescending ? "descending" : "none"}>
+        <Link href={href} className="inline-flex items-center gap-1 rounded-sm hover:text-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
+          {label}
+          <span aria-hidden="true" className={isAscending || isDescending ? "text-blue-700" : "text-slate-400"}>
+            {isAscending ? "↑" : isDescending ? "↓" : "↕"}
+          </span>
+        </Link>
+      </th>
+    );
+  };
   const countSummary = usesInternalInvoicing
     ? filters.view === "open"
       ? `Showing ${ledger.totalCount} open ${ledger.totalCount === 1 ? "invoice" : "invoices"}`
@@ -328,22 +350,22 @@ export default async function InvoiceLedgerPage({
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50/90">
                   <tr className={reportTableHeadClass}>
-                    <th className="px-3 py-3">Invoice</th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3">Customer</th>
-                    <th className="px-3 py-3">Billed To</th>
+                    {sortableHeader("Invoice", "invoice_number_asc", "invoice_number_desc")}
+                    {sortableHeader("Status", "status_asc", "status_desc")}
+                    {sortableHeader("Customer", "customer_asc", "customer_desc")}
+                    {sortableHeader("Billed To", "payer_asc", "payer_desc")}
                     <th className="px-3 py-3">Job</th>
-                    <th className="px-3 py-3">Invoice Date</th>
-                    <th className="px-3 py-3">Issued</th>
-                    <th className="px-3 py-3">Age</th>
+                    {sortableHeader("Invoice Date", "invoice_date_asc", "invoice_date_desc", "invoice_date_desc")}
+                    {sortableHeader("Issued", "issued_asc", "issued_desc", "issued_desc")}
+                    {sortableHeader("Age", "age_asc", "age_desc", "age_desc")}
                     <th className="px-3 py-3">Last Sent</th>
                     <th className="px-3 py-3">Send Status</th>
-                    <th className="px-3 py-3">Total</th>
-                    <th className="px-3 py-3">Paid</th>
-                    <th className="px-3 py-3">Still Owed</th>
-                    <th className="px-3 py-3">Payment Status</th>
+                    {sortableHeader("Total", "total_asc", "total_desc", "total_desc")}
+                    {sortableHeader("Paid", "paid_asc", "paid_desc", "paid_desc")}
+                    {sortableHeader("Still Owed", "balance_asc", "balance_desc", "balance_desc")}
+                    {sortableHeader("Payment Status", "payment_status_asc", "payment_status_desc")}
                     <th className="px-3 py-3">Last Payment</th>
-                    <th className="px-3 py-3">Payments</th>
+                    {sortableHeader("Payments", "payment_count_asc", "payment_count_desc", "payment_count_desc")}
                     <th className="px-3 py-3">Actions</th>
                   </tr>
                 </thead>

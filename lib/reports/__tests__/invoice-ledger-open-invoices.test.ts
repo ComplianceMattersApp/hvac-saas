@@ -180,6 +180,29 @@ describe("invoice ledger open invoices view", () => {
     expect(ledger.rows.find((row) => row.invoiceId === "draft")?.ageDisplay).toBe("-");
   });
 
+  it("sorts derived balance and aging columns in both directions", async () => {
+    const supabase = makeSupabaseMock({
+      invoices: [
+        invoice("newer-smaller", { issued_at: "2026-05-10T12:00:00Z", total_cents: 5000 }),
+        invoice("older-larger", { issued_at: "2026-05-01T12:00:00Z", total_cents: 15000 }),
+      ],
+    });
+
+    const balances = await listInvoiceLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: parseInvoiceLedgerFilters({ sort: "balance_asc" }),
+    });
+    const ages = await listInvoiceLedgerRows({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      filters: parseInvoiceLedgerFilters({ sort: "age_desc" }),
+    });
+
+    expect(balances.rows.map((row) => row.invoiceId)).toEqual(["newer-smaller", "older-larger"]);
+    expect(ages.rows.map((row) => row.invoiceId)).toEqual(["older-larger", "newer-smaller"]);
+  });
+
   it("separates service customer context from the billed party", async () => {
     const supabase = makeSupabaseMock({
       invoices: [invoice("payer", {
