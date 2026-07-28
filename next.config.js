@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: __dirname,
   async redirects() {
     return [
       // Redirect legacy Vercel app URL to canonical production domain.
