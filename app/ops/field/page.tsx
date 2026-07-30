@@ -95,7 +95,8 @@ export default async function OpsFieldPage() {
   const today = todayBusinessDateLA();
   const grouped = groupFieldJobs(jobs, today);
 
-  // Most time-sensitive first: overdue and active work lead, then today, then upcoming.
+  // Most time-sensitive first: overdue and active work lead, followed by
+  // today's schedule, today's completions, and then upcoming work.
   const sections: FieldWorkSection[] = [
     {
       key: "overdue",
@@ -119,18 +120,18 @@ export default async function OpsFieldPage() {
       jobs: grouped.today,
     },
     {
-      key: "upcoming",
-      title: "Upcoming",
-      mobileTitle: "Upcoming",
-      subtitle: "Assigned upcoming scheduled work in chronological order.",
-      jobs: grouped.upcoming,
-    },
-    {
       key: "completed",
       title: "Completed",
       mobileTitle: "Done",
       subtitle: "Assigned jobs completed today.",
       jobs: grouped.completed,
+    },
+    {
+      key: "upcoming",
+      title: "Upcoming",
+      mobileTitle: "Upcoming",
+      subtitle: "Assigned upcoming scheduled work in chronological order.",
+      jobs: grouped.upcoming,
     },
   ];
 
