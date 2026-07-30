@@ -209,13 +209,17 @@ than a mobile-only visual decision.
 ## My Work visual alignment
 
 - `/ops/field` keeps the authoritative scheduled-and-assigned My Work
-  eligibility rules and the existing Overdue, Active, Today, and Upcoming
-  grouping.
+  eligibility rules for Overdue, Active, Today, and Upcoming. Completed is a
+  fifth view containing only assigned jobs whose authoritative
+  `field_complete_at` timestamp falls on the current Los Angeles business day;
+  it is ordered newest completion first.
 - Jobs render inside one continuous white work sheet with neutral separators,
   rather than reviving individual rounded cards, colored left rails, or status
   pills.
 - Scheduled date/window, contractor, address, current section/status, and the
   existing Open Job, Call, Text, and Navigate destinations remain visible.
+- Completed jobs are excluded from every active-work group, and completed
+  history from prior business days is excluded from the page.
 - The My Work loading skeleton mirrors the continuous row structure so loading
   does not introduce the retired card treatment.
 

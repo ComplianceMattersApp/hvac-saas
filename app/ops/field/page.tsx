@@ -81,7 +81,7 @@ export default async function OpsFieldPage() {
     const { data, error: jobsErr } = await supabase
       .from("jobs")
       .select(
-        "id, title, status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractors(name), field_complete"
+        "id, title, status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractors(name), field_complete, field_complete_at"
       )
       .in("id", assignedJobIds)
       .eq("account_owner_user_id", accountOwnerUserId)
@@ -125,9 +125,17 @@ export default async function OpsFieldPage() {
       subtitle: "Assigned upcoming scheduled work in chronological order.",
       jobs: grouped.upcoming,
     },
+    {
+      key: "completed",
+      title: "Completed",
+      mobileTitle: "Done",
+      subtitle: "Assigned jobs completed today.",
+      jobs: grouped.completed,
+    },
   ];
 
   const totalVisibleJobs = sections.reduce((sum, section) => sum + section.jobs.length, 0);
+  const remainingJobs = totalVisibleJobs - grouped.completed.length;
 
   return (
     <div className="mx-auto max-w-4xl space-y-5 bg-slate-50 p-3 text-slate-900 sm:p-6">
@@ -140,7 +148,10 @@ export default async function OpsFieldPage() {
             </div>
             <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-navy">My Work</h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-              {totalVisibleJobs} stop{totalVisibleJobs === 1 ? "" : "s"} today. Open a job for full notes, status actions, tests, and closeout.
+              {remainingJobs} stop{remainingJobs === 1 ? "" : "s"} remaining
+              {grouped.completed.length > 0
+                ? ` · ${grouped.completed.length} completed today`
+                : ""}. Open a job for full notes, status actions, tests, and closeout.
             </p>
           </div>
           <Link

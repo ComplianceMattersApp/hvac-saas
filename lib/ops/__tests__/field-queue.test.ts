@@ -11,6 +11,7 @@ describe("groupFieldJobs", () => {
       today: [],
       overdue: [],
       upcoming: [],
+      completed: [],
     });
   });
 
@@ -58,7 +59,7 @@ describe("groupFieldJobs", () => {
     expect(grouped.upcoming.map((j) => j.id)).toEqual(["sooner", "later"]);
   });
 
-  it("excludes completed/closed/cancelled lifecycle and field-complete jobs", () => {
+  it("excludes lifecycle-complete and old or undated field-complete jobs from active work", () => {
     const jobs = [
       { id: "completed", status: "completed", scheduled_date: TODAY },
       { id: "closed", status: "closed", scheduled_date: TODAY },
@@ -69,12 +70,49 @@ describe("groupFieldJobs", () => {
 
     const grouped = groupFieldJobs(jobs, TODAY);
     expect(grouped.today.map((j) => j.id)).toEqual(["visible"]);
+    expect(grouped.completed).toEqual([]);
+  });
+
+  it("shows only jobs field-completed today in Los Angeles, newest first", () => {
+    const jobs = [
+      {
+        id: "today-earlier",
+        status: "completed",
+        scheduled_date: TODAY,
+        field_complete: true,
+        field_complete_at: "2026-07-05T15:00:00.000Z",
+      },
+      {
+        id: "today-later",
+        status: "completed",
+        scheduled_date: TODAY,
+        field_complete: true,
+        field_complete_at: "2026-07-06T01:00:00.000Z",
+      },
+      {
+        id: "yesterday-la",
+        status: "completed",
+        scheduled_date: TODAY,
+        field_complete: true,
+        field_complete_at: "2026-07-05T06:59:59.000Z",
+      },
+      {
+        id: "timestamp-only",
+        status: "completed",
+        scheduled_date: TODAY,
+        field_complete: false,
+        field_complete_at: "2026-07-05T16:00:00.000Z",
+      },
+    ];
+
+    const grouped = groupFieldJobs(jobs, TODAY);
+    expect(grouped.completed.map((j) => j.id)).toEqual(["today-later", "today-earlier"]);
   });
 
   it("excludes unscheduled jobs that aren't already active field work", () => {
     const jobs = [{ id: "unscheduled", status: "scheduled", scheduled_date: null }];
 
     const grouped = groupFieldJobs(jobs, TODAY);
-    expect(grouped).toEqual({ inProgress: [], today: [], overdue: [], upcoming: [] });
+    expect(grouped).toEqual({ inProgress: [], today: [], overdue: [], upcoming: [], completed: [] });
   });
 });

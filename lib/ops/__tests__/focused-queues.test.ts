@@ -658,6 +658,14 @@ describe("focused ops queue pages", () => {
     expect(opsFieldPageSource).not.toContain('title: "Unscheduled"');
   });
 
+  it("field My Work completed uses the authoritative LA completion day", () => {
+    expect(opsFieldPageSource).toContain("field_complete_at");
+    expect(opsFieldPageSource).toContain('key: "completed"');
+    expect(opsFieldPageSource).toContain('title: "Completed"');
+    expect(fieldQueueLibSource).toContain("businessDateLA(job?.field_complete_at) === todayLA");
+    expect(fieldQueueLibSource).toContain("sortByCompletionNewest");
+  });
+
   it("field My Work uses the approved continuous work-row presentation", () => {
     expect(fieldWorkCardSource).toContain("data-my-work-row={sectionKey}");
     expect(fieldWorkCardSource).toContain(

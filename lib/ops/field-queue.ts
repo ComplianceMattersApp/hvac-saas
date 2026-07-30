@@ -11,6 +11,7 @@ export type FieldQueueJob = {
   window_start?: string | null;
   window_end?: string | null;
   field_complete?: boolean | null;
+  field_complete_at?: string | null;
 };
 
 export type GroupedFieldJobs<T extends FieldQueueJob> = {
@@ -18,6 +19,7 @@ export type GroupedFieldJobs<T extends FieldQueueJob> = {
   today: T[];
   overdue: T[];
   upcoming: T[];
+  completed: T[];
 };
 
 function isLifecycleComplete(job: FieldQueueJob): boolean {
@@ -41,16 +43,44 @@ function sortBySchedule<T extends FieldQueueJob>(a: T, b: T): number {
   return String(a?.id ?? "").localeCompare(String(b?.id ?? ""));
 }
 
+function businessDateLA(value: unknown): string {
+  const parsed = new Date(String(value ?? ""));
+  if (!Number.isFinite(parsed.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+}
+
+function sortByCompletionNewest<T extends FieldQueueJob>(a: T, b: T): number {
+  const aTime = Date.parse(String(a?.field_complete_at ?? ""));
+  const bTime = Date.parse(String(b?.field_complete_at ?? ""));
+  const completionDiff = (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+  return completionDiff || sortBySchedule(a, b);
+}
+
 /**
  * Groups a tech's assigned jobs into the My Work sections: jobs already
  * underway, jobs scheduled for today, overdue jobs (most recent first),
- * and upcoming scheduled jobs. `todayLA` is the account's "today" business
- * date (YYYY-MM-DD) so callers control the timezone/clock source.
+ * upcoming scheduled jobs, and jobs field-completed today. `todayLA` is the
+ * account's "today" business date (YYYY-MM-DD) so callers control the
+ * timezone/clock source.
  */
 export function groupFieldJobs<T extends FieldQueueJob>(
   jobs: T[],
   todayLA: string,
 ): GroupedFieldJobs<T> {
+  const completed = (jobs ?? [])
+    .filter(
+      (job) =>
+        Boolean(job?.field_complete) &&
+        businessDateLA(job?.field_complete_at) === todayLA,
+    )
+    .sort(sortByCompletionNewest);
+
   const activeJobs = (jobs ?? []).filter((job) => {
     if (isLifecycleComplete(job)) return false;
     if (Boolean(job?.field_complete)) return false;
@@ -99,5 +129,5 @@ export function groupFieldJobs<T extends FieldQueueJob>(
     })
     .sort(sortBySchedule);
 
-  return { inProgress, today, overdue, upcoming };
+  return { inProgress, today, overdue, upcoming, completed };
 }

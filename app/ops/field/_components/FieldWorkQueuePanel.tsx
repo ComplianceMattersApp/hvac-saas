@@ -54,7 +54,7 @@ export default function FieldWorkQueuePanel({ sections, internalBusinessDisplayN
         })}
       </div>
 
-      <div className="flex gap-1 rounded-full bg-slate-100 p-1 sm:hidden" role="tablist" aria-label="My Work sections">
+      <div className="grid grid-cols-5 gap-1 rounded-full bg-slate-100 p-1 sm:hidden" role="tablist" aria-label="My Work sections">
         {sections.map((section) => {
           const isActive = section.key === activeSection?.key;
           return (
@@ -64,7 +64,7 @@ export default function FieldWorkQueuePanel({ sections, internalBusinessDisplayN
               role="tab"
               aria-selected={isActive}
               onClick={() => setActiveKey(section.key)}
-              className={`flex-1 rounded-full px-2 py-2 text-center transition-colors ${
+              className={`min-w-0 rounded-full px-1 py-2 text-center transition-colors ${
                 isActive ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"
               }`}
             >

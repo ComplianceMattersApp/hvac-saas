@@ -6,7 +6,7 @@ import { smsHref, telHref } from "@/lib/ops/phone-links";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
-export type FieldWorkSectionKey = "in_progress" | "today" | "overdue" | "upcoming";
+export type FieldWorkSectionKey = "in_progress" | "today" | "overdue" | "upcoming" | "completed";
 
 export type FieldWorkJob = FieldQueueJob & {
   city?: string | null;
@@ -89,6 +89,10 @@ function cardHighlight(
     return { text: windowLabel || "Today", className: "text-amber-700" };
   }
 
+  if (sectionKey === "completed") {
+    return { text: "Completed today", className: "text-emerald-700" };
+  }
+
   return {
     text: job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Schedule pending",
     className: "text-indigo-700",
@@ -133,6 +137,16 @@ export function sectionVisualTone(key: string) {
       text: "text-indigo-800",
       dot: "bg-indigo-500",
       card: "border-l-indigo-500",
+    };
+  }
+
+  if (key === "completed") {
+    return {
+      border: "border-emerald-200",
+      bg: "bg-emerald-50",
+      text: "text-emerald-800",
+      dot: "bg-emerald-500",
+      card: "border-l-emerald-500",
     };
   }
 

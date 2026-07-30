@@ -11,8 +11,8 @@ export default function OpsFieldLoading() {
           <div className="h-10 w-32 animate-pulse rounded-lg bg-slate-100" />
         </div>
 
-        <div className="mt-5 grid gap-2 sm:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
+        <div className="mt-5 grid grid-cols-5 gap-2">
+          {Array.from({ length: 5 }).map((_, index) => (
             <div key={index} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
               <div className="h-3 w-16 animate-pulse rounded bg-slate-200" />
               <div className="mt-2 h-6 w-8 animate-pulse rounded bg-slate-200" />
