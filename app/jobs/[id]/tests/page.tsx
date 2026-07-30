@@ -1229,6 +1229,7 @@ export default async function JobTestsPage({
   }> = [];
   let ductAsbestosPhotoAttachments: Awaited<ReturnType<typeof listJobDuctAsbestosPhotoImages>> = [];
   let equipmentLabelPhotoAttachments: Awaited<ReturnType<typeof listJobEquipmentLabelPhotoImages>> = [];
+  let primaryRefrigerantEvidenceAttachmentId: string | null = null;
 
   const reportAdminClient =
     focusedType === "refrigerant_charge" || focusedType === "duct_leakage" || isCompletionReportFocused
@@ -1242,6 +1243,19 @@ export default async function JobTestsPage({
       jobId: id,
       limit: 20,
     });
+    const { data: primaryEvidenceEvent } = await supabase
+      .from("job_events")
+      .select("meta")
+      .eq("job_id", id)
+      .eq("event_type", "refrigerant_evidence_primary_selected")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const primaryMeta = primaryEvidenceEvent && typeof primaryEvidenceEvent.meta !== "string"
+      ? primaryEvidenceEvent.meta as Record<string, unknown>
+      : null;
+    primaryRefrigerantEvidenceAttachmentId =
+      String(primaryMeta?.attachment_id ?? "").trim() || null;
   }
 
   if (focusedType === "duct_leakage") {
@@ -1842,6 +1856,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             <div className="mt-1">
               Choose <span className="font-semibold">Pass</span>, <span className="font-semibold">Fail</span>, or{" "}
               <span className="font-semibold">Needs Review</span> before completing Refrigerant Charge.
+            </div>
+          </div>
+        )}
+        {notice === "photo_failure_reason_required" && (
+          <div className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 shadow-sm">
+            <div className="font-semibold">Photo failure needs an exact reason.</div>
+            <div className="mt-1">
+              Select what the contractor must correct before completing Refrigerant Charge.
             </div>
           </div>
         )}
@@ -4794,6 +4816,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <RefrigerantChargeExceptionFields
                     initialExceptionReason={runRC.data?.charge_exempt_details ?? ""}
                     initialPhotoResult={runRC.data?.photo_evidence_result ?? ""}
+                    initialPhotoFailureReason={runRC.data?.photo_failure_reason ?? ""}
                     initialExceptionValue={
                       runRC.data?.verification_method === "photo_taken"
                         ? "photo_taken"
@@ -4805,6 +4828,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       jobId={job.id}
                       systemName={selectedSystemName}
                       evidenceAttachments={refrigerantEvidenceAttachments}
+                      primaryEvidenceAttachmentId={primaryRefrigerantEvidenceAttachmentId}
                       saveWithParentForm
                     />
                   </RefrigerantChargeExceptionFields>

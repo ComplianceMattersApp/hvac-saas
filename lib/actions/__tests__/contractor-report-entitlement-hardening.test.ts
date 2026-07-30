@@ -561,9 +561,13 @@ describe("contractor report entitlement hardening", () => {
       expect(emailArgs?.html).toContain("ECC Test Report");
       expect(emailArgs?.html).toContain("Open Contractor Portal");
       expect(emailArgs?.html).toContain("http://localhost:3000/portal/jobs/job-1");
+      expect(emailArgs?.html).toContain("View or print failure report");
+      expect(emailArgs?.html).toContain("http://localhost:3000/portal/jobs/job-1/report/print");
       expect(emailArgs?.text).toContain("ECC TEST REPORT");
       expect(emailArgs?.text).toContain("Open Contractor Portal:");
       expect(emailArgs?.text).toContain("http://localhost:3000/portal/jobs/job-1");
+      expect(emailArgs?.text).toContain("View or print failure report:");
+      expect(emailArgs?.text).toContain("http://localhost:3000/portal/jobs/job-1/report/print");
       expect(emailArgs?.text).toContain("Review and submit your response in the portal.");
     });
 

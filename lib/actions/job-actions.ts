@@ -2088,6 +2088,13 @@ function normalizeRefrigerantChargePhotoResult(value: FormDataEntryValue | null)
   return null;
 }
 
+function normalizeRefrigerantChargePhotoFailureReason(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return ["txv_not_visible", "readings_not_visible", "charge_out_of_range", "other"].includes(normalized)
+    ? normalized
+    : null;
+}
+
 /**
  * DERIVE SERVICE VISIT REASON (Step 5 Clean-Up):
  *
@@ -6184,6 +6191,9 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const photoResult = photoTaken
     ? normalizeRefrigerantChargePhotoResult(formData.get("rc_photo_result"))
     : null;
+  const photoFailureReason = photoResult === "fail"
+    ? normalizeRefrigerantChargePhotoFailureReason(formData.get("rc_photo_failure_reason"))
+    : null;
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
   const overrideDetails =
@@ -6221,6 +6231,14 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
     q.set("notice", "override_reason_required");
     redirect(`/jobs/${jobId}/tests?${q.toString()}`);
   }
+  if (photoResult === "fail" && !photoFailureReason) {
+    const q = new URLSearchParams();
+    q.set("t", "refrigerant_charge");
+    const systemIdFromForm = String(formData.get("system_id") || "").trim();
+    if (systemIdFromForm) q.set("s", systemIdFromForm);
+    q.set("notice", "photo_failure_reason_required");
+    redirect(`/jobs/${jobId}/tests?${q.toString()}`);
+  }
   const num = (key: string) => {
     const raw = String(formData.get(key) || "").trim();
     if (!raw) return null;
@@ -6251,6 +6269,8 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
     verification_method: photoTaken ? "photo_taken" : null,
     photo_taken_timestamp: photoTaken ? new Date().toISOString() : null,
     photo_evidence_result: photoResult,
+    photo_failure_reason: photoFailureReason,
+    photo_failure_details: photoResult === "fail" ? overrideDetails : null,
   };
 
   const measuredSubcool =
@@ -6364,7 +6384,8 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
     measured_superheat_f: measuredSuperheat,
     subcool_delta_f: subcoolDelta,
     rules,
-    failures: isChargeExempt ? [] : failures,
+    failures: isChargeExempt || photoTaken ? [] : failures,
+    photo_failure_reason: photoFailureReason,
     warnings,
   };
 
@@ -7544,6 +7565,9 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   const photoResult = photoTaken
     ? normalizeRefrigerantChargePhotoResult(formData.get("rc_photo_result"))
     : null;
+  const photoFailureReason = photoResult === "fail"
+    ? normalizeRefrigerantChargePhotoFailureReason(formData.get("rc_photo_failure_reason"))
+    : null;
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
   const overrideDetails =
@@ -7587,6 +7611,14 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     q.set("notice", "photo_result_required");
     redirect(`/jobs/${jobId}/tests?${q.toString()}`);
   }
+  if (photoResult === "fail" && !photoFailureReason) {
+    const q = new URLSearchParams();
+    q.set("t", "refrigerant_charge");
+    const systemIdFromForm = String(formData.get("system_id") || "").trim();
+    if (systemIdFromForm) q.set("s", systemIdFromForm);
+    q.set("notice", "photo_failure_reason_required");
+    redirect(`/jobs/${jobId}/tests?${q.toString()}`);
+  }
 
   const data = {
     lowest_return_air_db_f: num("lowest_return_air_db_f"),
@@ -7606,6 +7638,8 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     verification_method: photoTaken ? "photo_taken" : null,
     photo_taken_timestamp: photoTaken ? new Date().toISOString() : null,
     photo_evidence_result: photoResult,
+    photo_failure_reason: photoFailureReason,
+    photo_failure_details: photoResult === "fail" ? overrideDetails : null,
   };
 
   const measuredSubcool =
@@ -7713,7 +7747,8 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     measured_superheat_f: measuredSuperheat,
     subcool_delta_f: subcoolDelta,
     rules,
-    failures: isChargeExempt ? [] : failures,
+    failures: isChargeExempt || photoTaken ? [] : failures,
+    photo_failure_reason: photoFailureReason,
     warnings,
   };
   const photoOverridePass =

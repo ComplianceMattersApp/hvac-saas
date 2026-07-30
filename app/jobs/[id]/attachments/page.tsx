@@ -147,6 +147,18 @@ export default async function JobAttachmentsPage({
   if (shareEventsErr) throw new Error(shareEventsErr.message);
 
   const initialSharedAttachmentIds = getContractorSharedAttachmentIds(shareEvents ?? []);
+  const { data: primaryEvidenceEvent } = await supabase
+    .from("job_events")
+    .select("meta")
+    .eq("job_id", jobId)
+    .eq("event_type", "refrigerant_evidence_primary_selected")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const primaryEvidenceMeta =
+    primaryEvidenceEvent && typeof primaryEvidenceEvent.meta !== "string"
+      ? primaryEvidenceEvent.meta as Record<string, unknown>
+      : null;
 
   const attachmentAdmin = createAdminClient();
 
@@ -298,6 +310,7 @@ export default async function JobAttachmentsPage({
         attachmentInputMode={isRefrigerantChargePhotoContext ? "images" : "all"}
         attachmentEvidenceContext={attachmentEvidenceContext}
         initialSharedAttachmentIds={initialSharedAttachmentIds}
+        initialPrimaryRefrigerantEvidenceAttachmentId={String(primaryEvidenceMeta?.attachment_id ?? "").trim() || null}
       />
     </div>
   );

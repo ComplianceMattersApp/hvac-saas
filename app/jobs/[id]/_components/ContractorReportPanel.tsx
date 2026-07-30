@@ -251,6 +251,16 @@ export default function ContractorReportPanel({
         </div>
       ) : preview ? (
         <div className="space-y-3 text-sm">
+          <div className="flex justify-end">
+            <a
+              href={`/portal/jobs/${jobId}/report/print?mode=current`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+            >
+              Preview printable report
+            </a>
+          </div>
           {/* Meta block */}
           <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-3.5 py-3">
             <div className="mb-2.5 border-b border-slate-200/70 pb-2.5">

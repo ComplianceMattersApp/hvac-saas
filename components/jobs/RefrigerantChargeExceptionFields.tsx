@@ -7,6 +7,7 @@ type Props = {
   initialExceptionReason?: string | null;
   initialExceptionValue?: string | null;
   initialPhotoResult?: string | null;
+  initialPhotoFailureReason?: string | null;
   runId: string;
 };
 
@@ -20,6 +21,7 @@ export default function RefrigerantChargeExceptionFields({
   initialExceptionReason,
   initialExceptionValue,
   initialPhotoResult,
+  initialPhotoFailureReason,
   runId,
 }: Props) {
   const initialMethod = initialExceptionValue === "photo_taken"
@@ -31,6 +33,7 @@ export default function RefrigerantChargeExceptionFields({
   const [exceptionValue, setExceptionValue] = useState(
     initialMethod === "exception" ? initialExceptionValue ?? "" : "",
   );
+  const [photoResult, setPhotoResult] = useState(initialPhotoResult ?? "");
 
   const reasonRequired =
     documentationMethod === "exception" &&
@@ -140,13 +143,44 @@ export default function RefrigerantChargeExceptionFields({
                       type="radio"
                       name="rc_photo_result"
                       value={option.value}
-                      defaultChecked={initialPhotoResult === option.value}
+                      checked={photoResult === option.value}
+                      onChange={(event) => setPhotoResult(event.target.value)}
                     />
                     <span>{option.label}</span>
                   </label>
                 ))}
               </div>
             </div>
+            {photoResult === "fail" ? (
+              <div className="grid gap-1 rounded-xl border border-red-200 bg-red-50/70 px-3 py-3">
+                <label className="text-sm font-semibold text-red-950" htmlFor={`rc-photo-failure-${runId}`}>
+                  Why did the photo review fail?
+                </label>
+                <select
+                  id={`rc-photo-failure-${runId}`}
+                  name="rc_photo_failure_reason"
+                  defaultValue={initialPhotoFailureReason ?? ""}
+                  className="w-full rounded-lg border border-red-300 bg-white px-3 py-2.5 text-sm text-slate-950"
+                  required
+                >
+                  <option value="">Select the exact reason</option>
+                  <option value="txv_not_visible">TXV / metering device is not visible</option>
+                  <option value="readings_not_visible">Gauge readings are not visible or legible</option>
+                  <option value="charge_out_of_range">Refrigerant charge is outside the allowed range</option>
+                  <option value="other">Other photo-review failure</option>
+                </select>
+                <label className="mt-2 text-sm font-medium text-red-950" htmlFor={`rc-photo-failure-note-${runId}`}>
+                  Contractor-facing details <span className="font-normal">(optional)</span>
+                </label>
+                <input
+                  id={`rc-photo-failure-note-${runId}`}
+                  name="rc_photo_details"
+                  defaultValue={initialExceptionReason ?? ""}
+                  className="w-full rounded-lg border border-red-300 bg-white px-3 py-2.5 text-sm text-slate-950"
+                  placeholder="Add only the detail the contractor needs to correct the issue"
+                />
+              </div>
+            ) : null}
             {children}
           </>
         ) : null}

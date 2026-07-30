@@ -233,7 +233,7 @@ export default async function PortalPage({
   const { data: visibleRuns, error: visibleRunsErr } = await supabase
     .from("ecc_test_runs")
     .select(
-      "job_id, created_at, test_type, computed_pass, override_pass, computed, is_completed"
+      "job_id, created_at, test_type, data, computed_pass, override_pass, computed, is_completed"
     )
     .in("job_id", scopedJobIds.length ? scopedJobIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("is_completed", true)

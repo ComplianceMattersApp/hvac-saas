@@ -9,6 +9,7 @@ import {
   discardInternalJobAttachmentUpload,
   finalizeInternalJobAttachmentUpload,
   shareJobAttachmentToContractor,
+  setPrimaryRefrigerantEvidencePhoto,
   updateInternalJobAttachmentCaption,
 } from "@/lib/actions/attachment-actions";
 import type { AttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
@@ -87,6 +88,7 @@ export default function JobAttachmentsInternal({
   attachmentEvidenceContext,
   summary,
   initialSharedAttachmentIds = [],
+  initialPrimaryRefrigerantEvidenceAttachmentId = null,
 }: {
   jobId: string;
   initialItems: Item[];
@@ -94,6 +96,7 @@ export default function JobAttachmentsInternal({
   attachmentEvidenceContext?: string | null;
   summary?: AttachmentReviewSummary;
   initialSharedAttachmentIds?: string[];
+  initialPrimaryRefrigerantEvidenceAttachmentId?: string | null;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -114,6 +117,9 @@ export default function JobAttachmentsInternal({
   );
   const [sharedAttachmentIds, setSharedAttachmentIds] = useState<Set<string>>(
     () => new Set(initialSharedAttachmentIds)
+  );
+  const [primaryEvidenceAttachmentId, setPrimaryEvidenceAttachmentId] = useState<string | null>(
+    initialPrimaryRefrigerantEvidenceAttachmentId,
   );
 
   const isImageCaptureMode = attachmentInputMode === "images";
@@ -271,6 +277,21 @@ export default function JobAttachmentsInternal({
     } finally {
       setSharingId(null);
     }
+  }
+
+  async function makePrimaryEvidence(attachment: Item) {
+    setError(null);
+    setOk(null);
+    startTransition(async () => {
+      try {
+        await setPrimaryRefrigerantEvidencePhoto({ jobId, attachmentId: attachment.id });
+        setPrimaryEvidenceAttachmentId(attachment.id);
+        setOk(`Selected "${attachment.file_name}" as the primary failure photo.`);
+        router.refresh();
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Could not set primary failure photo");
+      }
+    });
   }
 
   function beginEdit(attachment: Item) {
@@ -464,6 +485,8 @@ export default function JobAttachmentsInternal({
                 const typeLabel = fileTypeLabel(a.content_type, a.file_name);
                 const glyph = fileGlyph(a.content_type, a.file_name);
                 const visibleCaption = stripRefrigerantChargeEvidenceTag(a.caption);
+                const isRefrigerantEvidence = String(a.caption ?? "").includes("[evidence:refrigerant_charge_photo]");
+                const isPrimaryEvidence = primaryEvidenceAttachmentId === a.id;
 
                 return (
                   <div
@@ -527,6 +550,11 @@ export default function JobAttachmentsInternal({
                             </span>
                             {sizeLabel ? <span>{sizeLabel}</span> : null}
                             {createdLabel ? <span>{createdLabel}</span> : null}
+                            {isPrimaryEvidence ? (
+                              <span className="inline-flex rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800">
+                                Primary failure photo
+                              </span>
+                            ) : null}
                           </div>
                         </div>
 
@@ -583,6 +611,16 @@ export default function JobAttachmentsInternal({
                       ) : null}
 
                       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+                        {isRefrigerantEvidence ? (
+                          <button
+                            type="button"
+                            onClick={() => makePrimaryEvidence(a)}
+                            disabled={isPending || isDeleting || isPrimaryEvidence}
+                            className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100 disabled:opacity-70"
+                          >
+                            {isPrimaryEvidence ? "Primary failure photo" : "Set as primary"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => beginEdit(a)}

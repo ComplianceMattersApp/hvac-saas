@@ -514,7 +514,7 @@ export default async function PortalJobDetailPage({
 
   const { data: testRuns, error: trErr } = await supabase
     .from("ecc_test_runs")
-    .select("id, job_id, created_at, test_type, computed_pass, override_pass, computed, is_completed")
+    .select("id, job_id, created_at, test_type, data, computed_pass, override_pass, computed, is_completed")
     .in("job_id", chainJobIds.length ? chainJobIds : [jobId])
     .order("created_at", { ascending: false })
     .limit(100);
@@ -910,6 +910,15 @@ export default async function PortalJobDetailPage({
           <div className="max-w-3xl text-sm leading-7 text-slate-700 dark:text-slate-200">{displayStatusExplanation}</div>
         ) : null}
 
+        {latestSentContractorNote && useLatestReportSummaryForCurrentStatus ? (
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-100">
+            <div className="text-xs font-bold uppercase tracking-[0.1em] text-amber-800 dark:text-amber-300">
+              Important message from our team
+            </div>
+            <div className="mt-2 whitespace-pre-wrap font-medium leading-6">{latestSentContractorNote}</div>
+          </div>
+        ) : null}
+
         {(statusDetailLines ?? []).slice(0, 4).length > 0 ? (
           <div className={`${portalInsetClass} space-y-2 text-sm leading-6 text-slate-700 dark:text-slate-200`}>
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">What to address</div>
@@ -972,7 +981,15 @@ export default async function PortalJobDetailPage({
 
       {latestSentReportMeta ? (
         <section className={`${portalPanelClass} space-y-3`}>
-          <div className="text-base font-semibold text-slate-950 dark:text-slate-100">Latest Contractor Report</div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-base font-semibold text-slate-950 dark:text-slate-100">Latest Contractor Report</div>
+            <Link
+              href={`/portal/jobs/${jobId}/report/print`}
+              className={portalPrimaryButtonClass}
+            >
+              Print failure report
+            </Link>
+          </div>
 
           <div className={`${portalInsetClass} text-sm space-y-2`}>
             <div>
@@ -987,7 +1004,7 @@ export default async function PortalJobDetailPage({
                   : "The latest contractor report remains available here for historical context."}
               </div>
             ) : null}
-            {latestSentContractorNote ? (
+            {latestSentContractorNote && !useLatestReportSummaryForCurrentStatus ? (
               <div>
                 <div className="font-medium text-slate-900 dark:text-slate-100">Included Note</div>
                 <div className="mt-1 whitespace-pre-wrap leading-6 text-slate-700 dark:text-slate-200">{latestSentContractorNote}</div>

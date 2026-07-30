@@ -95,6 +95,26 @@ export function finalRunPass(run: any): boolean | null {
 export function extractFailureReasons(run: any): string[] {
   const computed = run?.computed ?? null;
   if (!computed) return [];
+  const testType = String(run?.test_type ?? "").trim().toLowerCase();
+  const isFailedPhotoReview =
+    testType === "refrigerant_charge" &&
+    computed.status === "photo_evidence" &&
+    run?.override_pass === false;
+
+  if (isFailedPhotoReview) {
+    const reasonCode = String(run?.data?.photo_failure_reason ?? computed?.photo_failure_reason ?? "").trim();
+    const reasonLabels: Record<string, string> = {
+      txv_not_visible: "TXV / metering device is not visible in the refrigerant-charge photo.",
+      readings_not_visible: "Gauge readings are not visible or legible in the refrigerant-charge photo.",
+      charge_out_of_range: "Refrigerant charge shown in the photo is outside the allowed range.",
+      other: "Refrigerant-charge photo evidence did not pass review.",
+    };
+    const details = String(run?.data?.photo_failure_details ?? "").trim();
+    return Array.from(new Set([
+      reasonLabels[reasonCode] ?? "Refrigerant-charge photo evidence did not pass review.",
+      ...(details ? [details] : []),
+    ]));
+  }
 
   const failures = Array.isArray(computed.failures)
     ? computed.failures.map(String).map((s: string) => s.trim()).filter(Boolean)

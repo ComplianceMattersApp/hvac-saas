@@ -116,6 +116,7 @@ function buildPhotoAttestation(photoResult?: "pass" | "fail" | "needs_review"): 
   fd.set("system_id", "sys-1");
   fd.set("rc_photo_taken", "on");
   if (photoResult) fd.set("rc_photo_result", photoResult);
+  if (photoResult === "fail") fd.set("rc_photo_failure_reason", "txv_not_visible");
   return fd;
 }
 
@@ -479,6 +480,8 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     expect(update!.payload.computed_pass).toBeNull();
     expect(update!.payload.override_pass).toBe(false);
     expect(update!.payload.override_reason).toContain("marked Fail");
+    expect(update!.payload.data.photo_failure_reason).toBe("txv_not_visible");
+    expect(update!.payload.computed.failures).toEqual([]);
   });
 
   it("Complete Test with photo attestation: evaluateEccOpsStatus is called", async () => {
