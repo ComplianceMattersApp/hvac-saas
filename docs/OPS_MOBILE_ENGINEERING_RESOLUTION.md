@@ -206,6 +206,19 @@ than a mobile-only visual decision.
 - The mobile Export shortcut targets `#ops-export-menu-mobile`; the desktop
   shortcut continues to target `#ops-export-menu`.
 
+## My Work visual alignment
+
+- `/ops/field` keeps the authoritative scheduled-and-assigned My Work
+  eligibility rules and the existing Overdue, Active, Today, and Upcoming
+  grouping.
+- Jobs render inside one continuous white work sheet with neutral separators,
+  rather than reviving individual rounded cards, colored left rails, or status
+  pills.
+- Scheduled date/window, contractor, address, current section/status, and the
+  existing Open Job, Call, Text, and Navigate destinations remain visible.
+- The My Work loading skeleton mirrors the continuous row structure so loading
+  does not introduce the retired card treatment.
+
 ## Post-mobile desktop revision
 
 The deferred desktop presentation pass now:

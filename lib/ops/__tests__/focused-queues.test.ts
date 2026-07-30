@@ -43,6 +43,18 @@ const opsFieldPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/field/page.tsx"),
   "utf-8",
 );
+const fieldWorkCardSource = readFileSync(
+  resolve(__dirname, "../../../components/ops/FieldWorkCard.tsx"),
+  "utf-8",
+);
+const fieldWorkPanelSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/field/_components/FieldWorkQueuePanel.tsx"),
+  "utf-8",
+);
+const fieldWorkLoadingSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/field/loading.tsx"),
+  "utf-8",
+);
 
 const fieldQueueLibSource = readFileSync(
   resolve(__dirname, "../field-queue.ts"),
@@ -644,5 +656,23 @@ describe("focused ops queue pages", () => {
     expect(opsFieldPageSource).toContain("All caught up");
     expect(opsFieldPageSource).not.toContain('key: "unscheduled"');
     expect(opsFieldPageSource).not.toContain('title: "Unscheduled"');
+  });
+
+  it("field My Work uses the approved continuous work-row presentation", () => {
+    expect(fieldWorkCardSource).toContain("data-my-work-row={sectionKey}");
+    expect(fieldWorkCardSource).toContain(
+      "border-b-8 border-slate-100 bg-white",
+    );
+    expect(fieldWorkCardSource).not.toContain("border border-l-4");
+    expect(fieldWorkPanelSource).toContain(
+      "overflow-hidden rounded-[18px] border border-slate-200 bg-white",
+    );
+    expect(fieldWorkLoadingSource).toContain(
+      "border-b-8 border-slate-100 bg-white",
+    );
+    expect(fieldWorkCardSource).toContain("Open Job");
+    expect(fieldWorkCardSource).toContain("Call");
+    expect(fieldWorkCardSource).toContain("Text");
+    expect(fieldWorkCardSource).toContain("Navigate");
   });
 });

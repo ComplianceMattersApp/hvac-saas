@@ -165,9 +165,10 @@ export function FieldWorkCard({ job, internalBusinessDisplayName, sectionKey, se
   const stateChipLabel = sectionKey === "in_progress" ? formatStatus(job?.status) : sectionTitle;
 
   return (
-    <div
+    <article
       key={job.id}
-      className={`rounded-lg border border-l-4 ${sectionTone.card} border-slate-200 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.42)]`}
+      data-my-work-row={sectionKey}
+      className="border-b-8 border-slate-100 bg-white px-4 py-4 last:border-b-0 sm:px-5"
     >
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-2">
@@ -178,35 +179,33 @@ export function FieldWorkCard({ job, internalBusinessDisplayName, sectionKey, se
             >
               {normalizeRetestLinkedJobTitle(job?.title) || "Untitled Job"}
             </Link>
-            <span
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] ${sectionTone.border} ${sectionTone.bg} ${sectionTone.text}`}
-            >
+            <span className={`font-mono text-[11px] font-semibold uppercase tracking-[0.08em] ${sectionTone.text}`}>
               {stateChipLabel}
             </span>
           </div>
           <div className="text-sm font-medium text-slate-900">{customerName(job)}</div>
           <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
             <div>
-              <div className="font-semibold uppercase tracking-[0.06em] text-slate-400">Scheduled</div>
-              <div className="mt-0.5 text-slate-700">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Scheduled</div>
+              <div className="mt-0.5 text-[13px] text-slate-800">
                 {scheduleLabel}
                 {windowLabel ? ` · ${windowLabel}` : ""}
               </div>
             </div>
             <div>
-              <div className="font-semibold uppercase tracking-[0.06em] text-slate-400">Contractor</div>
-              <div className="mt-0.5 text-slate-700">{contractorName(job, internalBusinessDisplayName)}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Contractor</div>
+              <div className="mt-0.5 text-[13px] text-slate-800">{contractorName(job, internalBusinessDisplayName)}</div>
             </div>
             <div>
-              <div className="font-semibold uppercase tracking-[0.06em] text-slate-400">Address</div>
-              <div className="mt-0.5 text-slate-700">{jobAddressLine(job)}</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Address</div>
+              <div className="mt-0.5 text-[13px] text-slate-800">{jobAddressLine(job)}</div>
             </div>
           </div>
         </div>
         <div className={`shrink-0 text-sm font-semibold ${highlight.className}`}>{highlight.text}</div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 sm:flex sm:flex-wrap">
         <Link
           href={`/jobs/${job.id}?tab=ops`}
           className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 sm:min-h-10"
@@ -240,6 +239,6 @@ export function FieldWorkCard({ job, internalBusinessDisplayName, sectionKey, se
           </a>
         ) : null}
       </div>
-    </div>
+    </article>
   );
 }

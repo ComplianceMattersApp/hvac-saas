@@ -177,7 +177,7 @@ export default async function OpsFieldPage() {
           </Link>
         </div>
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-4">
+        <div>
           <FieldWorkQueuePanel
             sections={sections}
             internalBusinessDisplayName={internalBusinessDisplayName}

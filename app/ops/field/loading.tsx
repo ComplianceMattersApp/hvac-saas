@@ -1,6 +1,6 @@
 export default function OpsFieldLoading() {
   return (
-    <div className="mx-auto max-w-6xl space-y-5 bg-slate-50 p-3 sm:p-6" aria-busy="true" aria-live="polite">
+    <div className="mx-auto max-w-4xl space-y-5 bg-slate-50 p-3 sm:p-6" aria-busy="true" aria-live="polite">
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
@@ -34,11 +34,11 @@ export default function OpsFieldLoading() {
             <div className="h-6 w-8 animate-pulse rounded-full bg-slate-100" />
           </div>
 
-          <div className="grid gap-3">
+          <div className="overflow-hidden rounded-[18px] border border-slate-200 bg-white">
             {Array.from({ length: 2 }).map((_, cardIndex) => (
               <div
                 key={cardIndex}
-                className="rounded-lg border border-l-4 border-l-slate-300 border-slate-200 bg-white p-4 shadow-sm"
+                className="border-b-8 border-slate-100 bg-white p-4 last:border-b-0"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1 space-y-2">
