@@ -446,6 +446,42 @@ describe("internal manual permit request actions", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/ops");
   });
 
+  it("derives a useful request label when the optional label and intake note are blank", async () => {
+    const fixture = buildFixture();
+    createClientMock.mockResolvedValue(fixture.baseClient);
+    createAdminClientMock.mockReturnValue(fixture.adminClient);
+
+    const { createInternalManualPermitRequest } = await import("@/lib/actions/internal-permit-request-actions");
+
+    await createInternalManualPermitRequest({
+      contractorId: "ctr-1",
+      customerFirstName: "Ada",
+      customerLastName: "Lovelace",
+      serviceAddressText: "10 Main St",
+      city: "Fresno",
+      state: "CA",
+      zip: "93720",
+    });
+
+    expect(fixture.calls.permitRequestInsertPayloads[0]).toEqual(
+      expect.objectContaining({
+        request_label: "Permit request - Ada Lovelace",
+        internal_intake_note: [
+          "Request: Permit request - Ada Lovelace",
+          "Customer: Ada Lovelace",
+          "Service address: 10 Main St",
+        ].join("\n"),
+      }),
+    );
+    expect(fixture.calls.permitEventInsertPayloads[0]).toEqual(
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          request_label: "Permit request - Ada Lovelace",
+        }),
+      }),
+    );
+  });
+
   it("rejects contractor assignments outside the internal account scope", async () => {
     const fixture = buildFixture({ contractorOwnerId: "owner-2" });
     createClientMock.mockResolvedValue(fixture.baseClient);

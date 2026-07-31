@@ -4,6 +4,7 @@ import ContractorFocusSelector from "./_components/ContractorFocusSelector";
 import QueueCard from "@/components/ops/QueueCard";
 import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
+import ServiceLocationAddressFields from "@/components/addresses/ServiceLocationAddressFields";
 import { redirect } from "next/navigation";
 import { updateJobScheduleFromForm } from "@/lib/actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
@@ -2145,7 +2146,7 @@ export default async function OpsPage({
                       </select>
                     </label>
                     <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                      Short request label
+                      Short request label <span className="font-normal text-slate-400">(optional)</span>
                       <input
                         name="request_label"
                         maxLength={160}
@@ -2177,33 +2178,11 @@ export default async function OpsPage({
                       Customer phone
                       <input name="customer_phone" type="tel" autoComplete="tel" maxLength={80} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
                     </label>
-                    <label className="grid gap-1 text-xs font-semibold text-slate-600 lg:col-span-2">
-                      Street address
-                      <input
-                        name="service_address_text"
-                        maxLength={240}
-                        required
-                        className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold text-slate-600 lg:col-span-2">
-                      Address line 2 <span className="font-normal text-slate-400">(optional)</span>
-                      <input name="address_line2" maxLength={240} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                      City
-                      <input name="city" maxLength={120} required className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
-                    </label>
-                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-2">
-                      <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
-                        State
-                        <input name="state" maxLength={40} required className="min-h-10 min-w-0 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium uppercase text-slate-900" />
-                      </label>
-                      <label className="grid min-w-0 gap-1 text-xs font-semibold text-slate-600">
-                        ZIP
-                        <input name="zip" inputMode="numeric" autoComplete="postal-code" maxLength={40} required className="min-h-10 min-w-0 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900" />
-                      </label>
-                    </div>
+                    <ServiceLocationAddressFields
+                      addressLine1Name="service_address_text"
+                      compact
+                      className="lg:col-span-2"
+                    />
                     <label className="grid gap-1 text-xs font-semibold text-slate-600">
                       Jurisdiction
                       <input
@@ -2213,7 +2192,7 @@ export default async function OpsPage({
                       />
                     </label>
                     <label className="grid gap-1 text-xs font-semibold text-slate-600 lg:col-span-2">
-                      Intake note
+                      Intake note <span className="font-normal text-slate-400">(optional)</span>
                       <textarea
                         name="intake_note"
                         rows={3}
@@ -2223,7 +2202,7 @@ export default async function OpsPage({
                       />
                     </label>
                     <div className="flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
-                      <div className="text-xs text-slate-500">Add a short label or note to create the request.</div>
+                      <div className="text-xs text-slate-500">If blank, the request label is created from the customer or service address.</div>
                       <ImmediateSubmitButton
                         disabled={workspaceContractors.length === 0}
                         pendingText="Creating permit..."

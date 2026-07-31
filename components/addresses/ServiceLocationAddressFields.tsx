@@ -10,6 +10,7 @@ import {
 
 export type ServiceLocationAddressFieldsProps = {
   initialValues?: Partial<ServiceAddressFieldValues>;
+  addressLine1Name?: string;
   required?: boolean;
   showAddressLine2?: boolean;
   tone?: "white" | "muted";
@@ -21,6 +22,7 @@ const assistantLabel = "Start typing an address to fill the fields below, or ent
 
 export default function ServiceLocationAddressFields({
   initialValues,
+  addressLine1Name = "address_line1",
   required = true,
   showAddressLine2 = true,
   tone = "white",
@@ -60,7 +62,7 @@ export default function ServiceLocationAddressFields({
         Address Line 1
         <input
           id={`${id}-address-line-1`}
-          name="address_line1"
+          name={addressLine1Name}
           required={required}
           autoComplete="address-line1"
           value={values.addressLine1}

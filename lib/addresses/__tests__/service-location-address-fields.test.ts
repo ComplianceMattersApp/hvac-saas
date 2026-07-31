@@ -73,7 +73,7 @@ describe("shared service-location address fields", () => {
   });
 
   it("preserves canonical native form names and React-owned editability", () => {
-    for (const name of ["address_line1", "address_line2", "city", "state", "zip"]) {
+    for (const name of ["address_line2", "city", "state", "zip"]) {
       expect(componentSource).toContain(`name="${name}"`);
     }
     expect(componentSource).toContain("value={values.addressLine1}");
@@ -81,6 +81,8 @@ describe("shared service-location address fields", () => {
     expect(componentSource).toContain("value={values.state}");
     expect(componentSource).toContain('onChange={(event) => update("state", event.target.value)}');
     expect(componentSource).toContain("required={required}");
+    expect(componentSource).toContain('addressLine1Name = "address_line1"');
+    expect(componentSource).toContain("name={addressLine1Name}");
   });
 
   it("uses the adjacent assistant without submit, action, or identity behavior", () => {

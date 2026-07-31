@@ -68,6 +68,8 @@ describe("Ops workspace permit queue wiring", () => {
     expect(opsPageSource).toContain('name="contractor_id"');
     expect(opsPageSource).toContain('name="request_label"');
     expect(opsPageSource).toContain('name="intake_note"');
+    expect(opsPageSource).toContain("<ServiceLocationAddressFields");
+    expect(opsPageSource).toContain('addressLine1Name="service_address_text"');
     expect(opsPageSource).toContain("Create Permit Request");
   });
 

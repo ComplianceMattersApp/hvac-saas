@@ -163,6 +163,16 @@ function buildManualPermitRequestNote(input: ReturnType<typeof readManualPermitR
   return lines.length ? lines.join("\n").slice(0, 4000) : null;
 }
 
+function deriveManualPermitRequestLabel(
+  input: ReturnType<typeof readManualPermitRequestInput>,
+) {
+  if (input.requestLabel) return input.requestLabel;
+
+  const customerName = [input.customerFirstName, input.customerLastName].filter(Boolean).join(" ");
+  const context = customerName || input.serviceAddressText;
+  return context ? `Permit request - ${context}`.slice(0, 160) : "Permit request";
+}
+
 function buildNoteSnippet(value: string | null) {
   return value ? value.slice(0, 240) : null;
 }
@@ -1219,10 +1229,6 @@ export async function createInternalManualPermitRequest(
   if (!parsed.contractorId) {
     throw new Error("Select a contractor.");
   }
-
-  if (!parsed.requestLabel && !parsed.intakeNote) {
-    throw new Error("Add a short request label or intake note.");
-  }
   const supabase = await createClient();
   const admin = createAdminClient();
   const {
@@ -1241,14 +1247,18 @@ export async function createInternalManualPermitRequest(
     throw new Error("Street address, city, state, and ZIP are required.");
   }
 
-  const internalIntakeNote = buildManualPermitRequestNote(parsed);
+  const requestLabel = deriveManualPermitRequestLabel(parsed);
+  const internalIntakeNote = buildManualPermitRequestNote({
+    ...parsed,
+    requestLabel,
+  });
   const { data: permitRequestRow, error: requestInsertErr } = await admin
     .from("permit_requests")
     .insert({
       account_owner_user_id: internalUser.account_owner_user_id,
       contractor_id: contractor.id,
       status: "permit_request",
-      request_label: parsed.requestLabel,
+      request_label: requestLabel,
       customer_first_name_snapshot: parsed.customerFirstName,
       customer_last_name_snapshot: parsed.customerLastName,
       customer_email_snapshot: parsed.customerEmail,
@@ -1283,7 +1293,7 @@ export async function createInternalManualPermitRequest(
         source: "internal_manual",
         contractor_id: contractor.id,
         contractor_name: contractor.name,
-        request_label: parsed.requestLabel,
+        request_label: requestLabel,
         note_snippet: buildNoteSnippet(parsed.intakeNote),
         customer_first_name: parsed.customerFirstName,
         customer_last_name: parsed.customerLastName,
