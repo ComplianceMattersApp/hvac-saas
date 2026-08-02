@@ -174,6 +174,32 @@ function makeAddRunSupabase(existingRun = false) {
         };
       }
 
+      if (table === "jobs") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { project_type: "alteration" },
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "job_equipment") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(async () => ({
+                data: [],
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`UNEXPECTED_TABLE:${table}`);
     },
   };

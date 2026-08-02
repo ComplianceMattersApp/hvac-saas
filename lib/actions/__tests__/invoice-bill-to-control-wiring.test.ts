@@ -16,9 +16,12 @@ describe("Bill To control + re-pull wiring", () => {
   it("exposes updateInvoiceBillToFromForm and shares the snapshot helper with draft creation", () => {
     expect(actionsSrc).toContain("export async function updateInvoiceBillToFromForm");
     expect(actionsSrc).toContain("import { buildDraftBillingSnapshot }");
-    // both draft creation and re-pull build the snapshot via the shared helper
+    // the re-pull path builds the snapshot via the shared helper directly...
     const helperCalls = actionsSrc.match(/buildDraftBillingSnapshot\(\{/g) ?? [];
-    expect(helperCalls.length).toBeGreaterThanOrEqual(2);
+    expect(helperCalls.length).toBeGreaterThanOrEqual(1);
+    // ...and draft creation builds it through the shared source module that wraps the same helper,
+    // so both paths still derive the snapshot from one shared implementation
+    expect(actionsSrc).toContain("buildInternalInvoiceDraftSource(");
   });
 
   it("only re-pulls DRAFT invoices and validates the recipient", () => {

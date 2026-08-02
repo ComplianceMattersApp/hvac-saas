@@ -49,9 +49,9 @@ describe("Today Ops queue count wiring", () => {
   });
 
   it("renders the counts as an Operations queue summary instead of pills", () => {
-    expect(pageSource).toContain("Queues requiring attention");
+    expect(pageSource).toContain("Operations snapshot");
     expect(pageSource).toContain("Live counts from the Operations workboard.");
-    expect(pageSource).toContain("grid gap-2 sm:grid-cols-2");
+    expect(pageSource).toContain("overflow-hidden rounded-xl border border-slate-200/80 bg-white");
     expect(pageSource).not.toContain("Tap to focus");
   });
 });

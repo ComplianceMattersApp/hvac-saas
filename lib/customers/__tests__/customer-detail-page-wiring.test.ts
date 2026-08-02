@@ -14,8 +14,16 @@ const servicePlanWorkspaceSource = readFileSync(
   resolve(__dirname, "../../../components/maintenance-agreements/CustomerServicePlanWorkspace.tsx"),
   "utf8",
 );
+const servicePlanCreateFlowSource = readFileSync(
+  resolve(__dirname, "../../../components/maintenance-agreements/ServicePlanCreateFlow.tsx"),
+  "utf8",
+);
 const locationsContactsTabSource =
-  customerPageSource.match(/activeWorkspaceTab === "locations-contacts"[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
+  customerPageSource.match(/<WorkspaceTabPanel id="locations-contacts">[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
+const moneyTabSource =
+  customerPageSource.match(/<WorkspaceTabPanel id="money">[\s\S]*?<\/WorkspaceTabPanel>/)?.[0] ?? "";
+const servicePlansTabSource =
+  customerPageSource.match(/<WorkspaceTabPanel id="service-plans">[\s\S]*?<\/WorkspaceTabPanel>/)?.[0] ?? "";
 
 describe("customer detail relationship hub wiring", () => {
   it("centers the primary service location badge responsively", () => {
@@ -44,22 +52,27 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Locations & Contacts");
     expect(customerPageSource).toContain("Customer Notes");
     expect(customerPageSource).toContain("Settings");
-    expect(customerPageSource).toContain("?tab=${item.id}");
-    expect(customerPageSource).toContain("?tab=money");
-    expect(customerPageSource).toContain("?tab=service-plans");
+    // Segmented tabs are rendered client-side by WorkspaceTabsNav from the
+    // workspaceNavigationItems list; the active tab is kept query-param
+    // addressable (?tab=) via WorkspaceTabsProvider/sp.tab (see gating test).
+    expect(customerPageSource).toContain("<WorkspaceTabsNav tabs={workspaceNavigationItems} />");
+    expect(customerPageSource).toContain('{ id: "money", label: "Money" }');
+    expect(customerPageSource).toContain('{ id: "service-plans", label: "Service Plans" }');
   });
 
   it("defaults to Overview tab and gates tab panels", () => {
     expect(customerPageSource).toContain("const workspaceTabParam = String(sp.tab ?? \"\").trim().toLowerCase();");
     expect(customerPageSource).toContain(': "overview";');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "overview"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "work"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "systems-equipment"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "money"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "history"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "settings"');
+    // Each tab's content is gated behind its own <WorkspaceTabPanel id="...">,
+    // which hides the panel unless it is the active tab.
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="overview">');
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="work">');
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="systems-equipment">');
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="money">');
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="service-plans">');
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="locations-contacts">');
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="history">');
+    expect(customerPageSource).toContain('<WorkspaceTabPanel id="settings">');
     expect(customerPageSource).not.toContain("#customer-overview");
   });
 
@@ -67,8 +80,10 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Money Overview");
     expect(customerPageSource).toContain("Invoice Workspace");
     expect(customerPageSource).toContain("Payment Method");
-    expect(customerPageSource).toContain('activeWorkspaceTab === "money" && canViewPaymentHistory');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "money" && canManageSavedPaymentMethodSetup');
+    // Payment history and saved-card setup live in the Money tab panel and
+    // stay gated behind their respective permission flags inside it.
+    expect(moneyTabSource).toMatch(/canViewPaymentHistory && \(\s*<PaymentHistoryCard/);
+    expect(moneyTabSource).toMatch(/canManageSavedPaymentMethodSetup && \(\s*<section/);
     expect(customerPageSource).toContain("PaymentHistoryCard");
     expect(customerPageSource).toContain("Saved Card Setup");
     expect(customerPageSource).toContain("Saved Card Setup");
@@ -76,7 +91,9 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("startSavedPaymentMethodSetupAction");
     expect(customerPageSource).toContain("Payment failed - not collected. Review invoice before retrying.");
     expect(customerPageSource).toContain("Invoice-specific actions happen in the invoice workspace.");
-    expect(customerPageSource).not.toContain('activeWorkspaceTab === "money" && isInternalViewer && maintenanceAgreementsEnabled');
+    // Service-plan / maintenance-agreement controls must NOT leak into the Money tab.
+    expect(moneyTabSource).not.toContain("Maintenance Agreements");
+    expect(moneyTabSource).not.toContain("isInternalViewer && maintenanceAgreementsEnabled");
     expect(customerPageSource).toContain("generateDraftInvoiceFromBillingPeriodAction");
     expect(customerPageSource).toContain("linkBillingPeriodInvoiceAction");
     expect(customerPageSource).toContain("unlinkBillingPeriodInvoiceAction");
@@ -93,14 +110,23 @@ describe("customer detail relationship hub wiring", () => {
   });
 
   it("keeps service-plan and billing-period controls in Service Plans tab", () => {
-    expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans" && isInternalViewer && maintenanceAgreementsEnabled');
+    // The Service Plans tab panel is gated to internal viewers with the
+    // maintenance-agreements feature enabled.
+    expect(customerPageSource).toMatch(
+      /<WorkspaceTabPanel id="service-plans">\s*\{isInternalViewer && maintenanceAgreementsEnabled/,
+    );
     expect(customerPageSource).toContain("Maintenance Agreements");
     expect(customerPageSource).toContain("Service Plan Overview");
-    expect(customerPageSource).toContain("Start from template");
-    expect(customerPageSource).toContain("Load Template");
-    expect(customerPageSource).toContain('name="maTemplate"');
-    expect(customerPageSource).toContain('name="source_template_id"');
-    expect(customerPageSource).toContain("Template packages standardize agreement details.");
+    // The create-from-template flow was extracted into <ServicePlanCreateFlow>,
+    // rendered inside the Service Plans tab with the account's agreement templates.
+    // The template picker, selection wiring, submitted source_template_id, and
+    // template-default standardization all live in that component now.
+    expect(customerPageSource).toContain("<ServicePlanCreateFlow");
+    expect(customerPageSource).toContain("templates={agreementTemplates}");
+    expect(servicePlanCreateFlowSource).toContain("Or choose a template");
+    expect(servicePlanCreateFlowSource).toContain("selectTemplate");
+    expect(servicePlanCreateFlowSource).toContain('name="source_template_id"');
+    expect(servicePlanCreateFlowSource).toContain("selectedTemplate?.default_visit_scope_summary");
     expect(customerPageSource).toContain("Started from template:");
     expect(customerPageSource).toContain("Template changes do not automatically update this customer Service Plan.");
     expect(customerPageSource).toContain("Locked by template package");
@@ -112,7 +138,8 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Scheduling");
     expect(customerPageSource).toContain("Add Billing Period");
     expect(customerPageSource).toContain("Advanced Billing Period Actions");
-    expect(customerPageSource).toContain("Billing period policy notes");
+    // Billing-period policy/explanatory notes now live in a "What do these mean?" disclosure.
+    expect(customerPageSource).toContain("What do these mean?");
     expect(customerPageSource).toContain("Generate Draft Invoice");
     expect(customerPageSource).toContain("linkBillingPeriodInvoiceAction");
     expect(customerPageSource).toContain("cancelBillingPeriodAction");
@@ -121,12 +148,16 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("linkBillingAnchorJobAction");
     expect(customerPageSource).toContain("formatBillingPeriodInvoiceDisplayLabel");
     expect(customerPageSource).toContain("formatInvoiceDisplayReference");
-    expect(customerPageSource).not.toContain('activeWorkspaceTab === "service-plans" && canManageSavedPaymentMethodSetup');
+    // Saved-card setup must NOT leak into the Service Plans tab.
+    expect(servicePlansTabSource).not.toContain("Saved Card Setup");
+    expect(servicePlansTabSource).not.toContain("canManageSavedPaymentMethodSetup");
   });
 
   it("keeps account contacts and managed locations in Locations & Contacts tab", () => {
-    expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts" && isInternalViewer');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts" ? (');
+    // Contacts/locations content lives in the Locations & Contacts tab panel,
+    // gated to internal viewers.
+    expect(customerPageSource).toMatch(/<WorkspaceTabPanel id="locations-contacts">\s*\{isInternalViewer/);
+    expect(customerPageSource).toContain('id="contact-overview"');
     expect(customerPageSource).toContain("Contact Overview");
     expect(customerPageSource).toContain("Account Contacts");
     expect(customerPageSource).toContain("Managed Locations");
@@ -174,7 +205,8 @@ describe("customer detail relationship hub wiring", () => {
   });
 
   it("keeps danger/archive controls in Settings tab and preserves action wiring", () => {
-    expect(customerPageSource).toContain('activeWorkspaceTab === "settings" && isInternalViewer');
+    // Danger/archive controls live in the Settings tab panel, gated to internal viewers.
+    expect(customerPageSource).toMatch(/<WorkspaceTabPanel id="settings">\s*\{isInternalViewer/);
     expect(customerPageSource).toContain("Danger Zone");
     expect(customerPageSource).toContain("Archive Customer");
     expect(customerPageSource).toContain("action={archiveCustomerFromForm}");
@@ -185,17 +217,19 @@ describe("customer detail relationship hub wiring", () => {
   });
 
   it("keeps top quick actions and summary badges available", () => {
-    expect(customerPageSource).toContain("Quick Actions");
+    // Header quick-action cluster (call / text / email + create/edit CTAs).
     expect(customerPageSource).toContain("Call");
+    expect(customerPageSource).toContain("Text");
     expect(customerPageSource).toContain("Email");
-    expect(customerPageSource).toContain("Edit Customer");
+    expect(customerPageSource).toContain("/customers/${customerId}/edit");
     expect(customerPageSource).toContain("Create Job");
     expect(customerPageSource).toContain("Create Estimate");
-    expect(customerPageSource).toContain("open job");
-    expect(customerPageSource).toContain("location");
-    expect(customerPageSource).toContain("contact");
+    // Overview / Quick Facts summary badges.
+    expect(customerPageSource).toContain("{activeJobs.length} open");
+    expect(customerPageSource).toContain("Locations");
+    expect(customerPageSource).toContain("Additional contacts");
     expect(customerPageSource).toContain("payment attention");
-    expect(customerPageSource).toContain("active service plan");
+    expect(customerPageSource).toContain("Service plan");
   });
 
   it("uses responsible account language in overview", () => {
@@ -248,7 +282,7 @@ describe("customer detail relationship hub wiring", () => {
   it("renders Systems & Equipment profile section with grouped records and profile-owned add CTAs", () => {
     expect(customerPageSource).toContain("loadCustomerSystemsEquipmentSummary");
     expect(customerPageSource).toContain("Systems &amp; Equipment");
-    expect(customerPageSource).toContain('activeWorkspaceTab === "systems-equipment" && isInternalViewer');
+    expect(customerPageSource).toMatch(/<WorkspaceTabPanel id="systems-equipment">\s*\{isInternalViewer/);
     expect(customerPageSource).toContain("systemsEquipmentLocations.map((location)");
     expect(customerPageSource).toContain("location.systems.map((system)");
     expect(customerPageSource).toContain("system.filters.map((filter)");
@@ -269,15 +303,25 @@ describe("customer detail relationship hub wiring", () => {
 
   it("preserves job equipment links without using job equipment actions on the customer profile", () => {
     const systemsEquipmentTabSource =
-      customerPageSource.match(/activeWorkspaceTab === "systems-equipment"[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
+      customerPageSource.match(/<WorkspaceTabPanel id="systems-equipment">[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
 
-    expect(systemsEquipmentTabSource).toContain("View Equipment");
-    expect(systemsEquipmentTabSource).toContain("Manage Equipment");
+    // The View/Manage/Open-Job triad was collapsed: each equipment record is
+    // rendered via EquipmentComponentCard, which surfaces the source-job links
+    // (Open Job + Manage-on-job overflow) it receives through jobHref/jobManageHref.
+    expect(systemsEquipmentTabSource).toContain("EquipmentComponentCard");
+    expect(systemsEquipmentTabSource).toContain("jobManageHref");
     expect(systemsEquipmentTabSource).toContain("Open Job");
     expect(systemsEquipmentTabSource).toContain("Filters");
-    expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/equipment`}');
-    expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}');
-    expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}`}');
+    // Per-component link to its own source job (when it differs from the system's).
+    expect(systemsEquipmentTabSource).toContain(
+      'jobHref={!sameJobAsSystem && equipment.sourceJob ? `/jobs/${equipment.sourceJob.id}` : null}',
+    );
+    // Manage-equipment link routes to the job's equipment info tab.
+    expect(systemsEquipmentTabSource).toContain(
+      'jobManageHref={equipment.sourceJob ? `/jobs/${equipment.sourceJob.id}/info?f=equipment` : null}',
+    );
+    // System-header Open Job link.
+    expect(systemsEquipmentTabSource).toContain('href={`/jobs/${system.sourceJob.id}`}');
     expect(systemsEquipmentTabSource).not.toContain("<EquipmentCreateForm");
     expect(systemsEquipmentTabSource).not.toContain("EquipmentEditCard");
     expect(systemsEquipmentTabSource).not.toContain("addJobEquipmentFromForm");

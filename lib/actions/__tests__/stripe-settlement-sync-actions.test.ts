@@ -3,12 +3,45 @@ import fs from 'fs';
 import path from 'path';
 
 const readinessMock = vi.hoisted(() => vi.fn());
+const revalidatePathMock = vi.hoisted(() => vi.fn());
+const createClientMock = vi.hoisted(() => vi.fn());
+const createAdminClientMock = vi.hoisted(() => vi.fn());
+const requireInternalUserMock = vi.hoisted(() => vi.fn());
+const getStripeServerClientMock = vi.hoisted(() => vi.fn());
+const defaultSettlementHelperMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/business/tenant-stripe-connect-readiness', () => ({
   resolveTenantStripeConnectReadiness: readinessMock,
 }));
 
-import { syncStripePaymentSettlementsForAccount } from '@/lib/actions/stripe-settlement-sync-actions';
+// The following are only used by the `...FromForm` wrapper. The core
+// syncStripePaymentSettlementsForAccount export takes supabase/stripe/helper as
+// params, so mocking these does not touch the behavioral tests below.
+vi.mock('next/cache', () => ({
+  revalidatePath: revalidatePathMock,
+}));
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: createClientMock,
+  createAdminClient: createAdminClientMock,
+}));
+
+vi.mock('@/lib/auth/internal-user', () => ({
+  requireInternalUser: requireInternalUserMock,
+}));
+
+vi.mock('@/lib/business/platform-billing-stripe', () => ({
+  getStripeServerClient: getStripeServerClientMock,
+}));
+
+vi.mock('@/lib/business/stripe-payment-settlements', () => ({
+  syncStripePaymentSettlementForPayment: defaultSettlementHelperMock,
+}));
+
+import {
+  syncStripePaymentSettlementsForAccount,
+  syncStripePaymentSettlementsForAccountFromForm,
+} from '@/lib/actions/stripe-settlement-sync-actions';
 
 type PaymentRow = {
   id: string;
@@ -170,6 +203,12 @@ async function run(overrides: Partial<Parameters<typeof syncStripePaymentSettlem
 
 beforeEach(() => {
   readinessMock.mockReset();
+  revalidatePathMock.mockReset();
+  createClientMock.mockReset();
+  createAdminClientMock.mockReset();
+  requireInternalUserMock.mockReset();
+  getStripeServerClientMock.mockReset();
+  defaultSettlementHelperMock.mockReset();
 });
 
 describe('syncStripePaymentSettlementsForAccount', () => {
@@ -499,15 +538,108 @@ describe('syncStripePaymentSettlementsForAccount', () => {
     );
   });
 
-  it('adds only controlled report revalidation, not CSV, cron, or webhook wiring', () => {
+  // The commit-mode deposits revalidation is proven behaviorally below via the
+  // `...FromForm` wrapper. These remaining assertions are negative structural
+  // invariants ("this module never grows CSV/cron/webhook wiring") — proving the
+  // *absence* of a code path across all inputs has no honest behavioral proxy,
+  // so they stay as source guards.
+  it('never grows CSV, cron/schedule, or webhook wiring', () => {
     const source = fs.readFileSync(
       path.join(process.cwd(), 'lib/actions/stripe-settlement-sync-actions.ts'),
       'utf8',
     );
 
-    expect(source).toContain("revalidatePath('/reports/deposits')");
     expect(source).not.toMatch(/csv/i);
     expect(source).not.toMatch(/cron|schedule/i);
     expect(source).not.toMatch(/webhook/i);
+  });
+});
+
+describe('syncStripePaymentSettlementsForAccountFromForm', () => {
+  function makeForm(fields: Record<string, string>) {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(fields)) {
+      form.set(key, value);
+    }
+    return form;
+  }
+
+  function primeAuthAndClients(ctx: ReturnType<typeof makeSupabase>) {
+    requireInternalUserMock.mockResolvedValue({ userId: 'owner-1', internalUser: ownerUser });
+    createClientMock.mockResolvedValue({});
+    createAdminClientMock.mockReturnValue(ctx.client);
+    getStripeServerClientMock.mockReturnValue({ charges: {}, balanceTransactions: {}, payouts: {} });
+  }
+
+  it('revalidates the deposits report only after a committed sync records settlements', async () => {
+    readyConnect();
+    const ctx = makeSupabase({ payments: [makePayment({ id: 'pay-1', processor_charge_id: 'ch_1' })] });
+    primeAuthAndClients(ctx);
+    defaultSettlementHelperMock.mockResolvedValue({
+      status: 'synced',
+      code: 'synced',
+      reason: 'Stripe payment settlement synced.',
+      settlementId: 'set_1',
+    });
+
+    const result = await syncStripePaymentSettlementsForAccountFromForm(
+      makeForm({
+        commit: '1',
+        account_owner_user_id: 'owner-1',
+        date_from: '2026-06-10',
+        date_to: '2026-06-10',
+      }),
+    );
+
+    expect(result.synced).toBe(1);
+    expect(revalidatePathMock).toHaveBeenCalledWith('/reports/deposits');
+  });
+
+  it('does not revalidate the deposits report on a dry-run submission', async () => {
+    readyConnect();
+    const ctx = makeSupabase({ payments: [makePayment({ id: 'pay-1', processor_charge_id: 'ch_1' })] });
+    primeAuthAndClients(ctx);
+
+    const result = await syncStripePaymentSettlementsForAccountFromForm(
+      makeForm({
+        account_owner_user_id: 'owner-1',
+        date_from: '2026-06-10',
+        date_to: '2026-06-10',
+      }),
+    );
+
+    expect(result.dryRun).toBe(true);
+    expect(revalidatePathMock).not.toHaveBeenCalledWith('/reports/deposits');
+  });
+
+  it('does not revalidate the deposits report when a committed sync records nothing', async () => {
+    readyConnect();
+    // Non-Stripe row is skipped, so nothing syncs even in commit mode.
+    const ctx = makeSupabase({
+      payments: [
+        makePayment({
+          id: 'pay-1',
+          payment_method: 'cash',
+          processor_name: null,
+          processor_charge_id: null,
+          stripe_event_id: null,
+          stripe_checkout_session_id: null,
+          stripe_payment_intent_id: null,
+        }),
+      ],
+    });
+    primeAuthAndClients(ctx);
+
+    const result = await syncStripePaymentSettlementsForAccountFromForm(
+      makeForm({
+        commit: '1',
+        account_owner_user_id: 'owner-1',
+        date_from: '2026-06-10',
+        date_to: '2026-06-10',
+      }),
+    );
+
+    expect(result.synced).toBe(0);
+    expect(revalidatePathMock).not.toHaveBeenCalledWith('/reports/deposits');
   });
 });

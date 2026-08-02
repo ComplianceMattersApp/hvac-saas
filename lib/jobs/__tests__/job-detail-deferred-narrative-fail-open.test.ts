@@ -157,7 +157,7 @@ describe("job detail deferred narrative fail-open behavior", () => {
     const html = renderToStaticMarkup(jsx);
 
     expect(html).toContain("Section temporarily unavailable");
-    expect(html).toContain("Internal notes are temporarily unavailable");
+    expect(html).toContain("Notes are temporarily unavailable");
   });
 
   it("narrows shared notes reads to shared narrative event types", async () => {

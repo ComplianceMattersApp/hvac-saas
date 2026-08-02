@@ -9,9 +9,9 @@ const loginPageSource = readFileSync(
 
 describe("login page signup entry options", () => {
   it("renders Service, ECC, and Cleaning signup links", () => {
-    expect(loginPageSource).toContain('href="/signup/service"');
-    expect(loginPageSource).toContain('href="/signup/ecc"');
-    expect(loginPageSource).toContain('href="/signup/cleaning"');
+    expect(loginPageSource).toContain('href: "/signup/service"');
+    expect(loginPageSource).toContain('href: "/signup/ecc"');
+    expect(loginPageSource).toContain('href: "/signup/cleaning"');
     expect(loginPageSource).toContain("Start Service Trial");
     expect(loginPageSource).toContain("Start ECC / Compliance Trial");
     expect(loginPageSource).toContain("Start Cleaning Trial");

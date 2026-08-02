@@ -379,6 +379,13 @@ describe("job service location page wiring and intake guardrails", () => {
   it("documents job-only service case behavior in the action surface", () => {
     expect(jobActionsSource).toContain('event_type: "service_location_changed"');
     expect(jobActionsSource).toContain("service_case_id: String(job.service_case_id ?? \"\").trim() || null");
-    expect(jobActionsSource).not.toContain('.from("service_cases")\n    .update');
+    // The service-location-change action is job-only: it reads the service_case_id for the audit
+    // event but must not independently mutate the service case. Scope the guardrail to that action
+    // so it is not falsely satisfied/broken by unrelated actions that legitimately edit service_cases.
+    const start = jobActionsSource.indexOf("export async function changeJobServiceLocationFromForm");
+    const end = jobActionsSource.indexOf("export async function addPublicNoteFromForm", start);
+    const fn = jobActionsSource.slice(start, end);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(fn).not.toContain('.from("service_cases")');
   });
 });

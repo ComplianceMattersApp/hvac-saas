@@ -98,7 +98,8 @@ describe("customer profile equipment hotfix", () => {
     expect(profileEquipmentCreateFormSource).toContain('name="system_id"');
     expect(profileEquipmentCreateFormSource).toContain("includeFilterOption={false}");
     expect(equipmentCreateFormFieldsSource).toContain("System Item Type");
-    expect(equipmentCreateFormFieldsSource).toContain("Product Details");
+    // Product/spec entry section (manufacturer, serial, etc.) was renamed to "Enter Details".
+    expect(equipmentCreateFormFieldsSource).toContain("Enter Details");
     expect(equipmentCreateFormFieldsSource).toContain('name="equipment_role"');
     expect(equipmentCreateFormFieldsSource).toContain('name="manufacturer"');
     expect(equipmentCreateFormFieldsSource).toContain('name="serial"');

@@ -60,16 +60,41 @@ function buildFixture(options?: FixtureOptions) {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              maybeSingle: vi.fn(async () => ({
-                data: {
-                  contractor_id: "ctr-1",
-                  contractors: {
+              limit: vi.fn(async () => ({
+                data: [{ contractor_id: "ctr-1" }],
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "contractors") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => ({
+              limit: vi.fn(async () => ({
+                data: [
+                  {
                     id: "ctr-1",
                     name: "Delta HVAC",
                     lifecycle_state: "active",
                     owner_user_id: "owner-1",
                   },
-                },
+                ],
+                error: null,
+              })),
+            })),
+            eq: vi.fn(() => ({
+              limit: vi.fn(async () => ({
+                data: [
+                  {
+                    id: "ctr-1",
+                    name: "Delta HVAC",
+                    lifecycle_state: "active",
+                    owner_user_id: "owner-1",
+                  },
+                ],
                 error: null,
               })),
             })),

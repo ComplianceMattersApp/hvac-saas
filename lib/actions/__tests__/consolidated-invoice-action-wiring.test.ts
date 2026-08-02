@@ -15,7 +15,7 @@ describe("consolidated invoice action wiring", () => {
   });
 
   it("uses one transactional RPC and does not independently insert financial rows", () => {
-    expect(source).toContain('supabase.rpc("create_consolidated_invoice_draft_v1"');
+    expect(source).toContain('supabase.rpc("create_consolidated_invoice_from_prepared_drafts_v1"');
     expect(source).not.toMatch(/\.from\(["']internal_invoices["']\)\s*\.insert/);
     expect(source).not.toMatch(/\.from\(["']internal_invoice_jobs["']\)\s*\.insert/);
     expect(source).not.toMatch(/\.from\(["']internal_invoice_line_items["']\)\s*\.insert/);

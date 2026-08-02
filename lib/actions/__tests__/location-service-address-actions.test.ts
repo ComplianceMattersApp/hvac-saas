@@ -314,7 +314,10 @@ describe("location service address page wiring", () => {
     );
     expect(locationPageSource).toContain("action={updateLocationServiceAddressFromForm}");
     expect(locationPageSource).toContain("<ServiceLocationAddressFields");
-    expect(serviceLocationAddressFieldsSource).toContain('name="address_line1"');
+    // The address-line-1 field name is parameterized with an "address_line1" default, so the
+    // input still renders name="address_line1" unless a caller overrides it.
+    expect(serviceLocationAddressFieldsSource).toContain('addressLine1Name = "address_line1"');
+    expect(serviceLocationAddressFieldsSource).toContain("name={addressLine1Name}");
     expect(serviceLocationAddressFieldsSource).toContain('name="address_line2"');
     expect(serviceLocationAddressFieldsSource).toContain('name="city"');
     expect(serviceLocationAddressFieldsSource).toContain('name="state"');
