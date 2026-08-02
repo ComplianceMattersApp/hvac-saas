@@ -1798,13 +1798,18 @@ export default async function JobDetailPage({
   if (job.deleted_at) redirect("/ops?saved=job_archived");
   setPhaseValue("eccPayloadReads", phaseDurationsMs.mainJobRead ?? 0);
 
-  const { data: equipmentSystems, error: equipmentSystemsErr } = await supabase
-    .from("job_systems")
-    .select("id, name")
-    .eq("job_id", jobId)
-    .order("name", { ascending: true });
+  // Only consumed at render time — joins the grouped parallel await below
+  // instead of blocking the promise-creation section behind a round-trip.
+  const equipmentSystemsPromise = timedPhase("equipmentSystemsRead", async () => {
+    const { data, error } = await supabase
+      .from("job_systems")
+      .select("id, name")
+      .eq("job_id", jobId)
+      .order("name", { ascending: true });
 
-  if (equipmentSystemsErr) throw equipmentSystemsErr;
+    if (error) throw error;
+    return data as Array<{ id: string; name: string | null }> | null;
+  });
 
   const parentJobId = (job as any).parent_job_id as string | null;
   const retestRootId = parentJobId ?? jobId;
@@ -2220,17 +2225,20 @@ export default async function JobDetailPage({
       .filter((row) => row.id && row.item_name);
   });
 
-  const { internalInvoiceTruth, internalInvoicePaymentSummaryTruth, internalInvoicePaymentRowsTruth } = await immediateInvoiceTruthPromise;
-  const showInternalInvoicePanelForFieldBillingRead =
-    isInternalUser &&
-    buildJobBillingStateReadModel({
-      billingMode,
-      invoiceComplete: job.invoice_complete,
-      internalInvoice: internalInvoiceTruth,
-      billingDisposition: (job as any).billing_disposition,
-    }).internalInvoicePanelEnabled;
-
+  // Depends on the invoice truth read, so it awaits that promise internally —
+  // keeping the top-level flow non-blocking so the remaining promises below
+  // start immediately instead of waiting on the invoice ledger round-trips.
   const fieldBillingSummaryDataPromise = timedPhase("fieldBillingSummaryRead", async () => {
+    const { internalInvoiceTruth } = await immediateInvoiceTruthPromise;
+    const showInternalInvoicePanelForFieldBillingRead =
+      isInternalUser &&
+      buildJobBillingStateReadModel({
+        billingMode,
+        invoiceComplete: job.invoice_complete,
+        internalInvoice: internalInvoiceTruth,
+        billingDisposition: (job as any).billing_disposition,
+      }).internalInvoicePanelEnabled;
+
     if (!(showInternalInvoicePanelForFieldBillingRead && fieldBillingCapabilities.can_view_field_billing_summary)) {
       return {
         latestVoidedInternalInvoice: null as Awaited<ReturnType<typeof resolveLatestVoidedInternalInvoiceByJobId>> | null,
@@ -2471,6 +2479,74 @@ export default async function JobDetailPage({
     };
   });
 
+  // Checklist items (Phase 1, desktop/admin only, gated on feature flag + isInternalUser)
+  type JobChecklistItem = {
+    id: string;
+    item_label: string;
+    sort_order: number;
+    is_completed: boolean;
+    notes: string | null;
+    completed_by_user_id: string | null;
+    completed_at: string | null;
+  };
+  const jobChecklistItemsPromise = timedPhase("jobChecklistItemsRead", async (): Promise<JobChecklistItem[]> => {
+    if (!(isMaintenanceAgreementsEnabled() && isInternalUser)) return [];
+    try {
+      const { data: checklistRows } = await supabase
+        .from("job_checklist_item_completions")
+        .select("id, item_label, sort_order, is_completed, notes, completed_by_user_id, completed_at")
+        .eq("job_id", String(job.id ?? ""))
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true })
+        .limit(50);
+      if (!Array.isArray(checklistRows)) return [];
+      return checklistRows.map((row: any) => ({
+        id: String(row.id ?? ""),
+        item_label: String(row.item_label ?? ""),
+        sort_order: Number(row.sort_order ?? 0),
+        is_completed: Boolean(row.is_completed),
+        notes: row.notes ? String(row.notes) : null,
+        completed_by_user_id: row.completed_by_user_id ? String(row.completed_by_user_id) : null,
+        completed_at: row.completed_at ? String(row.completed_at) : null,
+      }));
+    } catch {
+      return [];
+    }
+  });
+
+  const savedCustomerServiceLocationsPromise = timedPhase("savedCustomerServiceLocationsRead", async () => {
+    if (!(isInternalUser && customerId)) {
+      return [] as Array<{
+        id: string;
+        nickname: string | null;
+        label: string | null;
+        address_line1: string | null;
+        address_line2: string | null;
+        city: string | null;
+        state: string | null;
+        zip: string | null;
+        postal_code?: string | null;
+      }>;
+    }
+    const { data, error } = await supabase
+      .from("locations")
+      .select("id, nickname, label, address_line1, address_line2, city, state, zip, postal_code")
+      .eq("customer_id", customerId)
+      .order("created_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as Array<{
+      id: string;
+      nickname: string | null;
+      label: string | null;
+      address_line1: string | null;
+      address_line2: string | null;
+      city: string | null;
+      state: string | null;
+      zip: string | null;
+      postal_code?: string | null;
+    }>;
+  });
+
   const [
     activeAssignmentDisplayMap,
     serviceCaseSummary,
@@ -2489,6 +2565,10 @@ export default async function JobDetailPage({
     serviceFollowUpProgressEvents,
     activeRetestChild,
     maintenanceAgreementResult,
+    equipmentSystems,
+    { internalInvoiceTruth, internalInvoicePaymentSummaryTruth, internalInvoicePaymentRowsTruth },
+    jobChecklistItems,
+    savedCustomerServiceLocations,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
@@ -2507,6 +2587,10 @@ export default async function JobDetailPage({
     serviceFollowUpProgressEventsPromise,
     activeRetestChildPromise,
     maintenanceAgreementPromise,
+    equipmentSystemsPromise,
+    immediateInvoiceTruthPromise,
+    jobChecklistItemsPromise,
+    savedCustomerServiceLocationsPromise,
   ]);
 
   const {
@@ -2516,42 +2600,6 @@ export default async function JobDetailPage({
     suggestedNextDueProjection,
     confirmedNextDueContext,
   } = maintenanceAgreementResult;
-
-  // Checklist items (Phase 1, desktop/admin only, gated on feature flag + isInternalUser)
-  type JobChecklistItem = {
-    id: string;
-    item_label: string;
-    sort_order: number;
-    is_completed: boolean;
-    notes: string | null;
-    completed_by_user_id: string | null;
-    completed_at: string | null;
-  };
-  let jobChecklistItems: JobChecklistItem[] = [];
-  if (isMaintenanceAgreementsEnabled() && isInternalUser) {
-    try {
-      const { data: checklistRows } = await supabase
-        .from("job_checklist_item_completions")
-        .select("id, item_label, sort_order, is_completed, notes, completed_by_user_id, completed_at")
-        .eq("job_id", String(job.id ?? ""))
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true })
-        .limit(50);
-      if (Array.isArray(checklistRows)) {
-        jobChecklistItems = checklistRows.map((row: any) => ({
-          id: String(row.id ?? ""),
-          item_label: String(row.item_label ?? ""),
-          sort_order: Number(row.sort_order ?? 0),
-          is_completed: Boolean(row.is_completed),
-          notes: row.notes ? String(row.notes) : null,
-          completed_by_user_id: row.completed_by_user_id ? String(row.completed_by_user_id) : null,
-          completed_at: row.completed_at ? String(row.completed_at) : null,
-        }));
-      }
-    } catch {
-      jobChecklistItems = [];
-    }
-  }
 
   const contractorBilling = billingPartyReads.contractorBilling;
   const customerBilling = billingPartyReads.customerBilling;
@@ -2824,29 +2872,6 @@ export default async function JobDetailPage({
 
   const serviceAddressDisplay =
     serviceAddressParts.length > 0 ? serviceAddressParts.join(", ") : "No address set";
-
-  const savedCustomerServiceLocations =
-    isInternalUser && customerId
-      ? await supabase
-          .from("locations")
-          .select("id, nickname, label, address_line1, address_line2, city, state, zip, postal_code")
-          .eq("customer_id", customerId)
-          .order("created_at", { ascending: true })
-          .then(({ data, error }) => {
-            if (error) throw error;
-            return (data ?? []) as Array<{
-              id: string;
-              nickname: string | null;
-              label: string | null;
-              address_line1: string | null;
-              address_line2: string | null;
-              city: string | null;
-              state: string | null;
-              zip: string | null;
-              postal_code?: string | null;
-            }>;
-          })
-      : [];
 
   const serviceLocationOptions = savedCustomerServiceLocations.map((loc) => {
     const locAddress = [
