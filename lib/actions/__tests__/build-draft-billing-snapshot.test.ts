@@ -38,6 +38,20 @@ const emptyJobBilling = {
   billing_zip: null,
 };
 
+// A job-level billing override with its OWN address. The snapshot must never
+// address the invoice to this (or to a service location) — the address always
+// comes from the bill-to recipient's own record.
+const jobBillingWithOverrideAddress = {
+  billing_name: "Job Override Name",
+  billing_email: "override@job.example",
+  billing_phone: "555-9999",
+  billing_address_line1: "999 Service Location Rd",
+  billing_address_line2: null,
+  billing_city: "Overrideville",
+  billing_state: "NV",
+  billing_zip: "89000",
+};
+
 describe("buildDraftBillingSnapshot", () => {
   it("contractor billing → addressed to the contractor, INCLUDING their address", () => {
     const snap = buildDraftBillingSnapshot({
@@ -89,5 +103,34 @@ describe("buildDraftBillingSnapshot", () => {
     });
     expect(snap.billing_name).toBe("Service Master");
     expect(snap.billing_address_line1).toBeNull();
+  });
+
+  it("customer billing → uses the customer's OWN address, never the job/service-location override", () => {
+    const snap = buildDraftBillingSnapshot({
+      billingRecipient: "customer",
+      customerBilling,
+      contractorBilling,
+      // A job-level override with a different address is present, but must be ignored.
+      jobBilling: jobBillingWithOverrideAddress,
+    });
+    expect(snap.billing_address_line1).toBe("8534 Don Ave");
+    expect(snap.billing_city).toBe("Stockton");
+    // The service-location / job override address must never leak into billing.
+    expect(snap.billing_address_line1).not.toBe("999 Service Location Rd");
+    expect(snap.billing_city).not.toBe("Overrideville");
+  });
+
+  it("customer billing with no address → billing address is null, not the job override (no fallback)", () => {
+    const snap = buildDraftBillingSnapshot({
+      billingRecipient: "customer",
+      customerBilling: { full_name: "Beck Raintree", billing_email: "beck@example.com" },
+      contractorBilling,
+      jobBilling: jobBillingWithOverrideAddress,
+    });
+    expect(snap.billing_name).toBe("Beck Raintree");
+    // Even though the job override carries an address, the snapshot refuses to
+    // fall back to it — the invoice is addressed to the recipient or nobody.
+    expect(snap.billing_address_line1).toBeNull();
+    expect(snap.billing_city).toBeNull();
   });
 });

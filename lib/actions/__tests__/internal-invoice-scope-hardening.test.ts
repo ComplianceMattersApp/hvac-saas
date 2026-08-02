@@ -489,17 +489,49 @@ describe('internal invoice mutation same-account hardening', () => {
     expect(supplementalCreateSlice).toContain('requireInvoiceLifecycleAccessOrRedirect');
   });
 
-  it('keeps invoice draft billing address explicit-only and avoids service-location fallback', () => {
-    // The snapshot builder now lives in lib/business/invoice-billing-snapshot.ts
-    // (a pure, testable module shared by draft creation and the Bill To re-pull).
-    // The address comes from the resolved bill-to source (recipient's own
-    // address), never from the service location or the job override.
-    const snapshotSrc = readFileSync(
-      resolve(__dirname, '../../business/invoice-billing-snapshot.ts'),
-      'utf-8',
-    );
-    expect(snapshotSrc).toContain('billing_address_line1: firstNonEmpty(billing.billing_address_line1)');
-    expect(snapshotSrc).not.toContain('locationBilling?.address_line1');
-    expect(snapshotSrc).not.toContain('jobBilling.billing_address_line1');
+  it('keeps invoice draft billing address explicit-only and avoids service-location fallback', async () => {
+    // Behavioral proof (replacing an earlier source-text assertion): the shared
+    // snapshot builder used by draft creation and the Bill To re-pull addresses
+    // the invoice to the recipient's OWN record, never the job/service-location
+    // override. A job override with a distinct address is supplied and must be
+    // ignored; when the recipient has no address, billing stays null.
+    const { buildDraftBillingSnapshot } = await import('@/lib/business/invoice-billing-snapshot');
+
+    const jobOverride = {
+      billing_name: 'Job Override Name',
+      billing_email: 'override@job.example',
+      billing_phone: '555-9999',
+      billing_address_line1: '999 Service Location Rd',
+      billing_address_line2: null,
+      billing_city: 'Overrideville',
+      billing_state: 'NV',
+      billing_zip: '89000',
+    };
+
+    const withRecipientAddress = buildDraftBillingSnapshot({
+      billingRecipient: 'customer',
+      customerBilling: {
+        full_name: 'Beck Raintree',
+        billing_email: 'beck@example.com',
+        billing_address_line1: '8534 Don Ave',
+        billing_city: 'Stockton',
+        billing_state: 'CA',
+        billing_zip: '95209',
+      },
+      contractorBilling: null,
+      jobBilling: jobOverride,
+    });
+    expect(withRecipientAddress.billing_address_line1).toBe('8534 Don Ave');
+    expect(withRecipientAddress.billing_address_line1).not.toBe('999 Service Location Rd');
+    expect(withRecipientAddress.billing_city).not.toBe('Overrideville');
+
+    const withoutRecipientAddress = buildDraftBillingSnapshot({
+      billingRecipient: 'customer',
+      customerBilling: { full_name: 'Beck Raintree', billing_email: 'beck@example.com' },
+      contractorBilling: null,
+      jobBilling: jobOverride,
+    });
+    expect(withoutRecipientAddress.billing_address_line1).toBeNull();
+    expect(withoutRecipientAddress.billing_city).toBeNull();
   });
 });
