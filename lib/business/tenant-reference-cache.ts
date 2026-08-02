@@ -26,7 +26,7 @@ import { normalizeAccountTimeZone } from "@/lib/utils/account-time-zone";
  *   cache callback reads with the admin client because it runs outside the
  *   request scope and cannot use the cookie-bound client.
  * - Server actions that write internal_business_profiles or
- *   account_settings.product_mode must call revalidateTag with
+ *   account_settings.product_mode must call updateTag with
  *   tenantReferenceCacheTag(accountOwnerUserId) so the next render sees the
  *   change immediately. The short TTL is a safety net for write paths outside
  *   the app (SQL, provisioning scripts), not the primary invalidation.

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
@@ -279,7 +279,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
     }
   }
 
-  revalidateTag(tenantReferenceCacheTag(internalUser.account_owner_user_id));
+  updateTag(tenantReferenceCacheTag(internalUser.account_owner_user_id));
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/company-profile");
@@ -335,7 +335,7 @@ export async function saveInvoiceModeFromForm(formData: FormData): Promise<void>
     redirect(withNotice("save_failed"));
   }
 
-  revalidateTag(tenantReferenceCacheTag(internalUser.account_owner_user_id));
+  updateTag(tenantReferenceCacheTag(internalUser.account_owner_user_id));
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/company-profile");
