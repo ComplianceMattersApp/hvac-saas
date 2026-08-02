@@ -15,7 +15,8 @@ import ShellOpsMenu from "@/components/layout/ShellOpsMenu";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
 import { getRequestDualContextAccess } from "@/lib/auth/request-identity";
-import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
+import { getCachedProductMode } from "@/lib/business/tenant-reference-cache";
+import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
@@ -23,7 +24,7 @@ import { shouldShowPortalMenuItem } from "@/lib/portal/partner-work-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 import { countAttentionCenterItems } from "@/lib/reports/attention-center-count";
-import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncher";
+import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncherLazy";
 import {
   buildHelpAssistantSafeContext,
   type HelpAssistantSafeContext,
@@ -131,10 +132,7 @@ export default async function RootLayout({
         supabase,
         accountOwnerUserId,
       }),
-      resolveProductModeForAccountOwnerId({
-        supabase,
-        accountOwnerUserId,
-      }),
+      getCachedProductMode(accountOwnerUserId),
       canViewFinancialAttention ? countAttentionCenterItems({ supabase, accountOwnerUserId }) : Promise.resolve(0),
     ]);
 

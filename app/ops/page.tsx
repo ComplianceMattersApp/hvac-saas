@@ -61,8 +61,11 @@ import {
   listCloseoutQueueJobs,
 } from "@/lib/ops/closeout-queue";
 import { buildWaitingQueueRows, type FocusedQueueJob } from "@/lib/ops/focused-queues";
-import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
-import { resolveAccountTimeZoneByAccountOwnerId, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import {
+  getCachedAccountTimeZone,
+  getCachedBillingMode,
+  getCachedProductMode,
+} from "@/lib/business/tenant-reference-cache";
 import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
@@ -258,17 +261,43 @@ export default async function OpsPage({
 
   const internalUser = actorContext.internalUser;
   const admin = createAdminClient();
-  const accountTimeZone = await resolveAccountTimeZoneByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
   if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
 
-  const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
-    supabase: supabase as any,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    internalUserId: internalUser.user_id,
-  });
+  const showTeamClockStatusCardForRole =
+    internalUser.role === "admin" || internalUser.role === "office";
+
+  // Everything in this group depends only on the resolved internal user, so it
+  // runs concurrently instead of as seven sequential round-trips. Timezone,
+  // product mode, and billing mode come from the cross-request tenant
+  // reference cache, so they are usually free.
+  const [
+    accountTimeZone,
+    explicitFieldBillingCapabilities,
+    incomingWorkshareConnectionRows,
+    returnedWorkshareCount,
+    timeClockAccountSettingsResult,
+    productMode,
+    billingMode,
+  ] = await Promise.all([
+    getCachedAccountTimeZone(internalUser.account_owner_user_id),
+    loadFieldBillingExplicitCapabilitiesForUser({
+      supabase: supabase as any,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      internalUserId: internalUser.user_id,
+    }),
+    listSenderWorkshareConnectionsForReceiver(supabase, internalUser.account_owner_user_id),
+    countReturnedWorkshareRequestsForSender(supabase, internalUser.account_owner_user_id),
+    showTeamClockStatusCardForRole
+      ? supabase
+          .from("account_settings")
+          .select("time_clock_enabled")
+          .eq("account_owner_user_id", internalUser.account_owner_user_id)
+          .maybeSingle()
+      : Promise.resolve(null),
+    getCachedProductMode(internalUser.account_owner_user_id),
+    getCachedBillingMode(internalUser.account_owner_user_id),
+  ]);
+
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
     internalUser,
@@ -284,18 +313,6 @@ export default async function OpsPage({
   const canViewFieldPaymentVerificationAttention =
     canViewFinancialRegisterForAccount || fieldBillingCapabilities.can_verify_non_card_collection;
 
-  const fieldPaymentReconciliationAttention = canViewFieldPaymentVerificationAttention
-    ? await listFieldPaymentCollectionReportsForReconciliation({
-      admin: supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      limit: 1,
-    })
-    : null;
-
-  const [incomingWorkshareConnectionRows, returnedWorkshareCount] = await Promise.all([
-    listSenderWorkshareConnectionsForReceiver(supabase, internalUser.account_owner_user_id),
-    countReturnedWorkshareRequestsForSender(supabase, internalUser.account_owner_user_id),
-  ]);
   // Show the incoming ECC/HERS request queue only to accounts that have an active
   // workshare connection where they are the receiver — no point surfacing an empty
   // queue to accounts that have not set up connections yet.
@@ -303,8 +320,30 @@ export default async function OpsPage({
     (row) => row.status === "active",
   );
 
-  const showTeamClockStatusCardForRole =
-    internalUser.role === "admin" || internalUser.role === "office";
+  if (showTeamClockStatusCardForRole && timeClockAccountSettingsResult?.error) {
+    throw timeClockAccountSettingsResult.error;
+  }
+  const isTimeClockEnabled = Boolean(
+    (timeClockAccountSettingsResult?.data as any)?.time_clock_enabled,
+  );
+
+  // Second group: both reads depend on results from the group above but not on
+  // each other.
+  const [fieldPaymentReconciliationAttention, teamClockPreviewRows] = await Promise.all([
+    canViewFieldPaymentVerificationAttention
+      ? listFieldPaymentCollectionReportsForReconciliation({
+          admin: supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          limit: 1,
+        })
+      : Promise.resolve(null),
+    showTeamClockStatusCardForRole && isTimeClockEnabled
+      ? listTeamClockStatusPreview({
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+        })
+      : Promise.resolve(null),
+  ]);
 
   let showTeamClockStatusCard = false;
   let teamClockStatusRows: Array<{
@@ -315,58 +354,31 @@ export default async function OpsPage({
     elapsed: string;
   }> = [];
 
-  if (showTeamClockStatusCardForRole) {
-    const { data: accountSettings, error: accountSettingsErr } = await supabase
-      .from("account_settings")
-      .select("time_clock_enabled")
-      .eq("account_owner_user_id", internalUser.account_owner_user_id)
-      .maybeSingle();
+  if (teamClockPreviewRows) {
+    const displayMap = await resolveUserDisplayMap({
+      supabase,
+      userIds: teamClockPreviewRows
+        .map((row) => String(row.internalUserId ?? "").trim())
+        .filter(Boolean),
+    });
 
-    if (accountSettingsErr) throw accountSettingsErr;
+    showTeamClockStatusCard = true;
+    teamClockStatusRows = teamClockPreviewRows.map((row) => {
+      const internalUserId = String(row.internalUserId ?? "").trim();
+      const displayName =
+        formatPersonNamePart(displayMap[internalUserId] ?? "") || "Unknown User";
+      const statusLabel = row.status === "on_lunch" ? "On Lunch" : "Clocked In";
+      const sinceSource = row.status === "on_lunch" ? row.lunchStartAt ?? row.clockInAt : row.clockInAt;
 
-    const isTimeClockEnabled = Boolean((accountSettings as any)?.time_clock_enabled);
-    if (isTimeClockEnabled) {
-      const previewRows = await listTeamClockStatusPreview({
-        supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-      });
-
-      const displayMap = await resolveUserDisplayMap({
-        supabase,
-        userIds: previewRows
-          .map((row) => String(row.internalUserId ?? "").trim())
-          .filter(Boolean),
-      });
-
-      showTeamClockStatusCard = true;
-      teamClockStatusRows = previewRows.map((row) => {
-        const internalUserId = String(row.internalUserId ?? "").trim();
-        const displayName =
-          formatPersonNamePart(displayMap[internalUserId] ?? "") || "Unknown User";
-        const statusLabel = row.status === "on_lunch" ? "On Lunch" : "Clocked In";
-        const sinceSource = row.status === "on_lunch" ? row.lunchStartAt ?? row.clockInAt : row.clockInAt;
-
-        return {
-          internalUserId,
-          displayName,
-          statusLabel,
-          sinceAt: formatTeamClockSince(sinceSource, accountTimeZone),
-          elapsed: formatTeamClockElapsedFromClockIn(row.clockInAt),
-        };
-      });
-    }
+      return {
+        internalUserId,
+        displayName,
+        statusLabel,
+        sinceAt: formatTeamClockSince(sinceSource, accountTimeZone),
+        elapsed: formatTeamClockElapsedFromClockIn(row.clockInAt),
+      };
+    });
   }
-
-  const resolvedProductModePromise = resolveProductModeForAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
-
-  const productMode: ProductMode = await resolvedProductModePromise;
-  const billingMode = await resolveBillingModeByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
   const isHvacServiceMode = productMode === "hvac_service";
   const canCreateEccBatchInvoice =
     canViewFinancialRegisterForAccount &&
