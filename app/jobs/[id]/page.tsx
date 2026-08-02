@@ -70,12 +70,13 @@ import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
   getActiveJobAssignmentDisplayMap,
 } from "@/lib/staffing/human-layer";
+import { type BillingMode } from "@/lib/business/internal-business-profile";
 import {
-  type BillingMode,
-  resolveBillingModeByAccountOwnerId,
-  resolveInternalBusinessIdentityByAccountOwnerId,
-} from "@/lib/business/internal-business-profile";
-import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
+  getCachedBillingMode,
+  getCachedInternalBusinessIdentity,
+  getCachedProductMode,
+} from "@/lib/business/tenant-reference-cache";
+import { type ProductMode } from "@/lib/business/product-mode-defaults";
 import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { buildJobBillingStateReadModel, formatJobBillingDispositionLabel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
@@ -1599,12 +1600,25 @@ export default async function JobDetailPage({
 
   if (!user) redirect("/login");
 
-  const actorResolution = await timedPhase("actorRoleResolution", () =>
-    resolveJobDetailActor({
-      supabase,
-      userId: user.id,
-    }),
-  );
+  // The actor resolution and the contractor shadow-membership read both depend
+  // only on user.id, so they run concurrently instead of serially.
+  const [actorResolution, contractorShadowMembershipResult] = await Promise.all([
+    timedPhase("actorRoleResolution", () =>
+      resolveJobDetailActor({
+        supabase,
+        userId: user.id,
+      }),
+    ),
+    timedPhase(
+      "contractorShadowMembershipRead",
+      async () =>
+        await supabase
+          .from("contractor_users")
+          .select("contractor_id")
+          .eq("user_id", user.id)
+          .maybeSingle(),
+    ),
+  ]);
 
   if (actorResolution.kind === "contractor") {
     redirect(`/portal/jobs/${jobId}`);
@@ -1616,15 +1630,8 @@ export default async function JobDetailPage({
 
   const internalUser = actorResolution.internalUser;
 
-  const { data: contractorShadowMembership, error: contractorShadowMembershipErr } = await timedPhase(
-    "contractorShadowMembershipRead",
-    async () =>
-      await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-  );
+  const { data: contractorShadowMembership, error: contractorShadowMembershipErr } =
+    contractorShadowMembershipResult;
 
   if (contractorShadowMembershipErr) {
     throw contractorShadowMembershipErr;
@@ -1635,9 +1642,6 @@ export default async function JobDetailPage({
 
   const internalRole = String(internalUser.role ?? "").trim().toLowerCase();
   const canManageWorkflowGuidance = internalRole === "owner" || internalRole === "admin";
-  const contractors = await timedPhase("contractorsRead", () =>
-    getContractors(internalUser.account_owner_user_id),
-  );
 
   let isInternalUser = true;
   let isInternalAdmin = false;
@@ -1646,37 +1650,83 @@ export default async function JobDetailPage({
   let productMode: ProductMode = "hybrid";
 
   isInternalAdmin = internalUser.role === "admin";
-  const { internalBusinessIdentity, resolvedBillingMode, resolvedProductMode } = await timedPhase("businessProfileReads", async () => {
-    const resolvedBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
-      supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-    });
-    const resolvedBillingMode = await resolveBillingModeByAccountOwnerId({
-      supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-    });
-    const resolvedProductMode = await resolveProductModeForAccountOwnerId({
-      supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-    });
 
-    return {
-      internalBusinessIdentity: resolvedBusinessIdentity,
-      resolvedBillingMode,
-      resolvedProductMode,
-    };
-  });
+  // Same-account scoped-job preflight, fail-closed. Wrapped so a thrown error
+  // resolves to null instead of rejecting the parallel group below.
+  const loadScopedReadJobFailClosed = async (): Promise<{ id?: string | null } | null> => {
+    try {
+      const scopedReadOutcome = await timedPhase("sameAccountScopedJobBoundary", () =>
+        loadScopedInternalJobDetailReadBoundaryOutcome({
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          jobId,
+        }),
+      );
+
+      if (scopedReadOutcome.status === "ok") {
+        return scopedReadOutcome.job;
+      }
+      if (scopedReadOutcome.status === "query_error") {
+        console.error("[job-detail:sameAccountScopedJobBoundary] query_error fail-closed", {
+          jobId,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          code: scopedReadOutcome.error.code,
+          message: scopedReadOutcome.error.message,
+          details: scopedReadOutcome.error.details,
+        });
+      }
+      return null;
+    } catch (error) {
+      const boundaryErrorMessage =
+        error instanceof Error
+          ? error.message
+          : (() => {
+              try {
+                return JSON.stringify(error);
+              } catch {
+                return String(error);
+              }
+            })();
+      console.error("[job-detail:sameAccountScopedJobBoundary] fail-closed", {
+        jobId,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        message: boundaryErrorMessage,
+      });
+      return null;
+    }
+  };
+
+  // Everything here needs only internalUser + user.id, so it all runs as one
+  // concurrent group instead of five sequential round-trips. The business
+  // profile / product mode reads come from the cross-request tenant reference
+  // cache, so they are usually free.
+  const [
+    contractors,
+    internalBusinessIdentity,
+    resolvedBillingMode,
+    resolvedProductMode,
+    explicitFieldBillingCapabilities,
+    scopedReadJob,
+  ] = await Promise.all([
+    timedPhase("contractorsRead", () => getContractors(internalUser.account_owner_user_id)),
+    timedPhase("businessProfileReads", () =>
+      getCachedInternalBusinessIdentity(internalUser.account_owner_user_id),
+    ),
+    getCachedBillingMode(internalUser.account_owner_user_id),
+    getCachedProductMode(internalUser.account_owner_user_id),
+    timedPhase("fieldBillingExplicitCapabilitiesRead", () =>
+      loadFieldBillingExplicitCapabilitiesForUser({
+        supabase: supabase as any,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        internalUserId: user.id,
+      }),
+    ),
+    loadScopedReadJobFailClosed(),
+  ]);
+
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
   billingMode = resolvedBillingMode;
   productMode = resolvedProductMode;
   const surfaceProfile = resolveProductSurfaceProfile(productMode);
-  const explicitFieldBillingCapabilities = await timedPhase("fieldBillingExplicitCapabilitiesRead", () =>
-    loadFieldBillingExplicitCapabilitiesForUser({
-      supabase: supabase as any,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      internalUserId: user.id,
-    }),
-  );
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
     internalUser,
@@ -1684,48 +1734,6 @@ export default async function JobDetailPage({
     explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
-  // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
-  let scopedReadJob: { id?: string | null } | null = null;
-  try {
-    const scopedReadOutcome = await timedPhase("sameAccountScopedJobBoundary", () =>
-      loadScopedInternalJobDetailReadBoundaryOutcome({
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        jobId,
-      }),
-    );
-
-    if (scopedReadOutcome.status === "ok") {
-      scopedReadJob = scopedReadOutcome.job;
-    } else if (scopedReadOutcome.status === "query_error") {
-      console.error("[job-detail:sameAccountScopedJobBoundary] query_error fail-closed", {
-        jobId,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        code: scopedReadOutcome.error.code,
-        message: scopedReadOutcome.error.message,
-        details: scopedReadOutcome.error.details,
-      });
-      scopedReadJob = null;
-    } else {
-      scopedReadJob = null;
-    }
-  } catch (error) {
-    const boundaryErrorMessage =
-      error instanceof Error
-        ? error.message
-        : (() => {
-            try {
-              return JSON.stringify(error);
-            } catch {
-              return String(error);
-            }
-          })();
-    console.error("[job-detail:sameAccountScopedJobBoundary] fail-closed", {
-      jobId,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      message: boundaryErrorMessage,
-    });
-    scopedReadJob = null;
-  }
   if (!scopedReadJob?.id) {
     return notFound();
   }

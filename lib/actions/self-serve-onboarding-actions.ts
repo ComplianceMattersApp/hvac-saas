@@ -1,5 +1,8 @@
 "use server";
 
+import { revalidateTag } from "next/cache";
+
+import { tenantReferenceCacheTag } from "@/lib/business/tenant-reference-cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import {
   provisionFirstOwnerAccount,
@@ -239,6 +242,7 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
         .select("account_owner_user_id, display_name, support_email, support_phone, billing_mode")
         .single();
       if (error) throw error;
+      revalidateTag(tenantReferenceCacheTag(String(data.account_owner_user_id)));
       return {
         account_owner_user_id: String(data.account_owner_user_id),
         display_name: toCleanString(data.display_name) || null,
@@ -385,6 +389,7 @@ function createProvisioningClientFromAdmin(admin: any): FirstOwnerProvisioningCl
         .select("account_owner_user_id, product_mode")
         .single();
       if (error) throw error;
+      revalidateTag(tenantReferenceCacheTag(String(data.account_owner_user_id)));
       return {
         account_owner_user_id: String(data.account_owner_user_id),
         product_mode: toCleanString(data.product_mode) || null,

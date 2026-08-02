@@ -24,10 +24,8 @@ import {
 import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
-import {
-  resolveProductModeForAccountOwnerId,
-  type ProductMode,
-} from "@/lib/business/product-mode-defaults";
+import { type ProductMode } from "@/lib/business/product-mode-defaults";
+import { getCachedProductMode } from "@/lib/business/tenant-reference-cache";
 import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import {
@@ -1897,37 +1895,40 @@ async function buildTodayReadModelForInternalActor(
   const role = internalUser.role;
   const today = todayBusinessDateLA();
   const canViewBusinessPulse = canViewBusinessPulseForRole(role);
-  const explicitFieldBillingCapabilities = await localTimedPhase(
-    "fieldBillingExplicitCapabilitiesRead",
-    () =>
-      loadFieldBillingExplicitCapabilitiesForUser({
-        supabase,
-        accountOwnerUserId,
-        internalUserId: userId,
-      }),
-  );
-  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
-    actorUserId: userId,
-    internalUser,
-    resourceAccountOwnerUserId: accountOwnerUserId,
-    explicitCapabilities: explicitFieldBillingCapabilities,
-  });
   const canViewFailedPaymentAttention = canViewFinancialRegister({
     actorUserId: userId,
     internalUser,
     resourceAccountOwnerUserId: accountOwnerUserId,
   });
   const showWelcomeModal = !hasDismissedTodayWelcome(actor.user?.user_metadata ?? null);
-  const canViewConfirmPaymentAttention =
-    canViewFailedPaymentAttention ||
-    fieldBillingCapabilities.can_verify_non_card_collection;
+
+  // The explicit field-billing capabilities read only feeds the
+  // confirm-payment-attention visibility flag, so it joins the parallel group
+  // below instead of blocking every other read behind its round-trip.
+  const canViewConfirmPaymentAttentionPromise = localTimedPhase(
+    "fieldBillingExplicitCapabilitiesRead",
+    async () => {
+      const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+        supabase,
+        accountOwnerUserId,
+        internalUserId: userId,
+      });
+      const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+        actorUserId: userId,
+        internalUser,
+        resourceAccountOwnerUserId: accountOwnerUserId,
+        explicitCapabilities: explicitFieldBillingCapabilities,
+      });
+      return (
+        canViewFailedPaymentAttention ||
+        fieldBillingCapabilities.can_verify_non_card_collection
+      );
+    },
+  );
 
   const productModePromise = localTimedPhase("concernReadProductMode", async () => {
     try {
-      return await resolveProductModeForAccountOwnerId({
-        supabase,
-        accountOwnerUserId,
-      });
+      return await getCachedProductMode(accountOwnerUserId);
     } catch {
       return "hybrid" as ProductMode;
     }
@@ -2076,7 +2077,7 @@ async function buildTodayReadModelForInternalActor(
   });
 
   const confirmPaymentAttentionPromise = localTimedPhase("confirmPaymentAttentionRead", async () => {
-    if (!canViewConfirmPaymentAttention) {
+    if (!(await canViewConfirmPaymentAttentionPromise)) {
       return {
         openCount: null,
         totalReportedAmountCents: null,
@@ -2118,6 +2119,7 @@ async function buildTodayReadModelForInternalActor(
     financialSnapshot,
     failedPaymentAttention,
     confirmPaymentAttention,
+    canViewConfirmPaymentAttention,
   ] = await localTimedPhase("groupedParallelAwait", async () =>
     Promise.all([
       productModePromise,
@@ -2135,6 +2137,7 @@ async function buildTodayReadModelForInternalActor(
       financialSnapshotPromise,
       failedPaymentAttentionPromise,
       confirmPaymentAttentionPromise,
+      canViewConfirmPaymentAttentionPromise,
     ]),
   );
 

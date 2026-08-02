@@ -7,6 +7,7 @@ const createTenantStripeConnectOnboardingLinkMock = vi.fn();
 const syncTenantStripeConnectReadinessForAccountOwnerMock = vi.fn();
 const resolveTenantStripeConnectReadinessMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const revalidateTagMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -16,6 +17,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+  revalidateTag: (...args: unknown[]) => revalidateTagMock(...args),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({

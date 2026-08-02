@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
@@ -18,6 +18,7 @@ import {
   syncTenantStripeConnectReadinessForAccountOwner,
 } from "@/lib/business/tenant-stripe-connect-onboarding";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import { tenantReferenceCacheTag } from "@/lib/business/tenant-reference-cache";
 
 const MAX_LOGO_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -278,6 +279,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
     }
   }
 
+  revalidateTag(tenantReferenceCacheTag(internalUser.account_owner_user_id));
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/company-profile");
@@ -333,6 +335,7 @@ export async function saveInvoiceModeFromForm(formData: FormData): Promise<void>
     redirect(withNotice("save_failed"));
   }
 
+  revalidateTag(tenantReferenceCacheTag(internalUser.account_owner_user_id));
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/company-profile");

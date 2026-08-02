@@ -4,6 +4,7 @@ const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const revalidateTagMock = vi.fn();
 
 type FixtureOptions = {
   preflightAllowed?: boolean;
@@ -18,6 +19,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+  revalidateTag: (...args: unknown[]) => revalidateTagMock(...args),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
