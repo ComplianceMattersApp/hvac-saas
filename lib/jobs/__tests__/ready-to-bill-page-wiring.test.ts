@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const page = readFileSync(resolve(process.cwd(), "app/billing/ready-to-bill/page.tsx"), "utf8");
 const selection = readFileSync(resolve(process.cwd(), "app/billing/ready-to-bill/ReadyToBillSelection.tsx"), "utf8");
 const invoiceReport = readFileSync(resolve(process.cwd(), "app/reports/invoices/page.tsx"), "utf8");
-const closeoutQueue = readFileSync(resolve(process.cwd(), "app/ops/closeout-queue/page.tsx"), "utf8");
+const closeoutQueue = readFileSync(resolve(process.cwd(), "app/ops/page.tsx"), "utf8");
 
 describe("Ready to Bill page wiring", () => {
   it("is discoverable from ECC closeout instead of the invoice report", () => {

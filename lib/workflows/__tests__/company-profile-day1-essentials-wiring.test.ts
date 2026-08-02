@@ -9,26 +9,26 @@ describe("company profile day 1 essentials wiring", () => {
   it("renders compact day 1 guidance copy", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("Setup attention");
-    expect(pageSource).toContain("Finish only the items that need attention.");
+    expect(pageSource).toContain("Needs attention");
+    expect(pageSource).toContain("Nothing needs your attention right now.");
     expect(pageSource).toContain("Open Training Room");
   });
 
   it("keeps company details before setup and training content", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource.indexOf('id="company-details"')).toBeGreaterThan(-1);
-    expect(pageSource.indexOf("Setup attention")).toBeGreaterThan(pageSource.indexOf('id="company-details"'));
-    expect(pageSource.indexOf("First job training")).toBeGreaterThan(pageSource.indexOf('id="company-details"'));
+    expect(pageSource.indexOf("Company Profile")).toBeGreaterThan(-1);
+    expect(pageSource.indexOf("Needs attention")).toBeGreaterThan(pageSource.indexOf("Company Profile"));
+    expect(pageSource.indexOf("First job training")).toBeGreaterThan(pageSource.indexOf("Company Profile"));
   });
 
   it("keeps linked section anchors on existing company profile sections", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("id=\"company-details\"");
-    expect(pageSource).toContain("id=\"invoice-settings\"");
     expect(pageSource).toContain("id=\"account-billing\"");
     expect(pageSource).toContain("id=\"accept-payments\"");
+    expect(pageSource).toContain("\"#identity\"");
+    expect(pageSource).toContain("\"#billing\"");
   });
 
   it("separates invoice workflow settings from online payment collection", () => {
@@ -68,9 +68,9 @@ describe("company profile day 1 essentials wiring", () => {
   it("keeps online payments before ECC handoff setup in the owner page rhythm", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource.indexOf("<PlatformAccountSection")).toBeLessThan(pageSource.indexOf('id="invoice-settings"'));
-    expect(pageSource.indexOf("<TenantStripePaymentsSection")).toBeGreaterThan(pageSource.indexOf('id="invoice-settings"'));
-    expect(pageSource.indexOf("<TenantStripePaymentsSection")).toBeLessThan(pageSource.indexOf('id="authorized-ecc-raters"'));
-    expect(pageSource.indexOf('id="authorized-ecc-raters"')).toBeLessThan(pageSource.indexOf('id="account-handoff-connections"'));
+    expect(pageSource.indexOf("<PlatformAccountSection")).toBeLessThan(pageSource.indexOf("Invoice Settings"));
+    expect(pageSource.indexOf("<TenantStripePaymentsSection")).toBeGreaterThan(pageSource.indexOf("Invoice Settings"));
+    expect(pageSource.indexOf("<TenantStripePaymentsSection")).toBeLessThan(pageSource.indexOf('eyebrow="ECC/HERS Partner Network"'));
+    expect(pageSource.indexOf('eyebrow="ECC/HERS Partner Network"')).toBeLessThan(pageSource.indexOf('href="/ops/admin/connections"'));
   });
 });

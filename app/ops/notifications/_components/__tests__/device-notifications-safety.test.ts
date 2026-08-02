@@ -50,8 +50,11 @@ describe("Device Notifications Device List — UI Safety", () => {
       "id", // for key prop only
     ];
 
-    // These fields MUST NEVER be rendered:
-    const sensitiveFields = ["endpoint", "p256dh", "auth", "user_agent"];
+    // These backend fields live on the safe row but MUST NEVER be rendered by the UI.
+    // (p256dh/auth are intentionally excluded from PushSubscriptionSafeRow entirely —
+    // they are never fetched into the display layer — so the safe row's remaining
+    // sensitive fields are endpoint and user_agent.)
+    const sensitiveFields = ["endpoint", "user_agent"];
 
     const row: PushSubscriptionSafeRow = {
       id: "sub-1",

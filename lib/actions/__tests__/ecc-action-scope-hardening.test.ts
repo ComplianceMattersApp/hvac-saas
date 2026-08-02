@@ -209,6 +209,19 @@ function makeSessionClientFixture() {
         };
       }
 
+      if (table === "jobs") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { project_type: "alteration" },
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     },
   };

@@ -10,7 +10,7 @@ describe("company profile first job training wiring", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("First job training");
-    expect(pageSource).toContain("Open Training Room for the step-by-step first job path.");
+    expect(pageSource).toContain("Step-by-step first job path in Training Room.");
     expect(pageSource).toContain('href="/training"');
     expect(pageSource).not.toContain("<ol");
   });

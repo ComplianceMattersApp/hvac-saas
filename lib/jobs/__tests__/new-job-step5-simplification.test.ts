@@ -41,7 +41,7 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("<details");
     expect(builderSource).toContain("Details");
     expect(builderSource).toContain("Price");
-    expect(builderSource).toContain("Carries into the draft invoice charge when you build the invoice.");
+    expect(builderSource).toContain("Quantity and unit price carry into the draft invoice charge.");
     expect(builderSource).not.toContain("Unit Label");
     expect(builderSource).not.toContain("Metadata:");
   });
@@ -105,7 +105,7 @@ describe("New job Step 5 simplification wiring", () => {
   it("keeps compact row editing with one-row expansion behavior", () => {
     expect(builderSource).toContain("setExpandedItemId(nextItemId)");
     expect(builderSource).toContain("setExpandedItemId((prev) => (prev === item.id ? null : item.id))");
-    expect(builderSource).toContain("lg:min-w-[12rem]");
+    expect(builderSource).toContain("lg:min-w-[18rem]");
     expect(builderSource).toContain("lg:text-right");
     expect(builderSource).toContain('aria-label={`Price for ${item.title.trim() || "scope item"}`}');
     expect(builderSource).toContain("value={item.title}");

@@ -19,12 +19,12 @@ describe("landing and signup copy wiring", () => {
   it("renders guided trial login copy with compact preview block", () => {
     const loginPage = readWorkspaceFile("app/login/page.tsx");
 
-    expect(loginPage).toContain("Log in to run field work, scheduling, closeout, and follow-up from one organized place.");
+    expect(loginPage).toContain("Welcome back. Your jobs, schedule, and field team are ready.");
     expect(loginPage).toContain("Start a 30-day guided setup. No payment details needed.");
     expect(loginPage).toContain("Start Service Trial");
     expect(loginPage).toContain("Start ECC / Compliance Trial");
-    expect(loginPage).toContain("For service calls, dispatch, work orders, and follow-up.");
-    expect(loginPage).toContain("For ECC jobs, tests, corrections, and closeout.");
+    expect(loginPage).toContain("For HVAC service calls, dispatch, field invoicing, and job closeout.");
+    expect(loginPage).toContain("For ECC testing, corrections, contractor handoff, and cert closeout.");
     expect(loginPage).toContain("Trial paths start with a 30-day guided setup and no payment details.");
     expect(loginPage).toContain("Already invited by your company? Contact your administrator if you need access.");
     expect(loginPage).not.toContain("14-day");
