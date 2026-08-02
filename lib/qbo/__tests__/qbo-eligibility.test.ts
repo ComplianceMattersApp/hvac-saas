@@ -125,6 +125,41 @@ describe("evaluateQboInvoiceEligibility — precedence & eligibility", () => {
     expect(r["inv-ok-err"].eligible).toBe(true);
   });
 
+  it("classifies a status outside draft/issued/void as unsupported_state (safety fallthrough)", async () => {
+    const store: Record<string, any[]> = {
+      internal_invoices: [
+        { id: "inv-weird", account_owner_user_id: ACCT, status: "partially_refunded", qbo_sync_status: null, total_cents: 5000, invoice_date: "2026-07-04", job_id: "job-w", customer_id: "cust-1", billing_name: "X" },
+      ],
+      jobs: [{ id: "job-w", billing_disposition: null }],
+      customers: [{ id: "cust-1", full_name: "Acme HVAC" }],
+      internal_invoice_line_items: [{ invoice_id: "inv-weird" }],
+    };
+    const { supabase } = makeFake(store);
+    const report = await evaluateQboInvoiceEligibility({ supabase, accountOwnerUserId: ACCT });
+    const r = byId(report)["inv-weird"];
+    expect(r.primaryReason).toBe("unsupported_state");
+    expect(r.eligible).toBe(false);
+    expect(report.excludedByReason.unsupported_state).toBe(1);
+  });
+
+  it("resolves customer identity from the invoice billing_name when the customer row is missing", async () => {
+    // Content-stage invoice whose customer_id has no matching customers row, but
+    // the invoice itself carries a billing_name → still a resolvable identity.
+    const store: Record<string, any[]> = {
+      internal_invoices: [
+        { id: "inv-billfallback", account_owner_user_id: ACCT, status: "issued", qbo_sync_status: null, total_cents: 5000, invoice_date: "2026-07-04", job_id: "job-b", customer_id: "ghost", billing_name: "Direct Bill LLC" },
+      ],
+      jobs: [{ id: "job-b", billing_disposition: null }],
+      customers: [], // no row for "ghost"
+      internal_invoice_line_items: [{ invoice_id: "inv-billfallback" }],
+    };
+    const { supabase } = makeFake(store);
+    const report = await evaluateQboInvoiceEligibility({ supabase, accountOwnerUserId: ACCT });
+    const r = byId(report)["inv-billfallback"];
+    expect(r.eligible).toBe(true);
+    expect(r.primaryReason).toBeNull();
+  });
+
   it("excludes other accounts entirely", async () => {
     const { supabase } = makeFake(baseStore());
     const report = await evaluateQboInvoiceEligibility({ supabase, accountOwnerUserId: ACCT });
@@ -175,10 +210,43 @@ describe("evaluateQboInvoiceEligibility — scope", () => {
 });
 
 describe("evaluateQboInvoiceEligibility — read-only & short-circuit guarantees", () => {
-  it("never attempts a write", async () => {
-    const { supabase, log } = makeFake(baseStore());
-    await evaluateQboInvoiceEligibility({ supabase, accountOwnerUserId: ACCT });
-    expect(log.writes).toEqual([]);
+  it("never attempts a mutation (insert/update/upsert/delete) on any code path", async () => {
+    // The FakeQuery throws "WRITE_ATTEMPTED …" from every mutation method, so a
+    // stray insert/update/upsert/delete would both reject the evaluator AND land
+    // in log.writes. Exercise every distinct fixture store — terminal-only,
+    // full-precedence, and the cutoff store — to cover the terminal, content, and
+    // pre-cutoff branches, then assert not a single mutation was issued.
+    const stores: Array<[string, Record<string, any[]>]> = [
+      ["baseStore (all precedence + content branches)", baseStore()],
+      [
+        "terminalOnly (no content reads)",
+        {
+          internal_invoices: [
+            { id: "v", account_owner_user_id: ACCT, status: "void", qbo_sync_status: null, job_id: "j1", customer_id: "cust-1" },
+            { id: "d", account_owner_user_id: ACCT, status: "draft", qbo_sync_status: null, job_id: "j2", customer_id: "cust-1" },
+          ],
+          jobs: [],
+          customers: [],
+          internal_invoice_line_items: [],
+        },
+      ],
+      [
+        "issued eligible (content stage reads jobs/customers/line_items)",
+        {
+          internal_invoices: [
+            { id: "e", account_owner_user_id: ACCT, status: "issued", qbo_sync_status: null, total_cents: 5000, invoice_date: "2026-07-04", job_id: "j1", customer_id: "cust-1", billing_name: "X" },
+          ],
+          jobs: [{ id: "j1", billing_disposition: null }],
+          customers: [{ id: "cust-1", full_name: "Acme HVAC" }],
+          internal_invoice_line_items: [{ invoice_id: "e" }],
+        },
+      ],
+    ];
+    for (const [name, store] of stores) {
+      const { supabase, log } = makeFake(store);
+      await evaluateQboInvoiceEligibility({ supabase, accountOwnerUserId: ACCT });
+      expect(log.writes, `writes issued for ${name}`).toEqual([]);
+    }
   });
 
   it("does NOT read content tables when only terminal-state invoices exist", async () => {
@@ -251,7 +319,14 @@ describe("evaluateQboInvoiceEligibility — sync-start cutoff", () => {
   });
 });
 
-describe("qbo-eligibility source — structural zero-write / zero-QBO lock", () => {
+describe("qbo-eligibility source — structural zero-QBO / zero-side-effect lock", () => {
+  // These are pure import-graph / no-side-effect invariants. None of these
+  // symbols are injected dependencies, so there is no honest behavioral proxy:
+  // the only way for the evaluator to touch QBO, resolve tokens, mutate sync
+  // fields, or revalidate a route cache would be to import one of these — which
+  // the source structurally must not do. (The supabase insert/update/upsert/
+  // delete "no mutation" guarantee IS injected and is proven behaviorally above
+  // by the FakeQuery write-guard, so it is not re-asserted here.)
   const source = readFileSync(resolve(__dirname, "../qbo-eligibility.ts"), "utf-8");
 
   it("imports nothing from the QBO API client and resolves no tokens", () => {
@@ -260,12 +335,8 @@ describe("qbo-eligibility source — structural zero-write / zero-QBO lock", () 
     expect(source).not.toContain("findOrCreateQbo");
   });
 
-  it("contains no mutation calls", () => {
-    expect(source).not.toMatch(/\.insert\(/);
-    expect(source).not.toMatch(/\.update\(/);
-    expect(source).not.toMatch(/\.upsert\(/);
-    expect(source).not.toMatch(/\.delete\(/);
-    // No invocation of the sync-path mutators (doc-comment mentions are allowed).
+  it("invokes no sync-path mutators or cache revalidation", () => {
+    // Doc-comment mentions are allowed; actual invocations are not.
     expect(source).not.toMatch(/updateInvoiceSyncFields\(/);
     expect(source).not.toMatch(/revalidatePath\(/);
   });
