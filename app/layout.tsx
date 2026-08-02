@@ -23,7 +23,7 @@ import { shouldShowPortalMenuItem } from "@/lib/portal/partner-work-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 import { countAttentionCenterItems } from "@/lib/reports/attention-center-count";
-import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncher";
+import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncherLazy";
 import {
   buildHelpAssistantSafeContext,
   type HelpAssistantSafeContext,

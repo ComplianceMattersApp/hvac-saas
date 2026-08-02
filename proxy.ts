@@ -22,7 +22,7 @@ export async function proxy(req: NextRequest) {
     phaseDurationsMs[phaseName] = durationMs;
   };
 
-  const emitTimingLog = (decision: "public_bypass" | "webhook_bypass" | "pass_through" | "redirect_login") => {
+  const emitTimingLog = (decision: "public_bypass" | "webhook_bypass" | "auth_route_bypass" | "pass_through" | "redirect_login") => {
     if (!timingEnabled) return;
     console.info(
       "[proxy-timing]",
@@ -65,8 +65,13 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Allow login, signup, and auth routes without a session.
-  const isAuthRoute = isUnauthedPublicRoute(pathname);
+  // Allow login, signup, and auth routes without a session. These routes never
+  // gate on auth, so skip the Supabase round-trip entirely instead of paying it
+  // and ignoring the result.
+  if (isUnauthedPublicRoute(pathname)) {
+    emitTimingLog("auth_route_bypass");
+    return NextResponse.next();
+  }
 
   let res = NextResponse.next();
 
@@ -88,13 +93,17 @@ export async function proxy(req: NextRequest) {
   );
 
   const authLookupStartMs = timingEnabled ? Date.now() : 0;
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the session JWT locally against the project's cached
+  // JWKS instead of round-tripping to the Supabase Auth server on every
+  // navigation the way getUser() does. It still refreshes an expired session
+  // through the cookie adapter above, and each page/API handler re-verifies
+  // identity server-side — this gate only decides the login redirect.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const hasSession = Boolean(claimsData?.claims?.sub);
   setPhaseValue("authLookup", Date.now() - authLookupStartMs);
 
   const redirectDecisionStartMs = timingEnabled ? Date.now() : 0;
-  if (!user && !isAuthRoute) {
+  if (!hasSession) {
     setPhaseValue("redirectDecision", Date.now() - redirectDecisionStartMs);
     const url = req.nextUrl.clone();
     url.pathname = "/login";

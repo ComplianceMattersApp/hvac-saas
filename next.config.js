@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      // Supabase Storage — business logos and uploaded photos.
+      { protocol: "https", hostname: "*.supabase.co" },
+    ],
+  },
   async redirects() {
     return [
       // Redirect legacy Vercel app URL to canonical production domain.

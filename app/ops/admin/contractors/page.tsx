@@ -160,30 +160,28 @@ export default async function AdminContractorsPage({
     }
   }
 
-  // N+1 fix: this previously called admin.auth.admin.getUserById() once per
-  // user_id (one auth request per contractor membership). Auth users are
-  // paginated, not filterable by id, so we page through listUsers() once for
-  // the whole request and build a lookup map, then resolve each userId from
-  // that map below.
+  // Resolve email-confirmation state with one targeted getUserById per
+  // membership user, issued concurrently. This replaces paginating the entire
+  // auth user table through listUsers() on every render, which scaled with
+  // total platform users rather than with the memberships on this page.
   const emailConfirmedMap = new Map<string, boolean | null>();
   if (userIds.length > 0) {
-    const authUserById = new Map<string, boolean>();
-    const perPage = 1000;
-    let page = 1;
-    while (true) {
-      const { data, error: listErr } = await admin.auth.admin.listUsers({ page, perPage });
-      if (listErr) throw listErr;
+    const lookups = await Promise.all(
+      userIds.map(async (id) => ({ id, result: await admin.auth.admin.getUserById(id) })),
+    );
 
-      for (const authUser of data?.users ?? []) {
-        authUserById.set(String(authUser.id), Boolean((authUser as any).email_confirmed_at));
+    for (const { id, result } of lookups) {
+      const { data, error } = result;
+      if (error) {
+        // A missing auth user maps to "unknown" status below, same as when the
+        // old lookup map had no entry for the id.
+        if (error.status === 404 || (error as { code?: string }).code === "user_not_found") {
+          emailConfirmedMap.set(id, null);
+          continue;
+        }
+        throw error;
       }
-
-      if (!data?.users || data.users.length < perPage) break;
-      page += 1;
-    }
-
-    for (const id of userIds) {
-      emailConfirmedMap.set(id, authUserById.has(id) ? authUserById.get(id)! : null);
+      emailConfirmedMap.set(id, data?.user ? Boolean((data.user as any).email_confirmed_at) : null);
     }
   }
 

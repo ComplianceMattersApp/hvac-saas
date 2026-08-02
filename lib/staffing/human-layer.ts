@@ -95,8 +95,18 @@ async function resolveIdentitySourceMap(params: {
   const _t_fallbackUserLookups = isOpsTimingEnabled() ? Date.now() : 0;
   const admin = createAdminClient();
 
-  for (const userId of unresolvedIds) {
-    const { data, error } = await admin.auth.admin.getUserById(userId);
+  // The admin auth API has no batch lookup, so issue the per-user reads
+  // concurrently instead of serially — this path previously cost one full
+  // round-trip per unresolved user on job-detail renders.
+  const fallbackLookups = await Promise.all(
+    unresolvedIds.map(async (userId) => ({
+      userId,
+      result: await admin.auth.admin.getUserById(userId),
+    })),
+  );
+
+  for (const { userId, result } of fallbackLookups) {
+    const { data, error } = result;
     if (error) throw error;
 
     const authUser = data?.user;
