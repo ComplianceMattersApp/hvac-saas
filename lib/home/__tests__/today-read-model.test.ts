@@ -133,7 +133,7 @@ describe("selectNextBestAction", () => {
     expect(result.kind).toBe("dispatcher_schedule");
     expect(result.headline).toContain("unassigned");
     expect(result.primaryLabel).toBe("Assign Technicians");
-    expect(result.primaryHref).toBe("/ops");
+    expect(result.primaryHref).toBe("/ops?bucket=without_tech#ops-workspace");
   });
 
   it("office: uses cleaning field-user language for unassigned work", () => {
@@ -405,6 +405,46 @@ describe("buildPriorityChips", () => {
     expect(chips.find((c) => c.key === "waiting")?.count).toBe(3);
     expect(chips.find((c) => c.key === "on_hold")).toBeUndefined();
   });
+
+  it("points every operations snapshot chip at the current /ops workspace bucket", () => {
+    const chips = buildPriorityChips({
+      productMode: "ecc_hers",
+      role: "office",
+      priorityCounts: {
+        ...baseCounts,
+        needScheduling: 2,
+        scheduledToday: 4,
+        scheduledTodayWithoutTech: 1,
+        contractorIntake: 1,
+        pendingInfo: 1,
+        failed: 1,
+        followUps: 1,
+        closeoutReady: 1,
+      },
+      servicePlansOverdue: 0,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: false,
+    });
+
+    const hrefByKey = Object.fromEntries(chips.map((chip) => [chip.key, chip.href]));
+    expect(hrefByKey).toMatchObject({
+      need_scheduling: "/ops?bucket=pending#ops-workspace",
+      field_work: "/ops?bucket=field_work#ops-workspace",
+      without_tech: "/ops?bucket=without_tech#ops-workspace",
+      contractor_intake: "/ops?bucket=contractor_intake#ops-workspace",
+      waiting: "/ops?bucket=waiting#ops-workspace",
+      exceptions: "/ops?bucket=exceptions#ops-workspace",
+      follow_ups: "/ops?bucket=follow_ups#ops-workspace",
+      closeout: "/ops?bucket=closeout#ops-workspace",
+    });
+
+    // Legacy standalone queue pages must not be reachable from the Today matrix.
+    for (const chip of chips) {
+      expect(chip.href).not.toBe("/ops/call-list");
+      expect(chip.href).not.toBe("/ops/field");
+      expect(chip.href).not.toBe("/ops/closeout-queue");
+    }
+  });
 });
 
 describe("followUpReason", () => {
@@ -617,7 +657,7 @@ describe("buildFollowUpGroups", () => {
       canViewBusinessPulse: false,
     });
 
-    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops?bucket=without_tech#ops-workspace");
     expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops?bucket=waiting#ops-workspace");
     expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });
@@ -659,7 +699,7 @@ describe("buildFollowUpGroups", () => {
       canViewBusinessPulse: false,
     });
 
-    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops?bucket=without_tech#ops-workspace");
     expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops?bucket=waiting#ops-workspace");
     expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });

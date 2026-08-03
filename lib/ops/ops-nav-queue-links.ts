@@ -1,43 +1,65 @@
+// Canonical Operations workspace queue destinations.
+//
+// The /ops board renders every queue as a bucket of the single Operations
+// Workspace surface (see `opsRailQueueRows` in app/ops/page.tsx). Any other
+// surface that links into an ops queue — shell nav, Today's operations
+// snapshot — must route through here so the destinations cannot drift.
+
+export type OpsWorkspaceQueueBucket =
+  | "pending"
+  | "field_work"
+  | "without_tech"
+  | "waiting"
+  | "exceptions"
+  | "closeout"
+  | "follow_ups"
+  | "contractor_intake"
+  | "permits";
+
+export function opsWorkspaceQueueHref(bucket: OpsWorkspaceQueueBucket): string {
+  return `/ops?bucket=${bucket}#ops-workspace`;
+}
+
 export const OPS_NAV_QUEUE_LINKS = [
   {
     label: "Needs Scheduling",
     bucket: "pending",
-    href: "/ops?bucket=pending#ops-workspace",
+    href: opsWorkspaceQueueHref("pending"),
   },
   {
     label: "Field Work",
     bucket: "field_work",
-    href: "/ops?bucket=field_work#ops-workspace",
+    href: opsWorkspaceQueueHref("field_work"),
   },
   {
     label: "Contractor Intake",
     bucket: "contractor_intake",
-    href: "/ops?bucket=contractor_intake#ops-workspace",
+    href: opsWorkspaceQueueHref("contractor_intake"),
   },
   {
     label: "Waiting / Pending Info",
     bucket: "waiting",
-    href: "/ops?bucket=waiting#ops-workspace",
+    href: opsWorkspaceQueueHref("waiting"),
   },
   {
     label: "Exceptions",
     bucket: "exceptions",
-    href: "/ops?bucket=exceptions#ops-workspace",
+    href: opsWorkspaceQueueHref("exceptions"),
   },
   {
     label: "Closeout & Review",
     bucket: "closeout",
-    href: "/ops?bucket=closeout#ops-workspace",
+    href: opsWorkspaceQueueHref("closeout"),
   },
   {
     label: "Follow Ups",
     bucket: "follow_ups",
-    href: "/ops?bucket=follow_ups#ops-workspace",
+    href: opsWorkspaceQueueHref("follow_ups"),
   },
   {
     label: "Permits",
     bucket: "permits",
-    href: "/ops?bucket=permits#ops-workspace",
+    href: opsWorkspaceQueueHref("permits"),
   },
 ] as const;
 
