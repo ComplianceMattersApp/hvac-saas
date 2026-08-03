@@ -37,6 +37,27 @@ describe("contractor permit request portal wiring", () => {
     expect(permitRequestFormSource).not.toContain("scheduled");
   });
 
+  it("confirms submission in a way the contractor can see and verify", () => {
+    // A submission that lands with no visible confirmation reads as a failure
+    // and gets resent, which is how duplicate permit requests are created.
+    expect(permitRequestFormSource).toContain("startTransition(async () =>");
+    expect(permitRequestFormSource).toContain("if (isPending) return;");
+    expect(permitRequestFormSource).toContain("Submitting...");
+    expect(permitRequestFormSource).toContain("scrollIntoView");
+    expect(permitRequestFormSource).toContain("Permit request sent to Compliance Matters.");
+    expect(permitRequestFormSource).toContain("buildPermitRequestReferenceCode");
+    expect(permitRequestFormSource).toContain("You do not need to send it again.");
+    expect(permitRequestFormSource).toContain("resolveSubmitErrorMessage");
+  });
+
+  it("gives the contractor a durable receipt list of submitted permit requests", () => {
+    expect(permitRequestPageSource).toContain("listContractorPermitRequestReceipts");
+    expect(permitRequestPageSource).toContain("Your permit requests");
+    expect(permitRequestPageSource).toContain("You have not sent a permit request yet.");
+    expect(permitRequestPageSource).toContain("referenceCode");
+    expect(permitRequestPageSource).toContain("statusLabel");
+  });
+
   it("does not add job lifecycle, job events, scheduling, or internal permit actions", () => {
     const source = actionSource.toLowerCase();
 

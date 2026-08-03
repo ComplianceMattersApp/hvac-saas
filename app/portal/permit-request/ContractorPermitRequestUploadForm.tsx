@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import {
   CONTRACTOR_PERMIT_REQUEST_ATTACHMENT_MAX_COUNT,
   CONTRACTOR_PERMIT_REQUEST_ATTACHMENT_MAX_FILE_SIZE_BYTES,
 } from "@/lib/permits/contractor-permit-request-upload-limits";
+import { buildPermitRequestReferenceCode } from "@/lib/permits/permit-request-reference";
 import {
   createContractorPermitRequestUploadToken,
   finalizeContractorPermitRequest,
@@ -15,6 +17,11 @@ import {
 
 const allowedMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "application/pdf"]);
 const allowedExtensions = new Set(["jpg", "jpeg", "png", "webp", "pdf"]);
+
+type SubmittedReceipt = {
+  referenceCode: string;
+  fileCount: number;
+};
 
 function fileExtension(fileName: string) {
   const parts = fileName.toLowerCase().split(".");
@@ -32,24 +39,56 @@ function validateFile(file: File) {
   return null;
 }
 
+/**
+ * Next.js redacts server action error messages in production builds, so the
+ * raw message is often an internal digest string. Show something the
+ * contractor can act on instead of leaking that.
+ */
+function resolveSubmitErrorMessage(error: unknown) {
+  const raw = error instanceof Error ? String(error.message ?? "").trim() : "";
+  const isRedactedServerError =
+    !raw ||
+    Boolean((error as { digest?: unknown } | null)?.digest) ||
+    raw.toLowerCase().includes("server components render") ||
+    raw.toLowerCase().includes("omitted in production");
+
+  if (isRedactedServerError) {
+    return "We could not send your permit request. Nothing was submitted — please try again, or contact Compliance Matters if it keeps failing.";
+  }
+
+  return raw;
+}
+
 export default function ContractorPermitRequestUploadForm() {
+  const router = useRouter();
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const feedbackRef = useRef<HTMLDivElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<SubmittedReceipt | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // The confirmation and error banners sit above the submit button, which is
+  // off-screen on a phone. Bring the outcome to the contractor.
+  useEffect(() => {
+    if (!error && !submitted) return;
+    feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [error, submitted]);
 
   function onPickFiles(event: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
-    setSuccess(null);
+    setSubmitted(null);
     setFiles(Array.from(event.target.files ?? []));
   }
 
   function submitPermitRequest() {
+    if (isPending) return;
+
     setError(null);
-    setSuccess(null);
+    setSubmitted(null);
 
     if (files.length === 0) {
       setError("Select at least one file to upload.");
@@ -69,58 +108,85 @@ export default function ContractorPermitRequestUploadForm() {
       }
     }
 
-    startTransition(() => {
-      void (async () => {
-        try {
-          const uploads: ContractorPermitRequestUploadDraft[] = [];
+    const pendingFiles = files;
 
-          for (const file of files) {
-            const token = await createContractorPermitRequestUploadToken({
-              fileName: file.name,
-              contentType: file.type,
-              fileSize: file.size,
-            });
+    startTransition(async () => {
+      try {
+        const uploads: ContractorPermitRequestUploadDraft[] = [];
 
-            const { error: uploadErr } = await supabase.storage
-              .from(token.bucket)
-              .uploadToSignedUrl(token.path, token.token, file, {
-                contentType: file.type,
-                upsert: false,
-              });
+        for (const [index, file] of pendingFiles.entries()) {
+          setProgress(`Uploading file ${index + 1} of ${pendingFiles.length}...`);
 
-            if (uploadErr) {
-              throw new Error("File upload failed. Please try again.");
-            }
-
-            uploads.push({
-              attachmentId: token.attachmentId,
-              path: token.path,
-              fileName: token.fileName,
-              contentType: token.contentType,
-              fileSize: token.fileSize,
-            });
-          }
-
-          await finalizeContractorPermitRequest({
-            uploads,
-            note,
+          const token = await createContractorPermitRequestUploadToken({
+            fileName: file.name,
+            contentType: file.type,
+            fileSize: file.size,
           });
 
-          setFiles([]);
-          setNote("");
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setSuccess("Permit request submitted. Compliance Matters will review it.");
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Could not submit permit request.");
+          const { error: uploadErr } = await supabase.storage
+            .from(token.bucket)
+            .uploadToSignedUrl(token.path, token.token, file, {
+              contentType: file.type,
+              upsert: false,
+            });
+
+          if (uploadErr) {
+            throw new Error("File upload failed. Please try again.");
+          }
+
+          uploads.push({
+            attachmentId: token.attachmentId,
+            path: token.path,
+            fileName: token.fileName,
+            contentType: token.contentType,
+            fileSize: token.fileSize,
+          });
         }
-      })();
+
+        setProgress("Sending your request...");
+
+        const result = await finalizeContractorPermitRequest({
+          uploads,
+          note,
+        });
+
+        setFiles([]);
+        setNote("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setSubmitted({
+          referenceCode: buildPermitRequestReferenceCode(result.permitRequestId),
+          fileCount: result.count,
+        });
+
+        // Refresh so the request shows up in the receipt list below.
+        router.refresh();
+      } catch (err) {
+        setError(resolveSubmitErrorMessage(err));
+      } finally {
+        setProgress(null);
+      }
     });
   }
 
   return (
     <div className="space-y-4">
-      <ActionFeedback type="warning" message={error} />
-      <ActionFeedback type="success" message={success} />
+      <div ref={feedbackRef} className="scroll-mt-24 space-y-4 empty:hidden">
+        <ActionFeedback type="warning" message={error} />
+        {submitted ? (
+          <div
+            role="status"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          >
+            <div className="font-semibold">Permit request sent to Compliance Matters.</div>
+            <div className="mt-1">
+              Reference{" "}
+              <span className="font-mono font-semibold">{submitted.referenceCode}</span> —{" "}
+              {submitted.fileCount} {submitted.fileCount === 1 ? "file" : "files"} received. It is
+              listed under &quot;Your permit requests&quot; below. You do not need to send it again.
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <div className="space-y-2">
         <label className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -160,14 +226,22 @@ export default function ContractorPermitRequestUploadForm() {
         />
       </div>
 
-      <button
-        type="button"
-        onClick={submitPermitRequest}
-        disabled={isPending}
-        className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(37,99,235,0.48)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {isPending ? "Submitting..." : "Submit Permit Request"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={submitPermitRequest}
+          disabled={isPending}
+          aria-busy={isPending}
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(37,99,235,0.48)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {isPending ? "Submitting..." : "Submit Permit Request"}
+        </button>
+        {isPending ? (
+          <span role="status" className="text-xs text-slate-600 dark:text-slate-300">
+            {progress ?? "Submitting..."} Keep this page open.
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }

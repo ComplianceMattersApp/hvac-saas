@@ -52,6 +52,15 @@ function normalizeContentType(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function describeSupabaseError(error: unknown) {
+  const candidate = error as { code?: unknown; message?: unknown; details?: unknown } | null;
+  return {
+    code: String(candidate?.code ?? "").trim() || null,
+    message: String(candidate?.message ?? "").trim() || null,
+    details: String(candidate?.details ?? "").trim() || null,
+  };
+}
+
 function sanitizeContractorPermitRequestNote(value: unknown) {
   const normalized = String(value ?? "").trim();
   return normalized ? normalized.slice(0, 4000) : null;
@@ -245,7 +254,15 @@ export async function finalizeContractorPermitRequest(input: {
     .select("id")
     .single();
 
-  if (requestInsertErr) throw requestInsertErr;
+  if (requestInsertErr) {
+    console.error("permit_request_finalize_insert_failed", {
+      contractorId: context.contractorId,
+      accountOwnerUserId,
+      attachmentCount: dedupedUploads.length,
+      error: describeSupabaseError(requestInsertErr),
+    });
+    throw new Error("Permit request could not be created. Please try again.");
+  }
 
   const permitRequestId = String((permitRequestRow as { id?: unknown } | null)?.id ?? "").trim();
   if (!permitRequestId) throw new Error("Permit request could not be created.");
@@ -264,7 +281,13 @@ export async function finalizeContractorPermitRequest(input: {
       },
     });
 
-  if (eventInsertErr) throw eventInsertErr;
+  if (eventInsertErr) {
+    console.error("permit_request_finalize_event_insert_failed", {
+      permitRequestId,
+      error: describeSupabaseError(eventInsertErr),
+    });
+    throw eventInsertErr;
+  }
 
   const attachmentRows = dedupedUploads.map((upload) => ({
     id: upload.attachmentId,
