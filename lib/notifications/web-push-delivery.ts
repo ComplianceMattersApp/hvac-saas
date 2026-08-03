@@ -12,12 +12,15 @@
  * 
  * Scope:
  * - Server-only; never expose to client
- * - Only for recipient-scoped notifications: internal_job_assigned, internal_note_tag
+ * - Only notification types declared in PUSH_NOTIFICATION_DEFINITIONS below.
+ *   Each declares whether it targets one recipient (recipient_ref) or the whole
+ *   internal account, and builds its own deep link.
  * - No offline caching
  * - No SMS/email/Twilio
  * - No sensitive data in payloads (no note text, addresses, customer details)
  */
 
+import { PERMIT_REQUEST_QUEUE_PATH } from "@/lib/permits/permit-request-reference";
 import { createAdminClient } from "@/lib/supabase/server";
 
 type NotificationDeliveryAttemptInput = {
@@ -38,9 +41,9 @@ type WebPushPayload = {
 type PushNotificationContext = {
   notificationId: string;
   accountOwnerUserId: string;
-  recipientUserId: string;
-  notificationType: "internal_job_assigned" | "internal_note_tag";
-  jobId: string;
+  recipientUserIds: string[];
+  notificationType: SupportedPushNotificationType;
+  jobId: string | null;
 };
 
 type PushSubscriptionRow = {
@@ -52,7 +55,49 @@ type PushSubscriptionRow = {
   auth?: string | null;
 };
 
-const SUPPORTED_PUSH_NOTIFICATION_TYPES = ["internal_job_assigned", "internal_note_tag"] as const;
+/**
+ * Push registry. `scope: "recipient"` delivers to the single user in
+ * recipient_ref; `scope: "account"` fans out to the account's active
+ * admin/office users, for arrivals that belong to the whole office rather than
+ * one person. `requiresJob` keeps job-scoped types from firing without a job.
+ *
+ * Titles and bodies must stay free of customer, address, and note detail —
+ * a push renders on a lock screen.
+ */
+type PushNotificationDefinition = {
+  scope: "recipient" | "account";
+  requiresJob: boolean;
+  title: string;
+  body: string;
+  buildUrl: (input: { jobId: string | null }) => string;
+};
+
+const PUSH_NOTIFICATION_DEFINITIONS = {
+  internal_job_assigned: {
+    scope: "recipient",
+    requiresJob: true,
+    title: "You were assigned to a job",
+    body: "Open EveryStep FieldWorks to view details",
+    buildUrl: ({ jobId }) => (jobId ? `/jobs/${jobId}?tab=ops` : "/ops"),
+  },
+  internal_note_tag: {
+    scope: "recipient",
+    requiresJob: true,
+    title: "You were mentioned in an internal note",
+    body: "Open EveryStep FieldWorks to view details",
+    buildUrl: ({ jobId }) => (jobId ? `/jobs/${jobId}?tab=ops#internal-notes` : "/ops"),
+  },
+  permit_request_received: {
+    scope: "account",
+    requiresJob: false,
+    title: "New permit request",
+    body: "A contractor sent a permit request for review",
+    buildUrl: () => PERMIT_REQUEST_QUEUE_PATH,
+  },
+} as const satisfies Record<string, PushNotificationDefinition>;
+
+type SupportedPushNotificationType = keyof typeof PUSH_NOTIFICATION_DEFINITIONS;
+
 const SUPPORTED_INTERNAL_RECIPIENT_TYPES = ["internal", "internal_user"] as const;
 
 function isWebPushEnabled(): boolean {
@@ -63,9 +108,43 @@ function normalizeText(value: unknown): string {
   return String(value ?? "").trim();
 }
 
-function isSupportedPushNotificationType(value: unknown): value is PushNotificationContext["notificationType"] {
-  return SUPPORTED_PUSH_NOTIFICATION_TYPES.includes(
-    normalizeText(value).toLowerCase() as PushNotificationContext["notificationType"],
+function isSupportedPushNotificationType(value: unknown): value is SupportedPushNotificationType {
+  return Object.prototype.hasOwnProperty.call(
+    PUSH_NOTIFICATION_DEFINITIONS,
+    normalizeText(value).toLowerCase(),
+  );
+}
+
+/**
+ * Active admin/office users for an account — the push equivalent of the email
+ * recipient rule in lib/notifications/internal-email-recipients.ts.
+ */
+async function resolveAccountPushRecipientUserIds(params: {
+  admin: any;
+  accountOwnerUserId: string;
+}): Promise<string[]> {
+  const { data, error } = await params.admin
+    .from("internal_users")
+    .select("user_id")
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .eq("is_active", true)
+    .in("role", ["admin", "office"]);
+
+  if (error) {
+    console.warn("[web-push] Failed to resolve account push recipients", {
+      marker: "web_push_account_recipients_resolve_failed",
+      accountOwnerUserId: params.accountOwnerUserId,
+      error: error.message,
+    });
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      (Array.isArray(data) ? data : [])
+        .map((row: any) => normalizeText(row?.user_id))
+        .filter(Boolean),
+    ),
   );
 }
 
@@ -107,23 +186,35 @@ async function resolvePushNotificationContext(params: {
     return null;
   }
 
+  const definition = PUSH_NOTIFICATION_DEFINITIONS[notificationType as SupportedPushNotificationType];
   const recipientType = normalizeText(data?.recipient_type).toLowerCase();
   const recipientUserId = normalizeText(data?.recipient_ref);
   const accountOwnerUserId = normalizeText(data?.account_owner_user_id);
-  const jobId = normalizeText(data?.job_id);
+  const jobId = normalizeText(data?.job_id) || null;
+
+  const recipientUserIds =
+    definition.scope === "account"
+      ? await resolveAccountPushRecipientUserIds({
+          admin: params.admin,
+          accountOwnerUserId,
+        })
+      : recipientUserId
+        ? [recipientUserId]
+        : [];
 
   if (
     !isSupportedInternalRecipientType(recipientType) ||
-    !recipientUserId ||
+    recipientUserIds.length === 0 ||
     !accountOwnerUserId ||
-    !jobId
+    (definition.requiresJob && !jobId)
   ) {
     console.warn("[web-push] Invalid notification context for push", {
       marker: "web_push_notification_context_invalid",
       notificationId,
       notificationType,
       recipientType,
-      hasRecipientRef: Boolean(recipientUserId),
+      scope: definition.scope,
+      recipientCount: recipientUserIds.length,
       hasAccountOwnerUserId: Boolean(accountOwnerUserId),
       hasJobId: Boolean(jobId),
     });
@@ -133,7 +224,7 @@ async function resolvePushNotificationContext(params: {
   return {
     notificationId,
     accountOwnerUserId,
-    recipientUserId,
+    recipientUserIds,
     notificationType,
     jobId,
   };
@@ -191,31 +282,21 @@ function buildSafePayload(params: {
   notificationType: string;
   jobId?: string | null;
 }): WebPushPayload | null {
-  const jobId = String(params.jobId ?? "").trim();
+  const jobId = String(params.jobId ?? "").trim() || null;
   const notificationType = String(params.notificationType ?? "").trim().toLowerCase();
 
-  if (notificationType === "internal_job_assigned") {
-    return {
-      title: "You were assigned to a job",
-      body: "Open EveryStep FieldWorks to view details",
-      data: {
-        url: jobId ? `/jobs/${jobId}?tab=ops` : "/ops",
-      },
-    };
-  }
+  if (!isSupportedPushNotificationType(notificationType)) return null;
 
-  if (notificationType === "internal_note_tag") {
-    return {
-      title: "You were mentioned in an internal note",
-      body: "Open EveryStep FieldWorks to view details",
-      data: {
-        url: jobId ? `/jobs/${jobId}?tab=ops#internal-notes` : "/ops",
-      },
-    };
-  }
+  const definition = PUSH_NOTIFICATION_DEFINITIONS[notificationType];
+  if (definition.requiresJob && !jobId) return null;
 
-  // Unsupported notification type for push
-  return null;
+  return {
+    title: definition.title,
+    body: definition.body,
+    data: {
+      url: definition.buildUrl({ jobId }),
+    },
+  };
 }
 
 /**
@@ -279,6 +360,36 @@ async function sendToSubscription(params: {
       statusCode,
       error: errorMsg,
     };
+  }
+}
+
+/**
+ * Keep the per-device health columns truthful. They exist on
+ * push_subscriptions and are what an operator reads to answer "is push
+ * actually reaching this device?" — nothing was writing them.
+ */
+async function recordSubscriptionDeliveryHealth(params: {
+  supabase: any;
+  subscriptionId: string;
+  sent: boolean;
+  errorCode?: string | null;
+}): Promise<void> {
+  try {
+    const nowIso = new Date().toISOString();
+    const patch = params.sent
+      ? { last_seen_at: nowIso, last_success_at: nowIso }
+      : {
+          last_seen_at: nowIso,
+          last_failure_at: nowIso,
+          last_failure_code: params.errorCode ?? "PROVIDER_SEND_FAILED",
+        };
+
+    await params.supabase.from("push_subscriptions").update(patch).eq("id", params.subscriptionId);
+  } catch (error) {
+    console.warn("[web-push] Failed to record subscription delivery health", {
+      subscriptionId: params.subscriptionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -365,95 +476,104 @@ export async function sendWebPushNotificationForInternalNotification(
 
     if (!payload) return;
 
-    // Fetch active subscriptions for recipient
-    const { data: subscriptions, error: fetchError } = await admin
-      .from("push_subscriptions")
-      .select("id, account_owner_user_id, user_id, endpoint, p256dh, auth")
-      .eq("account_owner_user_id", context.accountOwnerUserId)
-      .eq("user_id", context.recipientUserId)
-      .eq("is_active", true);
+    for (const recipientUserId of context.recipientUserIds) {
+      // Fetch active subscriptions for recipient
+      const { data: subscriptions, error: fetchError } = await admin
+        .from("push_subscriptions")
+        .select("id, account_owner_user_id, user_id, endpoint, p256dh, auth")
+        .eq("account_owner_user_id", context.accountOwnerUserId)
+        .eq("user_id", recipientUserId)
+        .eq("is_active", true);
 
-    if (fetchError) {
-      console.warn("[web-push] Failed to fetch subscriptions", {
-        recipientUserId: context.recipientUserId,
-        error: fetchError.message,
-      });
-
-      await recordDeliveryAttempt({
-        supabase: admin,
-        notificationId: context.notificationId,
-        accountOwnerUserId: context.accountOwnerUserId,
-        recipientUserId: context.recipientUserId,
-        channel: "web_push",
-        status: "skipped",
-        errorCode: "FETCH_SUBSCRIPTIONS_FAILED",
-        errorDetail: fetchError.message,
-      });
-
-      return;
-    }
-
-    console.info("[web-push] active subscriptions fetched", {
-      marker: "web_push_active_subscriptions_fetched",
-      notificationId: context.notificationId,
-      notificationType: context.notificationType,
-      recipientUserId: context.recipientUserId,
-      activeSubscriptionCount: subscriptions?.length ?? 0,
-    });
-
-    if (!subscriptions || subscriptions.length === 0) {
-      // No active subscriptions; this is normal and expected
-      await recordDeliveryAttempt({
-        supabase: admin,
-        notificationId: context.notificationId,
-        accountOwnerUserId: context.accountOwnerUserId,
-        recipientUserId: context.recipientUserId,
-        channel: "web_push",
-        status: "skipped",
-        errorCode: "NO_ACTIVE_SUBSCRIPTIONS",
-      });
-
-      return;
-    }
-
-    // Send to all active subscriptions for this user
-    for (const subscription of subscriptions as PushSubscriptionRow[]) {
-      const result = await sendToSubscription({
-        subscription,
-        payload,
-      });
-
-      console.info("[web-push] provider send completed", {
-        marker: "web_push_provider_send_completed",
-        notificationId: context.notificationId,
-        notificationType: context.notificationType,
-        sent: result.sent,
-        providerStatusCode: result.statusCode ?? null,
-        errorCode: result.error ? "PROVIDER_SEND_FAILED" : null,
-      });
-
-      if (result.statusCode === 410 || result.statusCode === 404) {
-        await markSubscriptionInactiveIfExpired({
-          supabase: admin,
-          subscription,
-          accountOwnerUserId: context.accountOwnerUserId,
-          recipientUserId: context.recipientUserId,
-          statusCode: result.statusCode,
+      if (fetchError) {
+        console.warn("[web-push] Failed to fetch subscriptions", {
+          recipientUserId,
+          error: fetchError.message,
         });
+
+        await recordDeliveryAttempt({
+          supabase: admin,
+          notificationId: context.notificationId,
+          accountOwnerUserId: context.accountOwnerUserId,
+          recipientUserId,
+          channel: "web_push",
+          status: "skipped",
+          errorCode: "FETCH_SUBSCRIPTIONS_FAILED",
+          errorDetail: fetchError.message,
+        });
+
+        continue;
       }
 
-      await recordDeliveryAttempt({
-        supabase: admin,
+      console.info("[web-push] active subscriptions fetched", {
+        marker: "web_push_active_subscriptions_fetched",
         notificationId: context.notificationId,
-        accountOwnerUserId: context.accountOwnerUserId,
-        recipientUserId: context.recipientUserId,
-        pushSubscriptionId: subscription.id,
-        channel: "web_push",
-        status: result.sent ? "sent" : "failed",
-        providerStatusCode: result.statusCode || null,
-        errorCode: result.error ? "PROVIDER_SEND_FAILED" : null,
-        errorDetail: result.error || null,
+        notificationType: context.notificationType,
+        recipientUserId,
+        activeSubscriptionCount: subscriptions?.length ?? 0,
       });
+
+      if (!subscriptions || subscriptions.length === 0) {
+        // No active subscriptions; this is normal and expected
+        await recordDeliveryAttempt({
+          supabase: admin,
+          notificationId: context.notificationId,
+          accountOwnerUserId: context.accountOwnerUserId,
+          recipientUserId,
+          channel: "web_push",
+          status: "skipped",
+          errorCode: "NO_ACTIVE_SUBSCRIPTIONS",
+        });
+
+        continue;
+      }
+
+      // Send to all active subscriptions for this user
+      for (const subscription of subscriptions as PushSubscriptionRow[]) {
+        const result = await sendToSubscription({
+          subscription,
+          payload,
+        });
+
+        console.info("[web-push] provider send completed", {
+          marker: "web_push_provider_send_completed",
+          notificationId: context.notificationId,
+          notificationType: context.notificationType,
+          sent: result.sent,
+          providerStatusCode: result.statusCode ?? null,
+          errorCode: result.error ? "PROVIDER_SEND_FAILED" : null,
+        });
+
+        if (result.statusCode === 410 || result.statusCode === 404) {
+          await markSubscriptionInactiveIfExpired({
+            supabase: admin,
+            subscription,
+            accountOwnerUserId: context.accountOwnerUserId,
+            recipientUserId,
+            statusCode: result.statusCode,
+          });
+        }
+
+        await recordSubscriptionDeliveryHealth({
+          supabase: admin,
+          subscriptionId: subscription.id,
+          sent: result.sent,
+          errorCode: result.error ? "PROVIDER_SEND_FAILED" : null,
+        });
+
+        await recordDeliveryAttempt({
+          supabase: admin,
+          notificationId: context.notificationId,
+          accountOwnerUserId: context.accountOwnerUserId,
+          recipientUserId,
+          pushSubscriptionId: subscription.id,
+          channel: "web_push",
+          status: result.sent ? "sent" : "failed",
+          providerStatusCode: result.statusCode || null,
+          errorCode: result.error ? "PROVIDER_SEND_FAILED" : null,
+          errorDetail: result.error || null,
+        });
+      }
     }
   } catch (error) {
     // Top-level catch: swallow all exceptions; log for debugging

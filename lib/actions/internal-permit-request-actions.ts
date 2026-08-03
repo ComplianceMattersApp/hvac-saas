@@ -11,6 +11,7 @@ import {
   type PermitRequestStatus,
 } from "@/lib/permits/permit-request-contracts";
 import { isPermitRequestSchemaUnavailableError } from "@/lib/permits/permit-requests-read-model";
+import { notifyContractorPermitRequestStatusChange } from "@/lib/permits/permit-request-contractor-notifications";
 import { assertPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
@@ -1195,6 +1196,52 @@ async function requireInternalPermitMutationContext(input: {
   };
 }
 
+function buildPermitRequestSummary(permitRequest: ActivePermitRequestForMutation) {
+  const label = String(permitRequest.request_label ?? "").trim();
+  if (label) return label;
+
+  const customerName = [
+    String(permitRequest.customer_first_name_snapshot ?? "").trim(),
+    String(permitRequest.customer_last_name_snapshot ?? "").trim(),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return customerName || null;
+}
+
+/**
+ * Tell the contractor their request moved. The transition is already committed
+ * when this runs, so a delivery failure is logged, never thrown.
+ */
+async function emitContractorPermitStatusAlert(
+  context: { admin: any; accountOwnerUserId: string; permitRequest: ActivePermitRequestForMutation },
+  input: {
+    status: PermitRequestStatus;
+    postPermitRoute?: PermitPostPermitRoute | null;
+    permitNumber?: string | null;
+  },
+) {
+  try {
+    await notifyContractorPermitRequestStatusChange({
+      admin: context.admin,
+      permitRequestId: context.permitRequest.id,
+      accountOwnerUserId: context.accountOwnerUserId,
+      contractorId: context.permitRequest.contractor_id,
+      status: input.status,
+      postPermitRoute: input.postPermitRoute ?? null,
+      permitNumber: input.permitNumber ?? null,
+      requestSummary: buildPermitRequestSummary(context.permitRequest),
+    });
+  } catch (error) {
+    console.error("permit_request_contractor_status_alert_failed", {
+      permitRequestId: context.permitRequest.id,
+      status: input.status,
+      error: error instanceof Error ? error.message : "Unknown alert error",
+    });
+  }
+}
+
 function buildChangedPermitIntakeFields(
   current: ActivePermitRequestForMutation,
   next: ReturnType<typeof readPermitRequestIntakeInput>,
@@ -1353,6 +1400,8 @@ export async function acceptInternalPermitRequest(
     toStatus: "accepted_in_process",
   });
 
+  await emitContractorPermitStatusAlert(context, { status: "accepted_in_process" });
+
   revalidatePath("/ops");
 
   return {
@@ -1399,6 +1448,10 @@ export async function holdInternalPermitRequest(
     meta: {
       hold_reason: "additional_information_needed",
     },
+  });
+
+  await emitContractorPermitStatusAlert(context, {
+    status: "on_hold_additional_info_needed",
   });
 
   revalidatePath("/ops");
@@ -1449,6 +1502,8 @@ export async function resumeInternalPermitRequest(
     },
   });
 
+  await emitContractorPermitStatusAlert(context, { status: "accepted_in_process" });
+
   revalidatePath("/ops");
 
   return {
@@ -1496,6 +1551,8 @@ export async function markInternalPermitRequestNotNeeded(
       reason: parsed.reason,
     },
   });
+
+  await emitContractorPermitStatusAlert(context, { status: "not_needed" });
 
   revalidatePath("/ops");
 
@@ -1687,6 +1744,12 @@ export async function markInternalPermitCreated(
     note: parsed.internalNote,
   });
 
+  await emitContractorPermitStatusAlert(context, {
+    status: "permit_created",
+    postPermitRoute: parsed.postPermitRoute,
+    permitNumber: parsed.permitNumber,
+  });
+
   revalidatePath("/ops");
   revalidatePath(`/jobs/${linkedJob.id}`);
 
@@ -1826,6 +1889,12 @@ export async function createJobFromPermitRequestAndMarkCreated(
     actorUserId: context.userId,
     permitRequestId: context.permitRequest.id,
     note: parsed.internalNote,
+  });
+
+  await emitContractorPermitStatusAlert(context, {
+    status: "permit_created",
+    postPermitRoute: parsed.postPermitRoute,
+    permitNumber: parsed.permitNumber,
   });
 
   revalidatePath("/ops");

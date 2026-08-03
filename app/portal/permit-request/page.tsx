@@ -147,6 +147,12 @@ export default async function ContractorPermitRequestPage() {
                       {receipt.attachmentCount} {receipt.attachmentCount === 1 ? "file" : "files"}
                     </span>
                   </div>
+                  {receipt.status === "on_hold_additional_info_needed" ? (
+                    <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      Compliance Matters needs more information before they can continue. Please
+                      contact them with the missing details.
+                    </p>
+                  ) : null}
                   {receipt.note ? (
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">
                       {receipt.note}

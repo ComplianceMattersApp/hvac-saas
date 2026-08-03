@@ -4,6 +4,7 @@ import { buildInternalPermitRequestAlertEmailHtml } from "@/lib/email/operationa
 import { resolveAppUrl } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveInternalOpsRecipientEmails } from "@/lib/notifications/internal-email-recipients";
+import { sendWebPushNotificationForInternalNotification } from "@/lib/notifications/web-push-delivery";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import {
   buildPermitRequestReferenceCode,
@@ -264,7 +265,7 @@ export async function notifyInternalPermitRequestReceived(params: {
     note,
   });
 
-  const { error: insertErr } = await params.admin.from("notifications").insert({
+  const { data: inserted, error: insertErr } = await params.admin.from("notifications").insert({
     job_id: null,
     account_owner_user_id: accountOwnerUserId,
     recipient_type: "internal",
@@ -285,13 +286,33 @@ export async function notifyInternalPermitRequestReceived(params: {
       note_preview: content.notePreview,
     },
     status: "queued",
-  });
+  })
+    .select("id")
+    .single();
+
+  const notificationId = String((inserted as { id?: unknown } | null)?.id ?? "").trim();
 
   if (insertErr) {
     console.error("permit_request_alert_in_app_insert_failed", {
       permitRequestId,
       error: insertErr instanceof Error ? insertErr.message : String(insertErr),
     });
+  }
+
+  // Push rides on the in-app row: same account scope, same deep link, and it
+  // no-ops unless ENABLE_WEB_PUSH is on and a device is enrolled.
+  if (notificationId) {
+    try {
+      await sendWebPushNotificationForInternalNotification({
+        supabase: params.admin,
+        notificationId,
+        accountOwnerUserId,
+        recipientUserId: "",
+        notificationType: PERMIT_REQUEST_RECEIVED_NOTIFICATION_TYPE,
+      });
+    } catch {
+      // The push helper swallows its own failures; this guards the unexpected.
+    }
   }
 
   // Email is a separate best-effort channel: a Resend outage must not discard
