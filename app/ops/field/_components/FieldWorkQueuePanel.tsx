@@ -80,7 +80,7 @@ export default function FieldWorkQueuePanel({ sections, internalBusinessDisplayN
           <p className="text-sm leading-6 text-slate-600">{activeSection.subtitle}</p>
 
           {activeSection.jobs.length > 0 ? (
-            <div className="overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+            <div className="space-y-3">
               {activeSection.jobs.map((job) => (
                 <FieldWorkCard
                   key={job.id}

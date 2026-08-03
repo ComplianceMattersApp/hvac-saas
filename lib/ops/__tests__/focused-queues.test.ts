@@ -666,18 +666,31 @@ describe("focused ops queue pages", () => {
     expect(fieldQueueLibSource).toContain("sortByCompletionNewest");
   });
 
-  it("field My Work uses the approved continuous work-row presentation", () => {
+  it("field My Work presents each job as a visually discrete card", () => {
+    // Supersedes the continuous work-sheet treatment: rows stacked on one white
+    // sheet with a slate band read as run-on, because the band was lighter than
+    // the hairlines inside each card. Card edge must now outrank both.
     expect(fieldWorkCardSource).toContain("data-my-work-row={sectionKey}");
     expect(fieldWorkCardSource).toContain(
-      "border-b-8 border-slate-100 bg-white",
+      "rounded-2xl border border-slate-300 bg-white shadow-",
     );
+    expect(fieldWorkCardSource).toContain("grid-cols-[4px_minmax(0,1fr)]");
+    expect(fieldWorkCardSource).toContain("border-t border-slate-300 bg-slate-100");
     expect(fieldWorkCardSource).not.toContain("border border-l-4");
-    expect(fieldWorkPanelSource).toContain(
+    expect(fieldWorkCardSource).not.toContain("border-b-8 border-slate-100 bg-white");
+
+    // Cards are gapped, not stacked inside a shared sheet.
+    expect(fieldWorkPanelSource).toContain('<div className="space-y-3">');
+    expect(fieldWorkPanelSource).not.toContain(
       "overflow-hidden rounded-[18px] border border-slate-200 bg-white",
     );
+
+    // The loading skeleton mirrors the card structure it stands in for.
     expect(fieldWorkLoadingSource).toContain(
-      "border-b-8 border-slate-100 bg-white",
+      "rounded-2xl border border-slate-300 bg-white shadow-",
     );
+    expect(fieldWorkLoadingSource).not.toContain("border-b-8 border-slate-100 bg-white");
+
     expect(fieldWorkCardSource).toContain("Open Job");
     expect(fieldWorkCardSource).toContain("Call");
     expect(fieldWorkCardSource).toContain("Text");

@@ -223,15 +223,24 @@ than a mobile-only visual decision.
   fifth view containing only assigned jobs whose authoritative
   `field_complete_at` timestamp falls on the current Los Angeles business day;
   it is ordered newest completion first.
-- Jobs render inside one continuous white work sheet with neutral separators,
-  rather than reviving individual rounded cards, colored left rails, or status
-  pills.
+- Jobs render as individually bounded, gapped cards matching the standard queue
+  row treatment above: `slate-300` border, `rounded-2xl` shell, drop shadow, a
+  section-toned left spine, and a tinted action footer holding Open Job, Call,
+  Text, and Navigate.
+- Superseded: jobs previously rendered inside one continuous white work sheet
+  with neutral separators. That treatment failed for the same reason the queue
+  band did — the separator between jobs was lighter than the hairlines inside a
+  job, so cards ran together and each job's actions appeared to belong to the
+  next one. Status pills remain retired.
+- The spine reuses `sectionVisualTone(...).dot`, so a card's spine color matches
+  its section tab (Active blue, Today amber, Overdue rose, Upcoming indigo,
+  Completed emerald).
 - Scheduled date/window, contractor, address, current section/status, and the
   existing Open Job, Call, Text, and Navigate destinations remain visible.
 - Completed jobs are excluded from every active-work group, and completed
   history from prior business days is excluded from the page.
-- The My Work loading skeleton mirrors the continuous row structure so loading
-  does not introduce the retired card treatment.
+- The My Work loading skeleton mirrors the discrete-card structure so loading
+  does not imply a different presentation than the loaded page.
 
 ## Post-mobile desktop revision
 

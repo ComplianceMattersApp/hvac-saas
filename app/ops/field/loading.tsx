@@ -34,31 +34,38 @@ export default function OpsFieldLoading() {
             <div className="h-6 w-8 animate-pulse rounded-full bg-slate-100" />
           </div>
 
-          <div className="overflow-hidden rounded-[18px] border border-slate-200 bg-white">
+          {/* Mirrors the discrete-card structure of FieldWorkCard: spine,
+              padded body, tinted action footer. */}
+          <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, cardIndex) => (
               <div
                 key={cardIndex}
-                className="border-b-8 border-slate-100 bg-white p-4 last:border-b-0"
+                className="grid grid-cols-[4px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_22px_-18px_rgba(15,23,42,0.45)]"
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="h-4 w-48 animate-pulse rounded bg-slate-200" />
-                    <div className="space-y-1">
-                      <div className="h-3 w-36 animate-pulse rounded bg-slate-100" />
-                      <div className="h-3 w-52 animate-pulse rounded bg-slate-100" />
-                      <div className="h-3 w-40 animate-pulse rounded bg-slate-100" />
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="h-6 w-28 animate-pulse rounded-full bg-slate-100" />
-                      <div className="h-6 w-20 animate-pulse rounded-full bg-slate-100" />
+                <div className="bg-slate-300" aria-hidden="true" />
+                <div className="min-w-0">
+                  <div className="p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="h-4 w-48 animate-pulse rounded bg-slate-200" />
+                        <div className="space-y-1">
+                          <div className="h-3 w-36 animate-pulse rounded bg-slate-100" />
+                          <div className="h-3 w-52 animate-pulse rounded bg-slate-100" />
+                          <div className="h-3 w-40 animate-pulse rounded bg-slate-100" />
+                        </div>
+                        <div className="flex gap-2">
+                          <div className="h-6 w-28 animate-pulse rounded-full bg-slate-100" />
+                          <div className="h-6 w-20 animate-pulse rounded-full bg-slate-100" />
+                        </div>
+                      </div>
+                      <div className="h-6 w-20 shrink-0 animate-pulse rounded-full bg-slate-100" />
                     </div>
                   </div>
-                  <div className="h-6 w-20 shrink-0 animate-pulse rounded-full bg-slate-100" />
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:flex">
-                  {Array.from({ length: 3 }).map((_, btnIndex) => (
-                    <div key={btnIndex} className="h-10 animate-pulse rounded-lg bg-slate-100 sm:w-24" />
-                  ))}
+                  <div className="grid grid-cols-2 gap-2 border-t border-slate-300 bg-slate-100 px-4 py-3 sm:flex">
+                    {Array.from({ length: 3 }).map((_, btnIndex) => (
+                      <div key={btnIndex} className="h-10 animate-pulse rounded-lg bg-slate-200 sm:w-24" />
+                    ))}
+                  </div>
                 </div>
               </div>
             ))}

@@ -178,80 +178,88 @@ export function FieldWorkCard({ job, internalBusinessDisplayName, sectionKey, se
   const highlight = cardHighlight(sectionKey, job, todayLA, windowLabel);
   const stateChipLabel = sectionKey === "in_progress" ? formatStatus(job?.status) : sectionTitle;
 
+  // Discrete card: the section-toned spine marks where the card starts and the
+  // tinted action footer marks where it ends, so the card boundary always reads
+  // stronger than the hairlines inside it. Matches the ops queue card language.
   return (
     <article
       key={job.id}
       data-my-work-row={sectionKey}
-      className="border-b-8 border-slate-100 bg-white px-4 py-4 last:border-b-0 sm:px-5"
+      className="grid grid-cols-[4px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_22px_-18px_rgba(15,23,42,0.45)]"
     >
-      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Link
-              href={`/jobs/${job.id}?tab=ops`}
-              className="text-base font-semibold tracking-tight text-slate-950 hover:text-blue-700 hover:underline"
-            >
-              {normalizeRetestLinkedJobTitle(job?.title) || "Untitled Job"}
-            </Link>
-            <span className={`font-mono text-[11px] font-semibold uppercase tracking-[0.08em] ${sectionTone.text}`}>
-              {stateChipLabel}
-            </span>
-          </div>
-          <div className="text-sm font-medium text-slate-900">{customerName(job)}</div>
-          <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Scheduled</div>
-              <div className="mt-0.5 text-[13px] text-slate-800">
-                {scheduleLabel}
-                {windowLabel ? ` · ${windowLabel}` : ""}
+      <div className={sectionTone.dot} aria-hidden="true" />
+      <div className="min-w-0">
+        <div className="px-4 py-4 sm:px-5">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Link
+                  href={`/jobs/${job.id}?tab=ops`}
+                  className="text-base font-semibold tracking-tight text-slate-950 hover:text-blue-700 hover:underline"
+                >
+                  {normalizeRetestLinkedJobTitle(job?.title) || "Untitled Job"}
+                </Link>
+                <span className={`font-mono text-[11px] font-semibold uppercase tracking-[0.08em] ${sectionTone.text}`}>
+                  {stateChipLabel}
+                </span>
+              </div>
+              <div className="text-sm font-medium text-slate-900">{customerName(job)}</div>
+              <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Scheduled</div>
+                  <div className="mt-0.5 text-[13px] text-slate-800">
+                    {scheduleLabel}
+                    {windowLabel ? ` · ${windowLabel}` : ""}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Contractor</div>
+                  <div className="mt-0.5 text-[13px] text-slate-800">{contractorName(job, internalBusinessDisplayName)}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Address</div>
+                  <div className="mt-0.5 text-[13px] text-slate-800">{jobAddressLine(job)}</div>
+                </div>
               </div>
             </div>
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Contractor</div>
-              <div className="mt-0.5 text-[13px] text-slate-800">{contractorName(job, internalBusinessDisplayName)}</div>
-            </div>
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Address</div>
-              <div className="mt-0.5 text-[13px] text-slate-800">{jobAddressLine(job)}</div>
-            </div>
+            <div className={`shrink-0 text-sm font-semibold ${highlight.className}`}>{highlight.text}</div>
           </div>
         </div>
-        <div className={`shrink-0 text-sm font-semibold ${highlight.className}`}>{highlight.text}</div>
-      </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 sm:flex sm:flex-wrap">
-        <Link
-          href={`/jobs/${job.id}?tab=ops`}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 sm:min-h-10"
-        >
-          Open Job
-        </Link>
-        {telHref(phone) ? (
-          <a
-            href={telHref(phone)}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-10"
+        <div className="grid grid-cols-2 gap-2 border-t border-slate-300 bg-slate-100 px-4 py-3 sm:flex sm:flex-wrap sm:px-5">
+          <Link
+            href={`/jobs/${job.id}?tab=ops`}
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 sm:min-h-10"
           >
-            Call
-          </a>
-        ) : null}
-        {smsHref(phone) ? (
-          <a
-            href={smsHref(phone)}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-10"
-          >
-            Text
-          </a>
-        ) : null}
-        {navigateHref ? (
-          <a
-            href={navigateHref}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-10"
-          >
-            Navigate
-          </a>
-        ) : null}
+            Open Job
+          </Link>
+          {telHref(phone) ? (
+            <a
+              href={telHref(phone)}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-10"
+            >
+              Call
+            </a>
+          ) : null}
+          {smsHref(phone) ? (
+            <a
+              href={smsHref(phone)}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-10"
+            >
+              Text
+            </a>
+          ) : null}
+          {navigateHref ? (
+            <a
+              href={navigateHref}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 sm:min-h-10"
+            >
+              Navigate
+            </a>
+          ) : null}
+        </div>
       </div>
     </article>
   );
