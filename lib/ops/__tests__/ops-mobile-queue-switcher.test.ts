@@ -74,12 +74,27 @@ describe("Ops mobile queue switcher", () => {
   it("raises mobile card readability and touch targets without replacing card data", () => {
     expect(rowCardSource).toContain('className="xl:hidden">{richCard}</div>');
     expect(rowCardSource).toContain("data-ops-mobile-row={view.kind}");
-    expect(rowCardSource).toContain("border-b-8 border-slate-100 bg-white");
     expect(rowCardSource).toContain("compactContactActionClass");
     expect(rowCardSource).toContain("min-h-11 min-w-14");
     expect(rowCardSource).toContain("xl:min-h-8");
     expect(rowCardSource).toContain('{ label: "Last Attempt", value: view.recentAttemptText, fullWidth: true }');
     expect(rowCardSource).toContain("const reason = ledgerReason(view)");
+  });
+
+  it("renders each mobile queue row as a visually discrete card", () => {
+    // Card edge must read stronger than any hairline inside it, and the list
+    // must gap the cards instead of stacking them on one shared white sheet.
+    expect(rowCardSource).toContain("rounded-2xl border border-slate-300 bg-white shadow-");
+    expect(rowCardSource).toContain("grid-cols-[4px_minmax(0,1fr)]");
+    expect(rowCardSource).toContain("border-t border-slate-300 bg-slate-100 px-4 py-3");
+    expect(rowCardSource).not.toContain("border-b-8 border-slate-100 bg-white");
+
+    expect(panelSource).toContain('className="space-y-3 xl:space-y-0"');
+    expect(panelSource).toContain(
+      'className="xl:overflow-hidden xl:rounded-xl xl:border xl:border-slate-200 xl:bg-white"',
+    );
+    // The shared sheet stays desktop-only; unprefixed it would merge the cards.
+    expect(panelSource).not.toContain('className="overflow-hidden rounded-[18px] border border-slate-200 bg-white');
   });
 
   it("renders the complete mobile card identity and attempt projection for every standard card kind", () => {

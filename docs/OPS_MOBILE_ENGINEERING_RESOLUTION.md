@@ -147,10 +147,20 @@ than a mobile-only visual decision.
 
 ## Final standard queue row treatment
 
-- Below `xl`, standard queue work is presented as one white queue container
-  with flat rows separated by a neutral slate band. The band gives every job a
-  clear visual ending without reviving individual rounded card shells, colored
-  left spines, floating age pills, or nested phone cards.
+- Below `xl`, standard queue work is presented as individually bounded cards on
+  the page background: each card has its own `slate-300` border, `rounded-2xl`
+  shell, drop shadow, and a gap to its neighbors.
+- Superseded: the earlier treatment stacked flat rows inside one white queue
+  container, separated only by a neutral slate band. In production the band did
+  not read as a boundary — the band was lighter than the card's own internal
+  hairlines, so cards ran into each other and the primary action of one card
+  appeared to belong to the next. Card separation must therefore be the
+  strongest rule on the surface, ranked: gap > card border > internal hairline.
+- Each card opens with an age-toned left spine (the desktop ledger's aging
+  colors) and ends with a tinted action footer holding Open Job / Call / Text.
+  The spine marks where a card starts and the footer marks where it ends.
+- Still rejected from the original concept: floating age pills and nested phone
+  cards.
 - Job type and age remain the row's compact orientation line. Existing aging
   thresholds are preserved through text color rather than a badge.
 - Customer, address, and the canonical formatted Reason remain visible before

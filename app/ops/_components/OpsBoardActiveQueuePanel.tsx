@@ -323,7 +323,10 @@ export default function OpsBoardActiveQueuePanel({
             ) : null}
 
             {visibleRows.length ? (
-              <div className="overflow-hidden rounded-[18px] border border-slate-200 bg-white xl:rounded-xl">
+              // The shared white sheet is desktop-only. Mobile renders discrete
+              // gapped cards, and an unprefixed sheet would merge them back
+              // into one continuous surface.
+              <div className="xl:overflow-hidden xl:rounded-xl xl:border xl:border-slate-200 xl:bg-white">
                 <div className="hidden grid-cols-[3px_minmax(190px,1fr)_140px_62px_130px_130px_110px] border-b border-slate-200 bg-slate-50 font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-600 xl:grid 2xl:grid-cols-[3px_minmax(220px,1fr)_168px_72px_158px_158px_132px]">
                   <div />
                   <div className="px-4 py-2.5">Customer / Job</div>
@@ -333,7 +336,7 @@ export default function OpsBoardActiveQueuePanel({
                   <div className="border-l border-slate-200 px-3 py-2.5">Last Attempt</div>
                   <div className="border-l border-slate-200 px-3 py-2.5 text-center">Actions</div>
                 </div>
-                <div className="xl:space-y-0">
+                <div className="space-y-3 xl:space-y-0">
                   {visibleRows.map((row) => (
                     <OpsQueueRowCard key={row.id} view={row.view} />
                   ))}

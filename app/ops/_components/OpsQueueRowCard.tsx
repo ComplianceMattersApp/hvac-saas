@@ -346,69 +346,79 @@ function MobileOpsCard({
   children?: React.ReactNode;
 }) {
   const reason = ledgerReason(view);
+  const ageTone = ledgerAgeTone(view.ageDays);
   const stateChips =
     view.kind === "follow_ups"
       ? [{ label: view.urgencyLabel, tone: view.urgencyTone }]
       : view.stateChips;
 
+  // Each mobile row is a discrete card: an age-toned spine marks where it
+  // starts, a tinted action footer marks where it ends, and the card border
+  // reads stronger than any hairline inside it. Cards are gapped by the list
+  // container, so one card can never bleed into the next.
   return (
     <article
       id={"cardDomId" in view ? view.cardDomId : undefined}
       data-ops-mobile-row={view.kind}
-      className="border-b-8 border-slate-100 bg-white px-4 py-4 last:border-b-0"
+      className="grid grid-cols-[4px_minmax(0,1fr)] overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.06),0_12px_22px_-18px_rgba(15,23,42,0.45)]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-            {view.jobTypeLabel}
-            {view.title ? <span className="text-slate-400"> · {view.title}</span> : null}
-          </div>
-          {stateChips.length ? (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {stateChips.map((chip, index) => (
-                <span
-                  key={`${chip.label}-${index}`}
-                  className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.03em] ${LEDGER_CHIP_TONE_CLASS[chip.tone]}`}
-                >
-                  {chip.label}
-                </span>
-              ))}
+      <div className={ageTone.rail} aria-hidden="true" />
+      <div className="min-w-0">
+        <div className="px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                {view.jobTypeLabel}
+                {view.title ? <span className="text-slate-400"> · {view.title}</span> : null}
+              </div>
+              {stateChips.length ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {stateChips.map((chip, index) => (
+                    <span
+                      key={`${chip.label}-${index}`}
+                      className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.03em] ${LEDGER_CHIP_TONE_CLASS[chip.tone]}`}
+                    >
+                      {chip.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-        <div className={`shrink-0 font-mono text-[13px] font-semibold tabular-nums ${mobileAgeClass(view.ageDays)}`}>
-          {view.ageDays == null ? view.ageLabel : `${view.ageDays}d`}
-        </div>
-      </div>
-
-      <Link href={view.href} className="mt-2 flex min-h-11 items-center text-base font-semibold leading-5 text-navy hover:text-blue-700 hover:underline">
-        {view.customerName}
-      </Link>
-      <div className="text-[13px] leading-5 text-slate-500">{view.address}</div>
-      <div className="mt-1 text-[13px] leading-5 text-slate-700">
-        <span className="mr-1 text-slate-500">Reason</span>
-        {reason.label}
-        {reason.detail ? <span className="text-slate-600"> · {reason.detail}</span> : null}
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-slate-200 pt-3 text-[13px] leading-5">
-        {fields.map((field, index) => (
-          <div key={`${field.label}-${index}`} className={field.fullWidth ? "col-span-2" : "min-w-0"}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">{field.label}</div>
-            <div className="mt-0.5 font-medium text-slate-900">{field.value}</div>
-            {field.detail ? <div className="text-[12.5px] text-slate-500">{field.detail}</div> : null}
+            <div className={`shrink-0 font-mono text-[13px] font-semibold tabular-nums ${mobileAgeClass(view.ageDays)}`}>
+              {view.ageDays == null ? view.ageLabel : `${view.ageDays}d`}
+            </div>
           </div>
-        ))}
-      </div>
 
-      {children}
+          <Link href={view.href} className="mt-2 flex min-h-11 items-center text-base font-semibold leading-5 text-navy hover:text-blue-700 hover:underline">
+            {view.customerName}
+          </Link>
+          <div className="text-[13px] leading-5 text-slate-500">{view.address}</div>
+          <div className="mt-1 text-[13px] leading-5 text-slate-700">
+            <span className="mr-1 text-slate-500">Reason</span>
+            {reason.label}
+            {reason.detail ? <span className="text-slate-600"> · {reason.detail}</span> : null}
+          </div>
 
-      <div className={`mt-3 grid gap-2 border-t border-slate-200 pt-3 ${phoneHref || textHref ? "grid-cols-[minmax(0,1fr)_78px_78px]" : "grid-cols-1"}`}>
-        <Link href={view.href} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
-          {actionLabel}
-        </Link>
-        {phoneHref ? <a href={phoneHref} className={compactContactActionClass}>Call</a> : null}
-        {textHref ? <a href={textHref} className={compactContactActionClass}>Text</a> : null}
+          <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-slate-200 pt-3 text-[13px] leading-5">
+            {fields.map((field, index) => (
+              <div key={`${field.label}-${index}`} className={field.fullWidth ? "col-span-2" : "min-w-0"}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">{field.label}</div>
+                <div className="mt-0.5 font-medium text-slate-900">{field.value}</div>
+                {field.detail ? <div className="text-[12.5px] text-slate-500">{field.detail}</div> : null}
+              </div>
+            ))}
+          </div>
+
+          {children}
+        </div>
+
+        <div className={`grid gap-2 border-t border-slate-300 bg-slate-100 px-4 py-3 ${phoneHref || textHref ? "grid-cols-[minmax(0,1fr)_78px_78px]" : "grid-cols-1"}`}>
+          <Link href={view.href} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
+            {actionLabel}
+          </Link>
+          {phoneHref ? <a href={phoneHref} className={compactContactActionClass}>Call</a> : null}
+          {textHref ? <a href={textHref} className={compactContactActionClass}>Text</a> : null}
+        </div>
       </div>
     </article>
   );
