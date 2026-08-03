@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, UserRound } from "lucide-react";
+import { FileText, Search, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { InvoiceSuggestion } from "@/lib/invoices/invoice-suggestions";
 
 type CustomerSuggestion = {
   customer_id: string;
@@ -14,6 +15,34 @@ type CustomerSuggestion = {
   sample_address: string | null;
   sample_city: string | null;
 };
+
+const INVOICE_STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  issued: "Issued",
+  void: "Void",
+};
+
+function invoiceStatusLabel(status: string) {
+  return INVOICE_STATUS_LABELS[status] ?? "Invoice";
+}
+
+function formatCentsUsd(cents: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format((Number(cents) || 0) / 100);
+}
+
+function invoiceSecondaryLine(invoice: InvoiceSuggestion) {
+  return [
+    invoice.bill_to_display,
+    invoice.job_reference,
+    `${invoiceStatusLabel(invoice.status)} · ${formatCentsUsd(invoice.total_cents)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 type Props = {
   compact?: boolean;
@@ -33,6 +62,7 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
 
@@ -43,11 +73,13 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
     setFocused(false);
     setQuery("");
     setSuggestions([]);
+    setInvoices([]);
   }, [pathname]);
 
   useEffect(() => {
     if (!showPanel) {
       setSuggestions([]);
+      setInvoices([]);
       setLoading(false);
       return;
     }
@@ -61,12 +93,20 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
         });
         if (!response.ok) {
           setSuggestions([]);
+          setInvoices([]);
           return;
         }
-        const payload = (await response.json()) as { suggestions?: CustomerSuggestion[] };
+        const payload = (await response.json()) as {
+          suggestions?: CustomerSuggestion[];
+          invoices?: InvoiceSuggestion[];
+        };
         setSuggestions(Array.isArray(payload.suggestions) ? payload.suggestions : []);
+        setInvoices(Array.isArray(payload.invoices) ? payload.invoices : []);
       } catch (error) {
-        if (!controller.signal.aborted) setSuggestions([]);
+        if (!controller.signal.aborted) {
+          setSuggestions([]);
+          setInvoices([]);
+        }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -102,9 +142,11 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
     };
   }, [focused]);
 
+  const hasResults = suggestions.length > 0 || invoices.length > 0;
+
   const emptyLabel = useMemo(() => {
     if (loading) return "Searching...";
-    return trimmedQuery.length >= 2 ? "No customers found" : "Search customers";
+    return trimmedQuery.length >= 2 ? "No customers or invoices found" : "Search customers or invoice #";
   }, [loading, trimmedQuery.length]);
 
   function handleNavigate() {
@@ -115,7 +157,7 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
   return (
     <div ref={rootRef} className={["relative", compact ? "w-full" : "w-full max-w-sm xl:max-w-md"].join(" ")}>
       <label className="sr-only" htmlFor={compact ? "mobile-customer-search" : "header-customer-search"}>
-        Search customers
+        Search customers or invoice number
       </label>
       <div className="relative">
         <Search
@@ -127,7 +169,7 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onFocus={() => setFocused(true)}
-          placeholder="Search customers"
+          placeholder="Search customers or invoice #"
           autoComplete="off"
           className={[
             "h-9 w-full rounded-lg border border-slate-200 bg-slate-50/80 pl-9 pr-3 text-sm font-medium text-slate-950 outline-none transition-colors placeholder:text-slate-400",
@@ -143,26 +185,65 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
             compact ? "left-0 right-0" : "left-0 right-0",
           ].join(" ")}
         >
-          {suggestions.length > 0 ? (
+          {hasResults ? (
             <div className="max-h-80 overflow-y-auto p-1">
-              {suggestions.map((suggestion) => (
-                <Link
-                  key={suggestion.customer_id}
-                  href={`/customers/${suggestion.customer_id}`}
-                  onClick={handleNavigate}
-                  className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
-                >
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
-                    <UserRound className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-slate-950">
-                      {suggestion.full_name || "Unnamed customer"}
-                    </span>
-                    <span className="block truncate text-xs text-slate-500">{secondaryLine(suggestion)}</span>
-                  </span>
-                </Link>
-              ))}
+              {invoices.length > 0 ? (
+                <>
+                  <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                    Invoices
+                  </div>
+                  {invoices.map((invoice) =>
+                    invoice.href ? (
+                      <Link
+                        key={invoice.invoice_id}
+                        href={invoice.href}
+                        onClick={handleNavigate}
+                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                      >
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
+                          <FileText className="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-950">
+                            {invoice.invoice_reference}
+                          </span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {invoiceSecondaryLine(invoice)}
+                          </span>
+                        </span>
+                      </Link>
+                    ) : null,
+                  )}
+                </>
+              ) : null}
+
+              {suggestions.length > 0 ? (
+                <>
+                  {invoices.length > 0 ? (
+                    <div className="mt-1 border-t border-slate-100 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+                      Customers
+                    </div>
+                  ) : null}
+                  {suggestions.map((suggestion) => (
+                    <Link
+                      key={suggestion.customer_id}
+                      href={`/customers/${suggestion.customer_id}`}
+                      onClick={handleNavigate}
+                      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                    >
+                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
+                        <UserRound className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-slate-950">
+                          {suggestion.full_name || "Unnamed customer"}
+                        </span>
+                        <span className="block truncate text-xs text-slate-500">{secondaryLine(suggestion)}</span>
+                      </span>
+                    </Link>
+                  ))}
+                </>
+              ) : null}
             </div>
           ) : (
             <div className="px-3 py-3 text-sm font-medium text-slate-500">{emptyLabel}</div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { searchScopedCustomerSuggestions } from "@/lib/customers/visibility";
+import { searchScopedInvoiceSuggestions } from "@/lib/invoices/invoice-suggestions";
 
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -14,15 +15,25 @@ export async function GET(request: Request) {
   const q = String(searchParams.get("q") ?? "").trim();
 
   if (q.length < 2) {
-    return NextResponse.json({ suggestions: [] });
+    return NextResponse.json({ suggestions: [], invoices: [] });
   }
 
-  const scoped = await searchScopedCustomerSuggestions({
-    supabase,
-    userId: userData.user.id,
-    searchText: q,
-    resultLimit: 6,
-  });
+  const [scoped, invoices] = await Promise.all([
+    searchScopedCustomerSuggestions({
+      supabase,
+      userId: userData.user.id,
+      searchText: q,
+      resultLimit: 6,
+    }),
+    // Invoice lookup is additive to the customer typeahead: a failure there must
+    // never take down the search box people use all day to find customers.
+    searchScopedInvoiceSuggestions({
+      supabase,
+      userId: userData.user.id,
+      searchText: q,
+      resultLimit: 5,
+    }).catch(() => ({ results: [] })),
+  ]);
 
-  return NextResponse.json({ suggestions: scoped.results });
+  return NextResponse.json({ suggestions: scoped.results, invoices: invoices.results });
 }
