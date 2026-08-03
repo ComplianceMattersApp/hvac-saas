@@ -4,6 +4,7 @@ import type { NotificationRowForUI, ProposalEnrichment, JobEnrichment } from "@/
 import {
   isContractorUpdateNotificationType,
 } from "@/lib/notifications/internal-awareness";
+import { PERMIT_REQUEST_QUEUE_PATH } from "@/lib/permits/permit-request-reference";
 import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
@@ -145,6 +146,7 @@ function notificationTypeLabel(value?: string | null) {
     workshare_request_failed: "Workshare Failed",
     workshare_retest_requested: "Workshare Retest",
     workshare_request_note: "Workshare Note",
+    permit_request_received: "Permit Request",
   };
   return labels[key] ?? "Notification";
 }
@@ -450,6 +452,10 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
     || type === "workshare_request_passed"
     || type === "workshare_request_failed"
     || type === "workshare_request_note";
+  const permitRequestLink =
+    type === "permit_request_received"
+      ? { href: PERMIT_REQUEST_QUEUE_PATH, label: "Open permit queue" }
+      : null;
   const workshareLink =
     type === "workshare_request_received"
       ? { href: "/ops/workshare/incoming", label: "View request" }
@@ -516,7 +522,15 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
               {workshareLink.label}
             </Link>
           ) : null}
-          {!estimateHref && !workshareLink && jobId ? (
+          {permitRequestLink ? (
+            <Link
+              href={permitRequestLink.href}
+              className="inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              {permitRequestLink.label}
+            </Link>
+          ) : null}
+          {!estimateHref && !workshareLink && !permitRequestLink && jobId ? (
             <Link
               href={`/jobs/${jobId}`}
               className="inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"

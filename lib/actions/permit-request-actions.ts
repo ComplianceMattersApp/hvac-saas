@@ -12,6 +12,7 @@ import {
   assertPermitWorkflowEnabledForAccountOwner,
   isPermitWorkflowEnabledForAccountOwner,
 } from "@/lib/permits/permit-workflow-gate";
+import { notifyInternalPermitRequestReceived } from "@/lib/permits/permit-request-notifications";
 
 export type ContractorPermitRequestUploadDraft = {
   attachmentId: string;
@@ -59,6 +60,37 @@ function describeSupabaseError(error: unknown) {
     message: String(candidate?.message ?? "").trim() || null,
     details: String(candidate?.details ?? "").trim() || null,
   };
+}
+
+/**
+ * Alert internal ops that a permit request arrived. Best-effort by contract:
+ * the request is already saved, so an alert failure is logged, never thrown.
+ */
+async function emitPermitRequestReceivedAlerts(input: {
+  admin: any;
+  permitRequestId: string;
+  accountOwnerUserId: string;
+  contractorId: string;
+  submittedByUserId: string;
+  attachmentCount: number;
+  note?: string | null;
+}) {
+  try {
+    await notifyInternalPermitRequestReceived({
+      admin: input.admin,
+      permitRequestId: input.permitRequestId,
+      accountOwnerUserId: input.accountOwnerUserId,
+      contractorId: input.contractorId,
+      submittedByUserId: input.submittedByUserId,
+      attachmentCount: input.attachmentCount,
+      note: sanitizeContractorPermitRequestNote(input.note),
+    });
+  } catch (error) {
+    console.error("permit_request_received_alert_failed", {
+      permitRequestId: input.permitRequestId,
+      error: error instanceof Error ? error.message : "Unknown alert error",
+    });
+  }
 }
 
 function sanitizeContractorPermitRequestNote(value: unknown) {
@@ -319,8 +351,30 @@ export async function finalizeContractorPermitRequest(input: {
       error: error instanceof Error ? error.message : "Unknown attachment insert error",
     });
 
+    // The request row exists and is queued for review, so ops still needs the
+    // alert — with an honest zero file count.
+    await emitPermitRequestReceivedAlerts({
+      admin,
+      permitRequestId,
+      accountOwnerUserId,
+      contractorId: context.contractorId,
+      submittedByUserId: context.userId,
+      attachmentCount: 0,
+      note: input.note,
+    });
+
     throw new Error("Permit request submitted, but files could not be attached. Compliance Matters will review it.");
   }
+
+  await emitPermitRequestReceivedAlerts({
+    admin,
+    permitRequestId,
+    accountOwnerUserId,
+    contractorId: context.contractorId,
+    submittedByUserId: context.userId,
+    attachmentCount: dedupedUploads.length,
+    note: input.note,
+  });
 
   revalidatePath("/portal");
   revalidatePath("/portal/permit-request");

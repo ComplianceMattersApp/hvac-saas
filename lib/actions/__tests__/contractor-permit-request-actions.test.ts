@@ -14,6 +14,13 @@ vi.mock("@/lib/supabase/server", () => ({
   createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
 }));
 
+const notifyInternalPermitRequestReceivedMock = vi.fn(async () => {});
+
+vi.mock("@/lib/permits/permit-request-notifications", () => ({
+  notifyInternalPermitRequestReceived: (...args: unknown[]) =>
+    notifyInternalPermitRequestReceivedMock(...(args as [])),
+}));
+
 type FixtureOptions = {
   schemaUnavailable?: boolean;
   attachmentInsertError?: Error | null;
@@ -319,6 +326,50 @@ describe("contractor permit request actions", () => {
     ]);
     expect(fixture.calls.jobMutations).toBe(0);
     expect(fixture.calls.jobEventMutations).toBe(0);
+
+    // A saved request the office never hears about is the same as a lost one.
+    expect(notifyInternalPermitRequestReceivedMock).toHaveBeenCalledTimes(1);
+    expect(notifyInternalPermitRequestReceivedMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permitRequestId: "permit-1",
+        accountOwnerUserId: "owner-1",
+        contractorId: "ctr-1",
+        submittedByUserId: "contractor-user-1",
+        attachmentCount: 1,
+        note: "Customer signed the contract.",
+      }),
+    );
+  });
+
+  it("still alerts ops when attachments fail, reporting zero files", async () => {
+    const fixture = buildFixture({
+      attachmentInsertError: new Error("attachment insert failed"),
+    });
+    createClientMock.mockResolvedValue(fixture.baseClient);
+    createAdminClientMock.mockReturnValue(fixture.adminClient);
+
+    const { finalizeContractorPermitRequest } = await import("@/lib/actions/permit-request-actions");
+
+    await expect(
+      finalizeContractorPermitRequest({ uploads: [uploadDraft], note: null }),
+    ).rejects.toThrow("Permit request submitted, but files could not be attached.");
+
+    expect(notifyInternalPermitRequestReceivedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ permitRequestId: "permit-1", attachmentCount: 0 }),
+    );
+  });
+
+  it("never fails a saved submission because the alert failed", async () => {
+    const fixture = buildFixture();
+    createClientMock.mockResolvedValue(fixture.baseClient);
+    createAdminClientMock.mockReturnValue(fixture.adminClient);
+    notifyInternalPermitRequestReceivedMock.mockRejectedValueOnce(new Error("notify exploded"));
+
+    const { finalizeContractorPermitRequest } = await import("@/lib/actions/permit-request-actions");
+
+    await expect(
+      finalizeContractorPermitRequest({ uploads: [uploadDraft], note: null }),
+    ).resolves.toMatchObject({ permitRequestId: "permit-1", count: 1 });
   });
 
   it("fails closed when permit request schema is unavailable", async () => {

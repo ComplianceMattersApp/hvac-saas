@@ -335,7 +335,10 @@ function isHiddenInternalNotificationType(value: string): boolean {
   return (
     value === "contractor_report_sent" ||
     value === "internal_contractor_correction_submission_email" ||
-    value === "internal_retest_ready_requested_email"
+    value === "internal_retest_ready_requested_email" ||
+    // Email delivery ledger for permit requests — the in_app row
+    // (permit_request_received) is the one visible card per request.
+    value === "internal_permit_request_email"
   );
 }
 
