@@ -70,6 +70,10 @@ import {
   retryFailedScheduledAutopayAttemptFromForm,
 } from "@/lib/actions/customer-saved-payment-method-actions";
 import TenantInvoicePaymentLinkPanel from "./_components/TenantInvoicePaymentLinkPanel";
+import InvoiceReadinessRail, {
+  resolveInvoiceReadinessChecks,
+  resolveInvoiceReadinessHeading,
+} from "./_components/InvoiceReadinessRail";
 import SupplementalInvoiceFamilySection from "../_components/SupplementalInvoiceFamilySection";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
@@ -91,18 +95,23 @@ import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-bi
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
+// Matches the Today page and the ops queue: rounded-2xl, slate-200/70 hairline,
+// and the shared 15,31,53 shadow ramp. This surface had drifted onto its own
+// radius, border weight, and shadow tint.
 const panelClass =
-  "rounded-3xl border border-slate-300/80 bg-white shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70";
+  "rounded-2xl border border-slate-200/70 bg-white shadow-[0_24px_52px_-30px_rgba(15,31,53,0.34)]";
 const labelClass =
   "mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,box-shadow,background-color] focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 [color-scheme:light]";
+// min-h-11 is the 44px touch target the field surfaces need; xl:min-h-9 restores
+// desktop density, the same responsive pattern OpsQueueRowCard uses.
 const primaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_18px_30px_-20px_rgba(37,99,235,0.48)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_18px_30px_-20px_rgba(37,99,235,0.48)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] xl:min-h-9";
 const secondaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] xl:min-h-9";
 const darkButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,23,42,0.55)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]";
+  "inline-flex min-h-11 items-center justify-center rounded-lg border border-[#0f1f35] bg-[#0f1f35] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,31,53,0.55)] transition-[background-color,box-shadow,transform] hover:bg-[#16263f] hover:shadow-[0_16px_30px_-22px_rgba(15,31,53,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px] xl:min-h-9";
 const chipClass =
   "inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600";
 
@@ -223,7 +232,7 @@ function bannerMessage(value?: string | null) {
     internal_invoice_supplemental_draft_created: "Supplemental draft invoice created.",
     internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
-    internal_invoice_issued: "Invoice issued. Send it to the billing recipient when ready.",
+    internal_invoice_issued: "Invoice issued — not sent yet. The billing recipient has not received it until you send it.",
     internal_invoice_issue_blocked: "Invoice cannot be issued until job and field work are complete.",
     internal_invoice_issue_incomplete: "Review recipient, charges, and total before issuing.",
     internal_invoice_duplicate_review_required: "Possible duplicate charges were found. Review the matching invoice and confirm before issuing.",
@@ -395,8 +404,6 @@ export default async function InternalInvoiceWorkspacePage({
   const checkoutSessionUrl = firstSearchValue(sp.checkout_session_url);
   const workspaceView = firstSearchValue(sp.view);
   const shouldOpenChargeEntry = firstSearchValue(sp.add_charge) === "1";
-  // Slice B: compressed mobile workspace gate. Desktop is untouched when false.
-  const isMobileWorkspace = firstSearchValue(sp.mobileLayout) === "v2";
   const supabase = await createClient();
 
   const {
@@ -759,25 +766,32 @@ export default async function InternalInvoiceWorkspacePage({
   const returnTo = invoice
     ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}#invoice-workspace`
     : `/jobs/${jobId}/invoice#invoice-workspace`;
-  const jobReturnHref = isMobileWorkspace
-    ? `/jobs/${jobId}?tab=ops`
-    : `/jobs/${jobId}?tab=info#internal-invoice-panel`;
-  // Slice B: keep the mobile workspace gate through action redirects.
-  const mobileReturnTo = invoice
-    ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}&mobileLayout=v2#invoice-workspace`
-    : `/jobs/${jobId}/invoice?mobileLayout=v2#invoice-workspace`;
+  const jobReturnHref = `/jobs/${jobId}?tab=ops`;
   const recipientEmailReady = Boolean(String(invoice?.billing_email ?? "").trim());
-  // Slice B: compact mobile Issue & Send readiness — only unmet checks are shown.
-  const mobileReadinessBlockers = [
-    { label: "Billing recipient", ready: recipientReady, needed: "Add a billing name." },
-    { label: "Charges", ready: chargesReady, needed: "Add at least 1 charge." },
-    { label: "Total", ready: totalReady, needed: "Total must be above $0.00." },
-    { label: "Job closeout", ready: jobReady, needed: "Complete the job and field work." },
-  ].filter((check) => !check.ready);
-  const canMobileCompoundIssueSend =
-    canIssue && canIssueInvoiceLifecycle && canSendInvoiceLifecycle && recipientEmailReady;
-  const canMobileIssueOnly = canIssue && canIssueInvoiceLifecycle;
-  const showMobileIssueSendCard = isMobileWorkspace && isDraft && !billingDispositionResolved;
+  // Single source of truth for issue readiness. Every surface (compressed field
+  // rail, draft rail, full workspace rail) renders these same checks and words.
+  const invoiceReadinessChecks = resolveInvoiceReadinessChecks({
+    recipientReady,
+    recipientEmailReady,
+    chargesReady,
+    totalReady,
+    jobReady,
+    billingName: invoice?.billing_name,
+    lineItemCount,
+    totalLabel: formatCurrencyFromCents(invoice?.total_cents ?? 0),
+    billingDispositionResolved,
+    billingDispositionLabel: jobBillingDispositionLabel,
+  });
+  // Issue and send in one action whenever the actor holds both rights and the
+  // recipient has an email. This is the fast path a tech needs between stops,
+  // and it is no worse for office staff, so it is not gated by surface.
+  const canCompoundIssueSend =
+    canIssueInvoiceLifecycle && canSendInvoiceLifecycle && recipientEmailReady;
+  const invoiceReadinessHeading = resolveInvoiceReadinessHeading({
+    billingDispositionResolved,
+    canIssue,
+    willAlsoSend: canCompoundIssueSend,
+  });
   const effectiveBanner = !banner && invalidRequestedInvoiceSelection
     ? "internal_invoice_selection_invalid"
     : banner;
@@ -920,10 +934,10 @@ export default async function InternalInvoiceWorkspacePage({
                 {supplementalReasonLabel ? ` Reason: ${supplementalReasonLabel}.` : ""}
               </div>
             ) : null}
-            {/* Slice B cleanup: internal workflow language is desktop-only; the
-                status chips are enough context for the compressed mobile flow. */}
-            {isMobileWorkspace || showPostSendCompletion || showGuidedDraft || showGuidedIssued ? null : (
-              <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
+            {/* Internal workflow language is desktop-only; the status chips are
+                enough context on a phone. Hidden by breakpoint, not by URL. */}
+            {showPostSendCompletion || showGuidedDraft || showGuidedIssued ? null : (
+              <div className="mt-3 hidden rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700 lg:block">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
                 <p className="mt-1">
                   <span className="font-semibold text-slate-900">Stage:</span> {invoiceRevenueWorkflowRail.stage}.
@@ -962,9 +976,9 @@ export default async function InternalInvoiceWorkspacePage({
                 Print Invoice
               </Link>
             ) : null}
-            {/* Slice B cleanup: redundant on mobile where charges scroll inline. */}
-            {invoice && !isMobileWorkspace && !showPostSendCompletion && !showGuidedDraft && !showGuidedIssued ? (
-              <Link href="#invoice-charges" className={darkButtonClass}>
+            {/* Redundant on a phone where charges scroll inline. */}
+            {invoice && !showPostSendCompletion && !showGuidedDraft && !showGuidedIssued ? (
+              <Link href="#invoice-charges" className={`${darkButtonClass} hidden lg:inline-flex`}>
                 Open Invoice Charges
               </Link>
             ) : null}
@@ -1093,7 +1107,6 @@ export default async function InternalInvoiceWorkspacePage({
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Invoice Draft</div>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Review what will be billed</h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">Confirm the payer and charges, then issue and send from the next-step card.</p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Draft Total</div>
@@ -1109,6 +1122,9 @@ export default async function InternalInvoiceWorkspacePage({
                     <div className="mt-1 text-xs leading-5 text-slate-600">
                       {[invoice.billing_email, invoice.billing_phone].filter(Boolean).join(" · ") || "No email or phone saved"}
                     </div>
+                    {billingAddress.length > 0 ? (
+                      <div className="mt-1 text-xs leading-5 text-slate-600">{billingAddress.join(", ")}</div>
+                    ) : null}
                   </div>
                   {canManageFinancialInvoiceLifecycle ? (
                     <details className="group sm:text-right">
@@ -1124,17 +1140,41 @@ export default async function InternalInvoiceWorkspacePage({
                           <option value="contractor">Contractor{(job as any).contractor_id ? "" : " (assign one first)"}</option>
                           <option value="other">Other / third party</option>
                         </select>
-                        <SubmitButton loadingText="Updating..." className={`${darkButtonClass} mt-3 w-full`}>Update Bill To</SubmitButton>
+                        <p className="mt-2 text-xs leading-5 text-slate-500">
+                          Assigning a contractor to the job does <span className="font-semibold">not</span> force contractor billing — pick who actually pays. Saving re-pulls their billing details from that record.
+                        </p>
+                        <SubmitButton loadingText="Applying..." className={`${darkButtonClass} mt-3 w-full`}>Apply &amp; Re-pull</SubmitButton>
                       </form>
                     </details>
                   ) : null}
                 </div>
+
+                {/* Billing-correctness guardrail: a contractor bill-to with no
+                    email or address will produce an invoice that cannot be
+                    delivered or collected. Surfaced on the draft screen because
+                    that is now where drafts are finished. */}
+                {String((job as any).billing_recipient ?? "").trim().toLowerCase() === "contractor"
+                && (!invoice.billing_email || !invoice.billing_address_line1) ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-900">
+                    This contractor bill-to is incomplete (missing{invoice.billing_email ? "" : " billing email"}
+                    {!invoice.billing_email && !invoice.billing_address_line1 ? " and" : ""}
+                    {invoice.billing_address_line1 ? "" : " address"}).{" "}
+                    {(job as any).contractor_id ? (
+                      <a href={`/contractors/${(job as any).contractor_id}/edit`} className="font-semibold underline">
+                        Complete the contractor record
+                      </a>
+                    ) : (
+                      "Complete the contractor record"
+                    )}
+                    , then re-pull the Bill To above.
+                  </div>
+                ) : null}
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/80">
-                {invoice.line_items.length === 0 ? (
-                  <div className="px-4 py-4 text-sm text-amber-800">No charges have been added yet.</div>
-                ) : (
+              {/* No summary block on an empty draft — the charge workspace below
+                  already opens onto its own empty state. */}
+              {invoice.line_items.length > 0 ? (
+                <div className="mt-4 overflow-hidden rounded-xl border border-slate-200/80">
                   <div className="divide-y divide-slate-200/80">
                     {invoice.line_items.map((lineItem) => (
                       <div key={lineItem.id} className="grid gap-2 bg-white px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
@@ -1147,11 +1187,11 @@ export default async function InternalInvoiceWorkspacePage({
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              ) : null}
 
               {canAccessDraftLineWorkspace ? (
-                <details open={shouldOpenChargeEntry} className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3">
+                <details open={shouldOpenChargeEntry || invoice.line_items.length === 0} className="mt-4 rounded-xl border border-slate-200/80 bg-white p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-800">Edit charges or add work</summary>
                   <div className="mt-3 border-t border-slate-200 pt-3">
                     <InternalInvoiceLineItemsTable
@@ -1175,7 +1215,6 @@ export default async function InternalInvoiceWorkspacePage({
                       workspaceInputClass={inputClass}
                       primaryButtonClass={primaryButtonClass}
                       secondaryButtonClass={secondaryButtonClass}
-                      isMobileWorkspace={isMobileWorkspace}
                       compactWorkspace
                       initialAddFormOpen={shouldOpenChargeEntry}
                       saveFieldItemToPricebookAction={saveFieldItemToPricebookFromForm}
@@ -1188,17 +1227,14 @@ export default async function InternalInvoiceWorkspacePage({
           </main>
 
           <aside className="space-y-5">
-            <section className={`${panelClass} p-4 sm:p-5`}>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Next Step</div>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">{canIssue ? "Ready to issue" : "Needs attention"}</h2>
-              <div className="mt-3 space-y-2">
-                {readinessRow("Billing recipient", recipientReady, recipientReady ? String(invoice.billing_name) : "Add a billing name.")}
-                {readinessRow("Charges", chargesReady, chargesReady ? `${lineItemCount} charge${lineItemCount === 1 ? "" : "s"}.` : "Add at least 1 charge.")}
-                {readinessRow("Total", totalReady, totalReady ? formatCurrencyFromCents(invoice.total_cents) : "Total must be above $0.00.")}
-                {readinessRow("Job closeout", jobReady, jobReady ? "Job and field work are complete." : "Complete the job and field work first.")}
-              </div>
-
-              {canIssue && canIssueInvoiceLifecycle && canSendInvoiceLifecycle ? (
+            <InvoiceReadinessRail
+              eyebrow="Next Step"
+              heading={invoiceReadinessHeading}
+              checks={invoiceReadinessChecks}
+              onlyBlockers
+              className={`${panelClass} p-4 sm:p-5`}
+            >
+              {canCompoundIssueSend ? (
                 <form action={issueAndSendInternalInvoiceFromForm} className="mt-4 space-y-3">
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="invoice_id" value={invoice.id} />
@@ -1214,9 +1250,9 @@ export default async function InternalInvoiceWorkspacePage({
                       <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
                     </label>
                   ) : null}
-                  <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`}>Issue &amp; Send Invoice</SubmitButton>
+                  <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>Issue &amp; Send Invoice</SubmitButton>
                 </form>
-              ) : canIssue && canIssueInvoiceLifecycle ? (
+              ) : canIssueInvoiceLifecycle ? (
                 <form action={issueInternalInvoiceFromForm} className="mt-4">
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="invoice_id" value={invoice.id} />
@@ -1228,18 +1264,89 @@ export default async function InternalInvoiceWorkspacePage({
                       <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
                     </label>
                   ) : null}
-                  <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`}>Issue Invoice</SubmitButton>
+                  <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>Issue Without Sending</SubmitButton>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {!recipientEmailReady
+                      ? "No email on file — this records the invoice but does not deliver it. Add an email under Edit billing details to send."
+                      : "You can issue but not send — this records the invoice but does not deliver it."}
+                  </p>
                 </form>
               ) : null}
+            </InvoiceReadinessRail>
 
-              {!canIssue ? <p className="mt-4 text-xs leading-5 text-slate-500">Resolve the items above to enable invoice issuance.</p> : null}
-            </section>
+            {/* Everything a draft can still need lives here rather than behind a
+                trip to view=all. Payer reassignment is already inline above, and
+                no-charge resolution sits in the charge block, so a draft never
+                has a reason to leave this screen. */}
+            {canManageFinancialInvoiceLifecycle ? (
+              <section className={`${panelClass} p-4`}>
+                <details className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-800">Edit billing details</summary>
+                  <InternalInvoiceDraftSaveForm action={saveInternalInvoiceDraftFromForm} className="mt-3 space-y-3">
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="invoice_number" value={invoice.invoice_number} />
+                    <div>
+                      <label className={labelClass}>Billing Name</label>
+                      <input name="billing_name" defaultValue={invoice.billing_name ?? ""} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Billing Email</label>
+                      <input type="email" name="billing_email" defaultValue={invoice.billing_email ?? ""} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Billing Phone</label>
+                      <input name="billing_phone" defaultValue={invoice.billing_phone ?? ""} className={inputClass} />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Address Line 1</label>
+                      <input name="billing_address_line1" defaultValue={invoice.billing_address_line1 ?? ""} className={inputClass} />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <label className={labelClass}>City</label>
+                        <input name="billing_city" defaultValue={invoice.billing_city ?? ""} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>State</label>
+                        <input name="billing_state" defaultValue={invoice.billing_state ?? ""} className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>ZIP</label>
+                        <input name="billing_zip" defaultValue={invoice.billing_zip ?? ""} className={inputClass} />
+                      </div>
+                    </div>
+                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full`}>
+                      Save Billing Details
+                    </SubmitButton>
+                  </InternalInvoiceDraftSaveForm>
+                </details>
 
-            <section className={`${panelClass} p-4`}>
-              <div className="text-sm font-semibold text-slate-900">Need another invoice control?</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">Billing details, notes, no-charge resolution, and administrative controls remain available in the full workspace.</p>
-              <Link href={`${selectedInvoiceWorkspaceBaseHref}&view=all#invoice-workspace`} className={`${secondaryButtonClass} mt-3 w-full`}>More Invoice Options</Link>
-            </section>
+                <details className="mt-2 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-slate-800">Discard this draft</summary>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">
+                    Voiding keeps the invoice in history. You can start a new draft afterwards.
+                  </p>
+                  <form action={voidInternalInvoiceFromForm} className="mt-3 space-y-3">
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <div>
+                      <label className={labelClass}>Void Reason</label>
+                      <textarea name="void_reason" rows={2} className={`${inputClass} min-h-[4rem]`} placeholder="Optional reason" />
+                    </div>
+                    <SubmitButton
+                      loadingText="Voiding..."
+                      className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 xl:min-h-9"
+                    >
+                      Void Draft Invoice
+                    </SubmitButton>
+                  </form>
+                </details>
+              </section>
+            ) : null}
           </aside>
         </div>
       ) : showGuidedIssued ? (
@@ -1382,13 +1489,7 @@ export default async function InternalInvoiceWorkspacePage({
           </div>
         </section>
       ) : (
-        <div
-          className={
-            isMobileWorkspace
-              ? "flex flex-col gap-5"
-              : "grid gap-5 xl:grid-cols-[minmax(0,1.32fr)_minmax(22rem,0.68fr)]"
-          }
-        >
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.32fr)_minmax(22rem,0.68fr)]">
           <main className="flex flex-col gap-5">
             <section id="invoice-charges" className={`${panelClass} order-40 p-4 sm:p-5`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1426,7 +1527,6 @@ export default async function InternalInvoiceWorkspacePage({
                   workspaceInputClass={inputClass}
                   primaryButtonClass={primaryButtonClass}
                   secondaryButtonClass={secondaryButtonClass}
-                  isMobileWorkspace={isMobileWorkspace}
                   initialAddFormOpen={shouldOpenChargeEntry}
                   saveFieldItemToPricebookAction={saveFieldItemToPricebookFromForm}
                   checkFieldPricebookItemNameExistsAction={checkFieldPricebookItemNameExistsFromForm}
@@ -1922,88 +2022,36 @@ export default async function InternalInvoiceWorkspacePage({
           </main>
 
           <aside className="space-y-5">
-            {showMobileIssueSendCard ? (
-              <section className={`${panelClass} p-4`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Issue &amp; Send</div>
-                {mobileReadinessBlockers.length > 0 ? (
-                  <div className="mt-3 space-y-1.5">
-                    {mobileReadinessBlockers.map((check) => (
-                      <div
-                        key={check.label}
-                        className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-900"
-                      >
-                        <span aria-hidden className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                        <span>
-                          <span className="font-semibold">{check.label}:</span> {check.needed}
-                        </span>
-                      </div>
-                    ))}
-                    <p className="pt-1 text-xs text-slate-500">Resolve the above to issue and send.</p>
-                  </div>
-                ) : canMobileCompoundIssueSend ? (
-                  <form action={issueAndSendInternalInvoiceFromForm} className="mt-3">
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input type="hidden" name="invoice_id" value={invoice.id} />
-                    <input type="hidden" name="tab" value="info" />
-                    <input type="hidden" name="return_to" value={mobileReturnTo} />
-                    <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
-                      Sending to <span className="font-semibold text-slate-900">{invoice.billing_name}</span>
-                      <span className="block text-xs text-slate-500">{invoice.billing_email}</span>
-                    </div>
-                    {duplicateChargeRisks.length > 0 ? (
-                      <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                        <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
-                        <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
-                      </label>
-                    ) : null}
-                    <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`}>
-                      Issue &amp; Send Invoice
-                    </SubmitButton>
-                  </form>
-                ) : canMobileIssueOnly ? (
-                  <form action={issueInternalInvoiceFromForm} className="mt-3">
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input type="hidden" name="invoice_id" value={invoice.id} />
-                    <input type="hidden" name="tab" value="info" />
-                    <input type="hidden" name="return_to" value={mobileReturnTo} />
-                    {duplicateChargeRisks.length > 0 ? (
-                      <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                        <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
-                        <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
-                      </label>
-                    ) : null}
-                    <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`}>
-                      Issue Invoice
-                    </SubmitButton>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {!recipientEmailReady
-                        ? "No email on file — invoice will be issued but not sent."
-                        : "Invoice send authority is not available for your role."}
-                    </p>
-                  </form>
-                ) : (
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-600">
-                    Invoice issue authority is not available for your current role.
-                  </div>
-                )}
-              </section>
-            ) : null}
-            {!showMobileIssueSendCard ? (
-            <section className={`${panelClass} p-4 sm:p-5`}>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Issue Readiness</div>
-              <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
-                {billingDispositionResolved ? "Billing handled" : canIssue ? "Ready to issue" : "Needs review"}
-              </h2>
-              <div className="mt-3 space-y-2">
-                {readinessRow("Billing recipient", recipientReady, recipientReady ? String(invoice.billing_name) : "Add a billing name.")}
-                {readinessRow("Charges", chargesReady, chargesReady ? `${lineItemCount} charge${lineItemCount === 1 ? "" : "s"} added.` : "Needs at least 1 charge.")}
-                {readinessRow("Total", totalReady, billingDispositionResolved ? (jobBillingDispositionLabel ?? "Billing Handled") : totalReady ? formatCurrencyFromCents(invoice.total_cents) : "Total must be above $0.00.")}
-                {readinessRow("Job closeout", jobReady, jobReady ? "Job and field work are complete." : "Job must be completed and field complete.")}
-              </div>
+            <InvoiceReadinessRail
+              heading={invoiceReadinessHeading}
+              checks={invoiceReadinessChecks}
+              onlyBlockers
+              className={`${panelClass} p-4 sm:p-5`}
+            >
               {billingDispositionResolved ? (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/75 px-3 py-2.5 text-sm text-emerald-900">
                   {jobBillingDispositionLabel ?? "Billing Handled"}
                 </div>
+              ) : invoice.status === "draft" && canCompoundIssueSend ? (
+                <form action={issueAndSendInternalInvoiceFromForm} className="mt-4">
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={invoice.id} />
+                  <input type="hidden" name="tab" value="info" />
+                  <input type="hidden" name="return_to" value={returnTo} />
+                  <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
+                    Sending to <span className="font-semibold text-slate-900">{invoice.billing_name}</span>
+                    <span className="block text-xs text-slate-500">{invoice.billing_email}</span>
+                  </div>
+                  {duplicateChargeRisks.length > 0 ? (
+                    <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
+                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
+                    </label>
+                  ) : null}
+                  <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>
+                    Issue &amp; Send Invoice
+                  </SubmitButton>
+                </form>
               ) : invoice.status === "draft" && canIssueInvoiceLifecycle ? (
                 <form action={issueInternalInvoiceFromForm} className="mt-4">
                   <input type="hidden" name="job_id" value={jobId} />
@@ -2017,8 +2065,13 @@ export default async function InternalInvoiceWorkspacePage({
                     </label>
                   ) : null}
                   <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>
-                    Issue Invoice
+                    Issue Without Sending
                   </SubmitButton>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {!recipientEmailReady
+                      ? "No email on file — this records the invoice but does not deliver it. Add an email under Edit billing details to send."
+                      : "You can issue but not send — this records the invoice but does not deliver it."}
+                  </p>
                 </form>
               ) : invoice.status === "draft" ? (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-600">
@@ -2040,8 +2093,7 @@ export default async function InternalInvoiceWorkspacePage({
                   ) : null}
                 </div>
               )}
-            </section>
-            ) : null}
+            </InvoiceReadinessRail>
 
             <section className={`${panelClass} p-4 sm:p-5`}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Billing Recipient</div>

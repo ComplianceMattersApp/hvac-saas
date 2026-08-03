@@ -229,7 +229,7 @@ function buildFormData(overrides: Partial<Record<string, string>> = {}) {
   formData.set('job_id', 'job-1');
   formData.set('invoice_id', 'inv-1');
   formData.set('tab', 'info');
-  formData.set('return_to', '/jobs/job-1/invoice?mobileLayout=v2#invoice-workspace');
+  formData.set('return_to', '/jobs/job-1/invoice#invoice-workspace');
   formData.set('recipient_email', 'billing@example.com');
 
   for (const [key, value] of Object.entries(overrides)) {

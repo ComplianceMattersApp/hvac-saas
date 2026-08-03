@@ -1189,7 +1189,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             </form>
           ) : canShowNativeInvoiceWorkspaceLink ? (
             <Link
-              href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}&mobileLayout=v2#invoice-workspace`}
+              href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}#invoice-workspace`}
               className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
             >
               <span className="min-w-0 break-words text-center">View Invoice</span>
@@ -1199,7 +1199,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             <form action={createInternalInvoiceDraftFromForm} className="mt-4">
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="tab" value={tab} />
-              <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice?mobileLayout=v2#invoice-workspace`} />
+              <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
               <input type="hidden" name="auto_import_visit_scope_items" value="1" />
               <SubmitButton
                 loadingText="Starting..."

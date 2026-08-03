@@ -7,6 +7,17 @@ const source = readFileSync(
   "utf8",
 );
 
+// Issue-readiness check labels and headings were extracted out of the page into
+// a single shared rail, so section-level copy assertions span both files.
+const readinessRailSource = readFileSync(
+  resolve(
+    __dirname,
+    "../../../app/jobs/[id]/invoice/_components/InvoiceReadinessRail.tsx",
+  ),
+  "utf8",
+);
+const workspaceSource = `${source}\n${readinessRailSource}`;
+
 describe("internal invoice workspace saved-card charge wiring", () => {
   it("wires direct draft-line workspace access through field billing capabilities", () => {
     expect(source).toContain('import {');
@@ -43,7 +54,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("const totalReady = billingDispositionResolved || Number(invoice?.total_cents ?? 0) > 0");
     expect(source).toContain("const canIssue = Boolean(invoice && isDraft && !billingDispositionResolved");
     expect(source).toContain('billingDisposition={jobBillingDisposition}');
-    expect(source).toContain("Billing handled");
+    expect(workspaceSource).toContain("Billing handled");
     expect(source).toContain("jobBillingDispositionLabel ?? \"Billing Handled\"");
   });
 
@@ -58,9 +69,9 @@ describe("internal invoice workspace saved-card charge wiring", () => {
   });
 
   it("keeps a back-to-job action visible in every desktop and mobile invoice state", () => {
-    expect(source).toContain("const jobReturnHref = isMobileWorkspace");
-    expect(source).toContain("? `/jobs/${jobId}?tab=ops`");
-    expect(source).toContain(": `/jobs/${jobId}?tab=info#internal-invoice-panel`");
+    // One back-to-job target now that the invoice route no longer branches on a
+    // mobileLayout query param.
+    expect(source).toContain("const jobReturnHref = `/jobs/${jobId}?tab=ops`");
     expect(source).toContain('<Link href={jobReturnHref} className={secondaryButtonClass}>');
     expect(source).not.toContain("{!showPostSendCompletion && !showGuidedDraft && !showGuidedIssued ? (\n              <Link");
   });
@@ -108,10 +119,22 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Who is paying?");
     expect(source).toContain("Edit charges or add work");
     expect(source).toContain("Next Step");
-    expect(source).toContain("Ready to issue");
+    expect(workspaceSource).toContain("Ready to issue");
     expect(source).toContain("Issue &amp; Send Invoice");
-    expect(source).toContain("Need another invoice control?");
-    expect(source).toContain("Billing details, notes, no-charge resolution, and administrative controls remain available in the full workspace.");
+    // A draft never has to leave this screen: payer reassignment, billing
+    // details, and voiding are all inline, so the old "full workspace" pointer
+    // is gone rather than merely relabelled.
+    expect(source).toContain("Edit billing details");
+    expect(source).toContain("Discard this draft");
+    // Bill To parity on the draft screen: the re-pull is named, the payer-vs-
+    // assignment distinction is stated, the address is shown, and an incomplete
+    // contractor bill-to is caught before issuing.
+    expect(source).toContain("Apply &amp; Re-pull");
+    expect(source).toContain("does <span className=\"font-semibold\">not</span> force contractor billing");
+    expect(source).toContain("{billingAddress.join(\", \")}");
+    expect(source.match(/This contractor bill-to is incomplete \(missing/g)).toHaveLength(2);
+    expect(source).not.toContain("Need another invoice control?");
+    expect(source).not.toContain("Billing details, notes, no-charge resolution, and administrative controls remain available in the full workspace.");
   });
 
   it("keeps an issued but unsent invoice focused on delivery", () => {
@@ -216,8 +239,8 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("issueInternalInvoiceFromForm");
     expect(source).toContain("sendInternalInvoiceEmailFromForm");
     expect(source).toContain("voidInternalInvoiceFromForm");
-    expect(source).toContain("Charges");
-    expect(source).toContain("Issue Readiness");
+    expect(workspaceSource).toContain("Charges");
+    expect(workspaceSource).toContain("Issue Readiness");
     expect(source).toContain("Billing Recipient");
     expect(source).toContain("Collection Actions");
     expect(source).toContain("Payment History");

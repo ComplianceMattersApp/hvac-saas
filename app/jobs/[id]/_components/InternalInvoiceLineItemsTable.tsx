@@ -60,16 +60,14 @@ type InternalInvoiceLineItemsTableProps = {
   workspaceInputClass: string;
   primaryButtonClass: string;
   secondaryButtonClass: string;
-  // Slice B: compressed mobile field workspace. Off by default so desktop is unchanged.
-  isMobileWorkspace?: boolean;
-  // Use the compact presentation when this builder is nested in a narrower
-  // desktop card. This changes layout only; mobile-only field behavior remains
-  // controlled by isMobileWorkspace.
+  // Use the compact single-column presentation instead of the wide charge table.
+  // Presentation only — no behavior or capability is gated on it.
   compactWorkspace?: boolean;
   // Opens charge entry when the user arrives from an explicit Add/Create Invoice action.
   initialAddFormOpen?: boolean;
-  // Slice C: optional field "save custom charge to Pricebook" actions. Only used on
-  // the mobile workspace; desktop never calls them.
+  // Optional "save custom charge to Pricebook" actions. Available on every
+  // surface that supplies them — an office admin entering a recurring one-off
+  // has the same reason to save it as a tech does.
   saveFieldItemToPricebookAction?: (formData: FormData) => Promise<FieldPricebookSaveResult>;
   checkFieldPricebookItemNameExistsAction?: (formData: FormData) => Promise<FieldPricebookNameCheckResult>;
 };
@@ -477,15 +475,11 @@ function ManualAddChargeForm({
   // false), so the live-subtotal preview resets to null on next open without an
   // explicit wrapper — keeping the action wired straight to handleAddManual.
   return (
-    <form action={handleAddManual} className="rounded-xl border border-slate-200 bg-white/90 px-4 py-4">
+    <form action={handleAddManual} className="rounded-xl bg-white/90 px-3 py-3">
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
       <input type="hidden" name="tab" value={tab} />
-      <div className="text-sm font-semibold text-slate-950">Manual Charge</div>
-      <div className="mt-1 text-xs leading-5 text-slate-500">
-        Type a one-off invoice charge when the Pricebook does not have the item you need.
-      </div>
-      <div className="mt-4 space-y-3">
+      <div className="space-y-3">
         <div>
           <label htmlFor="manual_invoice_item_name" className={workspaceFieldLabelClass}>
             Charge name
@@ -593,19 +587,23 @@ export default function InternalInvoiceLineItemsTable({
   workspaceInputClass,
   primaryButtonClass,
   secondaryButtonClass,
-  isMobileWorkspace = false,
   compactWorkspace = false,
   initialAddFormOpen = false,
   saveFieldItemToPricebookAction,
   checkFieldPricebookItemNameExistsAction,
 }: InternalInvoiceLineItemsTableProps) {
   const router = useRouter();
-  const useCompactLayout = isMobileWorkspace || compactWorkspace;
+  const useCompactLayout = compactWorkspace;
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
-  const [isAddFormOpen, setIsAddFormOpen] = useState(initialAddFormOpen);
+  // An empty draft opens straight into charge entry — that is the only thing the
+  // user came here to do, so it should not cost a click to reach.
+  const [isAddFormOpen, setIsAddFormOpen] = useState(initialAddFormOpen || lineItems.length === 0);
   const [feedback, setFeedback] = useState<InlineFeedback | null>(null);
   const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>('');
   const [pricebookSearchQuery, setPricebookSearchQuery] = useState('');
+  // The full catalog is a wall of options on arrival. Results appear as the user
+  // types; browsing everything stays available but is opt-in.
+  const [isBrowsingPricebook, setIsBrowsingPricebook] = useState(false);
   const [selectedVisitScopeItemIds, setSelectedVisitScopeItemIds] = useState<string[]>([]);
   // Slice C: ephemeral "save this custom item to your price list?" suggestion.
   const [pendingSaveSuggestion, setPendingSaveSuggestion] = useState<{
@@ -634,11 +632,11 @@ export default function InternalInvoiceLineItemsTable({
     setIsAddFormOpen(true);
   }
 
-  // Slice C: after a manual charge is added on mobile, offer to save it to the
-  // Pricebook when no active item with that name already exists. Best-effort — a
-  // failure here never disrupts the charge that was already created.
+  // After a manual charge is added, offer to save it to the Pricebook when no
+  // active item with that name already exists. Best-effort — a failure here
+  // never disrupts the charge that was already created.
   async function maybeOfferPricebookSave(candidate: { itemName: string; unitPrice: string; itemType: string }) {
-    if (!isMobileWorkspace || !checkFieldPricebookItemNameExistsAction || !saveFieldItemToPricebookAction) return;
+    if (!checkFieldPricebookItemNameExistsAction || !saveFieldItemToPricebookAction) return;
     const name = candidate.itemName.trim();
     const price = Number(String(candidate.unitPrice).replace(/[$,\s]/g, ''));
     if (!name || !Number.isFinite(price) || price <= 0) return;
@@ -694,7 +692,7 @@ export default function InternalInvoiceLineItemsTable({
   const totalCentsValue = Number(totalCents ?? 0);
   const isZeroDollarDraft = totalCentsValue === 0;
   const pricebookSearch = pricebookSearchQuery.trim().toLowerCase();
-  const filteredPricebookPickerItems = pricebookSearch
+  const matchingPricebookPickerItems = pricebookSearch
     ? pricebookPickerItems.filter((item) => {
         const searchCorpus = [
           item.item_name,
@@ -703,8 +701,19 @@ export default function InternalInvoiceLineItemsTable({
           item.category,
         ].filter(Boolean).join(' ').toLowerCase();
         return searchCorpus.includes(pricebookSearch);
-      }).slice(0, 8)
-    : pricebookPickerItems.slice(0, 6);
+      })
+    : pricebookPickerItems;
+  // Long result sets are previewed rather than truncated silently: whatever is
+  // held back is counted and offered, and browsing lifts the cap entirely so
+  // "Browse all N" actually shows N.
+  const PRICEBOOK_RESULT_PREVIEW_LIMIT = 8;
+  const pricebookResultsTruncated =
+    !isBrowsingPricebook && matchingPricebookPickerItems.length > PRICEBOOK_RESULT_PREVIEW_LIMIT;
+  const filteredPricebookPickerItems = pricebookResultsTruncated
+    ? matchingPricebookPickerItems.slice(0, PRICEBOOK_RESULT_PREVIEW_LIMIT)
+    : matchingPricebookPickerItems;
+  const hiddenPricebookResultCount =
+    matchingPricebookPickerItems.length - filteredPricebookPickerItems.length;
   const selectedPricebookItem = pricebookPickerItems.find((item) => item.id === selectedPricebookItemId) ?? null;
 
   function toggleVisitScopeItem(itemId: string) {
@@ -854,32 +863,33 @@ export default function InternalInvoiceLineItemsTable({
           </div>
         </div>
       ) : isZeroDollarDraft ? (
-        <div className="border-b border-amber-200/80 bg-amber-50/75 px-5 py-3">
-          <div className={`flex flex-col gap-3 ${useCompactLayout ? '' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-amber-950">$0.00 invoice - choose how to handle it</div>
-              <div className="mt-1 text-xs leading-5 text-amber-900">
-                Add a charge if billing is missing. No Charge resolves billing without collecting money. External Billing Complete resolves billing handled outside EveryStep FieldWorks.
-              </div>
-            </div>
-            <div className={`grid shrink-0 gap-2 ${useCompactLayout ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:flex sm:flex-wrap sm:justify-end'}`}>
-              <button
-                type="button"
-                onClick={openAddForm}
-                disabled={!canAddInvoiceLine}
-                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-950 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
-              >
-                Add Charge
-              </button>
+        // An empty draft is the expected starting state, not a problem, so it is
+        // styled neutrally. Adding a charge is the primary path and lives in the
+        // entry form below; the terminal "don't bill this" resolutions collapse
+        // here so they are one click away without competing for the same glance.
+        <div className="border-b border-slate-200/80 bg-white/72 px-5 py-3">
+          {/* Tinted and outlined so it reads as its own function rather than
+              blending into the charge entry it sits next to — but not amber,
+              which would put an empty draft back into a warning posture. */}
+          <details className="group rounded-xl border border-sky-200 bg-sky-50/60">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold text-sky-900 transition-colors hover:text-sky-950">
+              <span aria-hidden className="text-sky-500 transition-transform group-open:rotate-90">&rsaquo;</span>
+              Resolve without billing
+            </summary>
+            <p className="px-3.5 pb-1 pl-8 text-xs leading-5 text-sky-800">
+              For jobs that will not be billed through EveryStep FieldWorks. Each of these closes out billing for this job.
+            </p>
+            <div className={`grid gap-2 px-3.5 pb-3.5 pl-8 pt-2 ${useCompactLayout ? 'grid-cols-1' : 'sm:grid-cols-3'}`}>
               <form action={(formData) => handleBillingDisposition(formData, markNoChargeAction)}>
                 <input type="hidden" name="job_id" value={jobId} />
                 <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
                 <input type="hidden" name="tab" value={tab} />
                 <SubmitButton
                   loadingText="Saving..."
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px]"
+                  className="inline-flex min-h-11 w-full flex-col items-start justify-center gap-0.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 xl:min-h-9"
                 >
-                  Mark No Charge
+                  <span className="text-xs font-semibold text-slate-800">Mark No Charge</span>
+                  <span className="text-[11px] font-normal leading-4 text-slate-500">Closes billing, collects nothing.</span>
                 </SubmitButton>
               </form>
               <form action={handleExternalBillingDisposition}>
@@ -889,21 +899,23 @@ export default function InternalInvoiceLineItemsTable({
                 <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`} />
                 <SubmitButton
                   loadingText="Saving..."
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
+                  className="inline-flex min-h-11 w-full flex-col items-start justify-center gap-0.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 xl:min-h-9"
                 >
-                  External Billing Complete
+                  <span className="text-xs font-semibold text-slate-800">External Billing Complete</span>
+                  <span className="text-[11px] font-normal leading-4 text-slate-500">Billed outside FieldWorks.</span>
                 </SubmitButton>
               </form>
               <button
                 type="button"
                 disabled
                 title="Sending a no-payment-due invoice needs an approved zero-dollar issued invoice model."
-                className="inline-flex min-h-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-400"
+                className="inline-flex min-h-11 w-full cursor-not-allowed flex-col items-start justify-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left xl:min-h-9"
               >
-                Send $0 Invoice
+                <span className="text-xs font-semibold text-slate-400">Send $0 Invoice</span>
+                <span className="text-[11px] font-normal leading-4 text-slate-400">Not available yet.</span>
               </button>
             </div>
-          </div>
+          </details>
         </div>
       ) : !billingDispositionLabel ? (
         (() => {
@@ -948,7 +960,8 @@ export default function InternalInvoiceLineItemsTable({
         })()
       ) : null}
 
-      <div className={`${useCompactLayout ? 'hidden' : 'hidden md:grid'} grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3`}>
+      {/* No column headers over an empty table — the chrome reads as content. */}
+      <div className={`${useCompactLayout || lineItems.length === 0 ? 'hidden' : 'hidden md:grid'} grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)_auto] gap-4 border-b border-slate-200/80 bg-white/88 px-5 py-3`}>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Charge</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</div>
@@ -956,12 +969,6 @@ export default function InternalInvoiceLineItemsTable({
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Subtotal</div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Edit</div>
       </div>
-
-      {lineItems.length === 0 ? (
-        <div className="border-b border-dashed border-slate-200 bg-white/72 px-5 py-3.5 text-sm text-slate-600">
-          Start with the first charge below. Each row is an invoice charge for this invoice.
-        </div>
-      ) : null}
 
       <div className="divide-y divide-slate-200/80">
         {canAddVisitScopeLine && eligibleVisitScopeItems.length > 0 ? (
@@ -1276,8 +1283,8 @@ export default function InternalInvoiceLineItemsTable({
           );
         })}
 
-        {/* Slice C: optional "save to price list" suggestion, mobile only. */}
-        {isMobileWorkspace && pendingSaveSuggestion ? (
+        {/* Optional "save to price list" suggestion, offered on every surface. */}
+        {pendingSaveSuggestion ? (
           <div ref={suggestionCardRef} className="bg-sky-50/70 px-4 py-3">
             <div className="rounded-xl border border-sky-200 bg-white/80 px-3.5 py-3">
               <div className="text-sm text-slate-700">
@@ -1311,10 +1318,14 @@ export default function InternalInvoiceLineItemsTable({
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add another charge</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Use this for fees, add-ons, or anything not already listed on the invoice.
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {lineItems.length === 0 ? 'Add a charge' : 'Add another charge'}
                 </div>
+                {lineItems.length > 0 ? (
+                  <div className="mt-1 text-xs leading-5 text-slate-500">
+                    Use this for fees, add-ons, or anything not already listed on the invoice.
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -1328,17 +1339,17 @@ export default function InternalInvoiceLineItemsTable({
               </button>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)]">
+            {/* The Pricebook is the path; a manual charge is the escape hatch.
+                Stacked rather than side by side so they are not read as equal
+                choices requiring a decision before either can be used. */}
+            <div className="space-y-3">
               {canAddPricebookLine ? (
                 <form action={handleAddPricebook} className="rounded-xl border border-slate-200 bg-white/90 px-4 py-4">
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
                   <input type="hidden" name="tab" value={tab} />
                   <div className="text-sm font-semibold text-slate-950">Search Pricebook</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-500">
-                    Select a service, confirm its quantity, price, and details, then add the finished charge once.
-                  </div>
-                  <label htmlFor="invoice_pricebook_search" className={`${workspaceFieldLabelClass} mt-4`}>
+                  <label htmlFor="invoice_pricebook_search" className={`${workspaceFieldLabelClass} mt-3`}>
                     Search service or charge
                   </label>
                   <input
@@ -1354,9 +1365,22 @@ export default function InternalInvoiceLineItemsTable({
                   />
 
                   {pricebookPickerItems.length > 0 ? (
+                    pricebookSearchQuery.trim().length === 0 && !isBrowsingPricebook ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsBrowsingPricebook(true)}
+                        className="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 xl:min-h-9"
+                      >
+                        Browse all {pricebookPickerItems.length} Pricebook {pricebookPickerItems.length === 1 ? 'item' : 'items'}
+                      </button>
+                    ) : (
                     <div className="mt-3 space-y-2">
                       {filteredPricebookPickerItems.length > 0 ? (
-                        filteredPricebookPickerItems.map((item) => {
+                        // Contained scroll so a large catalog does not stretch the
+                        // page. overscroll-contain keeps a phone flick inside the
+                        // list instead of chaining to the document.
+                        <div className="max-h-[24rem] space-y-2 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-slate-50/50 p-2">
+                        {filteredPricebookPickerItems.map((item) => {
                           const isSelected = selectedPricebookItemId === item.id;
                           return (
                             <button
@@ -1379,13 +1403,24 @@ export default function InternalInvoiceLineItemsTable({
                               ) : null}
                             </button>
                           );
-                        })
+                        })}
+                        </div>
                       ) : (
                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
                           No Pricebook items match that search. Use the manual charge form.
                         </div>
                       )}
+                      {hiddenPricebookResultCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsBrowsingPricebook(true)}
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 xl:min-h-9"
+                        >
+                          Show {hiddenPricebookResultCount} more {hiddenPricebookResultCount === 1 ? 'match' : 'matches'}
+                        </button>
+                      ) : null}
                     </div>
+                    )
                   ) : (
                     <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm leading-6 text-amber-900">
                       No active non-credit Pricebook items are available for draft invoice adds yet.
@@ -1419,15 +1454,23 @@ export default function InternalInvoiceLineItemsTable({
               ) : null}
 
               {canAddManualLine ? (
-                <ManualAddChargeForm
-                  handleAddManual={handleAddManual}
-                  jobId={jobId}
-                  selectedInvoiceId={selectedInvoiceId}
-                  tab={tab}
-                  workspaceFieldLabelClass={workspaceFieldLabelClass}
-                  workspaceInputClass={workspaceInputClass}
-                  secondaryButtonClass={secondaryButtonClass}
-                />
+                <details className="group rounded-xl border border-slate-200 bg-white/60">
+                  <summary className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:text-slate-900">
+                    <span aria-hidden className="text-slate-400 transition-transform group-open:rotate-90">&rsaquo;</span>
+                    Not in the Pricebook? Add a manual charge
+                  </summary>
+                  <div className="px-1 pb-1">
+                    <ManualAddChargeForm
+                      handleAddManual={handleAddManual}
+                      jobId={jobId}
+                      selectedInvoiceId={selectedInvoiceId}
+                      tab={tab}
+                      workspaceFieldLabelClass={workspaceFieldLabelClass}
+                      workspaceInputClass={workspaceInputClass}
+                      secondaryButtonClass={secondaryButtonClass}
+                    />
+                  </div>
+                </details>
               ) : null}
             </div>
           </div>
@@ -1435,15 +1478,19 @@ export default function InternalInvoiceLineItemsTable({
           <div className="bg-slate-50/94 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add another charge</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">Use this for fees, add-ons, or anything not already listed on the invoice.</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  {lineItems.length === 0 ? 'Add a charge' : 'Add another charge'}
+                </div>
+                {lineItems.length > 0 ? (
+                  <div className="mt-1 text-xs leading-5 text-slate-500">Use this for fees, add-ons, or anything not already listed on the invoice.</div>
+                ) : null}
               </div>
               <button
                 type="button"
                 onClick={openAddForm}
-                className={`${primaryButtonClass}${isMobileWorkspace ? ' w-full' : ''}`}
+                className={`${primaryButtonClass} w-full sm:w-auto`}
               >
-                {isMobileWorkspace ? '+ Add Item' : 'Add Charge'}
+                Add Charge
               </button>
             </div>
           </div>
@@ -1457,11 +1504,7 @@ export default function InternalInvoiceLineItemsTable({
       </div>
 
       <div
-        className={
-          isMobileWorkspace
-            ? "sticky bottom-0 z-10 flex items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-8px_20px_-16px_rgba(15,23,42,0.4)]"
-            : "flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/80 bg-white/88 px-5 py-3.5"
-        }
+        className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-8px_20px_-16px_rgba(15,23,42,0.4)] lg:static lg:border-slate-200/80 lg:bg-white/88 lg:px-5 lg:py-3.5 lg:shadow-none"
       >
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Running Total</div>
         <div className="text-sm font-semibold text-slate-950">{formatCurrencyFromCents(totalCents)}</div>

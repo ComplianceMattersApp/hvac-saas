@@ -26,21 +26,31 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).toContain("const canRemoveLine = capabilities.can_remove_invoice_line");
   });
 
-  it("supports a compact nested-card layout without enabling mobile-only behavior", () => {
+  it("treats compact layout as presentation only, with no capability gated on it", () => {
     expect(source).toContain("compactWorkspace?: boolean");
-    expect(source).toContain("const useCompactLayout = isMobileWorkspace || compactWorkspace");
-    expect(source).toContain("if (!isMobileWorkspace || !checkFieldPricebookItemNameExistsAction");
-    expect(source).toContain("useCompactLayout ? 'grid-cols-1 sm:grid-cols-2'");
+    expect(source).toContain("const useCompactLayout = compactWorkspace");
+    expect(source).toContain("useCompactLayout ? 'grid-cols-1' : 'sm:grid-cols-3'");
     expect(invoicePageSource).toContain("compactWorkspace");
+    // The surface-specific flag is gone; nothing may reintroduce a layout prop
+    // as a capability gate.
+    expect(source).not.toContain("isMobileWorkspace");
+    expect(invoicePageSource).not.toContain("sp.mobileLayout");
+  });
+
+  it("offers the pricebook save suggestion on any surface that supplies the actions", () => {
+    expect(source).toContain("if (!checkFieldPricebookItemNameExistsAction || !saveFieldItemToPricebookAction) return;");
+    expect(source).toContain("{pendingSaveSuggestion ? (");
   });
 
   it("can expand desktop charge entry when an invoice action requests it", () => {
     expect(invoicePageSource).toContain('const shouldOpenChargeEntry = firstSearchValue(sp.add_charge) === "1";');
-    expect(invoicePageSource).toContain('<details open={shouldOpenChargeEntry}');
+    expect(invoicePageSource).toContain('<details open={shouldOpenChargeEntry || invoice.line_items.length === 0}');
     expect(invoicePageSource).toContain('initialAddFormOpen={shouldOpenChargeEntry}');
     expect(source).toContain('initialAddFormOpen?: boolean');
     expect(source).toContain('initialAddFormOpen = false');
-    expect(source).toContain('useState(initialAddFormOpen)');
+    // An empty draft opens charge entry without an explicit request — adding a
+    // charge is the only reason to be on an empty draft.
+    expect(source).toContain('useState(initialAddFormOpen || lineItems.length === 0)');
   });
 
   it("gates draft-line editor controls by granular capabilities", () => {
@@ -76,7 +86,12 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).toContain("Use this for fees, add-ons, or anything not already listed on the invoice.");
     expect(source).toContain("const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>('');");
     expect(source).toContain("const [pricebookSearchQuery, setPricebookSearchQuery] = useState('');");
-    expect(source).toContain("const filteredPricebookPickerItems = pricebookSearch");
+    expect(source).toContain("const matchingPricebookPickerItems = pricebookSearch");
+    // Results are previewed, never silently dropped: anything held back is
+    // counted and offered rather than disappearing off the end of the list.
+    expect(source).toContain("const hiddenPricebookResultCount =");
+    expect(source).not.toContain("}).slice(0, 8)");
+    expect(source).not.toContain("pricebookPickerItems.slice(0, 6)");
     expect(source).toContain('placeholder="Search Pricebook services..."');
     expect(source).toContain("Search Pricebook");
     expect(source).toContain("Manual Charge");
@@ -107,7 +122,7 @@ describe("internal invoice line items table capability wiring", () => {
   });
 
   it("renders draft billing disposition rails above charges without deleting draft detail", () => {
-    const zeroRailIndex = source.indexOf("$0.00 invoice - choose how to handle it");
+    const zeroRailIndex = source.indexOf("Resolve without billing");
     const externalRailIndex = source.indexOf("External billing option");
     const resolvedRailIndex = source.indexOf("Billing is handled for this $0.00 invoice. No payment was recorded.");
     const externalResolvedRailIndex = source.indexOf("Billed outside EveryStep FieldWorks");
@@ -127,7 +142,11 @@ describe("internal invoice line items table capability wiring", () => {
     expect(externalRailIndex).toBeGreaterThan(-1);
     expect(externalRailIndex).toBeLessThan(headerIndex);
     expect(externalRailIndex).toBeLessThan(bottomAddFormIndex);
-    expect(source).toContain("Add a charge if billing is missing. No Charge resolves billing without collecting money. External Billing Complete resolves billing handled outside EveryStep FieldWorks.");
+    // The empty draft is a neutral starting state, not a warning, and the
+    // non-billing resolutions explain themselves where they are chosen.
+    expect(source).toContain("For jobs that will not be billed through EveryStep FieldWorks. Each of these closes out billing for this job.");
+    expect(source).not.toContain("$0.00 invoice - choose how to handle it");
+    expect(source).not.toContain("bg-amber-50/75");
     expect(source).toContain("Mark this job as billed outside EveryStep FieldWorks. Existing draft line items will stay here for reference, but this draft will not be treated as the invoice sent through the app.");
     expect(source).toContain("Draft charges were kept for reference. No internal payment or Stripe collection was recorded.");
     expect(source).toContain("Mark No Charge");
@@ -138,7 +157,7 @@ describe("internal invoice line items table capability wiring", () => {
   });
 
   it("submits external billing completion through the redirecting server action path", () => {
-    const zeroRailIndex = source.indexOf("$0.00 invoice - choose how to handle it");
+    const zeroRailIndex = source.indexOf("Resolve without billing");
     const externalRailIndex = source.indexOf("External billing option");
     const zeroRailSlice = source.slice(zeroRailIndex, zeroRailIndex + 2600);
     const externalRailSlice = source.slice(externalRailIndex, externalRailIndex + 2200);
@@ -157,7 +176,7 @@ describe("internal invoice line items table capability wiring", () => {
 
   it("keeps Add Charge wired to the existing pricebook invoice action fields", () => {
     const pricebookFormIndex = source.indexOf("action={handleAddPricebook}");
-    const pricebookFormSlice = source.slice(pricebookFormIndex, pricebookFormIndex + 6000);
+    const pricebookFormSlice = source.slice(pricebookFormIndex, pricebookFormIndex + 7600);
 
     expect(pricebookFormSlice).toContain('name="job_id" value={jobId}');
     expect(pricebookFormSlice).toContain('name="invoice_id" value={selectedInvoiceId}');
