@@ -194,6 +194,10 @@ async function loadCloseoutRows(params: {
     .select(WORKSPACE_SELECT)
     .is("deleted_at", null)
     .neq("status", "cancelled")
+    // Closed jobs can never pass isInCloseoutQueue. Filtering before the
+    // oldest-first EXPORT_LIMIT also stops all-time closed history from
+    // crowding real queue rows out of the capped window.
+    .neq("ops_status", "closed")
     .eq("field_complete", true)
     .order("created_at", { ascending: true })
     .limit(EXPORT_LIMIT);

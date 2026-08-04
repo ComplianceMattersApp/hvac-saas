@@ -342,8 +342,14 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(loaderSource).toContain("listCloseoutQueueJobs(");
     expect(loaderSource).not.toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
     expect(loaderSource).not.toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
-    expect(loaderSource).not.toContain('.neq("ops_status", "closed")');
-    expect(loaderSource).not.toContain('.not("ops_status"');
+    // Queue membership truth lives in isInCloseoutQueue alone. The ONE allowed
+    // SQL status filter is the closed-exclusion: the predicate rejects closed
+    // rows unconditionally (pinned by lib/utils/__tests__/closeout.test.ts
+    // "keeps closed-status rows out of the active closeout queue..."), so this
+    // prefilter cannot diverge from it — it just stops the read from growing
+    // with all-time closed history. Any other ops_status logic stays banned.
+    const opsStatusFilters = loaderSource.match(/\.(neq|not|in|eq)\("ops_status"[^)]*\)/g) ?? [];
+    expect(opsStatusFilters).toEqual(['.neq("ops_status", "closed")']);
   });
 
   it("shows clear filters and empty filtered state for unmatched board filters", () => {

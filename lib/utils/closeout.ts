@@ -54,6 +54,9 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
 
   const opsStatus = String(job.ops_status ?? "").toLowerCase();
   const needs = getCloseoutNeeds(job);
+  // SQL prefilters (.neq ops_status closed) in app/ops/page.tsx and
+  // lib/ops/ops-queue-export.ts rely on this exclusion being unconditional.
+  // If closed jobs ever become queue-eligible, update those reads too.
   if (opsStatus === "closed") return false;
 
   if (needs.isBlockedForCloseout) {

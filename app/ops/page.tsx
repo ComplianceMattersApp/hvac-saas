@@ -827,6 +827,11 @@ export default async function OpsPage({
       .select(workspaceSelect)
       .is("deleted_at", null)
       .neq("status", "cancelled")
+      // isInCloseoutQueue rejects closed jobs unconditionally, and the billing
+      // projection copies ops_status verbatim (a closed job can never re-enter
+      // the queue). Filtering here keeps this read bounded by active closeout
+      // work instead of growing with all-time completed history.
+      .neq("ops_status", "closed")
       .eq("field_complete", true)
       .order("created_at", { ascending: false });
 
@@ -1068,6 +1073,9 @@ export default async function OpsPage({
         .select(workspaceSelect)
         .is("deleted_at", null)
         .neq("status", "cancelled")
+        // Closed jobs can never pass isInCloseoutQueue (projection copies
+        // ops_status verbatim) — keep this read bounded by active work.
+        .neq("ops_status", "closed")
         .eq("field_complete", true)
         .order("created_at", { ascending: true });
       if (closeoutRowsRes.error) throw closeoutRowsRes.error;
@@ -1079,7 +1087,13 @@ export default async function OpsPage({
         jobs: closeoutProjectionInputs(closeoutSourceRows),
       });
 
-      const closeoutJobIds = closeoutSourceRows
+      // Entered-at events are only consulted for rows that survive the queue
+      // filter — fetch them for that subset, not the whole source set.
+      const closeoutQueueRows = listCloseoutQueueJobs(
+        closeoutSourceRows,
+        (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
+      );
+      const closeoutJobIds = closeoutQueueRows
         .map((job: any) => String(job?.id ?? "").trim())
         .filter(Boolean);
       const closeoutStatusEventsRes = closeoutJobIds.length
@@ -1094,10 +1108,7 @@ export default async function OpsPage({
       const closeoutEnteredAtByJob = buildOpsStatusEnteredAtByJob(closeoutStatusEventsRes.data ?? []);
 
       return sortOpsBoardRows(
-        listCloseoutQueueJobs(
-          closeoutSourceRows,
-          (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
-        ),
+        closeoutQueueRows,
         boardSort,
         {
           queueEnteredAt: (job) => {
