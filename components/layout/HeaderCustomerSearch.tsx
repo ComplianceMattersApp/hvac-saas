@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { FileText, Search, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { InvoiceSuggestion } from "@/lib/invoices/invoice-suggestions";
+import type { InvoiceSuggestion, InvoiceSuggestionMatchKind } from "@/lib/invoices/invoice-suggestions";
 
 type CustomerSuggestion = {
   customer_id: string;
@@ -63,6 +63,7 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
   const [invoices, setInvoices] = useState<InvoiceSuggestion[]>([]);
+  const [invoiceMatchKind, setInvoiceMatchKind] = useState<InvoiceSuggestionMatchKind>(null);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
 
@@ -74,12 +75,14 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
     setQuery("");
     setSuggestions([]);
     setInvoices([]);
+    setInvoiceMatchKind(null);
   }, [pathname]);
 
   useEffect(() => {
     if (!showPanel) {
       setSuggestions([]);
       setInvoices([]);
+      setInvoiceMatchKind(null);
       setLoading(false);
       return;
     }
@@ -94,18 +97,22 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
         if (!response.ok) {
           setSuggestions([]);
           setInvoices([]);
+          setInvoiceMatchKind(null);
           return;
         }
         const payload = (await response.json()) as {
           suggestions?: CustomerSuggestion[];
           invoices?: InvoiceSuggestion[];
+          invoiceMatchKind?: InvoiceSuggestionMatchKind;
         };
         setSuggestions(Array.isArray(payload.suggestions) ? payload.suggestions : []);
         setInvoices(Array.isArray(payload.invoices) ? payload.invoices : []);
+        setInvoiceMatchKind(payload.invoiceMatchKind ?? null);
       } catch (error) {
         if (!controller.signal.aborted) {
           setSuggestions([]);
           setInvoices([]);
+          setInvoiceMatchKind(null);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -154,6 +161,66 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
     onNavigate?.();
   }
 
+  const invoiceSection = {
+    key: "invoices",
+    heading: "Invoices",
+    count: invoices.length,
+    render: () =>
+      invoices.map((invoice) =>
+        invoice.href ? (
+          <Link
+            key={invoice.invoice_id}
+            href={invoice.href}
+            onClick={handleNavigate}
+            className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+          >
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
+              <FileText className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-slate-950">
+                {invoice.invoice_reference}
+              </span>
+              <span className="block truncate text-xs text-slate-500">{invoiceSecondaryLine(invoice)}</span>
+            </span>
+          </Link>
+        ) : null,
+      ),
+  };
+
+  const customerSection = {
+    key: "customers",
+    heading: "Customers",
+    count: suggestions.length,
+    render: () =>
+      suggestions.map((suggestion) => (
+        <Link
+          key={suggestion.customer_id}
+          href={`/customers/${suggestion.customer_id}`}
+          onClick={handleNavigate}
+          className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+        >
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
+            <UserRound className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-sm font-semibold text-slate-950">
+              {suggestion.full_name || "Unnamed customer"}
+            </span>
+            <span className="block truncate text-xs text-slate-500">{secondaryLine(suggestion)}</span>
+          </span>
+        </Link>
+      )),
+  };
+
+  // An invoice number is an unambiguous request for that invoice, so it leads.
+  // A name is first and foremost a customer lookup - their invoices sit below.
+  const visibleSections = (
+    invoiceMatchKind === "number" ? [invoiceSection, customerSection] : [customerSection, invoiceSection]
+  ).filter((section) => section.count > 0);
+
+  const showSectionHeadings = visibleSections.length > 1;
+
   return (
     <div ref={rootRef} className={["relative", compact ? "w-full" : "w-full max-w-sm xl:max-w-md"].join(" ")}>
       <label className="sr-only" htmlFor={compact ? "mobile-customer-search" : "header-customer-search"}>
@@ -187,63 +254,21 @@ export default function HeaderCustomerSearch({ compact = false, onNavigate }: Pr
         >
           {hasResults ? (
             <div className="max-h-80 overflow-y-auto p-1">
-              {invoices.length > 0 ? (
-                <>
-                  <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-                    Invoices
-                  </div>
-                  {invoices.map((invoice) =>
-                    invoice.href ? (
-                      <Link
-                        key={invoice.invoice_id}
-                        href={invoice.href}
-                        onClick={handleNavigate}
-                        className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
-                      >
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
-                          <FileText className="h-4 w-4" aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-slate-950">
-                            {invoice.invoice_reference}
-                          </span>
-                          <span className="block truncate text-xs text-slate-500">
-                            {invoiceSecondaryLine(invoice)}
-                          </span>
-                        </span>
-                      </Link>
-                    ) : null,
-                  )}
-                </>
-              ) : null}
-
-              {suggestions.length > 0 ? (
-                <>
-                  {invoices.length > 0 ? (
-                    <div className="mt-1 border-t border-slate-100 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
-                      Customers
+              {visibleSections.map((section, index) => (
+                <div key={section.key}>
+                  {showSectionHeadings ? (
+                    <div
+                      className={[
+                        "px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400",
+                        index === 0 ? "pt-1.5" : "mt-1 border-t border-slate-100 pt-2",
+                      ].join(" ")}
+                    >
+                      {section.heading}
                     </div>
                   ) : null}
-                  {suggestions.map((suggestion) => (
-                    <Link
-                      key={suggestion.customer_id}
-                      href={`/customers/${suggestion.customer_id}`}
-                      onClick={handleNavigate}
-                      className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
-                    >
-                      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
-                        <UserRound className="h-4 w-4" aria-hidden="true" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-slate-950">
-                          {suggestion.full_name || "Unnamed customer"}
-                        </span>
-                        <span className="block truncate text-xs text-slate-500">{secondaryLine(suggestion)}</span>
-                      </span>
-                    </Link>
-                  ))}
-                </>
-              ) : null}
+                  {section.render()}
+                </div>
+              ))}
             </div>
           ) : (
             <div className="px-3 py-3 text-sm font-medium text-slate-500">{emptyLabel}</div>

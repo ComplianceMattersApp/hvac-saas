@@ -33,7 +33,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
     searchScopedCustomerSuggestions.mockResolvedValue({
       results: [{ id: "cust-1", label: "Acme Co" }],
     });
-    searchScopedInvoiceSuggestions.mockResolvedValue({ results: [] });
+    searchScopedInvoiceSuggestions.mockResolvedValue({ results: [], matchedBy: null });
   });
 
   it("returns 401 and never searches when there is no authenticated user", async () => {
@@ -50,7 +50,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
     const res = await getSuggestions("a");
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ suggestions: [], invoices: [] });
+    expect(await res.json()).toEqual({ suggestions: [], invoices: [], invoiceMatchKind: null });
     expect(searchScopedCustomerSuggestions).not.toHaveBeenCalled();
     expect(searchScopedInvoiceSuggestions).not.toHaveBeenCalled();
   });
@@ -58,7 +58,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
   it("treats a whitespace-padded 1-character query as too short after trimming", async () => {
     const res = await getSuggestions("  a  ");
 
-    expect(await res.json()).toEqual({ suggestions: [], invoices: [] });
+    expect(await res.json()).toEqual({ suggestions: [], invoices: [], invoiceMatchKind: null });
     expect(searchScopedCustomerSuggestions).not.toHaveBeenCalled();
   });
 
@@ -66,7 +66,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
     const res = await getSuggestions(null);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ suggestions: [], invoices: [] });
+    expect(await res.json()).toEqual({ suggestions: [], invoices: [], invoiceMatchKind: null });
     expect(searchScopedCustomerSuggestions).not.toHaveBeenCalled();
   });
 
@@ -77,6 +77,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
     expect(await res.json()).toEqual({
       suggestions: [{ id: "cust-1", label: "Acme Co" }],
       invoices: [],
+      invoiceMatchKind: null,
     });
     expect(searchScopedCustomerSuggestions).toHaveBeenCalledWith({
       supabase: expect.anything(),
@@ -89,6 +90,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
   it("returns invoice matches alongside customer matches for the same trimmed query", async () => {
     searchScopedInvoiceSuggestions.mockResolvedValue({
       results: [{ invoice_id: "inv-1", invoice_reference: "Invoice #2043" }],
+      matchedBy: "number",
     });
 
     const res = await getSuggestions("  2043  ");
@@ -96,6 +98,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
     expect(await res.json()).toEqual({
       suggestions: [{ id: "cust-1", label: "Acme Co" }],
       invoices: [{ invoice_id: "inv-1", invoice_reference: "Invoice #2043" }],
+      invoiceMatchKind: "number",
     });
     expect(searchScopedInvoiceSuggestions).toHaveBeenCalledWith({
       supabase: expect.anything(),
@@ -114,6 +117,7 @@ describe("GET /api/customers/suggestions — scoped customer typeahead", () => {
     expect(await res.json()).toEqual({
       suggestions: [{ id: "cust-1", label: "Acme Co" }],
       invoices: [],
+      invoiceMatchKind: null,
     });
   });
 });

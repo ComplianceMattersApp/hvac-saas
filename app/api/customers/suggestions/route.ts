@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const q = String(searchParams.get("q") ?? "").trim();
 
   if (q.length < 2) {
-    return NextResponse.json({ suggestions: [], invoices: [] });
+    return NextResponse.json({ suggestions: [], invoices: [], invoiceMatchKind: null });
   }
 
   const [scoped, invoices] = await Promise.all([
@@ -32,8 +32,12 @@ export async function GET(request: Request) {
       userId: userData.user.id,
       searchText: q,
       resultLimit: 5,
-    }).catch(() => ({ results: [] })),
+    }).catch(() => ({ results: [], matchedBy: null })),
   ]);
 
-  return NextResponse.json({ suggestions: scoped.results, invoices: invoices.results });
+  return NextResponse.json({
+    suggestions: scoped.results,
+    invoices: invoices.results,
+    invoiceMatchKind: invoices.matchedBy,
+  });
 }

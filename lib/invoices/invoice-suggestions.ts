@@ -5,6 +5,13 @@ import {
   normalizeDisplayNumber,
 } from "@/lib/utils/display-references";
 
+/**
+ * How the query reached the invoice. Callers use this to decide whether invoices
+ * or customers lead the result list: a number is an unambiguous invoice lookup,
+ * a name is primarily a customer lookup that happens to surface their invoices.
+ */
+export type InvoiceSuggestionMatchKind = "number" | "name" | null;
+
 export type InvoiceSuggestion = {
   invoice_id: string;
   job_id: string | null;
@@ -50,17 +57,26 @@ function escapeLikePattern(raw: string) {
   return raw.replace(/[%_]/g, "\\$&");
 }
 
+// PostgREST parses `or=(...)` as a comma-separated grammar, so a name carrying a
+// comma or a paren would break the filter apart. Quoting the value keeps the
+// whole pattern in one operand.
+function quoteOrFilterValue(pattern: string) {
+  return `"${pattern.replace(/[\\"]/g, (character) => `\\${character}`)}"`;
+}
+
 /**
- * Splits a raw search box query into the two ways an invoice can be addressed:
- * the short display number people actually read off a PDF ("2043", "#2043",
- * "invoice 2043"), and the opaque legacy `invoice_number` text ("INV-20260530-A1B2").
+ * Splits a raw search box query into the ways an invoice can be addressed: the
+ * short display number people read off a PDF ("2043", "#2043", "invoice 2043"),
+ * the opaque legacy `invoice_number` text ("INV-20260530-A1B2"), and the name of
+ * whoever the invoice is billed to.
  */
 export function parseInvoiceSearchQuery(raw: string | null | undefined): {
   displayNumber: number | null;
   legacyNumberText: string | null;
+  billToText: string | null;
 } {
   const trimmed = normalizeText(raw);
-  if (!trimmed) return { displayNumber: null, legacyNumberText: null };
+  if (!trimmed) return { displayNumber: null, legacyNumberText: null, billToText: null };
 
   const stripped = trimmed.replace(/^(?:invoices?|inv)?\s*#?\s*/i, "").trim();
 
@@ -71,14 +87,17 @@ export function parseInvoiceSearchQuery(raw: string | null | undefined): {
   }
 
   // Legacy invoice numbers look like "INV-20260530-A1B2". A bare digit run would
-  // match the date segment of every invoice raised that day, and a bare word run
-  // is a customer name - so only pay for that scan when the query is shaped like
-  // a legacy number.
+  // match the date segment of every invoice raised that day, so only pay for that
+  // scan when the query is shaped like a legacy number.
   const looksLikeLegacyNumber =
     /^inv/i.test(trimmed) || (/[a-z]/i.test(trimmed) && /\d/.test(trimmed));
   const legacyNumberText = looksLikeLegacyNumber ? trimmed : null;
 
-  return { displayNumber, legacyNumberText };
+  // A legacy number is never a person's name, and a single stray letter is a
+  // typo rather than a name worth scanning for.
+  const billToText = !looksLikeLegacyNumber && /[a-z]{2,}/i.test(trimmed) ? trimmed : null;
+
+  return { displayNumber, legacyNumberText, billToText };
 }
 
 function jobCustomerDisplay(job: InvoiceSuggestionJobRow | undefined) {
@@ -145,17 +164,45 @@ export function buildInvoiceSuggestions(params: {
   return ranked.slice(0, Math.max(0, params.resultLimit)).map((entry) => entry.suggestion);
 }
 
+async function findScopedCustomerIdsByName(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  nameText: string;
+  limit: number;
+}): Promise<string[]> {
+  const like = quoteOrFilterValue(`%${escapeLikePattern(params.nameText)}%`);
+
+  const { data, error } = await params.supabase
+    .from("customers")
+    .select("id")
+    .eq("owner_user_id", params.accountOwnerUserId)
+    .or([`full_name.ilike.${like}`, `first_name.ilike.${like}`, `last_name.ilike.${like}`].join(","))
+    .limit(params.limit);
+
+  if (error) throw error;
+
+  const ids = new Set<string>();
+  for (const row of (data ?? []) as Array<{ id?: string }>) {
+    const id = normalizeText(row.id);
+    if (id) ids.add(id);
+  }
+
+  return Array.from(ids);
+}
+
 export async function searchScopedInvoiceSuggestions(params: {
   supabase: any;
   userId: string;
   searchText: string;
   resultLimit?: number;
-}): Promise<{ results: InvoiceSuggestion[] }> {
+}): Promise<{ results: InvoiceSuggestion[]; matchedBy: InvoiceSuggestionMatchKind }> {
   const resultLimit = params.resultLimit ?? 5;
-  const { displayNumber, legacyNumberText } = parseInvoiceSearchQuery(params.searchText);
+  const { displayNumber, legacyNumberText, billToText } = parseInvoiceSearchQuery(params.searchText);
+  const matchedBy: InvoiceSuggestionMatchKind =
+    displayNumber !== null || legacyNumberText ? "number" : billToText ? "name" : null;
 
-  if (displayNumber === null && !legacyNumberText) {
-    return { results: [] };
+  if (!matchedBy) {
+    return { results: [], matchedBy: null };
   }
 
   const scope = await resolveCustomerVisibilityScope({
@@ -165,32 +212,50 @@ export async function searchScopedInvoiceSuggestions(params: {
 
   // Invoice lookup is an internal back-office affordance. Contractor portal users
   // reach their own invoices through the portal, so never widen their scope here.
-  if (!scope || scope.kind !== "internal") return { results: [] };
+  if (!scope || scope.kind !== "internal") return { results: [], matchedBy };
 
   const accountOwnerUserId = normalizeText(scope.accountOwnerUserId);
-  if (!accountOwnerUserId) return { results: [] };
+  if (!accountOwnerUserId) return { results: [], matchedBy };
 
-  const lookups: Array<Promise<{ data: unknown; error: unknown }>> = [];
+  function invoiceQuery() {
+    return params.supabase
+      .from("internal_invoices")
+      .select(INVOICE_SUGGESTION_SELECT)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      // Every lookup is capped, so order first - otherwise a customer with more
+      // invoices than the cap returns an arbitrary handful instead of the recent ones.
+      .order("invoice_display_number", { ascending: false })
+      .limit(resultLimit);
+  }
+
+  const lookups: Array<PromiseLike<{ data: unknown; error: unknown }>> = [];
 
   if (displayNumber !== null) {
-    lookups.push(
-      params.supabase
-        .from("internal_invoices")
-        .select(INVOICE_SUGGESTION_SELECT)
-        .eq("account_owner_user_id", accountOwnerUserId)
-        .eq("invoice_display_number", displayNumber)
-        .limit(resultLimit),
-    );
+    lookups.push(invoiceQuery().eq("invoice_display_number", displayNumber));
   }
 
   if (legacyNumberText) {
+    lookups.push(invoiceQuery().ilike("invoice_number", `%${escapeLikePattern(legacyNumberText)}%`));
+  }
+
+  if (billToText) {
+    // The name printed on the invoice - covers contractor bill-to as well as customers.
+    lookups.push(invoiceQuery().ilike("billing_name", `%${escapeLikePattern(billToText)}%`));
+
+    // Invoices are not required to carry a billing name, so also come at it from
+    // the customer record the invoice hangs off.
     lookups.push(
-      params.supabase
-        .from("internal_invoices")
-        .select(INVOICE_SUGGESTION_SELECT)
-        .eq("account_owner_user_id", accountOwnerUserId)
-        .ilike("invoice_number", `%${escapeLikePattern(legacyNumberText)}%`)
-        .limit(resultLimit),
+      (async () => {
+        const customerIds = await findScopedCustomerIdsByName({
+          supabase: params.supabase,
+          accountOwnerUserId,
+          nameText: billToText,
+          limit: Math.max(resultLimit * 2, 10),
+        });
+
+        if (!customerIds.length) return { data: [], error: null };
+        return invoiceQuery().in("customer_id", customerIds);
+      })(),
     );
   }
 
@@ -202,7 +267,7 @@ export async function searchScopedInvoiceSuggestions(params: {
     invoices.push(...((result?.data ?? []) as InvoiceSuggestionRow[]));
   }
 
-  if (!invoices.length) return { results: [] };
+  if (!invoices.length) return { results: [], matchedBy };
 
   const jobIds = Array.from(
     new Set(invoices.map((invoice) => normalizeText(invoice.job_id)).filter(Boolean)),
@@ -219,5 +284,5 @@ export async function searchScopedInvoiceSuggestions(params: {
     jobs = (jobRows ?? []) as InvoiceSuggestionJobRow[];
   }
 
-  return { results: buildInvoiceSuggestions({ invoices, jobs, resultLimit }) };
+  return { results: buildInvoiceSuggestions({ invoices, jobs, resultLimit }), matchedBy };
 }
