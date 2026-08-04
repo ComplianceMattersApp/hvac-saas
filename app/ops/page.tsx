@@ -1320,55 +1320,79 @@ export default async function OpsPage({
     const selectedPreviewJobIds = selectedPreviewRows
       .map((job: any) => String(job?.id ?? "").trim())
       .filter(Boolean);
-    const selectedPreviewAssignmentDisplayMap = selectedPreviewJobIds.length
-      ? await getActiveJobAssignmentDisplayMap({
-          supabase,
-          jobIds: selectedPreviewJobIds,
-        })
-      : {};
-
-    const selectedPreviewFailedRunsRes = selectedPreviewJobIds.length
-      ? await supabase
-          .from("ecc_test_runs")
-          .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
-          .in("job_id", selectedPreviewJobIds)
-          .eq("is_completed", true)
-          .or("override_pass.eq.false,computed_pass.eq.false")
-      : { data: [], error: null };
+    // These enrichment reads all depend only on the selected preview job ids
+    // (plus two independent account-level reads), so they run as one barrier
+    // instead of eight sequential round-trips.
+    const _t_selectedPreviewEnrichment = opsTimingEnabled ? Date.now() : 0;
+    const [
+      selectedPreviewAssignmentDisplayMap,
+      selectedPreviewFailedRunsRes,
+      selectedPreviewCustomerAttemptEventsRes,
+      selectedPreviewContractorReportEventsRes,
+      selectedPreviewJobEventsRes,
+      selectedWorkspaceCloseoutProjection,
+      operationalTenantIdentity,
+      workspaceContractorsRes,
+    ] = await Promise.all([
+      selectedPreviewJobIds.length
+        ? getActiveJobAssignmentDisplayMap({
+            supabase,
+            jobIds: selectedPreviewJobIds,
+          })
+        : Promise.resolve({}),
+      selectedPreviewJobIds.length
+        ? supabase
+            .from("ecc_test_runs")
+            .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
+            .in("job_id", selectedPreviewJobIds)
+            .eq("is_completed", true)
+            .or("override_pass.eq.false,computed_pass.eq.false")
+        : Promise.resolve({ data: [], error: null }),
+      selectedPreviewJobIds.length
+        ? supabase
+            .from("job_events")
+            .select("job_id, created_at")
+            .in("job_id", selectedPreviewJobIds)
+            .eq("event_type", "customer_attempt")
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      selectedPreviewJobIds.length
+        ? supabase
+            .from("job_events")
+            .select("job_id, event_type, created_at, meta")
+            .in("job_id", selectedPreviewJobIds)
+            .eq("event_type", "contractor_report_sent")
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      selectedPreviewJobIds.length
+        ? supabase
+            .from("job_events")
+            .select("job_id, event_type, created_at, message, meta")
+            .in("job_id", selectedPreviewJobIds)
+            .order("created_at", { ascending: false })
+            .limit(1000)
+        : Promise.resolve({ data: [], error: null }),
+      selectedWorkspaceKey === "closeout" && selectedPreviewRows.length
+        ? buildBillingTruthCloseoutProjectionMap({
+            supabase,
+            accountOwnerUserId: internalUser.account_owner_user_id,
+            jobs: closeoutProjectionInputs(selectedPreviewRows),
+          })
+        : Promise.resolve(null),
+      operationalTenantIdentityPromise,
+      supabase
+        .from("contractors")
+        .select("id, name")
+        .eq("lifecycle_state", "active")
+        .order("name", { ascending: true }),
+    ]);
+    if (opsTimingEnabled) {
+      console.log(`[ops:selectedPreviewEnrichment] ${Date.now() - _t_selectedPreviewEnrichment}ms`);
+    }
 
     if (selectedPreviewFailedRunsRes.error) throw selectedPreviewFailedRunsRes.error;
-
-    const selectedPreviewCustomerAttemptEventsRes = selectedPreviewJobIds.length
-      ? await supabase
-          .from("job_events")
-          .select("job_id, created_at")
-          .in("job_id", selectedPreviewJobIds)
-          .eq("event_type", "customer_attempt")
-          .order("created_at", { ascending: false })
-      : { data: [], error: null };
-
     if (selectedPreviewCustomerAttemptEventsRes.error) throw selectedPreviewCustomerAttemptEventsRes.error;
-
-    const selectedPreviewContractorReportEventsRes = selectedPreviewJobIds.length
-      ? await supabase
-          .from("job_events")
-          .select("job_id, event_type, created_at, meta")
-          .in("job_id", selectedPreviewJobIds)
-          .eq("event_type", "contractor_report_sent")
-          .order("created_at", { ascending: false })
-      : { data: [], error: null };
-
     if (selectedPreviewContractorReportEventsRes.error) throw selectedPreviewContractorReportEventsRes.error;
-
-    const selectedPreviewJobEventsRes = selectedPreviewJobIds.length
-      ? await supabase
-          .from("job_events")
-          .select("job_id, event_type, created_at, message, meta")
-          .in("job_id", selectedPreviewJobIds)
-          .order("created_at", { ascending: false })
-          .limit(1000)
-      : { data: [], error: null };
-
     if (selectedPreviewJobEventsRes.error) throw selectedPreviewJobEventsRes.error;
 
     const selectedPreviewJobEvents = selectedPreviewJobEventsRes.data ?? [];
@@ -1397,22 +1421,8 @@ export default async function OpsPage({
       (selectedPreviewCustomerAttemptEventsRes.data ?? []) as Array<{ job_id: string; created_at: string }>,
     );
     const selectedWorkspaceCloseoutProjectionByJob =
-      selectedWorkspaceKey === "closeout" && selectedPreviewRows.length
-        ? (
-            await buildBillingTruthCloseoutProjectionMap({
-              supabase,
-              accountOwnerUserId: internalUser.account_owner_user_id,
-              jobs: closeoutProjectionInputs(selectedPreviewRows),
-            })
-          ).projectionsByJobId
-        : new Map<string, any>();
+      selectedWorkspaceCloseoutProjection?.projectionsByJobId ?? new Map<string, any>();
 
-    const operationalTenantIdentity = await operationalTenantIdentityPromise;
-    const workspaceContractorsRes = await supabase
-      .from("contractors")
-      .select("id, name")
-      .eq("lifecycle_state", "active")
-      .order("name", { ascending: true });
     if (workspaceContractorsRes.error) throw workspaceContractorsRes.error;
     const workspaceContractors = workspaceContractorsRes.data ?? [];
     // Contractor Focus is scoped to the bucket currently being rendered. Queue
