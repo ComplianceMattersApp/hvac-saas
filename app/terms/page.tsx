@@ -24,7 +24,7 @@ export default function TermsOfServicePage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <p className="text-sm text-stone-500">Last updated: July 11, 2026</p>
+        <p className="text-sm text-stone-500">Last updated: August 4, 2026</p>
         <h1 className="mt-2 text-2xl font-bold text-[#0f1f35]">
           Terms of Service — EveryStep FieldWorks by Compliance Matters
         </h1>
@@ -80,19 +80,48 @@ export default function TermsOfServicePage() {
           presented at signup. All fees are non-refundable unless otherwise stated.
         </p>
 
-        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">8. Limitation of Liability</h2>
+        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">
+          8. SMS/Text Messaging Terms
+        </h2>
+        <p className="text-stone-700 leading-relaxed">
+          Compliance Matters may offer customers the option to receive operational text messages,
+          including appointment confirmations, appointment reminders, scheduling updates, technician
+          or rater on-the-way notifications, service updates, and customer-requested communications.
+          These messages are transactional and service-related, not marketing messages.
+        </p>
+        <p className="mt-3 text-stone-700 leading-relaxed">
+          By providing consent to receive text messages from Compliance Matters, you agree to receive
+          operational service-related communications. Consent may be provided through approved
+          business communication channels, including verbally during appointment scheduling or
+          through a digital consent method if and when one is made available. Consent is optional,
+          applies only to operational communications, and is not a condition of purchase or service.
+        </p>
+        <p className="mt-3 text-stone-700 leading-relaxed">
+          Message frequency varies based on customer appointments, service activity, and
+          communication needs. Message and data rates may apply depending on your mobile carrier and
+          plan. Reply STOP at any time to unsubscribe from SMS communications. Reply HELP for
+          assistance or contact Compliance Matters directly.
+        </p>
+        <p className="mt-3 text-stone-700 leading-relaxed">
+          Wireless carriers and network providers are not responsible for delayed or undelivered
+          messages. Compliance Matters does not guarantee message delivery, which may be affected by
+          carrier availability, network limitations, device compatibility, or other circumstances
+          outside our control.
+        </p>
+
+        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">9. Limitation of Liability</h2>
         <p className="text-stone-700 leading-relaxed">
           The Service is provided &ldquo;as is.&rdquo; Compliance Matters shall not be liable for any
           indirect, incidental, or consequential damages arising from your use of the Service.
         </p>
 
-        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">9. Modifications</h2>
+        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">10. Modifications</h2>
         <p className="text-stone-700 leading-relaxed">
           We may update these Terms at any time. Continued use of the Service after changes constitutes
           acceptance of the updated Terms.
         </p>
 
-        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">10. Contact</h2>
+        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">11. Contact</h2>
         <p className="text-stone-700 leading-relaxed">
           Compliance Matters
           <br />

@@ -24,7 +24,7 @@ export default function PrivacyPolicyPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-12">
-        <p className="text-sm text-stone-500">Last updated: July 11, 2026</p>
+        <p className="text-sm text-stone-500">Last updated: August 4, 2026</p>
         <h1 className="mt-2 text-2xl font-bold text-[#0f1f35]">
           Privacy Policy — EveryStep FieldWorks by Compliance Matters
         </h1>
@@ -99,13 +99,45 @@ export default function PrivacyPolicyPage() {
           <li>As required by law</li>
         </ul>
 
-        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">7. Your Rights</h2>
+        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">
+          7. SMS/Text Messaging Program
+        </h2>
+        <p className="text-stone-700 leading-relaxed">
+          Compliance Matters may send text messages to customers who have consented to receive
+          operational communications. These messages may include appointment confirmations,
+          appointment reminders, scheduling updates, technician or rater on-the-way notifications,
+          service updates, and customer-requested communications. These are transactional,
+          service-related communications and are not marketing messages.
+        </p>
+        <p className="mt-3 text-stone-700 leading-relaxed">
+          Customers may provide SMS consent through approved business communication channels,
+          including verbal consent during appointment scheduling and digital consent methods if and
+          when those methods are made available. SMS consent is optional, is specific to operational
+          communications, and is not a condition of purchasing or receiving services. Customers can
+          receive services without agreeing to text messages.
+        </p>
+        <p className="mt-3 text-stone-700 leading-relaxed">
+          Message frequency varies based on customer appointments, service activity, and
+          communication needs. Message and data rates may apply depending on your mobile carrier and
+          plan. Customers may opt out of SMS communications at any time by replying STOP. Customers
+          may request assistance by replying HELP or contacting Compliance Matters directly. Delivery
+          of text messages is subject to carrier and network availability.
+        </p>
+        <p className="mt-3 text-stone-700 leading-relaxed">
+          Mobile numbers collected for SMS consent are not sold and are not shared with third parties
+          for marketing purposes. SMS consent information is used only for authorized communications.
+          We may share mobile numbers with service providers, such as messaging and telecommunications
+          providers, only as necessary to deliver those authorized communications and operate the
+          messaging program.
+        </p>
+
+        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">8. Your Rights</h2>
         <p className="text-stone-700 leading-relaxed">
           You may request access to, correction of, or deletion of your personal data by contacting us
           at eddie@compliancemattersca.com.
         </p>
 
-        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">8. Contact</h2>
+        <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">9. Contact</h2>
         <p className="text-stone-700 leading-relaxed">
           Compliance Matters
           <br />
