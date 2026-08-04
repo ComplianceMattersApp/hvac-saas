@@ -59,7 +59,7 @@ describe("job detail V2 entrypoint", () => {
   });
 
   it("throws Desktop V2 contractor shadow membership read failures", () => {
-    expect(v2JobDetailSource).toContain("const { data: shadowMembership, error: shadowMembershipError } = await supabase");
+    expect(v2JobDetailSource).toContain("const { data: shadowMembership, error: shadowMembershipError } = shadowMembershipResult;");
     expect(v2JobDetailSource).toContain("if (shadowMembershipError) throw shadowMembershipError;");
     expect(v2JobDetailSource.indexOf("if (shadowMembershipError) throw shadowMembershipError;")).toBeLessThan(
       v2JobDetailSource.indexOf("const hasShadowMembership = Boolean(shadowMembership?.contractor_id);"),

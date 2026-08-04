@@ -405,9 +405,18 @@ export default async function JobDetailV2Page({
   const user = await timedPhase("authGetUser", () => getRequestUser());
   if (!user) redirect("/login");
 
-  const actorResolution = await timedPhase("actorRoleResolution", () =>
-    resolveJobDetailActor({ supabase, userId: user.id }),
-  );
+  // Actor resolution and the dual-role contractor shadow membership check both
+  // depend only on the authenticated user id — run them concurrently.
+  const [actorResolution, shadowMembershipResult] = await Promise.all([
+    timedPhase("actorRoleResolution", () =>
+      resolveJobDetailActor({ supabase, userId: user.id }),
+    ),
+    supabase
+      .from("contractor_users")
+      .select("contractor_id")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
   if (actorResolution.kind === "contractor") redirect(`/portal/jobs/${jobId}`);
   if (actorResolution.kind === "unauthorized") redirect("/login");
 
@@ -416,40 +425,53 @@ export default async function JobDetailV2Page({
   const internalRole = String(internalUser.role ?? "").toLowerCase();
   const isAdmin = internalRole === "admin";
 
-  // check for dual-role contractor shadow membership
-  const { data: shadowMembership, error: shadowMembershipError } = await supabase
-    .from("contractor_users")
-    .select("contractor_id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data: shadowMembership, error: shadowMembershipError } = shadowMembershipResult;
   if (shadowMembershipError) throw shadowMembershipError;
 
   const hasShadowMembership = Boolean(shadowMembership?.contractor_id);
 
-  // same-account boundary check
-  const scopedOutcome = await loadScopedInternalJobDetailReadBoundaryOutcome({
-    accountOwnerUserId,
-    jobId,
-  });
-  if (scopedOutcome.status !== "ok") return notFound();
-
   if (hasShadowMembership) supabase = createAdminClient();
 
   // ── main job query ─────────────────────────────────────────────────────────
+  // The same-account boundary check and the main job read run concurrently; the
+  // job payload is only consumed after the boundary check returns ok.
 
-  const { data: job, error: jobError } = await timedPhase("mainJobRead", () =>
-    supabase
-      .from("jobs")
-      .select(JOB_V2_SELECT)
-      .eq("id", jobId)
-      .single(),
-  );
+  const [scopedOutcome, mainJobReadResult] = await Promise.all([
+    loadScopedInternalJobDetailReadBoundaryOutcome({
+      accountOwnerUserId,
+      jobId,
+    }),
+    timedPhase("mainJobRead", () =>
+      supabase
+        .from("jobs")
+        .select(JOB_V2_SELECT)
+        .eq("id", jobId)
+        .single(),
+    ),
+  ]);
+  if (scopedOutcome.status !== "ok") return notFound();
+
+  const { data: job, error: jobError } = mainJobReadResult;
 
   if (jobError) throw jobError;
   if (!job) return notFound();
   if (job.deleted_at) redirect("/ops?saved=job_archived");
 
   const timelineScopeJobIds = [jobId, job.parent_job_id].filter(Boolean) as string[];
+
+  // equipment rows (label-photo evidence for them resolves in the burst below)
+  const baseEquipmentRows = ((job as any).job_equipment ?? []) as Array<{
+    id: string;
+    equipment_role: string | null;
+    component_type: string | null;
+    system_location: string | null;
+    manufacturer: string | null;
+    model: string | null;
+    serial: string | null;
+    tonnage: number | null;
+    refrigerant_type: string | null;
+    notes: string | null;
+  }>;
 
   // ── supplemental queries ──────────────────────────────────────────────────
 
@@ -467,6 +489,8 @@ export default async function JobDetailV2Page({
     workshareRequests,
     productMode,
     activeRetestChild,
+    receiverWorkshareRequest,
+    equipmentLabelPhotoAttachments,
   ] = await timedPhase("supplementalReads", () => Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
@@ -524,6 +548,20 @@ export default async function JobDetailV2Page({
       if (error) throw new Error(error.message);
       return data ?? null;
     })(),
+    // Receiver side: is THIS job a workshare receiving job? Needs only the
+    // account + job id, so it joins the supplemental burst.
+    getWorkshareRequestForReceivingJob(supabase, accountOwnerUserId, jobId),
+    // Equipment label-photo evidence needs only the equipment ids already on
+    // the main job payload.
+    baseEquipmentRows.length
+      ? listJobEquipmentLabelPhotoImages({
+          supabase,
+          admin: createAdminClient(),
+          jobId,
+          equipmentIds: baseEquipmentRows.map((equipment) => String(equipment.id)),
+          limit: 100,
+        })
+      : Promise.resolve([] as Awaited<ReturnType<typeof listJobEquipmentLabelPhotoImages>>),
   ]));
 
   if (customerLocationsError) throw customerLocationsError;
@@ -690,50 +728,54 @@ export default async function JobDetailV2Page({
   // connection invite; otherwise resolve the rater account's business identity
   // (RLS-scoped to them, so use the service-role client) — never fall back to an id.
   const workshareLabelAdmin = activeRaterWorkshareConnections.length > 0 ? createAdminClient() : null;
-  const workshareConnectionOptions = await Promise.all(
-    activeRaterWorkshareConnections.map(async (row) => {
-      const inviteName = String(row.invite_company_name ?? "").trim();
-      let label = inviteName;
-      if (!label && workshareLabelAdmin) {
-        const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
-          accountOwnerUserId: row.receiver_account_id,
-          supabase: workshareLabelAdmin,
-        });
-        label = String(identity.display_name ?? "").trim();
-      }
-      return { id: row.id, label: label || "Connected rater" };
-    }),
-  );
-
-  // Company names for the sent-request list (so it never shows a rater account id).
   const workshareRaterNameById: Record<string, string> = {};
-  {
-    const requestReceivers = Array.from(
-      new Set((workshareRequests ?? []).map((r) => String(r.receiver_account_id ?? "").trim()).filter(Boolean)),
-    );
-    if (requestReceivers.length > 0) {
-      const raterAdmin = workshareLabelAdmin ?? createAdminClient();
-      await Promise.all(
-        requestReceivers.map(async (receiverId) => {
+  // The three workshare name-resolution reads (connection labels, sent-request
+  // rater names, receiver-side sender name) are independent — one barrier.
+  const [workshareConnectionOptions, , receiverWorkshareSenderNames] = await Promise.all([
+    Promise.all(
+      activeRaterWorkshareConnections.map(async (row) => {
+        const inviteName = String(row.invite_company_name ?? "").trim();
+        let label = inviteName;
+        if (!label && workshareLabelAdmin) {
           const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
-            accountOwnerUserId: receiverId,
-            supabase: raterAdmin,
+            accountOwnerUserId: row.receiver_account_id,
+            supabase: workshareLabelAdmin,
           });
-          workshareRaterNameById[receiverId] = String(identity.display_name ?? "").trim() || "Connected rater";
-        }),
+          label = String(identity.display_name ?? "").trim();
+        }
+        return { id: row.id, label: label || "Connected rater" };
+      }),
+    ),
+    // Company names for the sent-request list (so it never shows a rater account id).
+    (async () => {
+      const requestReceivers = Array.from(
+        new Set((workshareRequests ?? []).map((r) => String(r.receiver_account_id ?? "").trim()).filter(Boolean)),
       );
-    }
-  }
+      if (requestReceivers.length > 0) {
+        const raterAdmin = workshareLabelAdmin ?? createAdminClient();
+        await Promise.all(
+          requestReceivers.map(async (receiverId) => {
+            const identity = await resolveInternalBusinessIdentityByAccountOwnerId({
+              accountOwnerUserId: receiverId,
+              supabase: raterAdmin,
+            });
+            workshareRaterNameById[receiverId] = String(identity.display_name ?? "").trim() || "Connected rater";
+          }),
+        );
+      }
+    })(),
+    // Receiver side: sender company name for the partner panel.
+    receiverWorkshareRequest
+      ? resolveWorkshareSenderCompanyNames([receiverWorkshareRequest])
+      : Promise.resolve(null),
+  ]);
 
-  // Receiver side: is THIS job a workshare receiving job (created from an accepted
-  // request)? If so, surface the partner panel with the contractor context.
-  const receiverWorkshareRequest = await getWorkshareRequestForReceivingJob(supabase, accountOwnerUserId, jobId);
   let receiverWorkshareSenderName = "Connected contractor";
   let receiverWorkshareCurrentResult: "passed" | "failed" | null = null;
-  if (receiverWorkshareRequest) {
-    const senderNames = await resolveWorkshareSenderCompanyNames([receiverWorkshareRequest]);
+  if (receiverWorkshareRequest && receiverWorkshareSenderNames) {
     receiverWorkshareSenderName =
-      senderNames.get(String(receiverWorkshareRequest.sender_account_id ?? "").trim()) || "Connected contractor";
+      receiverWorkshareSenderNames.get(String(receiverWorkshareRequest.sender_account_id ?? "").trim()) ||
+      "Connected contractor";
     // Live ECC result of this receiving job (rater sends it manually).
     const receiverOps = String(job.ops_status ?? "").toLowerCase();
     receiverWorkshareCurrentResult =
@@ -880,28 +922,8 @@ export default async function JobDetailV2Page({
     return "All done — this job is fully closed out.";
   })();
 
-  // equipment rows
-  const baseEquipmentRows = ((job as any).job_equipment ?? []) as Array<{
-    id: string;
-    equipment_role: string | null;
-    component_type: string | null;
-    system_location: string | null;
-    manufacturer: string | null;
-    model: string | null;
-    serial: string | null;
-    tonnage: number | null;
-    refrigerant_type: string | null;
-    notes: string | null;
-  }>;
-  const equipmentLabelPhotoAttachments = baseEquipmentRows.length
-    ? await listJobEquipmentLabelPhotoImages({
-        supabase,
-        admin: createAdminClient(),
-        jobId,
-        equipmentIds: baseEquipmentRows.map((equipment) => String(equipment.id)),
-        limit: 100,
-      })
-    : [];
+  // equipment rows: baseEquipmentRows declared above the supplemental burst;
+  // equipmentLabelPhotoAttachments resolved inside it.
   const equipmentIdsWithLabelPhoto = new Set(
     equipmentLabelPhotoAttachments
       .map((attachment) => String(attachment.equipmentId ?? "").trim())
