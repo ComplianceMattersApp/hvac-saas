@@ -3671,13 +3671,7 @@ export default async function JobDetailV2Page({
                 currentStatus={status}
                 hasFullSchedule={hasFullSchedule}
                 buttonStyle={S.primaryBtn as React.CSSProperties}
-              >
-                {status === "in_process"
-                  ? "Finish Visit"
-                  : status === "on_the_way"
-                    ? "Mark On Site"
-                    : "Mark On the Way"}
-              </FieldStatusAdvanceForm>
+              />
             ) : fieldComplete && closeoutNeeds.needsPermit ? (
               <PermitForm
                 jobId={jobId}

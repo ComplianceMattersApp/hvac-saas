@@ -1,8 +1,11 @@
 "use client";
 
-import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
+import {
+  STATUS_ADVANCE_ERROR_MESSAGES,
+  useInPlaceStatusAdvance,
+} from "./useInPlaceStatusAdvance";
 
 type JobFieldActionButtonProps = {
   jobId: string;
@@ -67,23 +70,24 @@ export function JobFieldActionButton({
   completedLabel = "Field visit complete",
 }: JobFieldActionButtonProps) {
   const [submitted, setSubmitted] = useState(false);
-  const isDone = ["completed", "failed", "cancelled"].includes(currentStatus);
+  const { effectiveStatus, errorCode, submitAction } = useInPlaceStatusAdvance(currentStatus);
+  const isDone = ["completed", "failed", "cancelled"].includes(effectiveStatus);
 
   const label =
-    currentStatus === "open"
+    effectiveStatus === "open"
       ? "Mark On the Way"
-      : currentStatus === "on_the_way"
+      : effectiveStatus === "on_the_way"
       ? "Mark In Progress"
-      : currentStatus === "in_process"
+      : effectiveStatus === "in_process"
       ? completeLabel
       : "—";
 
   const pendingLabel =
-    currentStatus === "open"
+    effectiveStatus === "open"
       ? "Marking On The Way..."
-      : currentStatus === "on_the_way"
+      : effectiveStatus === "on_the_way"
       ? "Starting Work..."
-      : currentStatus === "in_process"
+      : effectiveStatus === "in_process"
       ? "Completing..."
       : "Saving...";
 
@@ -98,14 +102,20 @@ export function JobFieldActionButton({
   return (
     <form
       className={variant === "fieldMode" ? "w-full" : variant === "commandBar" ? "w-auto flex-none" : "min-w-[9.5rem] flex-1 sm:w-auto sm:min-w-0 sm:flex-none"}
-      action={advanceJobStatusFromForm}
+      action={async (formData: FormData) => {
+        try {
+          await submitAction(formData);
+        } finally {
+          setSubmitted(false);
+        }
+      }}
       onSubmit={(e) => {
         if (submitted) {
           e.preventDefault();
           return;
         }
 
-        const needsScheduleConfirm = currentStatus === "open" && !hasFullSchedule;
+        const needsScheduleConfirm = effectiveStatus === "open" && !hasFullSchedule;
         if (!needsScheduleConfirm) {
           setSubmitted(true);
           return;
@@ -130,11 +140,16 @@ export function JobFieldActionButton({
       }}
     >
       <input type="hidden" name="job_id" value={jobId} />
-      <input type="hidden" name="current_status" value={currentStatus} />
+      <input type="hidden" name="current_status" value={effectiveStatus} />
       <input type="hidden" name="tab" value={tab} />
       <input type="hidden" name="auto_schedule_confirmed" value="0" />
 
       <FieldActionSubmitButton label={label} pendingLabel={pendingLabel} submitted={submitted} variant={variant} />
+      {errorCode ? (
+        <div role="alert" className="mt-1.5 text-xs font-medium text-red-700">
+          {STATUS_ADVANCE_ERROR_MESSAGES[errorCode] ?? STATUS_ADVANCE_ERROR_MESSAGES.status_update_failed}
+        </div>
+      ) : null}
     </form>
   );
 }

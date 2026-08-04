@@ -10165,12 +10165,28 @@ return;
 /**
  * UPDATE: used by Edit Scheduling form on job detail page
  */
-export async function advanceJobStatusFromForm(formData: FormData) {
+export type AdvanceJobStatusResult = {
+  ok: boolean;
+  code:
+    | "status_updated"
+    | "status_already_updated"
+    | "status_update_failed"
+    | "schedule_required"
+    | "ecc_test_required";
+};
+
+export async function advanceJobStatusFromForm(
+  formData: FormData,
+): Promise<AdvanceJobStatusResult | void> {
   const id =
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
   const tab = normalizeJobTab(String(formData.get("tab") || ""));
   const returnToRaw = String(formData.get("return_to") || "").trim();
+  // no_redirect=1: caller handles the result in place (client transition);
+  // guards return typed codes instead of redirecting, and success refreshes
+  // the client router rather than navigating. Auth/scope failures still redirect.
+  const noRedirect = String(formData.get("no_redirect") || "").trim() === "1";
   const fieldStatusAnchor = "field-status-actions";
 
   if (!id) throw new Error("Job ID is required");
@@ -10382,6 +10398,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
       if (!hasCompletedRun) {
         console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "ecc_test_required", current, next });
+        if (noRedirect) {
+          _ftEmit("guard:ecc_test_required", "no_redirect");
+          return { ok: false, code: "ecc_test_required" };
+        }
         _ftEmit("guard:ecc_test_required", buildJobRedirect({ notice: "ecc_test_required" }));
         redirect(buildJobRedirect({ notice: "ecc_test_required" }));
       }
@@ -10410,6 +10430,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     if (!hasFullSchedule && !autoScheduleConfirmed) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "schedule_required", current, next, hasFullSchedule });
+      if (noRedirect) {
+        _ftEmit("guard:schedule_required", "no_redirect");
+        return { ok: false, code: "schedule_required" };
+      }
       _ftEmit("guard:schedule_required", buildJobRedirect({ schedule_required: "1" }));
       redirect(buildJobRedirect({ schedule_required: "1" }));
     }
@@ -10458,6 +10482,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
         branch: "on_the_way_stamp",
         error: updErr.message,
       });
+      if (noRedirect) {
+        _ftEmit("guard:status_update_failed", "no_redirect");
+        return { ok: false, code: "status_update_failed" };
+      }
       _ftEmit("guard:status_update_failed", buildJobRedirect({ banner: "status_update_failed" }));
       redirect(buildJobRedirect({ banner: "status_update_failed" }));
     }
@@ -10469,13 +10497,24 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     // do not emit duplicate transition events on this stale request.
     if (!onTheWayApplied?.id) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "on_the_way_stamp", current, next });
+      // no_redirect: skip revalidation entirely — ANY revalidatePath in an
+      // action pulls a full current-page re-render into this POST response and
+      // the caller would wait on it. Every path here is a dynamic (cookie-authed)
+      // route rendered fresh per request; the viewed page reconciles via the
+      // client's router.refresh() after the result lands.
+      if (!noRedirect) {
+        revalidatePath(`/jobs/${id}`);
+        revalidatePath(`/jobs/${id}/v2`, "page");
+        revalidatePath(`/jobs`);
+        revalidatePath(`/ops`);
+        revalidatePath(`/portal`);
+        revalidatePath(`/portal/jobs/${id}`);
+      }
+      if (noRedirect) {
+        _ftEmit("no-op:status_already_updated", "no_redirect");
+        return { ok: true, code: "status_already_updated" };
+      }
       _ftEmit("no-op:status_already_updated", buildJobRedirect({ banner: "status_already_updated" }));
-      revalidatePath(`/jobs/${id}`);
-      revalidatePath(`/jobs/${id}/v2`, "page");
-      revalidatePath(`/jobs`);
-      revalidatePath(`/ops`);
-      revalidatePath(`/portal`);
-      revalidatePath(`/portal/jobs/${id}`);
       redirect(buildJobRedirect({ banner: "status_already_updated" }));
     }
 
@@ -10677,6 +10716,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
         branch: "else",
         error: updErr.message,
       });
+      if (noRedirect) {
+        _ftEmit("guard:status_update_failed", "no_redirect");
+        return { ok: false, code: "status_update_failed" };
+      }
       _ftEmit("guard:status_update_failed", buildJobRedirect({ banner: "status_update_failed" }));
       redirect(buildJobRedirect({ banner: "status_update_failed" }));
     }
@@ -10688,13 +10731,20 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     // lifecycle events when a parallel request already moved status forward.
     if (!transitionApplied?.id) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_already_updated", branch: "else", current, next });
+      // no_redirect: revalidation skipped entirely (see on_the_way branch note).
+      if (!noRedirect) {
+        revalidatePath(`/jobs/${id}`);
+        revalidatePath(`/jobs/${id}/v2`, "page");
+        revalidatePath(`/jobs`);
+        revalidatePath(`/ops`);
+        revalidatePath(`/portal`);
+        revalidatePath(`/portal/jobs/${id}`);
+      }
+      if (noRedirect) {
+        _ftEmit("no-op:status_already_updated", "no_redirect");
+        return { ok: true, code: "status_already_updated" };
+      }
       _ftEmit("no-op:status_already_updated", buildJobRedirect({ banner: "status_already_updated" }));
-      revalidatePath(`/jobs/${id}`);
-      revalidatePath(`/jobs/${id}/v2`, "page");
-      revalidatePath(`/jobs`);
-      revalidatePath(`/ops`);
-      revalidatePath(`/portal`);
-      revalidatePath(`/portal/jobs/${id}`);
       redirect(buildJobRedirect({ banner: "status_already_updated" }));
     }
 
@@ -10966,15 +11016,26 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   }
 
   console.log("[ADVANCE_STATUS_PREREVALIDATE]", { jobId: id, current, next });
-  revalidatePath(`/jobs/${id}`);
-  revalidatePath(`/jobs/${id}/v2`, "page");
-  revalidatePath(`/jobs`);
-  revalidatePath(`/ops`);
-  revalidatePath(`/portal`);
-  revalidatePath(`/portal/jobs/${id}`);
+  // no_redirect: skip revalidation entirely — ANY revalidatePath in an action
+  // pulls a full current-page re-render into this POST response and the caller
+  // would wait on it. Every path here is a dynamic (cookie-authed) route
+  // rendered fresh per request; the viewed page reconciles via the client's
+  // router.refresh() after the result lands.
+  if (!noRedirect) {
+    revalidatePath(`/jobs/${id}`);
+    revalidatePath(`/jobs/${id}/v2`, "page");
+    revalidatePath(`/jobs`);
+    revalidatePath(`/ops`);
+    revalidatePath(`/portal`);
+    revalidatePath(`/portal/jobs/${id}`);
+  }
   _ftCompletePhase("revalidation");
 
   console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "status_updated", current, next });
+  if (noRedirect) {
+    _ftEmit("success", "no_redirect");
+    return { ok: true, code: "status_updated" };
+  }
   if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
     const target = new URL(returnToRaw, "https://app.local");
     target.searchParams.set("banner", "status_updated");

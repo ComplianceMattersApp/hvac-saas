@@ -43,16 +43,20 @@ describe("job detail button response wiring", () => {
     expect(fieldActionButtonSource).toContain("const isPending = pending || submitted;");
     expect(fieldActionButtonSource).toContain("disabled={isPending}");
     expect(fieldActionButtonSource).toContain("aria-busy={isPending}");
-    expect(fieldActionButtonSource).toContain("currentStatus === \"open\"");
-    expect(fieldActionButtonSource).toContain("currentStatus === \"on_the_way\"");
-    expect(fieldActionButtonSource).toContain("currentStatus === \"in_process\"");
+    expect(fieldActionButtonSource).toContain("effectiveStatus === \"open\"");
+    expect(fieldActionButtonSource).toContain("effectiveStatus === \"on_the_way\"");
+    expect(fieldActionButtonSource).toContain("effectiveStatus === \"in_process\"");
     expect(fieldActionButtonSource).not.toContain('setCurrentStatus("on_the_way")');
     expect(fieldActionButtonSource).not.toContain('setCurrentStatus("in_process")');
     expect(fieldActionButtonSource).not.toContain('setCurrentStatus("completed")');
   });
 
   it("preserves lifecycle submit wiring, hidden fields, and field-status return anchors", () => {
-    expect(fieldActionButtonSource).toContain("action={advanceJobStatusFromForm}");
+    // In-place advance: the form action wraps the shared hook's submitAction,
+    // which calls advanceJobStatusFromForm with no_redirect=1 and flips the
+    // label only after the server confirms the write.
+    expect(fieldActionButtonSource).toContain("useInPlaceStatusAdvance(currentStatus)");
+    expect(fieldActionButtonSource).toContain("await submitAction(formData);");
     expect(fieldActionButtonSource).toContain('name="job_id"');
     expect(fieldActionButtonSource).toContain('name="current_status"');
     expect(fieldActionButtonSource).toContain('name="tab"');
@@ -85,7 +89,7 @@ describe("job detail button response wiring", () => {
   });
 
   it("confirms only unscheduled Mark On The Way submits before using the existing auto-schedule path", () => {
-    expect(fieldActionButtonSource).toContain("const needsScheduleConfirm = currentStatus === \"open\" && !hasFullSchedule;");
+    expect(fieldActionButtonSource).toContain("const needsScheduleConfirm = effectiveStatus === \"open\" && !hasFullSchedule;");
     expect(fieldActionButtonSource).toContain("if (!needsScheduleConfirm)");
     expect(fieldActionButtonSource).toContain("window.confirm(");
     expect(fieldActionButtonSource).toContain(
@@ -104,8 +108,9 @@ describe("job detail button response wiring", () => {
     expect(desktopV2Source).toContain("<FieldStatusAdvanceForm");
     expect(desktopV2Source).toContain("hasFullSchedule={hasFullSchedule}");
     expect(desktopV2Source).not.toContain("<form action={advanceStatusAction}>");
-    expect(desktopV2FieldStatusAdvanceFormSource).toContain("action={advanceJobStatusFromForm}");
-    expect(desktopV2FieldStatusAdvanceFormSource).toContain("const needsScheduleConfirm = currentStatus === \"open\" && !hasFullSchedule;");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain("useInPlaceStatusAdvance(currentStatus)");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain("action={submitAction}");
+    expect(desktopV2FieldStatusAdvanceFormSource).toContain("const needsScheduleConfirm = effectiveStatus === \"open\" && !hasFullSchedule;");
     expect(desktopV2FieldStatusAdvanceFormSource).toContain("window.confirm(");
     expect(desktopV2FieldStatusAdvanceFormSource).toContain("schedule a 2-hour window starting now");
     expect(desktopV2FieldStatusAdvanceFormSource).toContain('input[name="auto_schedule_confirmed"]');
