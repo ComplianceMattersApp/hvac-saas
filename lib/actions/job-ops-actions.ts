@@ -1294,7 +1294,7 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
   // Current snapshot
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("id, job_type, ops_status, certs_complete, invoice_complete")
+    .select("id, job_type, status, ops_status, certs_complete, invoice_complete, field_complete, permit_number, pending_info_reason")
     .eq("id", jobId)
     .single();
 
@@ -1311,9 +1311,31 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
   }
   const beforeOps = job.ops_status ?? null;
 
+  // Route through the same permit-needed rule the canonical ECC evaluator
+  // applies before settling on paperwork_required (applyEccPermitNeededBlocker
+  // in ecc-status.ts). Without this, resolving a failure on a permit-missing
+  // job lands it in a state no queue claims: Closeout excludes cert-only work
+  // blocked by permit, and Waiting requires pending_info. Evaluated against the
+  // post-resolution status — the pre-resolution failure statuses are protected
+  // in shouldApplyEccPermitNeededBlocker and would always decline.
+  const routeToPermitNeeded = shouldApplyEccPermitNeededBlocker({
+    job_type: job.job_type,
+    status: job.status,
+    field_complete: job.field_complete,
+    certs_complete: job.certs_complete,
+    permit_number: job.permit_number,
+    ops_status: "paperwork_required",
+    pending_info_reason: job.pending_info_reason,
+  });
+
+  const resolvedUpdate: Record<string, unknown> = routeToPermitNeeded
+    ? { ops_status: "pending_info", pending_info_reason: ECC_PERMIT_NEEDED_REASON }
+    : { ops_status: "paperwork_required" };
+  const resolvedOpsStatus = String(resolvedUpdate.ops_status);
+
   const { error: updErr } = await supabase
     .from("jobs")
-    .update({ ops_status: "paperwork_required" })
+    .update(resolvedUpdate)
     .eq("id", jobId);
 
   if (updErr) throw new Error(updErr.message);
@@ -1324,9 +1346,10 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
     event_type: "failure_resolved_by_correction_review",
     meta: {
       from: beforeOps,
-      to: "paperwork_required",
+      to: resolvedOpsStatus,
       review_note,
       source: "internal_review",
+      ...(routeToPermitNeeded ? { permit_needed_blocker_applied: true } : {}),
     },
     user_id: user.id,
   });
@@ -1339,7 +1362,12 @@ export async function resolveFailureByCorrectionReviewFromForm(formData: FormDat
     event_type: "ops_update",
     message: "Failure resolved by correction review",
     meta: {
-      changes: [{ field: "ops_status", from: beforeOps, to: "paperwork_required" }],
+      changes: [
+        { field: "ops_status", from: beforeOps, to: resolvedOpsStatus },
+        ...(routeToPermitNeeded
+          ? [{ field: "pending_info_reason", from: job.pending_info_reason ?? null, to: ECC_PERMIT_NEEDED_REASON }]
+          : []),
+      ],
       source: "job_detail_ops",
       review_note,
     },
