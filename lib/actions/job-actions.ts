@@ -3,6 +3,7 @@
 "use server";
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { runAfterResponse } from "@/lib/server/run-after-response";
 import { redirect } from "next/navigation";
 import { revalidatePath, refresh } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
@@ -10288,28 +10289,63 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   const supabase = await createClient();
   if (_ftEnabled) _ftPhaseStart = Date.now(); // exclude createClient overhead
   _ftCompletePhase("parseInput");
-  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+  const _ftAuthTiming = _ftEnabled
+    ? (name: string, elapsedMs: number) => _ftRecordSubphase(`authActorScope.${name}`, elapsedMs)
+    : undefined;
+
+  // ✅ Read true current status from DB (source of truth).
+  // Kicked off before the auth/scope round-trips because it only needs the job
+  // id; the result is consumed only after scope + entitlement checks pass.
+  // Wrapped so an early failure surfaces at the await below, never as an
+  // unhandled rejection when a guard redirects first.
+  const jobReadPromise = (async () => {
+    try {
+      return await supabase
+        .from("jobs")
+        .select("status, on_the_way_at, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, window_start, window_end, customer_first_name, parent_job_id")
+        .eq("id", id)
+        .single();
+    } catch (error) {
+      return { data: null, error };
+    }
+  })();
+
+  const { userId: actingUserId, internalUser } = await requireInternalUser({
     supabase,
-    jobId: id,
-    timing: _ftEnabled
-      ? (name, elapsedMs) => _ftRecordSubphase(`authActorScope.${name}`, elapsedMs)
-      : undefined,
+    timing: _ftAuthTiming,
   });
-  await requireOperationalScopedJobMutationAccessOrRedirect({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    timing: _ftEnabled
-      ? (name, elapsedMs) => _ftRecordSubphase(`authActorScope.${name}`, elapsedMs)
-      : undefined,
-  });
+
+  // Scope preflight and entitlement gate only share the resolved internal user,
+  // so they run concurrently. Denial precedence is unchanged: scope denial
+  // redirects before the entitlement block is considered.
+  const [scopedJob, entitlementAccess] = await Promise.all([
+    loadScopedInternalJobForMutation({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId: id,
+      select: "id",
+      timing: _ftAuthTiming,
+    }),
+    resolveOperationalMutationEntitlementAccess({
+      accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim(),
+      supabase,
+      timing: _ftAuthTiming,
+    }),
+  ]);
+
+  if (!scopedJob?.id) {
+    redirect(`/jobs/${id}?notice=not_authorized`);
+  }
+
+  if (!entitlementAccess.authorized) {
+    const entitlementSearch = new URLSearchParams({
+      err: "entitlement_blocked",
+      reason: entitlementAccess.reason,
+    });
+    redirect(`/ops/admin/company-profile?${entitlementSearch.toString()}`);
+  }
   _ftCompletePhase("authActorScope");
 
-  // ✅ Read true current status from DB (source of truth)
-  const { data: job, error: jobErr } = await supabase
-    .from("jobs")
-    .select("status, on_the_way_at, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, window_start, window_end, customer_first_name, parent_job_id")
-    .eq("id", id)
-    .single();
+  const { data: job, error: jobErr } = await jobReadPromise;
 
   if (jobErr) throw jobErr;
 
@@ -10443,7 +10479,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       redirect(buildJobRedirect({ banner: "status_already_updated" }));
     }
 
-    try {
+    // Breadcrumb events and the SMS intent chain are best-effort and nothing on
+    // the redirect target reads them synchronously — run them after the
+    // response streams so they stay off the user-felt critical path.
+    await runAfterResponse(async () => {
+      const _ftDeferredStartedAt = Date.now();
+      try {
       // Keep on_my_way close to user intent in event order.
       // assignment_added (if any) -> on_my_way -> schedule_updated (if any)
       let onMyWayEventId: string | null = null;
@@ -10564,16 +10605,27 @@ export async function advanceJobStatusFromForm(formData: FormData) {
           // Intentionally swallowed: intent creation failure does not affect job lifecycle
         }
       }
-    } catch (ancillaryError) {
-      console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
-        jobId: id,
-        fromStatus: current,
-        toStatus: next,
-        stage: "on_the_way_post_update",
-        error: ancillaryError instanceof Error ? ancillaryError.message : String(ancillaryError),
-        stack: ancillaryError instanceof Error ? ancillaryError.stack : undefined,
-      });
-    }
+      } catch (ancillaryError) {
+        console.error("[FIELD_STATUS_POST_UPDATE_FAILED]", {
+          jobId: id,
+          fromStatus: current,
+          toStatus: next,
+          stage: "on_the_way_post_update",
+          error: ancillaryError instanceof Error ? ancillaryError.message : String(ancillaryError),
+          stack: ancillaryError instanceof Error ? ancillaryError.stack : undefined,
+        });
+      }
+      if (_ftEnabled) {
+        console.info(
+          "[advance-status-timing:deferred]",
+          JSON.stringify({
+            jobId: id,
+            branch: "on_the_way_stamp",
+            deferredMs: Date.now() - _ftDeferredStartedAt,
+          }),
+        );
+      }
+    });
     console.log("[ADVANCE_STATUS_OTW_BRANCH_END]", { jobId: id, note: "on_the_way branch completed — no redirect issued from this code path" });
     _ftCompletePhase("eventBreadcrumb");
   } else {
@@ -10646,25 +10698,10 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       redirect(buildJobRedirect({ banner: "status_already_updated" }));
     }
 
-    if (next === "completed" && completedJobType === "service") {
-      // Best-effort: lifecycle completion should not fail if auto-count side effect fails.
-      try {
-        await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
-          admin: supabase,
-          accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim(),
-          jobId: id,
-          actingUserId,
-        });
-      } catch (error) {
-        console.error("[ADVANCE_STATUS_AUTO_COUNT_BEST_EFFORT_FAILED]", {
-          jobId: id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
     // ECC canonical resolution:
-    // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs
+    // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs.
+    // Stays synchronous: the redirect target renders ops_status, which for ECC
+    // jobs is derived here.
     if (next === "completed") {
       try {
         if ((job?.job_type ?? "").toLowerCase() === "ecc") {
@@ -10682,6 +10719,29 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       }
     }
     _ftCompletePhase("eccEvaluation");
+
+    // Everything below is best-effort bookkeeping (maintenance auto-count,
+    // breadcrumb events, retest breadcrumbs) that nothing on the redirect
+    // target reads synchronously — run it after the response streams.
+    await runAfterResponse(async () => {
+    const _ftDeferredStartedAt = Date.now();
+
+    if (next === "completed" && completedJobType === "service") {
+      // Best-effort: lifecycle completion should not fail if auto-count side effect fails.
+      try {
+        await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+          admin: supabase,
+          accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim(),
+          jobId: id,
+          actingUserId,
+        });
+      } catch (error) {
+        console.error("[ADVANCE_STATUS_AUTO_COUNT_BEST_EFFORT_FAILED]", {
+          jobId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
 
     const lifecycleEventMap: Partial<Record<JobStatus, string>> = {
       on_the_way: "on_my_way",
@@ -10890,6 +10950,18 @@ export async function advanceJobStatusFromForm(formData: FormData) {
         });
       }
     }
+
+    if (_ftEnabled) {
+      console.info(
+        "[advance-status-timing:deferred]",
+        JSON.stringify({
+          jobId: id,
+          branch: "else",
+          deferredMs: Date.now() - _ftDeferredStartedAt,
+        }),
+      );
+    }
+    });
     _ftCompletePhase("eventBreadcrumb");
   }
 
