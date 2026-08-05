@@ -740,6 +740,96 @@ Risk lock:
 - False delivered-claim risk is high unless UI only says submit/queued/accepted before callback truth.
 - Missing-webhook risk is acceptable only for manual sandbox smoke, not live.
 
+## F6D Webhooks + Setup/Consent Wiring Completion Cross-Reference (August 2026)
+
+This slice closes the F6D webhook lane and the remaining "no caller" gaps so the pipeline is
+end-to-end operable for sandbox testing the day the A2P campaign is approved. Live SMS remains
+disabled; nothing here activates automatic or customer-facing sending.
+
+Webhook routes (new):
+
+- `app/api/sms/twilio/status-callback/route.ts` — status callback route. Validates the
+  `X-Twilio-Signature` header (HMAC-SHA1 per Twilio spec) before any processing; 403 on mismatch,
+  503 when `TWILIO_AUTH_TOKEN` is unset.
+- `app/api/sms/twilio/inbound/route.ts` — inbound message route with the same signature gate.
+  Responds with empty TwiML so provider-side Advanced Opt-Out auto-replies are never doubled.
+- `lib/communications/twilio-webhook-signature.ts` — signature compute/validate + canonical
+  webhook URL resolution (`TWILIO_WEBHOOK_BASE_URL` preferred, forwarded-host fallback).
+- `lib/communications/twilio-status-callback-processor.ts` — maps Twilio statuses to normalized
+  `provider_status`, forward-only rank ordering (duplicate/out-of-order callbacks cannot regress
+  delivery truth), stamps `sent_at`/`delivered_at`/`failed_at` once, records sanitized error
+  fields, and stores an allowlisted callback snapshot (no To/From/Body/AccountSid). Account scope
+  resolves from the delivery row found by `provider_message_id` — payload account values are
+  never trusted.
+- `lib/communications/twilio-inbound-processor.ts` — resolves the tenant account by matching
+  inbound `To` against `sms_sender_identities.phone_e164`; STOP variants write a phone-level
+  `contact_recipient_suppressions` row (`stop_keyword` / `inbound_stop`, keyword + provider
+  message id recorded; active-duplicate insert treated as already-recorded). START is
+  acknowledged but does NOT auto-lift local suppression (schema requires a lifting user; manual
+  admin lift stays the deliberate path). HELP is acknowledged with no write.
+- Proxy: `isProviderWebhookRoute` now allows the two Twilio routes to bypass session auth
+  (signature validation is the gate inside each route).
+
+Pipeline wiring (new):
+
+- `prepareSmsSandboxDeliveryFromForm` in `lib/actions/sms-sandbox-send-actions.ts` — admin-only
+  action that finally calls the F6B `prepareSmsProviderDeliveryPreflight` helper, closing the
+  intent → delivery gap. Notices: `sandbox_delivery_prepared`, `sandbox_delivery_already_prepared`,
+  `sandbox_preflight_blocked`.
+- `/ops/admin/communications` now renders the Sandbox Send Queue (recent On-The-Way intents with
+  masked recipient phones, delivery status, prepare/dry-run/submit forms) and defines all
+  `sandbox_*` notice strings. Read model: `lib/communications/sms-sandbox-queue-read.ts`.
+
+Provider setup CRUD (new, account-scoped/tenant-generic):
+
+- `lib/actions/sms-provider-setup-actions.ts` — admin-only actions writing via the admin client
+  (tables remain SELECT-only under RLS): sandbox provider configuration upsert (messaging service
+  ref + optional account ref; refs only, never credentials; sets `ready_for_sandbox` and marks
+  webhook readiness fields `ready`), sandbox send gate enable/disable with audit fields, sender
+  identity upsert (E.164 phone, `a2p_10dlc`, verified/active only via explicit attestation
+  checkbox), and verified sandbox test recipient add/deactivate.
+- Read model: `lib/communications/sms-sandbox-setup-read.ts` (masked refs only in browser).
+- Admin Communications page gains a Provider Setup (Sandbox) section; hero copy updated from
+  "no configuration allowed yet" to sandbox-only configuration language.
+
+Consent capture (new, account-scoped/tenant-generic):
+
+- `lib/actions/sms-consent-actions.ts` — `recordContactRecipientSmsConsentFromForm` writes
+  `contact_recipient_consents` through the REGULAR client (the table's RLS insert/update policies
+  require captured-by = acting user, which is the audit posture). Records opted_in/opted_out for a
+  message class with source (`verbal_in_person` / `verbal_phone` / `written_form` /
+  `customer_request`), `consent_text_version` `sms-consent-v1-2026-08`, captured-at/by.
+- Customer detail page (`/customers/[id]`, Account Contacts section) gains a "Service Text
+  Message Consent" block listing active phone-bearing contacts with their `on_the_way` consent
+  status and record-opt-in/opt-out forms. This is the product path any tenant uses to capture
+  auditable customer opt-in before intents can reach `ready_for_provider`.
+
+Environment (names only, values remain server-side):
+
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WEBHOOK_BASE_URL` added to `.env.example`.
+
+Boundaries confirmed:
+
+- Mark On The Way still does not send SMS; intent creation remains best-effort audit only.
+- Sandbox submits remain admin-only, gated on the schema-backed sandbox gate AND verified test
+  recipients; consent capture does not send anything.
+- Live SMS remains deferred until legal/provider/A2P approval and explicit activation; quiet-hours
+  gate remains deferred; production provider configuration remains out of scope for this slice.
+
+Validation recorded (August 2026):
+
+- New tests: signature helper 10/10, status callback processor 12/12, inbound processor 9/9,
+  proxy public-route 10/10 (incl. webhook-route cases), sandbox send actions 56/56 (incl. 6 new
+  prepare-action tests).
+- Existing suites re-run green: provider config resolver 18/18, delivery preflight 17/17, intent
+  create 15/15, intent eligibility 12/12, contact recipient actions 9/9.
+- `npx.cmd tsc --noEmit`: no errors in any touched file (11 pre-existing errors in unrelated test
+  files confirmed identical on a clean tree).
+
+Remaining before live activation: controlled sandbox smoke after campaign approval, quiet-hours
+gate, START auto-lift decision (currently manual by design), production provider configuration +
+activation flow, and legal/provider review.
+
 ---
 
 ## 1) Current Decision
