@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isCronRoute, isPublicAssetPath, isUnauthedPublicRoute } from "@/proxy";
+import {
+  isCronRoute,
+  isProviderWebhookRoute,
+  isPublicAssetPath,
+  isUnauthedPublicRoute,
+} from "@/proxy";
 
 describe("isUnauthedPublicRoute", () => {
   it("allows /signup without auth", () => {
@@ -42,6 +47,17 @@ describe("isUnauthedPublicRoute", () => {
 
   it("allows the push service worker through as a public asset", () => {
     expect(isPublicAssetPath("/sw.js")).toBe(true);
+  });
+});
+
+describe("isProviderWebhookRoute", () => {
+  it("allows only signature-verified provider webhook paths to bypass auth", () => {
+    expect(isProviderWebhookRoute("/api/stripe/webhook")).toBe(true);
+    expect(isProviderWebhookRoute("/api/sms/twilio/status-callback")).toBe(true);
+    expect(isProviderWebhookRoute("/api/sms/twilio/inbound")).toBe(true);
+    expect(isProviderWebhookRoute("/api/sms/twilio")).toBe(false);
+    expect(isProviderWebhookRoute("/api/sms/twilio/other")).toBe(false);
+    expect(isProviderWebhookRoute("/ops")).toBe(false);
   });
 });
 

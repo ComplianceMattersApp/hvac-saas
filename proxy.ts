@@ -4,7 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 
 function classifyProxyRoute(pathname: string): "public_asset" | "webhook" | "cron" | "auth_route" | "protected_route" {
   if (isPublicAssetPath(pathname)) return "public_asset";
-  if (pathname === "/api/stripe/webhook") return "webhook";
+  if (isProviderWebhookRoute(pathname)) return "webhook";
   if (isCronRoute(pathname)) return "cron";
   if (isUnauthedPublicRoute(pathname)) return "auth_route";
   return "protected_route";
@@ -52,8 +52,9 @@ export async function proxy(req: NextRequest) {
   }
   setPhaseValue("publicBypassCheck", Date.now() - publicBypassStartMs);
 
-  // Allow Stripe webhook to bypass auth — signature verification happens inside the route.
-  if (pathname === "/api/stripe/webhook") {
+  // Allow provider webhooks (Stripe, Twilio) to bypass auth — request signature
+  // verification happens inside each route.
+  if (isProviderWebhookRoute(pathname)) {
     emitTimingLog("webhook_bypass");
     return NextResponse.next();
   }
@@ -137,6 +138,14 @@ export function isUnauthedPublicRoute(pathname: string) {
 
 export function isCronRoute(pathname: string) {
   return pathname.startsWith("/api/cron/");
+}
+
+export function isProviderWebhookRoute(pathname: string) {
+  return (
+    pathname === "/api/stripe/webhook" ||
+    pathname === "/api/sms/twilio/status-callback" ||
+    pathname === "/api/sms/twilio/inbound"
+  );
 }
 
 export function isPublicAssetPath(pathname: string) {
