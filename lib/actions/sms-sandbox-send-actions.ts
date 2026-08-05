@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import { prepareSmsProviderDeliveryPreflight } from "@/lib/communications/sms-provider-delivery-preflight";
 import { resolveSmsSandboxProviderConfig } from "@/lib/communications/sms-provider-config-resolver";
 import { readSmsSandboxTestRecipientForPhone } from "@/lib/communications/sms-sandbox-test-recipient-read";
 import {
@@ -126,6 +127,56 @@ function isIntentReadyForDryRun(intent: IntentRow): boolean {
   }
 
   return true;
+}
+
+/**
+ * F6D wiring: create the sms_provider_deliveries row for a ready intent via the
+ * F6B preflight helper. Admin-only, non-sending — the delivery row starts at
+ * provider_status = not_submitted and is consumed later by the manual sandbox
+ * dry-run/submit actions.
+ */
+export async function prepareSmsSandboxDeliveryFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+
+  let accountOwnerUserId: string;
+  let actingUserId: string;
+
+  try {
+    const ctx = await requireInternalRole("admin", { supabase });
+    accountOwnerUserId = asTrimmed(ctx.internalUser.account_owner_user_id);
+    actingUserId = asTrimmed(ctx.internalUser.user_id);
+  } catch {
+    redirect(withNotice(COMMUNICATIONS_PATH, "admin_required"));
+  }
+
+  const intentId = asTrimmed(formData.get("intent_id"));
+  if (!intentId) {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_intent_missing"));
+  }
+
+  const admin = createAdminClient();
+
+  let preflight;
+  try {
+    preflight = await prepareSmsProviderDeliveryPreflight({
+      supabase: admin,
+      accountOwnerUserId,
+      smsMessageIntentId: intentId,
+      actingUserId,
+    });
+  } catch {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_internal_error"));
+  }
+
+  if (preflight.deduped) {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_delivery_already_prepared"));
+  }
+
+  if (!preflight.created) {
+    redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_preflight_blocked"));
+  }
+
+  redirect(withNotice(COMMUNICATIONS_PATH, "sandbox_delivery_prepared"));
 }
 
 export async function reserveSmsSandboxDeliveryDryRunFromForm(formData: FormData): Promise<void> {

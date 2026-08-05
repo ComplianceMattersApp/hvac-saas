@@ -5,7 +5,21 @@ import {
   markOnTheWayTemplateReadyForSandboxFromForm,
   saveOnTheWayTemplateDraftFromForm,
 } from "@/lib/actions/sms-template-actions";
+import {
+  prepareSmsSandboxDeliveryFromForm,
+  reserveSmsSandboxDeliveryDryRunFromForm,
+  submitSmsSandboxDeliveryToProviderFromForm,
+} from "@/lib/actions/sms-sandbox-send-actions";
+import {
+  addSmsSandboxTestRecipientFromForm,
+  deactivateSmsSandboxTestRecipientFromForm,
+  saveSmsSandboxProviderConfigFromForm,
+  saveSmsSenderIdentityFromForm,
+  setSmsSandboxSendGateFromForm,
+} from "@/lib/actions/sms-provider-setup-actions";
 import { getSmsProviderReadinessForAccount } from "@/lib/communications/sms-provider-readiness-read";
+import { getSmsSandboxQueueForAccount } from "@/lib/communications/sms-sandbox-queue-read";
+import { getSmsSandboxSetupForAccount } from "@/lib/communications/sms-sandbox-setup-read";
 import {
   getSmsOnTheWayTemplateGovernanceForAccount,
   type SmsTemplateGovernanceVersionSummary,
@@ -78,6 +92,107 @@ const TEMPLATE_NOTICE_TEXT: Record<string, TemplateNotice> = {
   template_ready_failed: {
     tone: "error",
     message: "Could not mark wording ready. Please try again.",
+  },
+  // Provider setup
+  provider_config_saved: { tone: "success", message: "Sandbox provider configuration saved." },
+  provider_config_invalid: {
+    tone: "error",
+    message: "Enter a valid Messaging Service reference (no spaces).",
+  },
+  provider_config_save_failed: {
+    tone: "error",
+    message: "Could not save provider configuration. Please try again.",
+  },
+  provider_config_missing: {
+    tone: "error",
+    message: "Save the sandbox provider configuration first.",
+  },
+  sandbox_gate_enabled: {
+    tone: "success",
+    message: "Sandbox send gate enabled. Sends remain limited to verified test recipients.",
+  },
+  sandbox_gate_disabled: { tone: "success", message: "Sandbox send gate disabled." },
+  sandbox_gate_update_failed: {
+    tone: "error",
+    message: "Could not update the sandbox send gate. Please try again.",
+  },
+  sender_identity_saved: { tone: "success", message: "Sender identity saved." },
+  sender_identity_invalid: {
+    tone: "error",
+    message: "Enter a sender label and a valid phone number.",
+  },
+  sender_identity_save_failed: {
+    tone: "error",
+    message: "Could not save sender identity. Please try again.",
+  },
+  test_recipient_added: { tone: "success", message: "Verified test recipient added." },
+  test_recipient_invalid: { tone: "error", message: "Enter a valid test recipient phone number." },
+  test_recipient_exists: { tone: "warn", message: "This test recipient already exists." },
+  test_recipient_add_failed: {
+    tone: "error",
+    message: "Could not add test recipient. Please try again.",
+  },
+  test_recipient_deactivated: { tone: "success", message: "Test recipient deactivated." },
+  test_recipient_update_failed: {
+    tone: "error",
+    message: "Could not update test recipient. Please try again.",
+  },
+  // Sandbox send queue
+  sandbox_intent_missing: { tone: "error", message: "Message intent was missing." },
+  sandbox_delivery_prepared: {
+    tone: "success",
+    message: "Delivery prepared. It can now be dry-run checked and sandbox submitted.",
+  },
+  sandbox_delivery_already_prepared: {
+    tone: "warn",
+    message: "A delivery already exists for this intent.",
+  },
+  sandbox_preflight_blocked: {
+    tone: "error",
+    message: "Intent is not ready for delivery preparation. Review its blocked reasons.",
+  },
+  sandbox_delivery_missing: { tone: "error", message: "Delivery id was missing." },
+  sandbox_delivery_not_found: { tone: "error", message: "Delivery was not found." },
+  sandbox_delivery_not_ready: { tone: "error", message: "Delivery is not ready for submission." },
+  sandbox_delivery_already_submitted: {
+    tone: "warn",
+    message: "This delivery was already submitted to the provider.",
+  },
+  sandbox_intent_not_ready: {
+    tone: "error",
+    message: "The linked message intent is not ready for provider submission.",
+  },
+  sandbox_provider_not_ready: {
+    tone: "error",
+    message: "Sandbox provider configuration is not ready. Complete provider setup below.",
+  },
+  sandbox_send_gate_missing_or_disabled: {
+    tone: "error",
+    message: "The sandbox send gate is disabled. Enable it in provider setup to allow test submits.",
+  },
+  sandbox_test_recipient_required: {
+    tone: "error",
+    message: "The recipient phone must match an active, verified sandbox test recipient.",
+  },
+  sandbox_reservation_dry_run_ready: {
+    tone: "success",
+    message: "Dry run passed. All gates are ready for a sandbox test submit.",
+  },
+  sandbox_delivery_reserved: {
+    tone: "warn",
+    message: "This delivery was already reserved by another submit attempt.",
+  },
+  sandbox_provider_submit_attempted: {
+    tone: "success",
+    message: "Sandbox submit attempted. Delivery status will update from provider callbacks.",
+  },
+  sandbox_provider_immediate_failure: {
+    tone: "error",
+    message: "The provider rejected the sandbox submit. The failure was recorded on the delivery.",
+  },
+  sandbox_internal_error: {
+    tone: "error",
+    message: "Something went wrong processing the sandbox action. Please try again.",
   },
 };
 
@@ -299,6 +414,27 @@ export default async function AdminCommunicationsPage({
     }),
   );
 
+  // Fail closed to safe-empty views when local schemas lag behind.
+  const sandboxSetup = await getSmsSandboxSetupForAccount({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  }).catch(() =>
+    getSmsSandboxSetupForAccount({
+      supabase,
+      accountOwnerUserId: "",
+    }),
+  );
+
+  const sandboxQueue = await getSmsSandboxQueueForAccount({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  }).catch(() =>
+    getSmsSandboxQueueForAccount({
+      supabase,
+      accountOwnerUserId: "",
+    }),
+  );
+
   const latestVersionIsMutableDraft =
     templateGovernance.latestVersion.exists && templateGovernance.latestVersion.versionStatus === "draft";
 
@@ -320,7 +456,7 @@ export default async function AdminCommunicationsPage({
               Review SMS provider readiness and messaging configuration status.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Status and readiness only; no configuration allowed yet
+              Sandbox setup and testing only; live SMS remains disabled
             </div>
           </div>
           <Link
@@ -331,6 +467,12 @@ export default async function AdminCommunicationsPage({
           </Link>
         </div>
       </div>
+
+      {templateNotice ? (
+        <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(templateNotice.tone)}`}>
+          {templateNotice.message}
+        </div>
+      ) : null}
 
       {/* Communications Status Section */}
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
@@ -344,7 +486,10 @@ export default async function AdminCommunicationsPage({
             <p className="mt-1 text-slate-600">{readiness.communicationsStatus.helperText}</p>
           </div>
           <div className="border-t border-slate-200 pt-3 text-sm text-slate-600">
-            <p>This page is readiness and status only. SMS send, testing, and provider configuration are not available in this build.</p>
+            <p>
+              Sandbox provider setup and manual test sends to verified test recipients are available
+              below. Live customer SMS remains disabled until activation gates are complete.
+            </p>
           </div>
         </div>
       </section>
@@ -483,6 +628,262 @@ export default async function AdminCommunicationsPage({
         </div>
       </section>
 
+      {/* Provider Setup (Sandbox) Section */}
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Configuration</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Provider Setup (Sandbox)</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Configure the Twilio sandbox rows the manual test-send path gates on. References only —
+            credentials stay in server environment variables and are never stored here. Nothing on
+            this page enables live customer SMS.
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          {/* Provider configuration */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-900">Sandbox provider configuration</p>
+              {sandboxSetup.providerConfig.exists ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                  Configured
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                  Not configured
+                </span>
+              )}
+            </div>
+            {sandboxSetup.providerConfig.exists ? (
+              <p className="mt-2 text-xs text-slate-600">
+                Messaging Service: {sandboxSetup.providerConfig.maskedMessagingServiceRef ?? "Not set"} •
+                Readiness: {sandboxSetup.providerConfig.readinessStatus ?? "unknown"}
+              </p>
+            ) : null}
+            <form action={saveSmsSandboxProviderConfigFromForm} className="mt-3 space-y-3">
+              <div>
+                <label htmlFor="messaging-service-ref" className="text-xs font-semibold text-slate-700">
+                  Messaging Service SID
+                </label>
+                <input
+                  id="messaging-service-ref"
+                  name="messaging_service_ref"
+                  required
+                  placeholder="MG..."
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="provider-account-ref" className="text-xs font-semibold text-slate-700">
+                  Account reference (optional)
+                </label>
+                <input
+                  id="provider-account-ref"
+                  name="provider_account_ref"
+                  placeholder="Subaccount reference (never the auth token)"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+              >
+                Save provider configuration
+              </button>
+            </form>
+
+            <div className="mt-4 border-t border-slate-200 pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Sandbox send gate</p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    Server-only gate for manual test submits. Sends stay limited to verified test
+                    recipients even when enabled.
+                  </p>
+                </div>
+                {sandboxSetup.providerConfig.sandboxSendEnabled ? (
+                  <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                    Enabled
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                    Disabled
+                  </span>
+                )}
+              </div>
+              <form action={setSmsSandboxSendGateFromForm} className="mt-2">
+                <input
+                  type="hidden"
+                  name="enable"
+                  value={sandboxSetup.providerConfig.sandboxSendEnabled ? "false" : "true"}
+                />
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+                >
+                  {sandboxSetup.providerConfig.sandboxSendEnabled
+                    ? "Disable sandbox send gate"
+                    : "Enable sandbox send gate"}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Sender identity */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-900">Sender identity</p>
+              {sandboxSetup.senderIdentity.exists ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                  {sandboxSetup.senderIdentity.verificationStatus === "verified" ||
+                  sandboxSetup.senderIdentity.verificationStatus === "active"
+                    ? "Verified"
+                    : "Pending verification"}
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                  Not configured
+                </span>
+              )}
+            </div>
+            {sandboxSetup.senderIdentity.exists ? (
+              <p className="mt-2 text-xs text-slate-600">
+                {sandboxSetup.senderIdentity.displayLabel} • ••••
+                {sandboxSetup.senderIdentity.phoneLast4 ?? "----"}
+              </p>
+            ) : null}
+            <form action={saveSmsSenderIdentityFromForm} className="mt-3 space-y-3">
+              <div>
+                <label htmlFor="sender-display-label" className="text-xs font-semibold text-slate-700">
+                  Sender label
+                </label>
+                <input
+                  id="sender-display-label"
+                  name="sender_display_label"
+                  required
+                  placeholder="Business texting number"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="sender-phone" className="text-xs font-semibold text-slate-700">
+                  Twilio phone number
+                </label>
+                <input
+                  id="sender-phone"
+                  name="phone"
+                  required
+                  placeholder="(209) 555-1234"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="sender-campaign-ref" className="text-xs font-semibold text-slate-700">
+                  A2P campaign reference (optional)
+                </label>
+                <input
+                  id="sender-campaign-ref"
+                  name="provider_campaign_ref"
+                  placeholder="Campaign SID once approved"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+                />
+              </div>
+              <label className="flex items-start gap-2 text-xs text-slate-700">
+                <input type="checkbox" name="verified_with_provider" value="true" className="mt-0.5" />
+                <span>
+                  This number is active in the provider console and its A2P campaign is approved.
+                  Checking this marks the sender verified for sandbox testing only.
+                </span>
+              </label>
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+              >
+                Save sender identity
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Test recipients */}
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-900">Verified sandbox test recipients</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Sandbox test sends only go to phones on this list. Add your own phone here to smoke-test
+            once the campaign is approved.
+          </p>
+
+          {sandboxSetup.testRecipients.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {sandboxSetup.testRecipients.map((recipient) => (
+                <div
+                  key={recipient.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm"
+                >
+                  <div className="text-slate-800">
+                    ••••{recipient.phoneLast4}
+                    {recipient.phoneLabel ? ` • ${recipient.phoneLabel}` : ""}
+                    {!recipient.isActive ? (
+                      <span className="ml-2 inline-flex items-center rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                        Inactive
+                      </span>
+                    ) : null}
+                  </div>
+                  {recipient.isActive ? (
+                    <form action={deactivateSmsSandboxTestRecipientFromForm}>
+                      <input type="hidden" name="test_recipient_id" value={recipient.id} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Deactivate
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              No test recipients yet.
+            </p>
+          )}
+
+          <form action={addSmsSandboxTestRecipientFromForm} className="mt-3 flex flex-wrap items-end gap-2">
+            <div>
+              <label htmlFor="test-recipient-phone" className="text-xs font-semibold text-slate-700">
+                Phone
+              </label>
+              <input
+                id="test-recipient-phone"
+                name="phone"
+                required
+                placeholder="(209) 555-1234"
+                className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="test-recipient-label" className="text-xs font-semibold text-slate-700">
+                Label (optional)
+              </label>
+              <input
+                id="test-recipient-label"
+                name="phone_label"
+                placeholder="Owner phone"
+                className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+            >
+              Add verified test recipient
+            </button>
+          </form>
+        </div>
+      </section>
+
       {/* On-The-Way Notification Section */}
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
@@ -490,8 +891,12 @@ export default async function AdminCommunicationsPage({
           <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">On-The-Way Notification</h2>
         </div>
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700">
-          <p className="font-medium text-slate-900">Planned only</p>
-          <p className="mt-1">Mark On The Way does not send SMS. Future On-The-Way SMS will be background event-driven after job status transitions.</p>
+          <p className="font-medium text-slate-900">Audit-only (no automatic sends)</p>
+          <p className="mt-1">
+            Mark On The Way records a non-sending message intent when the recipient, consent, and
+            template gates pass. Intents appear in the Sandbox Send Queue below for manual test
+            submission. Automatic sending remains disabled until live activation is approved.
+          </p>
         </div>
       </section>
 
@@ -509,12 +914,6 @@ export default async function AdminCommunicationsPage({
             <p className="mt-1">Template approval and Mark On The Way do not send SMS.</p>
             <p className="mt-1">Sample previews are informational only; final wording may still require legal/provider review.</p>
           </div>
-
-          {templateNotice ? (
-            <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(templateNotice.tone)}`}>
-              {templateNotice.message}
-            </div>
-          ) : null}
 
           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -774,6 +1173,119 @@ export default async function AdminCommunicationsPage({
               ))}
             </ul>
           </div>
+        </div>
+      </section>
+
+      {/* Sandbox Send Queue Section */}
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Testing</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Sandbox Send Queue</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Recent On-The-Way message intents created by Mark On The Way. Prepare a ready intent,
+            dry-run its gates, then submit a sandbox test. Submits only reach verified test
+            recipients; delivery status updates from provider callbacks.
+          </p>
+        </div>
+
+        <div className="mt-4">
+          {!sandboxQueue.hasIntents ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              No On-The-Way message intents yet. Intents appear here after a job is marked On The
+              Way for a contact with recorded SMS consent.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {sandboxQueue.intents.map((intent) => (
+                <div key={intent.intentId} className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="text-sm">
+                      <div className="font-semibold text-slate-900">
+                        Recipient {intent.maskedRecipientPhone}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">
+                        {intent.createdAt ? new Date(intent.createdAt).toLocaleString() : "Unknown time"}
+                        {intent.templateVersion ? ` • Template v${intent.templateVersion}` : ""}
+                      </div>
+                    </div>
+                    <span
+                      className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-medium ${
+                        intent.decisionOutcome === "ready_for_provider"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : "border-slate-300 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      {intent.decisionOutcomeLabel}
+                    </span>
+                  </div>
+
+                  {intent.blockedReasonCodes.length > 0 ? (
+                    <div className="mt-2 text-xs text-amber-700">
+                      Blocked: {intent.blockedReasonCodes.join(", ")}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    {intent.delivery ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="text-xs text-slate-700">
+                          <span className="font-semibold">Delivery:</span>{" "}
+                          {intent.delivery.providerStatusLabel}
+                          {intent.delivery.providerErrorCode
+                            ? ` • Error ${intent.delivery.providerErrorCode}`
+                            : ""}
+                          {intent.delivery.deliveredAt
+                            ? ` • Delivered ${new Date(intent.delivery.deliveredAt).toLocaleString()}`
+                            : intent.delivery.sentAt
+                              ? ` • Sent ${new Date(intent.delivery.sentAt).toLocaleString()}`
+                              : ""}
+                        </div>
+                        {intent.delivery.providerStatus === "not_submitted" ? (
+                          <div className="flex flex-wrap gap-2">
+                            <form action={reserveSmsSandboxDeliveryDryRunFromForm}>
+                              <input type="hidden" name="delivery_id" value={intent.delivery.deliveryId} />
+                              <button
+                                type="submit"
+                                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+                              >
+                                Dry-run gates
+                              </button>
+                            </form>
+                            <form action={submitSmsSandboxDeliveryToProviderFromForm}>
+                              <input type="hidden" name="delivery_id" value={intent.delivery.deliveryId} />
+                              <button
+                                type="submit"
+                                className="inline-flex items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-900 shadow-sm hover:bg-emerald-100"
+                              >
+                                Submit sandbox SMS test
+                              </button>
+                            </form>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : intent.canPrepareDelivery ? (
+                      <form action={prepareSmsSandboxDeliveryFromForm} className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-slate-600">
+                          No delivery prepared yet for this ready intent.
+                        </span>
+                        <input type="hidden" name="intent_id" value={intent.intentId} />
+                        <button
+                          type="submit"
+                          className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+                        >
+                          Prepare delivery
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="text-xs text-slate-500">
+                        Not eligible for delivery preparation.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

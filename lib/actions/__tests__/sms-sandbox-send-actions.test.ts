@@ -31,6 +31,11 @@ vi.mock("@/lib/communications/sms-sandbox-test-recipient-read", () => ({
     readSmsSandboxTestRecipientForPhoneMock(...args),
 }));
 
+vi.mock("@/lib/communications/sms-provider-delivery-preflight", () => ({
+  prepareSmsProviderDeliveryPreflight: (...args: unknown[]) =>
+    prepareSmsProviderDeliveryPreflightMock(...args),
+}));
+
 vi.mock("@/lib/communications/twilio-messages-client", () => ({
   sendTwilioSandboxMessage: (...args: unknown[]) => sendTwilioSandboxMessageMock(...args),
   TwilioMessageError: class TwilioMessageError extends Error {
@@ -46,8 +51,10 @@ vi.mock("@/lib/communications/twilio-messages-client", () => ({
 }));
 
 const readSmsSandboxTestRecipientForPhoneMock = vi.fn();
+const prepareSmsProviderDeliveryPreflightMock = vi.fn();
 
 import {
+  prepareSmsSandboxDeliveryFromForm,
   reserveSmsSandboxDeliveryDryRunFromForm,
   submitSmsSandboxDeliveryToProviderFromForm,
 } from "@/lib/actions/sms-sandbox-send-actions";
@@ -1339,5 +1346,115 @@ describe("submitSmsSandboxDeliveryToProviderFromForm", () => {
       submitSmsSandboxDeliveryToProviderFromForm(buildFormData("delivery-1")),
     ).rejects.toThrow("admin_required");
     expect(sendTwilioSandboxMessageMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("prepareSmsSandboxDeliveryFromForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    createAdminClientMock.mockReturnValue({ from: vi.fn() });
+    requireInternalRoleMock.mockResolvedValue({
+      userId: "admin-1",
+      internalUser: {
+        user_id: "admin-1",
+        role: "admin",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+  });
+
+  function buildIntentFormData(intentId?: string) {
+    const formData = new FormData();
+    if (intentId !== undefined) {
+      formData.set("intent_id", intentId);
+    }
+    return formData;
+  }
+
+  it("blocks non-admin actor", async () => {
+    requireInternalRoleMock.mockRejectedValueOnce(new Error("INTERNAL_ROLE_REQUIRED"));
+
+    await expect(prepareSmsSandboxDeliveryFromForm(buildIntentFormData("intent-1"))).rejects.toThrow(
+      "admin_required",
+    );
+    expect(prepareSmsProviderDeliveryPreflightMock).not.toHaveBeenCalled();
+  });
+
+  it("requires intent_id", async () => {
+    await expect(prepareSmsSandboxDeliveryFromForm(buildIntentFormData())).rejects.toThrow(
+      "sandbox_intent_missing",
+    );
+    expect(prepareSmsProviderDeliveryPreflightMock).not.toHaveBeenCalled();
+  });
+
+  it("passes account scope and intent id to the preflight helper", async () => {
+    prepareSmsProviderDeliveryPreflightMock.mockResolvedValueOnce({
+      created: true,
+      deduped: false,
+      deliveryId: "delivery-1",
+      readyForProviderSubmit: false,
+      blockedReasons: [],
+      warnings: [],
+      providerName: "twilio",
+      providerStatus: "not_submitted",
+      liveSendEnabled: false,
+    });
+
+    await expect(prepareSmsSandboxDeliveryFromForm(buildIntentFormData("intent-1"))).rejects.toThrow(
+      "sandbox_delivery_prepared",
+    );
+
+    expect(prepareSmsProviderDeliveryPreflightMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: "owner-1",
+        smsMessageIntentId: "intent-1",
+        actingUserId: "admin-1",
+      }),
+    );
+    expect(sendTwilioSandboxMessageMock).not.toHaveBeenCalled();
+  });
+
+  it("reports dedupe when a delivery already exists", async () => {
+    prepareSmsProviderDeliveryPreflightMock.mockResolvedValueOnce({
+      created: false,
+      deduped: true,
+      deliveryId: "delivery-1",
+      readyForProviderSubmit: false,
+      blockedReasons: [],
+      warnings: [],
+      providerName: "twilio",
+      liveSendEnabled: false,
+    });
+
+    await expect(prepareSmsSandboxDeliveryFromForm(buildIntentFormData("intent-1"))).rejects.toThrow(
+      "sandbox_delivery_already_prepared",
+    );
+  });
+
+  it("reports blocked preflight without creating anything", async () => {
+    prepareSmsProviderDeliveryPreflightMock.mockResolvedValueOnce({
+      created: false,
+      deduped: false,
+      readyForProviderSubmit: false,
+      blockedReasons: ["intent_not_ready_for_provider"],
+      warnings: [],
+      providerName: "twilio",
+      liveSendEnabled: false,
+    });
+
+    await expect(prepareSmsSandboxDeliveryFromForm(buildIntentFormData("intent-1"))).rejects.toThrow(
+      "sandbox_preflight_blocked",
+    );
+  });
+
+  it("reports internal error when the preflight helper throws", async () => {
+    prepareSmsProviderDeliveryPreflightMock.mockRejectedValueOnce(new Error("db down"));
+
+    await expect(prepareSmsSandboxDeliveryFromForm(buildIntentFormData("intent-1"))).rejects.toThrow(
+      "sandbox_internal_error",
+    );
   });
 });
