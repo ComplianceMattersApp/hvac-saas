@@ -15,6 +15,7 @@ import {
 import { updateLocationServiceAddressFromForm } from "@/app/locations/[id]/notes-actions";
 import ServiceLocationAddressFields from "@/components/addresses/ServiceLocationAddressFields";
 import { startCustomerSavedPaymentMethodSetupFromForm } from "@/lib/actions/customer-saved-payment-method-actions";
+import { recordContactRecipientSmsConsentFromForm } from "@/lib/actions/sms-consent-actions";
 import {
   addCustomerRoleContactFromForm,
   addLocationRoleContactFromForm,
@@ -636,6 +637,8 @@ export default async function CustomerDetailPage(props: {
     rcError?: string;
     rcLocSaved?: string;
     rcLocError?: string;
+    consentSaved?: string;
+    consentError?: string;
     locSaved?: string;
     saved?: string;
   }>;
@@ -665,6 +668,8 @@ export default async function CustomerDetailPage(props: {
   const roleContactError = String(sp.rcError ?? "").trim() === "1";
   const locationRoleContactSaved = String(sp.rcLocSaved ?? "").trim() === "1";
   const locationRoleContactError = String(sp.rcLocError ?? "").trim() === "1";
+  const smsConsentSaved = String(sp.consentSaved ?? "").trim() === "1";
+  const smsConsentError = String(sp.consentError ?? "").trim() === "1";
   const serviceLocationSaved = String(sp.locSaved ?? "").trim().toLowerCase();
   const systemsEquipmentSaved = String(sp.saved ?? "").trim().toLowerCase();
   const systemsEquipmentError = String(sp.err ?? "").trim().toLowerCase();
@@ -780,6 +785,31 @@ export default async function CustomerDetailPage(props: {
       status: ["active"],
       limit: 250,
     }).catch(() => []);
+  }
+
+  // Service-notification SMS consent (on_the_way class) per contact recipient.
+  const smsConsentByRecipientId = new Map<string, string>();
+  if (isInternalViewer && visibilityScope.kind === "internal" && customerRoleContacts.length > 0) {
+    const consentRecipientIds = customerRoleContacts
+      .map((recipient) => String(recipient.id ?? "").trim())
+      .filter(Boolean);
+
+    if (consentRecipientIds.length > 0) {
+      const { data: consentRows } = await supabase
+        .from("contact_recipient_consents")
+        .select("contact_recipient_id, consent_status")
+        .eq("account_owner_user_id", visibilityScope.accountOwnerUserId)
+        .eq("message_class", "on_the_way")
+        .in("contact_recipient_id", consentRecipientIds);
+
+      for (const row of consentRows ?? []) {
+        const recipientId = String((row as any)?.contact_recipient_id ?? "").trim();
+        const status = String((row as any)?.consent_status ?? "").trim();
+        if (recipientId && status) {
+          smsConsentByRecipientId.set(recipientId, status);
+        }
+      }
+    }
   }
 
   let locationsData: LocationRow[] = [];
@@ -2419,6 +2449,127 @@ export default async function CustomerDetailPage(props: {
                 No account contacts saved yet. Add who handles scheduling, billing, or access.
               </div>
             )}
+
+            {/* Service text message consent */}
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+              <h3 className="text-sm font-semibold text-slate-900">Service Text Message Consent</h3>
+              <p className="mt-1 text-xs text-slate-600">
+                Record whether each contact agreed to receive service text messages (for example
+                &ldquo;technician on the way&rdquo; updates). Recording consent does not send any
+                message. Customers can opt out any time by replying STOP.
+              </p>
+
+              {smsConsentSaved ? (
+                <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  Consent preference saved.
+                </div>
+              ) : null}
+              {smsConsentError ? (
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                  Could not save consent preference. Please try again.
+                </div>
+              ) : null}
+
+              {customerRoleContacts.filter(
+                (recipient) =>
+                  String(recipient.phone_e164 ?? "").trim() && recipient.status === "active",
+              ).length === 0 ? (
+                <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  Add an account contact with a phone number to record text message consent.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {customerRoleContacts
+                    .filter(
+                      (recipient) =>
+                        String(recipient.phone_e164 ?? "").trim() && recipient.status === "active",
+                    )
+                    .map((recipient) => {
+                      const consentStatus =
+                        smsConsentByRecipientId.get(String(recipient.id ?? "").trim()) ?? "not_recorded";
+                      const consentLabel =
+                        consentStatus === "opted_in"
+                          ? "Opted in"
+                          : consentStatus === "opted_out"
+                            ? "Opted out"
+                            : consentStatus === "revoked"
+                              ? "Revoked"
+                              : "Not recorded";
+                      const consentTone =
+                        consentStatus === "opted_in"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : consentStatus === "opted_out" || consentStatus === "revoked"
+                            ? "border-rose-200 bg-rose-50 text-rose-800"
+                            : "border-slate-200 bg-slate-50 text-slate-600";
+
+                      return (
+                        <div
+                          key={`consent-${recipient.id}`}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-slate-900">
+                              {recipient.display_name || "Contact"}
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                              <span>{recipient.phone_e164}</span>
+                              <span
+                                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${consentTone}`}
+                              >
+                                {consentLabel}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {consentStatus !== "opted_in" ? (
+                              <form
+                                action={recordContactRecipientSmsConsentFromForm}
+                                className="flex flex-wrap items-center gap-2"
+                              >
+                                <input type="hidden" name="customer_id" value={customerId} />
+                                <input type="hidden" name="contact_recipient_id" value={recipient.id} />
+                                <input type="hidden" name="message_class" value="on_the_way" />
+                                <input type="hidden" name="consent_action" value="opt_in" />
+                                <select
+                                  name="consent_source"
+                                  defaultValue="verbal_in_person"
+                                  className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900"
+                                >
+                                  <option value="verbal_in_person">Agreed in person</option>
+                                  <option value="verbal_phone">Agreed by phone</option>
+                                  <option value="written_form">Written / form</option>
+                                  <option value="customer_request">Customer requested</option>
+                                </select>
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+                                >
+                                  Record opt-in
+                                </button>
+                              </form>
+                            ) : null}
+                            {consentStatus === "opted_in" ? (
+                              <form action={recordContactRecipientSmsConsentFromForm}>
+                                <input type="hidden" name="customer_id" value={customerId} />
+                                <input type="hidden" name="contact_recipient_id" value={recipient.id} />
+                                <input type="hidden" name="message_class" value="on_the_way" />
+                                <input type="hidden" name="consent_action" value="opt_out" />
+                                <input type="hidden" name="consent_source" value="customer_request" />
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                                >
+                                  Record opt-out
+                                </button>
+                              </form>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
 
             <Disclosure title="Add account contact" className="mt-3">
               <form action={addCustomerRoleContactFromForm} className="grid gap-2 sm:grid-cols-2">
