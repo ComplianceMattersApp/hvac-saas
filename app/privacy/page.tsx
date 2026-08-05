@@ -59,7 +59,10 @@ export default function PrivacyPolicyPage() {
         <ul className="mt-2 list-disc space-y-1 pl-6 text-stone-700 leading-relaxed">
           <li>Provide and operate the EveryStep FieldWorks platform</li>
           <li>Process and manage jobs, invoices, and payments</li>
-          <li>Sync invoice data to QuickBooks Online when you authorize this integration</li>
+          <li>
+            Synchronize eligible invoice and recorded payment information with QuickBooks Online when
+            you authorize this integration
+          </li>
           <li>Send notifications and communications related to your account</li>
           <li>Improve and maintain our services</li>
         </ul>
@@ -69,9 +72,18 @@ export default function PrivacyPolicyPage() {
         </h2>
         <p className="text-stone-700 leading-relaxed">
           If you connect your QuickBooks Online account, we store OAuth access tokens and refresh
-          tokens to enable invoice synchronization. These tokens are encrypted at rest using
-          AES-256-GCM encryption. We sync invoice data one-way from EveryStep FieldWorks to QuickBooks
-          Online. We do not modify or delete data in your QuickBooks account beyond what you explicitly
+          tokens to enable synchronization. These tokens are encrypted at rest using AES-256-GCM
+          encryption. EveryStep FieldWorks may synchronize eligible invoice and recorded payment
+          information with QuickBooks Online when an account has enabled the integration. After a
+          payment is successfully confirmed and recorded in EveryStep, EveryStep may create a related
+          QuickBooks Online payment and apply it to the corresponding invoice. Synchronization depends
+          on account configuration, provider availability, authorization status, and successful record
+          matching.
+        </p>
+        <p className="mt-3 text-stone-700 leading-relaxed">
+          QuickBooks Online is used as a downstream accounting synchronization service. EveryStep
+          remains the operational source of truth for job activity, invoices, and recorded payment
+          status. We do not modify or delete data in your QuickBooks account beyond what you explicitly
           authorize. You may disconnect the integration at any time from your Company Profile settings.
         </p>
 

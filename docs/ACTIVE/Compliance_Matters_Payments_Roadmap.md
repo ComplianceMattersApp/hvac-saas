@@ -46,7 +46,8 @@ Current roadmap status:
 - Durable payment register, allocation, failed-payment, and invoice paid/balance contracts remain in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md).
 - Durable service-plan billing, saved-method, scheduled-autopay attempt, and billing-period contracts remain in [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
 - Future customer communication and self-service flows remain deferred: failed-payment email/SMS, portal update-card flow, customer self-service retry, retry reminders, and broader notification automation.
-- Future payment add-ons remain deferred unless explicitly reopened in roadmap order: refunds, disputes, ACH, QBO sync, public/customer portal payment history, partial payments, broader saved-card flows, and deeper recurring-billing automation.
+- Optional downstream QBO synchronization is implemented for eligible invoices and recorded payments. After Stripe or an authorized internal workflow confirms payment and EveryStep records payment truth, EveryStep makes a best-effort attempt to create and apply the related QBO Payment. Connection, authorization, provider/API availability, and successful record matching remain required; QBO never determines EveryStep payment truth.
+- Future payment add-ons remain deferred unless explicitly reopened in roadmap order: refunds, disputes, ACH, public/customer portal payment history, broader partial-payment entry flows, broader saved-card flows, and deeper recurring-billing automation. Refund, dispute, and reversal synchronization to QBO is not implemented.
 
 ## Scheduled Autopay Roadmap / Source-Of-Truth Boundaries
 
@@ -1522,7 +1523,7 @@ Launch-status update:
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production.
 - This work no longer sits in pending live-environment readiness; live keys, live webhook, and final smoke are complete for the platform-account subscription slice.
 - Tenant customer invoice/work-payment execution V1 current scope is now in scope and closed for this phase.
-- Deferred in this lane: refunds/disputes/saved cards/partial payments/receipt messaging/public portal/platform application fees/QBO sync.
+- Deferred beyond the current aggregate implementation: refunds/disputes, broader partial-payment entry flows, receipt messaging expansion, public/customer portal expansion, and broader payment automation. Saved-method/manual and scheduled-autopay PaymentIntent workflows are implemented, and eligible recorded payments may synchronize downstream to QBO when configured.
 
 Recommended first scope for tenant customer/work payments:
 - customer pays invoice online
@@ -1563,14 +1564,17 @@ Explicit non-goals preserved in this phase:
 - no receipt automation
 - no platform-fee execution
 
-### Phase P4 — Optional QBO sync (later)
-Accounting convenience only.
+### Phase P4 — Optional QBO sync (implemented and account-configured)
+Accounting convenience only; downstream and best effort.
 
-Possible scope:
-- invoice sync
-- payment sync
-- reconciliation support
-- bookkeeping-friendly exports or mappings
+Current scope:
+- eligible invoice synchronization
+- recorded payment synchronization by creating/applying a related QBO Payment after EveryStep payment truth is confirmed
+- operator-visible failures and manual retry
+
+Future hardening:
+- provider request idempotency and durable QBO sync-attempt state
+- ambiguous provider-outcome recovery and duplicate detection
 
 **Locked boundary:**
 - QBO sync must remain optional and downstream
@@ -1579,9 +1583,9 @@ Possible scope:
 - QBO must not override Compliance Matters invoice truth or collected-payment truth
 - one-way Compliance Matters to QBO is the safest first shape; broad two-way sync stays deferred
 
-### QBO parking decision
-- QBO remains last-last.
-- QBO is optional downstream accounting sync/export only.
+### QBO operating decision
+- QBO is implemented when configured by the account owner.
+- QBO is optional downstream accounting synchronization only.
 - QBO is not required for launch.
 - QBO is not required for core product use.
 - QBO is not required before tenant Stripe customer payments.
@@ -1629,7 +1633,7 @@ Not as:
 
 ### 12. One-line definition
 
-Compliance Matters is **payment-ready by design with tenant customer payments V1 current scope active**: operational payment truth lives in the platform, Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding, tenant customer invoice checkout uses connected-account direct-charge with webhook-only payment truth writeback, and refunds/disputes/saved cards/partial payments/public portal/platform application fees/QBO sync remain deferred.
+Compliance Matters is **payment-ready by design with tenant customer payments V1 current scope active**: operational payment truth lives in the platform; Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding; tenant customer invoice Checkout and eligible saved-method/scheduled-autopay PaymentIntent flows use webhook-confirmed payment truth; authorized manual/off-platform payment recording remains supported; and eligible recorded payments may synchronize downstream to QBO when configured. Refunds, disputes, broader partial-payment entry, and broad customer portal expansion remain deferred.
 
 ---
 

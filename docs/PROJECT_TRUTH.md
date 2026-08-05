@@ -21,7 +21,7 @@ The following is current runtime truth and supersedes older future/deferred word
 - Internal payment-received email is live after durable recorded payment truth. Delivery is best-effort, uniquely claimed by payment and recipient, and never rolls back payment truth. The configured business support email is the first recipient; the account-owner profile email is fallback.
 - Internal contractor profiles show contractor-associated jobs separately from invoices whose frozen billing recipient is that contractor. Job assignment never proves payment responsibility.
 - Authenticated contractor portal users may access only issued invoices with `bill_to_kind = contractor` and a matching `bill_to_contractor_id`. List, detail, printable view, and payment-link creation repeat that boundary. Customer/homeowner-billed invoices and unrelated work remain invisible.
-- QBO is implemented as optional downstream accounting synchronization and never overrides EveryStep invoice, payment, job, or closeout truth.
+- QBO is implemented as optional downstream accounting synchronization for eligible invoices and recorded payments. After EveryStep confirms payment truth, it attempts to create and apply the related QBO Payment. QBO never overrides EveryStep invoice, payment, job, or closeout truth.
 - Contractor saved-card self-service was explicitly pulled into active implementation on July 16, 2026. Its locked boundary is contractor-owned identity and explicit setup/use; it must never attach a contractor card to the homeowner customer or imply autopay consent.
 - Still deferred: customer portal/client hub, ACH, refunds/disputes, and broader recurring-payment automation.
 
@@ -563,19 +563,19 @@ The platform supports live invoice collection through Stripe and durable manual/
 
 ### 19.3 Ownership model (locked)
 - EveryStep JobWorks = operational source of truth for payment visibility, payment-related workflow state, and operational tracking.
-- Stripe = implemented rail for platform subscription onboarding and tenant invoice payment acceptance through connected-account Checkout.
-- QBO = implemented but owner/Intuit-gated optional downstream accounting synchronization; never operational or payment truth.
+- Stripe = processor truth for implemented platform subscription and tenant invoice payment flows, including connected-account Checkout and eligible saved-method PaymentIntents.
+- QBO = account-configured optional downstream accounting synchronization for eligible invoices and recorded payments; never operational or payment truth.
 
 Operational payment state, accounting sync, and payment execution are separate layers and must remain separate in the architecture.
 
 ### 19.4 QBO rule (locked)
-QuickBooks Online must not be the required foundation for payment architecture. QBO is optional, downstream, accounting-oriented synchronization. QBO is not the required basis for payment acceptance, the payment rail, the required merchant setup, or a prerequisite for core product usage.
+QuickBooks Online must not be the required foundation for payment architecture. When configured by the account owner, current QBO synchronization includes eligible invoices and recorded payments. Payment is first confirmed through Stripe or an authorized internal payment workflow; EveryStep records payment truth and updates its invoice/payment projections; then EveryStep makes a best-effort attempt to create and apply the related QBO accounting Payment. That attempt depends on the account connection, authorization status, provider and external API availability, and successful record matching. QBO is not the required basis for payment acceptance, the payment rail, the required merchant setup, or a prerequisite for core product usage.
 
 ### 19.5 Stripe rule (locked)
-Stripe is the implemented payment rail for platform subscription onboarding and tenant invoice Checkout. Processor-backed payment handling does not depend on QBO; verified Stripe webhook outcomes create payment truth. Signed invoice-specific guest payment is implemented, and contractor-owned saved-card self-service is the active next expansion. Refunds, disputes, ACH, and broad customer portal self-service remain deferred. Keep future Stripe expansion additive and preserve payment/register idempotency.
+Stripe is the implemented processor for platform subscription onboarding and tenant invoice payment flows. Processor-backed payment handling does not depend on QBO; verified Stripe webhook outcomes create payment truth. Signed invoice-specific guest payment, eligible manual saved-method charges, and scheduled-autopay PaymentIntent handling are implemented. Refunds, disputes, ACH, and broad customer portal self-service remain deferred. Keep future Stripe expansion additive and preserve payment/register idempotency.
 
 ### 19.6 Current live behavior
-Supported now: payment tracking; payment status and amount due/paid visibility; manual/external payment recording; Stripe invoice Checkout; signed invoice-specific guest payment; webhook-confirmed payment truth; operational payment-received email; and financially authorized Bank Deposits reporting with automatic post-payment settlement sync, controlled backfill/refresh, invoice-payment fee/net explanation, real Stripe payout grouping, detail drilldown, and CSV export. Bank Deposits is a support schedule: customer payments minus proven fees/deductions equals expected bank deposit. Stripe payout status does not certify bank arrival; the bank statement or connected accounting feed remains authoritative.
+Supported now: payment tracking; payment status and amount due/paid visibility; manual/external payment recording; Stripe invoice Checkout; signed invoice-specific guest payment; eligible saved-method and scheduled-autopay PaymentIntent workflows; webhook-confirmed payment truth; operational payment-received email; optional downstream synchronization of eligible invoices and recorded payments to QBO; and financially authorized Bank Deposits reporting with automatic post-payment settlement sync, controlled backfill/refresh, invoice-payment fee/net explanation, real Stripe payout grouping, detail drilldown, and CSV export. QBO synchronization is best effort and does not determine EveryStep payment truth. Bank Deposits is a support schedule: customer payments minus proven fees/deductions equals expected bank deposit. Stripe payout status does not certify bank arrival; the bank statement or connected accounting feed remains authoritative.
 
 The financially authorized **Monthly Overview** is the owner performance surface. It keeps issued invoice totals (**Billed**), recorded customer payments (**Received**), proven Stripe settlement net (**Deposited**), current issued-invoice receivables (**Outstanding now**), and field-completed jobs as separate measures. It provides calendar-month selection, prior-period comparisons, a daily received-income trend, completed-job context, and drill-throughs to the underlying reports. The Today page remains a lightweight operational pulse and links into this full report.
 
@@ -594,7 +594,7 @@ Stripe-based acceptance may support a small **configurable** platform fee later:
 - **P0 — Tracking foundation (complete):** payment visibility, status tracking, operational awareness, and manual/external reference support.
 - **P1 — Payment-ready foundation (complete):** payment domain model, processor-agnostic architecture, event-ready transitions, UI wording boundaries, Stripe seam, optional downstream QBO seam, and support for a later configurable platform fee.
 - **P2 — Invoice payment acceptance (complete for current scope):** a payer can pay an issued invoice through signed guest access and Stripe Checkout; webhook-confirmed outcomes write back and update state automatically. Platform subscription billing remains a separate platform-billing track.
-- **P4 — Optional QBO sync (implemented and gated):** accounting convenience only; QBO sync remains optional and downstream.
+- **P4 — Optional QBO sync (implemented and account-configured):** eligible invoice and recorded-payment synchronization is an accounting convenience only; QBO remains optional, downstream, and best effort.
 
 > (Current phase status and the P1 completed-slice evidence live in [CURRENT_ROADMAP.md](./CURRENT_ROADMAP.md) and the payment evidence ledgers, not here.)
 

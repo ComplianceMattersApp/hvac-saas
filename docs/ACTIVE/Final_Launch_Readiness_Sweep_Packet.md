@@ -18,7 +18,7 @@ No launch blocker was found in this docs/source readiness sweep. The current pos
 - Support Case / Call Log V1 is implemented and production-smoke-passed for owner/support-internal case logging.
 - Support Console remains parked/runbook-gated.
 - Live provider SMS remains disabled/deferred.
-- QBO remains downstream-only and deferred.
+- QBO is optional, account-configured, downstream accounting synchronization for eligible invoices and recorded payments; it is not required for launch.
 - Customer portal, online booking, GPS/routing, marketing/reviews, AI/call answering, inventory/job costing/payroll, and broader provider-powered communication remain future/deferred lanes unless explicitly reopened.
 
 This packet does not authorize implementation, production mutation, feature activation, fallback removal, Support Console enablement, live SMS enablement, QBO work, customer portal work, Stripe/payment behavior changes, schema changes, migrations, or Supabase commands.
@@ -36,7 +36,7 @@ First tester smoke execution is complete. Results:
 - Controlled owner-led launch posture remains **Go**.
 - Launch blocker count remains **0**.
 
-Mobile V2 remains launch-ready / monitoring with current/classic fallback retained. Support V0 / Support Case V1 remain the active support model. Support Console remains parked/runbook-gated. Live SMS remains disabled/deferred. QBO remains deferred/downstream-only. Customer portal, online booking, GPS/routing, marketing/reviews, AI/call answering, and inventory/job costing/payroll remain future/deferred lanes.
+Mobile V2 remains launch-ready / monitoring with current/classic fallback retained. Support V0 / Support Case V1 remain the active support model. Support Console remains parked/runbook-gated. Live SMS remains disabled/deferred. QBO is optional, account-configured, downstream, and best effort. Customer portal, online booking, GPS/routing, marketing/reviews, AI/call answering, and inventory/job costing/payroll remain future/deferred lanes.
 
 ## 1B. Daily-Use Baseline Context
 
@@ -52,7 +52,7 @@ Current readiness work is controlled expansion / first tester validation on top 
 | Missing support operating path | Launch blocker | None found. Support V0 has owner contact path and issue-log process. |
 | Support Console required for first tester | Launch blocker | None. Support Console remains deferred/runbook-gated and is not required for this launch posture. |
 | Live SMS required for first tester | Launch blocker | None. Live SMS is explicitly deferred/non-sending. |
-| QBO required for first tester | Launch blocker | None. QBO remains downstream-only/deferred. |
+| QBO required for first tester | Launch blocker | None. QBO is optional downstream accounting synchronization and is not required for core use. |
 | Broad customer portal required for first tester | Launch blocker | None. Contractor portal and public proposal/payment links cover current external surfaces; customer portal remains deferred. |
 
 Launch blocker count: **0**.
@@ -72,7 +72,7 @@ Launch blocker count: **0**.
 | 9 | HVAC service workflow, field finish, waiting/exception outcomes | Service workflow, field finish, waiting/parts/approval/on-hold and follow-up actions have tests and current action surfaces; final fixture smoke remains useful. | Owner/tester smoke item | Active service job, waiting on info, parts/material, approval needed, unable-to-complete/follow-up, finish field visit. |
 | 10 | Customer/location/equipment/system/filter continuity | Customer/location/equipment/system/filter foundations and tests exist; relationship-intake and display wording were launch-hardened. | Owner/tester smoke item | Customer profile to location/equipment/system filter; job location edit; equipment route from job; no duplicate truth confusion. |
 | 11 | Estimates/proposals/public approval links | Proposal email/link/customer approval lane is closed for current scope; token safety and public approval were previously smoked. | Owner/tester smoke item | Create estimate, generate public proposal link, approve link, confirm internal notification/status without invoice/payment automation promises. |
-| 12 | Internal invoice/payment truth and wording honesty | Internal invoice/payment truth is mature; webhook-confirmed/manual rows remain payment truth; failed/reversed rows are non-collected; Payments V2 add-ons deferred. | Launch hardening recommended | Draft/issue/send/print/pay link wording; manual/off-platform payment; failed payment display; no refund/QBO/ACH/customer-portal promises. |
+| 12 | Internal invoice/payment truth and wording honesty | Internal invoice/payment truth is mature; webhook-confirmed/manual rows remain payment truth; eligible recorded payments may synchronize downstream to QBO; failed/reversed rows are non-collected; Payments V2 add-ons deferred. | Launch hardening recommended | Draft/issue/send/print/pay link wording; manual/off-platform payment; failed payment display; no refund/reversal/ACH/customer-portal or guaranteed-QBO-delivery promises. |
 | 13 | Service plans / maintenance agreements current scope | Service plans/maintenance agreements are operational recurring-service truth; visit count and next-due are separate from billing/payment truth. | Owner/tester smoke item | Plan details, create visit, count visit, confirm next due, no invoice/payment hard-blocking of operations. |
 | 14 | Reports/payment register/time clock | Reports, payment register, invoice reports, deposits, time clock, and time-clock export surfaces exist with role boundaries documented. | Owner/tester smoke item | `/reports`, `/reports/payments`, `/reports/invoices`, `/reports/time-clock`, CSV export where authorized. |
 | 15 | Notifications / push / device setup | In-app notifications and web push/device setup are current controlled rollout scope; push is per-device and best-effort. | Owner/tester smoke item | `/ops/notifications`, enable one device, mention/assignment alert, in-app fallback, notification read state. |
@@ -80,7 +80,7 @@ Launch blocker count: **0**.
 | 17 | SMS readiness/non-sending wording | SMS template governance/readiness exists, but live SMS remains deferred. Wording must keep `sample/readiness/non-sending` clear. | Launch hardening recommended | Confirm `/ops/admin/communications` copy: sample preview only, SMS not enabled, Mark On The Way does not send SMS. |
 | 18 | PWA/install/device setup | PWA/device setup and push setup are part of controlled rollout; older planning-doc "missing foundation" sections are stale after V1 closeout. | Stale/resolved plus smoke item | Install/add-to-phone guidance, app launch, refresh/update behavior, device notification setup. |
 | 19 | RLS-sensitive drift checklist | Many account-scope/RLS-sensitive tests exist across auth, jobs, contractor intake, reports, payments, notifications, support, and service plans. | Launch hardening recommended | Run targeted RLS/scope test pack before each wider tester wave; no data repair/mutation during audit. |
-| 20 | Production/env/flag sanity checklist | Read-only confirmation only. Support Console disabled, SMS non-sending, QBO deferred, Mobile V2 fallback retained, no surprise feature flags. | Launch hardening recommended | Read-only env/flag checklist through approved owner process; no env changes in this sweep. |
+| 20 | Production/env/flag sanity checklist | Read-only confirmation only. Support Console disabled, SMS non-sending, QBO configuration/authorization state known, Mobile V2 fallback retained, no surprise feature flags. | Launch hardening recommended | Read-only env/flag checklist through approved owner process; no env changes in this sweep. |
 
 ## 4. Launch Hardening Checklist
 
@@ -140,7 +140,7 @@ Use one controlled tester/account and existing safe/local/non-production fixture
 - Keep deferred requests parked unless the owner explicitly reopens the lane.
 - Keep current/classic Mobile V2 fallback available for every tester.
 - Do not use support paths for impersonation or tenant operational mutation.
-- Do not promise live SMS, customer portal, QBO, GPS/routing, reviews/marketing automation, AI/call answering, inventory/job costing/payroll, or online booking as active first-launch features.
+- Do not promise live SMS, customer portal, or unconfigured/guaranteed QBO synchronization as active first-launch features. Do not promise GPS/routing, reviews/marketing automation, AI/call answering, inventory/job costing/payroll, or online booking.
 
 ## 7. Deferred / Runbook-Gated Confirmation List
 
@@ -148,7 +148,7 @@ Use one controlled tester/account and existing safe/local/non-production fixture
 | --- | --- | --- |
 | Customer portal / client hub | Deferred future lane; contractor portal and public proposal/payment links remain current external surfaces. | Deferred/runbook-gated |
 | Provider-powered SMS / two-way messaging | Deferred; readiness/template governance exists, live sends disabled. | Deferred/runbook-gated |
-| QBO/accounting sync | Deferred downstream-only; does not override CM invoice/payment truth. | Deferred/runbook-gated |
+| QBO/accounting sync | Implemented for eligible invoices and recorded payments when account-configured; downstream and best effort; does not override EveryStep invoice/payment truth. | Optional/account-configured |
 | Online booking/request intake | Deferred; current intake is internal/contractor/public proposal-link oriented. | Deferred/runbook-gated |
 | GPS/routing/location timers | Deferred; no GPS/geofencing/job-costing expansion. | Deferred/runbook-gated |
 | Marketing/reviews/referrals | Deferred GTM/growth lane. | Deferred/runbook-gated |
@@ -191,7 +191,7 @@ Read-only owner verification only:
 
 - Support Console flag remains disabled/unset unless a future runbook window explicitly enables it.
 - SMS provider/live-send gates remain disabled/deferred.
-- QBO credentials/sync remain absent or inactive.
+- QBO connection, authorization, and sync status are known for each account that elects to use the integration; inactive accounts remain unaffected.
 - Mobile V2 current/classic fallback remains available.
 - Web push status is known and rollback path is understood.
 - Stripe/payment environment posture is not changed by this sweep.
@@ -204,7 +204,7 @@ No narrow launch blocker was found, so no implementation prompt is recommended f
 
 If first tester smoke later finds a narrow blocker, use a scoped prompt in this shape:
 
-> Fix only the confirmed `[route/workflow]` launch blocker observed during controlled first tester smoke. Preserve Mobile V2 fallback, source-of-truth boundaries, role gates, payment truth, SMS non-sending posture, QBO deferred posture, Support Console parked posture, and all deferred-lane boundaries. Do not change schema, migrations, Supabase data, production env/flags, Stripe/SMS/QBO/provider behavior, or unrelated workflows.
+> Fix only the confirmed `[route/workflow]` launch blocker observed during controlled first tester smoke. Preserve Mobile V2 fallback, source-of-truth boundaries, role gates, payment truth, SMS non-sending posture, optional downstream QBO posture, Support Console parked posture, and all deferred-lane boundaries. Do not change schema, migrations, Supabase data, production env/flags, Stripe/SMS/QBO/provider behavior, or unrelated workflows.
 
 ## 12. Commands / Evidence Used
 

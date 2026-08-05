@@ -69,9 +69,13 @@ export default function TermsOfServicePage() {
           6. QuickBooks Online Integration
         </h2>
         <p className="text-stone-700 leading-relaxed">
-          The QuickBooks Online integration syncs your invoice data to your connected QuickBooks
-          company. You are responsible for ensuring your use of this integration complies with
-          Intuit&apos;s terms of service. We are not affiliated with or endorsed by Intuit Inc.
+          When the QuickBooks Online integration is enabled, EveryStep FieldWorks may synchronize
+          eligible invoice and recorded payment information with QuickBooks Online. Synchronization is
+          provided as a convenience feature and depends on account configuration, authorization,
+          provider availability, and successful record matching. EveryStep remains the operational
+          system of record for jobs, invoices, and recorded payment status. You are responsible for
+          ensuring your use of this integration complies with Intuit&apos;s terms of service. We are not
+          affiliated with or endorsed by Intuit Inc.
         </p>
 
         <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">7. Payment and Billing</h2>

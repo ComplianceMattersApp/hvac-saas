@@ -18,7 +18,7 @@ Current launch posture:
 - Support V0 plus Support Case V1 are the active support model.
 - Support Console remains parked/runbook-gated.
 - Live SMS remains disabled/deferred.
-- QBO remains deferred/downstream-only.
+- QBO is optional, account-configured, downstream accounting synchronization for eligible invoices and recorded payments; it is not required for testing or core use.
 - Customer portal, online booking, GPS/routing, marketing/reviews, AI/call answering, inventory/job costing/payroll remain future/deferred.
 
 Strict non-actions:
@@ -52,7 +52,7 @@ Preserved status:
 - Support V0 / Support Case V1 remain the active support model.
 - Support Console remains parked/runbook-gated.
 - Live SMS remains disabled/deferred.
-- QBO remains deferred/downstream-only.
+- QBO remains optional, account-configured, downstream, and best effort.
 - Customer portal, online booking, GPS/routing, marketing/reviews, AI/call answering, inventory/job costing/payroll remain future/deferred lanes.
 
 ## 1B. Daily-Use Baseline Context
@@ -78,7 +78,7 @@ This first tester smoke closeout validates controlled onboarding and external/us
 | Confirm tester has approved relationship-based first tester expectations | Tester understands owner-led support and controlled rollout scope. |  |  |  |  |
 | Confirm support path is ready | Support email, phone/text, hours, issue log, and owner responder are available. |  |  |  |  |
 | Confirm smoke data posture | Use existing safe fixtures or owner-approved test records only; do not repair/delete/mutate production data for checklist cleanup. |  |  |  |  |
-| Confirm deferred-feature wording | Tester will not be promised live SMS, customer portal, QBO, online booking, GPS/routing, marketing/reviews, AI/call answering, inventory/job costing/payroll. |  |  |  |  |
+| Confirm optional/deferred-feature wording | Tester will not be promised live SMS, customer portal, unconfigured or guaranteed QBO synchronization, online booking, GPS/routing, marketing/reviews, AI/call answering, inventory/job costing/payroll. |  |  |  |  |
 | Confirm fallback posture | Mobile current/classic fallback remains available; desktop remains separate. |  |  |  |  |
 | Confirm payment posture | Payment smoke uses current safe payment path only when relevant; no Stripe/payment behavior changes are introduced. |  |  |  |  |
 | Confirm Support Console posture | Support Console is not enabled or used for first tester support. |  |  |  |  |
@@ -156,7 +156,7 @@ Fill every applicable row during the first tester session. Mark non-applicable r
 | --- | --- |
 | Go to next controlled tester | No S1 blockers. Any S2 issues have owner-approved fallback/workaround. Mobile current/classic fallback remains intact. Auth, primary workflow, support path, and payment/ECC/source-of-truth boundaries remain safe. Deferred-feature expectations are clear. |
 | Hold at first tester | Any unresolved S2 that materially impairs the tester's core workflow, even with fallback, or repeated S3 confusion in the same critical path. |
-| No-go / stop expansion | Any S1 blocker; any issue affecting auth/role gates, source-of-truth boundaries, financial truth, ECC truth, final-state read-only posture, production data integrity, Mobile V2 fallback, desktop separation, live SMS posture, QBO deferred posture, or Support Console parked posture. |
+| No-go / stop expansion | Any S1 blocker; any issue affecting auth/role gates, source-of-truth boundaries, financial truth, ECC truth, final-state read-only posture, production data integrity, Mobile V2 fallback, desktop separation, live SMS posture, optional downstream QBO boundaries, or Support Console parked posture. |
 
 Minimum evidence before expanding:
 
@@ -251,14 +251,14 @@ Use plain wording like this during the first tester session:
 
 - Customer portal: "For this first controlled launch, customer self-service portal is not part of the active scope. We are using owner-led support, contractor portal where relevant, and public proposal/payment links where already supported."
 - SMS: "Live provider SMS is not enabled. Text-related labels are contact/logging or device-intent only unless we explicitly activate provider SMS later."
-- QBO: "QuickBooks integration is deferred and downstream-only. Compliance Matters remains the source of truth for app invoices and payment status."
+- QBO: "QuickBooks integration is optional and available when configured by the account owner. EveryStep may synchronize eligible invoices and recorded payments downstream to QuickBooks on a best-effort basis; EveryStep remains operational invoice and payment truth."
 - Online booking: "Online self-scheduling/request intake is not active for this first tester launch."
 - GPS/routing/location timers: "GPS routing, geofencing, and location timers are not active launch features."
 - Marketing/reviews/referrals: "Review management and marketing automation are future growth lanes, not first tester scope."
 - AI/call answering: "AI receptionist, call answering, and call insights are not active launch features."
 - Inventory/job costing/payroll: "Inventory, job costing, payroll, wage logic, and financing are future business-layer lanes. Time clock is not payroll."
 - Support Console: "Support Console remains parked. First tester support uses owner-led Support V0 and Support Case V1 logging."
-- Payments: "Only current supported invoice/payment paths are in scope. Refunds, disputes, ACH, QBO sync, broader payment portal behavior, and deeper automation remain deferred unless explicitly reopened."
+- Payments: "Only current supported invoice/payment paths are in scope. Eligible recorded payments may synchronize downstream to QBO when configured. Refunds, disputes, reversals, ACH, broader payment portal behavior, and deeper automation remain deferred unless explicitly reopened."
 - Mobile V2 fallback: "Mobile V2 is the default mobile job page, and current/classic fallback remains available."
 
 ## 11. Exact Next Implementation Prompt
@@ -267,7 +267,7 @@ No implementation is authorized by this packet.
 
 If the smoke session finds a narrow S1 blocker, use this prompt shape only after owner approval:
 
-> Fix only the confirmed first-tester S1 blocker in `[route/workflow]`. Preserve Mobile V2 current/classic fallback, desktop separation, source-of-truth boundaries, auth/role gates, payment truth, ECC truth, final-state read-only posture, SMS non-sending posture, QBO deferred posture, Support Console parked posture, and all deferred-lane boundaries. Do not change schema, migrations, Supabase data, production env/flags, Stripe/SMS/QBO/provider behavior, customer portal scope, or unrelated workflows.
+> Fix only the confirmed first-tester S1 blocker in `[route/workflow]`. Preserve Mobile V2 current/classic fallback, desktop separation, source-of-truth boundaries, auth/role gates, payment truth, ECC truth, final-state read-only posture, SMS non-sending posture, optional downstream QBO posture, Support Console parked posture, and all deferred-lane boundaries. Do not change schema, migrations, Supabase data, production env/flags, Stripe/SMS/QBO/provider behavior, customer portal scope, or unrelated workflows.
 
 ## 12. Validation Notes
 
