@@ -95,8 +95,10 @@ export default function PrivacyPolicyPage() {
         <ul className="mt-2 list-disc space-y-1 pl-6 text-stone-700 leading-relaxed">
           <li>Encryption in transit (HTTPS/TLS)</li>
           <li>Encryption at rest for sensitive credentials</li>
-          <li>Row-level security policies on all data</li>
-          <li>Authentication required for all data access</li>
+          <li>Account-scoped access controls and row-level security protections where applicable</li>
+          <li>
+            Authentication and secure limited-purpose access controls for protected information
+          </li>
         </ul>
 
         <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">6. Data Sharing</h2>
@@ -122,11 +124,10 @@ export default function PrivacyPolicyPage() {
           service-related communications and are not marketing messages.
         </p>
         <p className="mt-3 text-stone-700 leading-relaxed">
-          Customers may provide SMS consent through approved business communication channels,
-          including verbal consent during appointment scheduling and digital consent methods if and
-          when those methods are made available. SMS consent is optional, is specific to operational
-          communications, and is not a condition of purchasing or receiving services. Customers can
-          receive services without agreeing to text messages.
+          Customers may provide SMS consent verbally during appointment scheduling or through other
+          approved consent methods made available by Compliance Matters. SMS consent is optional,
+          applies only to operational communications, and is not a condition of purchasing or
+          receiving services. Customers can receive services without agreeing to text messages.
         </p>
         <p className="mt-3 text-stone-700 leading-relaxed">
           Message frequency varies based on customer appointments, service activity, and
@@ -136,11 +137,10 @@ export default function PrivacyPolicyPage() {
           of text messages is subject to carrier and network availability.
         </p>
         <p className="mt-3 text-stone-700 leading-relaxed">
-          Mobile numbers collected for SMS consent are not sold and are not shared with third parties
-          for marketing purposes. SMS consent information is used only for authorized communications.
-          We may share mobile numbers with service providers, such as messaging and telecommunications
-          providers, only as necessary to deliver those authorized communications and operate the
-          messaging program.
+          Mobile numbers, SMS consent information, and messaging preferences are not sold or shared
+          with third parties or affiliates for marketing or promotional purposes. We may share this
+          information with service providers necessary to operate and deliver authorized messaging
+          communications. SMS consent information is used only for authorized communications.
         </p>
 
         <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">8. Your Rights</h2>

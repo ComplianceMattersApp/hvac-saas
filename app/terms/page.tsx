@@ -73,9 +73,10 @@ export default function TermsOfServicePage() {
           eligible invoice and recorded payment information with QuickBooks Online. Synchronization is
           provided as a convenience feature and depends on account configuration, authorization,
           provider availability, and successful record matching. EveryStep remains the operational
-          system of record for jobs, invoices, and recorded payment status. You are responsible for
-          ensuring your use of this integration complies with Intuit&apos;s terms of service. We are not
-          affiliated with or endorsed by Intuit Inc.
+          system of record for jobs, invoices, and recorded payment status. QuickBooks Online does not
+          replace EveryStep as the operational source of truth. You are responsible for ensuring your
+          use of this integration complies with Intuit&apos;s terms of service. We are not affiliated
+          with or endorsed by Intuit Inc.
         </p>
 
         <h2 className="mt-8 mb-2 text-lg font-semibold text-[#0f1f35]">7. Payment and Billing</h2>
@@ -96,9 +97,9 @@ export default function TermsOfServicePage() {
         <p className="mt-3 text-stone-700 leading-relaxed">
           By providing consent to receive text messages from Compliance Matters, you agree to receive
           operational service-related communications. Consent may be provided through approved
-          business communication channels, including verbally during appointment scheduling or
-          through a digital consent method if and when one is made available. Consent is optional,
-          applies only to operational communications, and is not a condition of purchase or service.
+          Compliance Matters consent methods, including verbal consent during appointment scheduling.
+          Consent is optional, applies only to operational communications, and is not a condition of
+          purchase or service.
         </p>
         <p className="mt-3 text-stone-700 leading-relaxed">
           Message frequency varies based on customer appointments, service activity, and

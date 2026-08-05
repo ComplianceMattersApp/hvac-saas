@@ -20,6 +20,25 @@ describe("public QBO policy wording", () => {
     expect(terms).toContain("provided as a convenience feature");
     expect(terms).toContain("operational");
     expect(terms).toContain("system of record for jobs, invoices, and recorded payment status");
+    expect(terms).toContain("replace EveryStep as the operational source of truth");
     expect(terms).not.toContain("syncs your invoice data to your connected QuickBooks");
+  });
+
+  it("keeps SMS consent current and mobile-information sharing appropriately limited", () => {
+    expect(privacy).toContain("Customers may provide SMS consent verbally during appointment scheduling");
+    expect(privacy).toContain(
+      "Mobile numbers, SMS consent information, and messaging preferences are not sold or shared"
+    );
+    expect(privacy).toContain("service providers necessary to operate and deliver authorized messaging");
+    expect(privacy).not.toContain("digital consent methods if and");
+    expect(terms).toContain("Compliance Matters consent methods");
+    expect(terms).not.toContain("digital consent method if and when one is made available");
+  });
+
+  it("describes scoped security controls without unsupported absolutes", () => {
+    expect(privacy).toContain("row-level security protections where applicable");
+    expect(privacy).toContain("secure limited-purpose access controls for protected information");
+    expect(privacy).not.toContain("Row-level security policies on all data");
+    expect(privacy).not.toContain("Authentication required for all data access");
   });
 });
