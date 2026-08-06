@@ -67,10 +67,10 @@ async function requireAdminContext(): Promise<{
 async function readSandboxProviderConfigRow(params: {
   admin: any;
   accountOwnerUserId: string;
-}): Promise<{ id: string } | null> {
+}): Promise<{ id: string; defaultMessagingServiceRef: string | null } | null> {
   const response = await params.admin
     .from("sms_provider_configurations")
-    .select("id")
+    .select("id, default_messaging_service_ref")
     .eq("account_owner_user_id", params.accountOwnerUserId)
     .eq("provider_name", "twilio")
     .eq("provider_environment", "sandbox")
@@ -81,7 +81,14 @@ async function readSandboxProviderConfigRow(params: {
   }
 
   const id = asTrimmed(response?.data?.id);
-  return id ? { id } : null;
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    defaultMessagingServiceRef: asTrimmed(response?.data?.default_messaging_service_ref) || null,
+  };
 }
 
 export async function saveSmsSandboxProviderConfigFromForm(formData: FormData): Promise<void> {
@@ -223,12 +230,16 @@ export async function saveSmsSenderIdentityFromForm(formData: FormData): Promise
 
     const phoneLast4 = phoneE164.replace(/\D/g, "").slice(-4);
 
+    // Sender belongs to the sandbox provider config: inherit its Messaging
+    // Service ref when the form doesn't supply one, so the readiness read model
+    // (which requires at least one provider ref) counts this sender as
+    // configured.
     const values = {
       sender_type: "long_code",
       sender_display_label: displayLabel,
       phone_e164: phoneE164,
       phone_last4: phoneLast4,
-      messaging_service_ref: messagingServiceRef || null,
+      messaging_service_ref: messagingServiceRef || config.defaultMessagingServiceRef,
       registration_type: "a2p_10dlc",
       provider_campaign_ref: providerCampaignRef || null,
       verification_status: verifiedWithProvider ? "verified" : "pending_verification",
