@@ -2622,6 +2622,27 @@ export default async function CustomerDetailPage(props: {
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                   />
                 </div>
+                <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <label className="flex items-start gap-2 text-xs text-slate-700">
+                    <input type="checkbox" name="sms_consent_opt_in" value="true" className="mt-0.5" />
+                    <span>
+                      Customer agreed to receive service text messages at this number (for example
+                      &ldquo;technician on the way&rdquo; updates). They can reply STOP any time.
+                    </span>
+                  </label>
+                  <div className="mt-2">
+                    <select
+                      name="sms_consent_source"
+                      defaultValue="verbal_in_person"
+                      className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900"
+                    >
+                      <option value="verbal_in_person">Agreed in person</option>
+                      <option value="verbal_phone">Agreed by phone</option>
+                      <option value="written_form">Written / form</option>
+                      <option value="customer_request">Customer requested</option>
+                    </select>
+                  </div>
+                </div>
                 <div className="sm:col-span-2">
                   <button
                     type="submit"
@@ -2872,6 +2893,27 @@ export default async function CustomerDetailPage(props: {
                                   rows={2}
                                   className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
                                 />
+                              </div>
+                              <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                <label className="flex items-start gap-2 text-xs text-slate-700">
+                                  <input type="checkbox" name="sms_consent_opt_in" value="true" className="mt-0.5" />
+                                  <span>
+                                    Contact agreed to receive service text messages at this number.
+                                    They can reply STOP any time.
+                                  </span>
+                                </label>
+                                <div className="mt-2">
+                                  <select
+                                    name="sms_consent_source"
+                                    defaultValue="verbal_in_person"
+                                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
+                                  >
+                                    <option value="verbal_in_person">Agreed in person</option>
+                                    <option value="verbal_phone">Agreed by phone</option>
+                                    <option value="written_form">Written / form</option>
+                                    <option value="customer_request">Customer requested</option>
+                                  </select>
+                                </div>
                               </div>
                               <div className="sm:col-span-2">
                                 <button

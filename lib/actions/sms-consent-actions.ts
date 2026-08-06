@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import {
+  isSmsConsentSource,
+  SMS_CONSENT_TEXT_VERSION,
+} from "@/lib/communications/sms-consent-constants";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -28,16 +32,6 @@ const ALLOWED_MESSAGE_CLASSES = new Set([
   "completion_notice",
   "invoice_ready_notice",
 ]);
-
-const ALLOWED_CONSENT_SOURCES = new Set([
-  "verbal_in_person",
-  "verbal_phone",
-  "written_form",
-  "customer_request",
-]);
-
-/** Bump when the customer-facing consent wording changes (privacy/terms). */
-const CONSENT_TEXT_VERSION = "sms-consent-v1-2026-08";
 
 function asTrimmed(value: unknown): string {
   const text = String(value ?? "").trim();
@@ -91,7 +85,7 @@ export async function recordContactRecipientSmsConsentFromForm(
     redirect(failurePath);
   }
 
-  if (consentAction === "opt_in" && !ALLOWED_CONSENT_SOURCES.has(consentSource)) {
+  if (consentAction === "opt_in" && !isSmsConsentSource(consentSource)) {
     redirect(failurePath);
   }
 
@@ -129,7 +123,7 @@ export async function recordContactRecipientSmsConsentFromForm(
   const consentValues = {
     consent_status: consentStatus,
     consent_source: consentAction === "opt_in" ? consentSource : consentSource || "customer_request",
-    consent_text_version: CONSENT_TEXT_VERSION,
+    consent_text_version: SMS_CONSENT_TEXT_VERSION,
     consent_captured_at: now,
     consent_captured_by_user_id: userId,
     updated_by_user_id: userId,

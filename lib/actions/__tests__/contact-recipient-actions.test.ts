@@ -91,7 +91,13 @@ function makeSessionClientFixture() {
         return {
           insert(values: Record<string, unknown>) {
             insertCalls.push({ table, values });
-            return Promise.resolve({ error: null });
+            return {
+              select() {
+                return {
+                  single: async () => ({ data: { id: "recipient-1" }, error: null }),
+                };
+              },
+            };
           },
         };
       }
@@ -274,6 +280,60 @@ describe("addCustomerRoleContactFromForm", () => {
     );
 
     expect(fromCalls.some((table) => /sms|email|push|notification/i.test(table))).toBe(false);
+  });
+
+  it("records on_the_way consent in the same flow when the opt-in box is checked", async () => {
+    const { supabase, fromCalls, insertCalls } = makeSessionClientFixture();
+    const consentInserts: Array<Record<string, unknown>> = [];
+    const originalFrom = supabase.from.bind(supabase);
+    supabase.from = (table: string) => {
+      if (table === "contact_recipient_consents") {
+        fromCalls.push(table);
+        return {
+          insert: async (values: Record<string, unknown>) => {
+            consentInserts.push(values);
+            return { error: null };
+          },
+        } as any;
+      }
+      return originalFrom(table);
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClientFixture({ customerInScope: true }));
+
+    const { addCustomerRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
+
+    await expect(
+      addCustomerRoleContactFromForm(
+        makeFormData({ sms_consent_opt_in: "true", sms_consent_source: "verbal_phone" }),
+      ),
+    ).rejects.toThrow(
+      "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcSaved=1#role-contacts",
+    );
+
+    expect(insertCalls).toHaveLength(1);
+    expect(consentInserts).toHaveLength(1);
+    expect(consentInserts[0]).toMatchObject({
+      contact_recipient_id: "recipient-1",
+      message_class: "on_the_way",
+      consent_status: "opted_in",
+      consent_source: "verbal_phone",
+    });
+  });
+
+  it("does not record consent when the opt-in box is unchecked", async () => {
+    const { supabase, fromCalls } = makeSessionClientFixture();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClientFixture({ customerInScope: true }));
+
+    const { addCustomerRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
+
+    await expect(addCustomerRoleContactFromForm(makeFormData())).rejects.toThrow(
+      "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcSaved=1#role-contacts",
+    );
+
+    expect(fromCalls).not.toContain("contact_recipient_consents");
   });
 
   it("can create a location-linked site/access contact in same account", async () => {

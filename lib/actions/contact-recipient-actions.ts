@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import {
+  isSmsConsentSource,
+  SMS_CONSENT_TEXT_VERSION,
+} from "@/lib/communications/sms-consent-constants";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 const CUSTOMER_FORM_ALLOWED_ROLES = [
@@ -177,22 +181,66 @@ async function insertScopedContactRecipient(params: {
   preferredContactMethod: "sms" | "phone" | "email" | "none";
   notes: string | null;
 }) {
-  return params.supabase.from("contact_recipients").insert({
-    account_owner_user_id: params.accountOwnerUserId,
-    linked_entity_type: params.linkedEntityType,
-    linked_entity_id: params.linkedEntityId,
-    recipient_role: params.role,
-    display_name: params.displayName,
-    phone_e164: params.phoneE164,
-    phone_last10: params.phoneLast10,
-    email: params.email,
-    preferred_contact_method: params.preferredContactMethod,
-    notes: params.notes,
-    source_type: "manual",
-    status: "active",
-    created_by_user_id: params.userId,
-    updated_by_user_id: params.userId,
-  });
+  return params.supabase
+    .from("contact_recipients")
+    .insert({
+      account_owner_user_id: params.accountOwnerUserId,
+      linked_entity_type: params.linkedEntityType,
+      linked_entity_id: params.linkedEntityId,
+      recipient_role: params.role,
+      display_name: params.displayName,
+      phone_e164: params.phoneE164,
+      phone_last10: params.phoneLast10,
+      email: params.email,
+      preferred_contact_method: params.preferredContactMethod,
+      notes: params.notes,
+      source_type: "manual",
+      status: "active",
+      created_by_user_id: params.userId,
+      updated_by_user_id: params.userId,
+    })
+    .select("id")
+    .single();
+}
+
+/**
+ * One-step consent capture at contact creation: when the form's SMS consent
+ * checkbox was checked and the contact has a phone, record opted_in for the
+ * on_the_way class in the same flow. Best-effort — the contact save is the
+ * primary write and never fails because of consent.
+ */
+async function recordOnTheWayConsentBestEffort(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  userId: string;
+  contactRecipientId: string;
+  formData: FormData;
+  phoneE164: string | null;
+}) {
+  try {
+    if (!params.phoneE164 || !params.contactRecipientId) return;
+
+    const optIn = asTrimmed(params.formData.get("sms_consent_opt_in"));
+    if (optIn !== "true" && optIn !== "on") return;
+
+    const rawSource = asTrimmed(params.formData.get("sms_consent_source")).toLowerCase();
+    const source = isSmsConsentSource(rawSource) ? rawSource : "verbal_in_person";
+    const now = new Date().toISOString();
+
+    await params.supabase.from("contact_recipient_consents").insert({
+      account_owner_user_id: params.accountOwnerUserId,
+      contact_recipient_id: params.contactRecipientId,
+      message_class: "on_the_way",
+      consent_status: "opted_in",
+      consent_source: source,
+      consent_text_version: SMS_CONSENT_TEXT_VERSION,
+      consent_captured_at: now,
+      consent_captured_by_user_id: params.userId,
+      updated_by_user_id: params.userId,
+    });
+  } catch {
+    // Best-effort: consent can still be recorded from the customer page block.
+  }
 }
 
 export async function addCustomerRoleContactFromForm(formData: FormData) {
@@ -248,7 +296,7 @@ export async function addCustomerRoleContactFromForm(formData: FormData) {
     redirect(failurePath);
   }
 
-  const { error: insertError } = await insertScopedContactRecipient({
+  const { data: insertedRecipient, error: insertError } = await insertScopedContactRecipient({
     supabase,
     accountOwnerUserId,
     userId,
@@ -266,6 +314,15 @@ export async function addCustomerRoleContactFromForm(formData: FormData) {
   if (insertError) {
     redirect(failurePath);
   }
+
+  await recordOnTheWayConsentBestEffort({
+    supabase,
+    accountOwnerUserId,
+    userId,
+    contactRecipientId: String(insertedRecipient?.id ?? "").trim(),
+    formData,
+    phoneE164,
+  });
 
   revalidatePath(customerPath);
   redirect(`${customerPath}?rcSaved=1#role-contacts`);
@@ -335,7 +392,7 @@ export async function addLocationRoleContactFromForm(formData: FormData) {
     redirect(failurePath);
   }
 
-  const { error: insertError } = await insertScopedContactRecipient({
+  const { data: insertedRecipient, error: insertError } = await insertScopedContactRecipient({
     supabase,
     accountOwnerUserId,
     userId,
@@ -353,6 +410,15 @@ export async function addLocationRoleContactFromForm(formData: FormData) {
   if (insertError) {
     redirect(failurePath);
   }
+
+  await recordOnTheWayConsentBestEffort({
+    supabase,
+    accountOwnerUserId,
+    userId,
+    contactRecipientId: String(insertedRecipient?.id ?? "").trim(),
+    formData,
+    phoneE164,
+  });
 
   revalidatePath(customerPath);
   redirect(`${customerPath}?rcLocSaved=1#location-contacts-${locationId}`);
