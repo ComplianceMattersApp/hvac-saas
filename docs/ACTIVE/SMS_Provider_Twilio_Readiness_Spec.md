@@ -871,6 +871,38 @@ Validation: live-send tests 15/15 (window math, activation/suppression/quiet-hou
 reservation race, provider failure recording, never-throws), contact recipient actions 11/11
 (incl. one-step consent on/off), full touched-suite sweep 124/124, `tsc` clean on touched files.
 
+## Assumed-Consent Intake Model Completion Cross-Reference (August 2026)
+
+Owner decision (2026-08-06): for the OPERATIONAL message class only, providing a phone number
+while booking service constitutes prior express consent under the intake disclosure shown on
+phone-collecting forms. No explicit opt-in action is required; staff record an explicit decline
+instead. This never extends to marketing classes (review requests keep the express opt-in bar),
+and STOP suppression + the customer-profile opt-out always override.
+
+- `lib/communications/sms-consent-provisioning.ts` — `provisionCustomerSmsRecipientAndConsent`:
+  on customer creation with a valid phone, seeds an active `contact_recipients` row
+  (`customer_primary`, `seeded_from_customer` — both values the Slice A schema reserved for
+  exactly this) and an `on_the_way` consent row (`opted_in` source
+  `service_intake_number_provided`, or `opted_out` source `declined_at_intake` when the decline
+  box was checked). Never overwrites an existing consent decision; idempotent via the active-
+  identity unique index with 23505 re-read; best-effort by contract (customer creation can never
+  fail because of SMS provisioning).
+- Wired into all five customer-creation sites: `createCustomerOnlyFromForm`,
+  `createJobFromIntake`, contractor-intake `createCustomerInScope` (public submitter provided
+  the number requesting service), `findOrCreateCustomer` (create branch only — reused customers
+  keep their existing consent state; new optional `smsDeclined` param threaded from
+  `createJobFromForm`), and permit-request `createPermitJobCustomer`.
+- Forms flipped to the decline model: `/customers/new`, the New Job intake form, and both
+  add-contact forms now show the disclosure line (`SMS_INTAKE_DISCLOSURE_TEXT`) plus a single
+  "Customer declined text messages" checkbox. The opt-in checkbox + source picker are gone;
+  `recordOnTheWayConsentBestEffort` now always records under the intake disclosure.
+- The customer-page consent block remains the profile-level on/off control after creation.
+- Campaign-registration note: the A2P campaign's opt-in description should match "customers
+  provide their number when booking service" — verify wording in the Twilio campaign details.
+
+Validation: provisioning tests 7/7, contact recipient actions 12/12, affected intake/customer
+suites re-run green (134/134 total sweep), `tsc` clean on touched files.
+
 ---
 
 ## 1) Current Decision
