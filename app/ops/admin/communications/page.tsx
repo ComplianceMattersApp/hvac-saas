@@ -11,12 +11,15 @@ import {
   submitSmsSandboxDeliveryToProviderFromForm,
 } from "@/lib/actions/sms-sandbox-send-actions";
 import {
+  activateSmsLiveSendingFromForm,
   addSmsSandboxTestRecipientFromForm,
+  deactivateSmsLiveSendingFromForm,
   deactivateSmsSandboxTestRecipientFromForm,
   saveSmsSandboxProviderConfigFromForm,
   saveSmsSenderIdentityFromForm,
   setSmsSandboxSendGateFromForm,
 } from "@/lib/actions/sms-provider-setup-actions";
+import { liftContactRecipientSuppressionFromForm } from "@/lib/actions/sms-suppression-actions";
 import { getSmsProviderReadinessForAccount } from "@/lib/communications/sms-provider-readiness-read";
 import { getSmsSandboxQueueForAccount } from "@/lib/communications/sms-sandbox-queue-read";
 import { getSmsSandboxSetupForAccount } from "@/lib/communications/sms-sandbox-setup-read";
@@ -193,6 +196,31 @@ const TEMPLATE_NOTICE_TEXT: Record<string, TemplateNotice> = {
   sandbox_internal_error: {
     tone: "error",
     message: "Something went wrong processing the sandbox action. Please try again.",
+  },
+  // Live activation
+  live_activation_enabled: {
+    tone: "success",
+    message:
+      "Live SMS activated. Mark On The Way now sends automatically to consented, unsuppressed contacts during allowed hours.",
+  },
+  live_activation_disabled: { tone: "success", message: "Live SMS deactivated." },
+  live_activation_attestations_required: {
+    tone: "error",
+    message: "All attestations must be checked before live activation.",
+  },
+  live_activation_failed: {
+    tone: "error",
+    message: "Could not update live activation. Please try again.",
+  },
+  // Suppressions
+  suppression_lifted: { tone: "success", message: "Suppression lifted." },
+  suppression_lift_invalid: {
+    tone: "error",
+    message: "A lift reason is required to lift a suppression.",
+  },
+  suppression_lift_failed: {
+    tone: "error",
+    message: "Could not lift the suppression. Please try again.",
   },
 };
 
@@ -434,6 +462,24 @@ export default async function AdminCommunicationsPage({
       accountOwnerUserId: "",
     }),
   );
+
+  // Active suppressions (account-scoped SELECT under RLS; fail to empty list).
+  const { data: suppressionRows } = await supabase
+    .from("contact_recipient_suppressions")
+    .select("id, phone_e164, suppression_type, source, received_keyword, suppressed_at")
+    .eq("account_owner_user_id", internalUser.account_owner_user_id)
+    .eq("is_active", true)
+    .order("suppressed_at", { ascending: false })
+    .limit(25);
+
+  const activeSuppressions = (suppressionRows ?? []).map((row: any) => ({
+    id: String(row.id ?? ""),
+    phoneLast4: String(row.phone_e164 ?? "").replace(/\D/g, "").slice(-4),
+    type: String(row.suppression_type ?? ""),
+    source: String(row.source ?? ""),
+    keyword: String(row.received_keyword ?? "").trim() || null,
+    suppressedAt: String(row.suppressed_at ?? "").trim() || null,
+  }));
 
   const latestVersionIsMutableDraft =
     templateGovernance.latestVersion.exists && templateGovernance.latestVersion.versionStatus === "draft";
@@ -1173,6 +1219,137 @@ export default async function AdminCommunicationsPage({
               ))}
             </ul>
           </div>
+        </div>
+      </section>
+
+      {/* Live Activation Section */}
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Activation</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Live SMS Activation</h2>
+            <p className="mt-1 max-w-2xl text-sm text-slate-600">
+              When active, Mark On The Way automatically texts the job&apos;s consented contact —
+              no test-recipient limits. Every send still enforces consent, STOP suppression, and
+              the 8am–9pm business-time send window. Deactivate any time to stop all automatic
+              sending instantly.
+            </p>
+          </div>
+          {sandboxSetup.providerConfig.liveActivationEnabled ? (
+            <span className="inline-flex items-center rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800">
+              LIVE
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700">
+              Not active
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+          {sandboxSetup.providerConfig.liveActivationEnabled ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-700">
+                Live sending is active. Delivery truth updates from provider callbacks; STOP
+                replies suppress numbers immediately.
+              </p>
+              <form action={deactivateSmsLiveSendingFromForm}>
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg border border-rose-300 bg-rose-50 px-3.5 py-2 text-sm font-medium text-rose-900 shadow-sm hover:bg-rose-100"
+                >
+                  Deactivate live SMS
+                </button>
+              </form>
+            </div>
+          ) : (
+            <form action={activateSmsLiveSendingFromForm} className="space-y-3">
+              <p className="text-sm font-semibold text-slate-900">Activation attestations</p>
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="attest_campaign_approved" value="true" className="mt-0.5" />
+                <span>The A2P campaign for this number is approved by the carrier/provider.</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="attest_wording_reviewed" value="true" className="mt-0.5" />
+                <span>
+                  The On-The-Way template wording has been reviewed and matches the approved
+                  campaign use case (operational only, STOP language included).
+                </span>
+              </label>
+              <label className="flex items-start gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="attest_stop_tested" value="true" className="mt-0.5" />
+                <span>
+                  A sandbox test message was delivered and STOP opt-out was verified end to end.
+                </span>
+              </label>
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-lg border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-900 shadow-sm hover:bg-emerald-100"
+              >
+                Activate live SMS
+              </button>
+            </form>
+          )}
+        </div>
+      </section>
+
+      {/* Suppressions Section */}
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Compliance</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Active SMS Suppressions</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Numbers that opted out (STOP) or were manually suppressed. Texting resumes only when an
+            admin lifts the suppression with a reason — a START reply alone never lifts it. Only
+            lift when the customer has clearly asked to receive texts again.
+          </p>
+        </div>
+
+        <div className="mt-4">
+          {activeSuppressions.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              No active suppressions.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activeSuppressions.map((suppression) => (
+                <div
+                  key={suppression.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3"
+                >
+                  <div className="text-sm">
+                    <div className="font-semibold text-slate-900">••••{suppression.phoneLast4}</div>
+                    <div className="mt-0.5 text-xs text-slate-600">
+                      {suppression.type}
+                      {suppression.keyword ? ` • keyword "${suppression.keyword}"` : ""} •{" "}
+                      {suppression.source}
+                      {suppression.suppressedAt
+                        ? ` • ${new Date(suppression.suppressedAt).toLocaleString()}`
+                        : ""}
+                    </div>
+                  </div>
+                  <form
+                    action={liftContactRecipientSuppressionFromForm}
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <input type="hidden" name="suppression_id" value={suppression.id} />
+                    <input
+                      name="lift_reason"
+                      required
+                      placeholder="Reason (e.g. customer asked to resume texts)"
+                      className="w-64 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 shadow-sm"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      Lift suppression
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

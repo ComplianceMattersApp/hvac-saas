@@ -18,6 +18,7 @@ export type SmsSandboxSetupResult = {
     maskedProviderAccountRef: string | null;
     readinessStatus: string | null;
     sandboxSendEnabled: boolean;
+    liveActivationEnabled: boolean;
   };
   senderIdentity: {
     exists: boolean;
@@ -54,6 +55,7 @@ function emptyResult(): SmsSandboxSetupResult {
       maskedProviderAccountRef: null,
       readinessStatus: null,
       sandboxSendEnabled: false,
+      liveActivationEnabled: false,
     },
     senderIdentity: {
       exists: false,
@@ -79,7 +81,9 @@ export async function getSmsSandboxSetupForAccount(params: {
 
   const configResponse = await params.supabase
     .from("sms_provider_configurations")
-    .select("id, default_messaging_service_ref, provider_account_ref, readiness_status, sandbox_send_enabled")
+    .select(
+      "id, default_messaging_service_ref, provider_account_ref, readiness_status, sandbox_send_enabled, activation_status",
+    )
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("provider_name", "twilio")
     .eq("provider_environment", "sandbox")
@@ -97,6 +101,7 @@ export async function getSmsSandboxSetupForAccount(params: {
       maskedProviderAccountRef: maskRef(asTrimmed(configRow.provider_account_ref)),
       readinessStatus: asTrimmed(configRow.readiness_status) || null,
       sandboxSendEnabled: configRow.sandbox_send_enabled === true,
+      liveActivationEnabled: asTrimmed(configRow.activation_status) === "active",
     };
 
     const senderResponse = await params.supabase

@@ -293,6 +293,94 @@ export async function saveSmsSenderIdentityFromForm(formData: FormData): Promise
   redirect(withNotice("sender_identity_saved"));
 }
 
+/**
+ * Live activation: the explicit, attested admin decision that turns on
+ * automatic On-The-Way sending for this account. Reuses the existing provider
+ * configuration row — no duplicate setup, no re-entering the number. The
+ * schema enforces that activation_status = 'active' requires activation-ready
+ * readiness. Per-recipient consent, suppression, and quiet-hours gates still
+ * apply to every individual send.
+ */
+export async function activateSmsLiveSendingFromForm(formData: FormData): Promise<void> {
+  const { accountOwnerUserId, actingUserId } = await requireAdminContext();
+
+  const attestCampaignApproved = asTrimmed(formData.get("attest_campaign_approved")) === "true";
+  const attestWordingReviewed = asTrimmed(formData.get("attest_wording_reviewed")) === "true";
+  const attestStopTested = asTrimmed(formData.get("attest_stop_tested")) === "true";
+
+  if (!attestCampaignApproved || !attestWordingReviewed || !attestStopTested) {
+    redirect(withNotice("live_activation_attestations_required"));
+  }
+
+  const admin = createAdminClient();
+
+  try {
+    const existing = await readSandboxProviderConfigRow({ admin, accountOwnerUserId });
+    if (!existing) {
+      redirect(withNotice("provider_config_missing"));
+    }
+
+    const response = await admin
+      .from("sms_provider_configurations")
+      .update({
+        readiness_status: "ready_for_activation",
+        activation_status: "active",
+        callback_status_readiness: "ready",
+        status_callback_readiness: "ready",
+        inbound_webhook_readiness: "ready",
+        advanced_opt_out_readiness: "ready",
+        updated_by_user_id: actingUserId,
+      })
+      .eq("id", existing.id)
+      .eq("account_owner_user_id", accountOwnerUserId);
+
+    if (response?.error) {
+      throw response.error;
+    }
+  } catch (error) {
+    if (error && typeof error === "object" && "digest" in error) {
+      throw error;
+    }
+    redirect(withNotice("live_activation_failed"));
+  }
+
+  redirect(withNotice("live_activation_enabled"));
+}
+
+export async function deactivateSmsLiveSendingFromForm(): Promise<void> {
+  const { accountOwnerUserId, actingUserId } = await requireAdminContext();
+
+  const admin = createAdminClient();
+
+  try {
+    const existing = await readSandboxProviderConfigRow({ admin, accountOwnerUserId });
+    if (!existing) {
+      redirect(withNotice("provider_config_missing"));
+    }
+
+    const response = await admin
+      .from("sms_provider_configurations")
+      .update({
+        activation_status: "disabled",
+        readiness_status: "ready_for_sandbox",
+        updated_by_user_id: actingUserId,
+      })
+      .eq("id", existing.id)
+      .eq("account_owner_user_id", accountOwnerUserId);
+
+    if (response?.error) {
+      throw response.error;
+    }
+  } catch (error) {
+    if (error && typeof error === "object" && "digest" in error) {
+      throw error;
+    }
+    redirect(withNotice("live_activation_failed"));
+  }
+
+  redirect(withNotice("live_activation_disabled"));
+}
+
 export async function addSmsSandboxTestRecipientFromForm(formData: FormData): Promise<void> {
   const { accountOwnerUserId, actingUserId } = await requireAdminContext();
 
