@@ -830,6 +830,47 @@ Remaining before live activation: controlled sandbox smoke after campaign approv
 gate, START auto-lift decision (currently manual by design), production provider configuration +
 activation flow, and legal/provider review.
 
+## Live Activation Lane Completion Cross-Reference (August 2026)
+
+Shipped after the successful sandbox smoke (submit → delivered 2.2s with callback truth; STOP
+suppression ingestion verified in production on 2026-08-05).
+
+- `lib/communications/sms-live-send.ts` — live send engine. `attemptLiveOnTheWaySend` runs
+  best-effort after Mark On The Way writes a ready intent: requires explicit live activation
+  (`activation_status = 'active'` on the account's existing Twilio configuration row — the single
+  row from sandbox setup is reused; activation never requires re-entering the number), verified
+  sender + Messaging Service ref, a **fresh suppression check at send time** (a STOP arriving
+  after intent creation still blocks), and the **quiet-hours window (8am–9pm in the account's
+  `internal_business_profiles.time_zone`)**. On-the-way is a now-event, so out-of-window sends are
+  skipped (`held_quiet_hours`), not delayed. Same guarded-reservation + delivery-truth writes as
+  the sandbox path. Never throws to the caller.
+- `lib/actions/job-actions.ts` — after `createOnTheWayIntentFromEvent` returns
+  `ready_for_provider`, the live send attempt fires (admin client) and its outcome is logged as
+  `[SMS_LIVE_SEND_ATTEMPT]`. Job lifecycle remains untouchable by SMS failures.
+- Live activation actions (`activateSmsLiveSendingFromForm` / `deactivateSmsLiveSendingFromForm`)
+  — admin-only, requires three attestations (campaign approved, wording reviewed/operational,
+  STOP verified end-to-end); sets `readiness_status = 'ready_for_activation'` +
+  `activation_status = 'active'` per the schema's activation constraint. Deactivation is instant
+  and returns the row to sandbox-only readiness. New Live SMS Activation section on
+  `/ops/admin/communications` with LIVE badge.
+- Suppression lift (`lib/actions/sms-suppression-actions.ts` + Active SMS Suppressions admin
+  section) — lifting requires a reason and writes `lifted_at`/`lifted_by_user_id` through the
+  REGULAR client so RLS enforces actor attribution. START replies still never auto-lift.
+- One-step consent capture — the add-contact forms (customer + location) now include the SMS
+  opt-in checkbox + source; the contact insert and `contact_recipient_consents` write happen in
+  one submission (`recordOnTheWayConsentBestEffort`). Shared constants moved to
+  `lib/communications/sms-consent-constants.ts`. The standalone consent block on the customer
+  page remains for status changes.
+
+Boundaries: sandbox manual submit path unchanged (still test-recipient gated); live sends enforce
+consent + suppression + quiet hours per recipient per send; deactivation instantly stops
+automatic sending. Note: `sendTwilioSandboxMessage` is the generic Messages API client used by
+both paths; a rename is cosmetic and deferred.
+
+Validation: live-send tests 15/15 (window math, activation/suppression/quiet-hours gates,
+reservation race, provider failure recording, never-throws), contact recipient actions 11/11
+(incl. one-step consent on/off), full touched-suite sweep 124/124, `tsc` clean on touched files.
+
 ---
 
 ## 1) Current Decision
