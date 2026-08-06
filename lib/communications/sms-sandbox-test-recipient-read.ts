@@ -31,11 +31,16 @@ export async function readSmsSandboxTestRecipientForPhone(params: {
   accountOwnerUserId: string;
   phoneE164: string;
 }): Promise<SmsSandboxTestRecipientRow | null> {
+  // Deactivated rows are retained for audit, so the same phone can have many
+  // inactive rows plus at most one active row (partial unique index). Only the
+  // active row can satisfy the sandbox recipient gate — filter to it so
+  // historical rows never break the single-row read.
   const response = await params.supabase
     .from("sms_sandbox_test_recipients")
     .select(SMS_SANDBOX_TEST_RECIPIENT_SELECT)
     .eq("account_owner_user_id", params.accountOwnerUserId)
     .eq("phone_e164", params.phoneE164)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (response?.error) {
