@@ -26,6 +26,7 @@ import {
   markInternalNewWorkNotificationsResolved,
 } from "@/lib/actions/notification-actions";
 import { createOnTheWayIntentFromEvent } from "@/lib/communications/sms-on-the-way-intent-create";
+import { attemptLiveOnTheWaySend } from "@/lib/communications/sms-live-send";
 import { formatAppointmentContext } from "@/lib/communications/sms-on-the-way-token-renderer";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
 import {
@@ -10619,7 +10620,7 @@ export async function advanceJobStatusFromForm(
             windowEnd: updatePayload.window_end ?? job?.window_end ?? null,
           });
 
-          await _ftTimeSubphase("eventBreadcrumb.smsOnTheWayIntentCreate", async () =>
+          const intentResult = await _ftTimeSubphase("eventBreadcrumb.smsOnTheWayIntentCreate", async () =>
             createOnTheWayIntentFromEvent({
               supabase,
               accountOwnerUserId: internalUser.account_owner_user_id,
@@ -10635,6 +10636,32 @@ export async function advanceJobStatusFromForm(
             }),
           );
           console.log("[SMS_INTENT_CREATE_SUCCESS]", { jobId: id, onMyWayEventId });
+
+          // Live send: fires only when the account's provider configuration has
+          // been explicitly activated by an admin. Best-effort — quiet hours,
+          // suppression, and activation gates are enforced inside; failures
+          // never affect job lifecycle.
+          if (
+            intentResult?.decisionOutcomeWritten === "ready_for_provider" &&
+            intentResult.intentId
+          ) {
+            const liveSendResult = await _ftTimeSubphase(
+              "eventBreadcrumb.smsOnTheWayLiveSend",
+              async () =>
+                attemptLiveOnTheWaySend({
+                  admin: createAdminClient(),
+                  accountOwnerUserId: internalUser.account_owner_user_id,
+                  smsMessageIntentId: intentResult.intentId!,
+                }),
+            );
+            console.log("[SMS_LIVE_SEND_ATTEMPT]", {
+              jobId: id,
+              intentId: intentResult.intentId,
+              outcome: liveSendResult.outcome,
+              deliveryId: liveSendResult.deliveryId ?? null,
+              detail: liveSendResult.detail ?? null,
+            });
+          }
         } catch (intentError) {
           console.error("[SMS_INTENT_CREATE_BEST_EFFORT_FAILED]", {
             jobId: id,
