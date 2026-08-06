@@ -28,6 +28,13 @@ export const SMS_CONSENT_SOURCE_SERVICE_INTAKE = "service_intake_number_provided
 /** Staff checked "customer declined text messages" on a phone-collecting form. */
 export const SMS_CONSENT_SOURCE_DECLINED_AT_INTAKE = "declined_at_intake";
 
+/**
+ * Backfill of pre-existing customers: the number was provided historically in
+ * the course of the service relationship, before the intake disclosure existed
+ * on forms. Kept distinct from the intake source for audit clarity.
+ */
+export const SMS_CONSENT_SOURCE_SERVICE_RELATIONSHIP_BACKFILL = "service_relationship_backfill";
+
 /** Disclosure line shown wherever a phone number is collected. */
 export const SMS_INTAKE_DISCLOSURE_TEXT =
   "By providing a mobile number, the customer agrees to receive service-related text messages (like technician on-the-way updates). Msg & data rates may apply. Reply STOP to opt out.";

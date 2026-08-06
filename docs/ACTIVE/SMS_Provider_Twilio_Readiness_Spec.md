@@ -903,6 +903,13 @@ and STOP suppression + the customer-profile opt-out always override.
 Validation: provisioning tests 7/7, contact recipient actions 12/12, affected intake/customer
 suites re-run green (134/134 total sweep), `tsc` clean on touched files.
 
+Legacy backfill addendum (same day): `findSmsBackfillCandidates` + admin-only
+`backfillCustomerSmsProvisioningFromForm` (batches of 200, re-runnable) with a Legacy Customer
+SMS Backfill section on `/ops/admin/communications` showing the pending count and last-run
+results. Backfilled consent uses distinct source `service_relationship_backfill`; phones with any
+ACTIVE suppression are skipped entirely; existing consent decisions are never modified.
+Provisioning suite 10/10.
+
 ---
 
 ## 1) Current Decision

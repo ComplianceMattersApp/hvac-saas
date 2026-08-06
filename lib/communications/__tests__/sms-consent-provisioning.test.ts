@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { provisionCustomerSmsRecipientAndConsent } from "@/lib/communications/sms-consent-provisioning";
+import {
+  findSmsBackfillCandidates,
+  provisionCustomerSmsRecipientAndConsent,
+} from "@/lib/communications/sms-consent-provisioning";
 
 type Fixtures = {
   existingRecipientId?: string | null;
@@ -178,5 +181,78 @@ describe("provisionCustomerSmsRecipientAndConsent", () => {
 
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+describe("findSmsBackfillCandidates", () => {
+  function buildBackfillMock(fixtures: {
+    customers: Array<Record<string, unknown>>;
+    coveredCustomerIds?: string[];
+  }) {
+    return {
+      from(table: string) {
+        const chain: any = {
+          select: () => chain,
+          eq: () => chain,
+          not: () => chain,
+          order: () => chain,
+          in: async () => ({
+            data: (fixtures.coveredCustomerIds ?? []).map((id) => ({ linked_entity_id: id })),
+            error: null,
+          }),
+          limit: async () => {
+            if (table !== "customers") throw new Error(`unexpected limit on ${table}`);
+            return { data: fixtures.customers, error: null };
+          },
+        };
+        return chain;
+      },
+    };
+  }
+
+  it("returns phone-bearing customers without an active recipient", async () => {
+    const supabase = buildBackfillMock({
+      customers: [
+        { id: "c-1", full_name: "Covered Customer", phone: "(209) 555-0001" },
+        { id: "c-2", full_name: "Legacy Customer", phone: "(209) 555-0002" },
+        { id: "c-3", full_name: "Bad Phone", phone: "n/a" },
+      ],
+      coveredCustomerIds: ["c-1"],
+    });
+
+    const result = await findSmsBackfillCandidates({
+      supabase,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]).toMatchObject({
+      customerId: "c-2",
+      displayName: "Legacy Customer",
+    });
+  });
+
+  it("respects the batch limit", async () => {
+    const supabase = buildBackfillMock({
+      customers: Array.from({ length: 5 }, (_, index) => ({
+        id: `c-${index}`,
+        full_name: `Customer ${index}`,
+        phone: `(209) 555-000${index}`,
+      })),
+    });
+
+    const result = await findSmsBackfillCandidates({
+      supabase,
+      accountOwnerUserId: "owner-1",
+      limit: 2,
+    });
+
+    expect(result.candidates).toHaveLength(2);
+  });
+
+  it("returns empty without account scope", async () => {
+    const supabase = buildBackfillMock({ customers: [] });
+    const result = await findSmsBackfillCandidates({ supabase, accountOwnerUserId: "" });
+    expect(result.candidates).toHaveLength(0);
   });
 });

@@ -20,6 +20,8 @@ import {
   setSmsSandboxSendGateFromForm,
 } from "@/lib/actions/sms-provider-setup-actions";
 import { liftContactRecipientSuppressionFromForm } from "@/lib/actions/sms-suppression-actions";
+import { backfillCustomerSmsProvisioningFromForm } from "@/lib/actions/sms-consent-backfill-actions";
+import { findSmsBackfillCandidates } from "@/lib/communications/sms-consent-provisioning";
 import { getSmsProviderReadinessForAccount } from "@/lib/communications/sms-provider-readiness-read";
 import { getSmsSandboxQueueForAccount } from "@/lib/communications/sms-sandbox-queue-read";
 import { getSmsSandboxSetupForAccount } from "@/lib/communications/sms-sandbox-setup-read";
@@ -32,7 +34,11 @@ import { resolveInternalAccessErrorRedirectPath } from "@/lib/auth/internal-acce
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/auth/request-identity";
 
-type SearchParams = Promise<{ notice?: string }>;
+type SearchParams = Promise<{
+  notice?: string;
+  backfilled?: string;
+  skipped_suppressed?: string;
+}>;
 
 type TemplateNoticeTone = "success" | "warn" | "error";
 
@@ -221,6 +227,15 @@ const TEMPLATE_NOTICE_TEXT: Record<string, TemplateNotice> = {
   suppression_lift_failed: {
     tone: "error",
     message: "Could not lift the suppression. Please try again.",
+  },
+  // Legacy backfill
+  sms_backfill_completed: {
+    tone: "success",
+    message: "Backfill batch completed. Re-run if legacy customers remain.",
+  },
+  sms_backfill_failed: {
+    tone: "error",
+    message: "Backfill run failed part-way. Completed customers are saved — run again to continue.",
   },
 };
 
@@ -462,6 +477,17 @@ export default async function AdminCommunicationsPage({
       accountOwnerUserId: "",
     }),
   );
+
+  // Legacy backfill pending count (fail closed to zero on read issues).
+  const backfillPending = await findSmsBackfillCandidates({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  })
+    .then((result) => result.candidates.length)
+    .catch(() => 0);
+
+  const backfilledCount = Number.parseInt(String(sp.backfilled ?? ""), 10);
+  const skippedSuppressedCount = Number.parseInt(String(sp.skipped_suppressed ?? ""), 10);
 
   // Active suppressions (account-scoped SELECT under RLS; fail to empty list).
   const { data: suppressionRows } = await supabase
@@ -927,6 +953,54 @@ export default async function AdminCommunicationsPage({
               Add verified test recipient
             </button>
           </form>
+        </div>
+      </section>
+
+      {/* Legacy Customer SMS Backfill Section */}
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Data</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Legacy Customer SMS Backfill</h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">
+            Customers created before automatic SMS provisioning have a phone on file but no SMS
+            contact. This backfill creates their contact and records consent under the service
+            relationship (source kept distinct for audit). Phones with an active STOP suppression
+            are skipped, and existing consent decisions are never changed. Runs in batches of 200
+            — safe to run repeatedly.
+          </p>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+          {Number.isFinite(backfilledCount) && backfilledCount >= 0 ? (
+            <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              Last run: {backfilledCount} customer{backfilledCount === 1 ? "" : "s"} provisioned
+              {Number.isFinite(skippedSuppressedCount) && skippedSuppressedCount > 0
+                ? `, ${skippedSuppressedCount} skipped (active suppression)`
+                : ""}
+              .
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-slate-700">
+              <span className="font-semibold text-slate-900">{backfillPending}</span> legacy
+              customer{backfillPending === 1 ? "" : "s"} with a phone and no SMS contact.
+            </div>
+            {backfillPending > 0 ? (
+              <form action={backfillCustomerSmsProvisioningFromForm}>
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+                >
+                  Run backfill batch
+                </button>
+              </form>
+            ) : (
+              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800">
+                All caught up
+              </span>
+            )}
+          </div>
         </div>
       </section>
 

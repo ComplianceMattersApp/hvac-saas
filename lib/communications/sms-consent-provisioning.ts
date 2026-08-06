@@ -66,6 +66,8 @@ export type ProvisionCustomerSmsConsentParams = {
   phoneRaw: string | null | undefined;
   /** True when staff checked "customer declined text messages". */
   declined?: boolean;
+  /** Override the opted_in consent source (e.g. legacy backfill). */
+  consentSourceOverride?: string | null;
 };
 
 export async function provisionCustomerSmsRecipientAndConsent(
@@ -186,7 +188,7 @@ export async function provisionCustomerSmsRecipientAndConsent(
         consent_status: declined ? "opted_out" : "opted_in",
         consent_source: declined
           ? SMS_CONSENT_SOURCE_DECLINED_AT_INTAKE
-          : SMS_CONSENT_SOURCE_SERVICE_INTAKE,
+          : asTrimmed(params.consentSourceOverride) || SMS_CONSENT_SOURCE_SERVICE_INTAKE,
         consent_text_version: SMS_CONSENT_TEXT_VERSION,
         consent_captured_at: now,
         consent_captured_by_user_id: actingUserId,
@@ -202,4 +204,86 @@ export async function provisionCustomerSmsRecipientAndConsent(
       message: error instanceof Error ? error.message : "unknown_error",
     });
   }
+}
+
+const BACKFILL_SCAN_LIMIT = 2000;
+
+export type SmsBackfillCandidate = {
+  customerId: string;
+  displayName: string | null;
+  phoneRaw: string;
+};
+
+/**
+ * Legacy customers with a usable phone but no active customer-linked contact
+ * recipient — the population the admin backfill provisions. Scans up to
+ * BACKFILL_SCAN_LIMIT customers per call; re-run until pendingCount is 0.
+ */
+export async function findSmsBackfillCandidates(params: {
+  supabase: SupabaseLike;
+  accountOwnerUserId: string | null | undefined;
+  limit?: number;
+}): Promise<{ candidates: SmsBackfillCandidate[]; scannedCount: number }> {
+  const accountOwnerUserId = asTrimmed(params.accountOwnerUserId);
+  if (!accountOwnerUserId) {
+    return { candidates: [], scannedCount: 0 };
+  }
+
+  const customerResponse = await params.supabase
+    .from("customers")
+    .select("id, full_name, first_name, last_name, phone")
+    .eq("owner_user_id", accountOwnerUserId)
+    .not("phone", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(BACKFILL_SCAN_LIMIT);
+
+  if (customerResponse?.error) {
+    throw customerResponse.error;
+  }
+
+  const customerRows: any[] = Array.isArray(customerResponse?.data) ? customerResponse.data : [];
+
+  const usable = customerRows
+    .map((row) => {
+      const phoneRaw = asTrimmed(row?.phone);
+      const customerId = asTrimmed(row?.id);
+      if (!customerId || !normalizePhoneE164ForProvisioning(phoneRaw)) {
+        return null;
+      }
+      const displayName =
+        asTrimmed(row?.full_name) ||
+        [asTrimmed(row?.first_name), asTrimmed(row?.last_name)].filter(Boolean).join(" ") ||
+        null;
+      return { customerId, displayName, phoneRaw };
+    })
+    .filter(Boolean) as SmsBackfillCandidate[];
+
+  if (usable.length === 0) {
+    return { candidates: [], scannedCount: customerRows.length };
+  }
+
+  // Exclude customers that already have an active customer-linked recipient.
+  const customerIds = usable.map((candidate) => candidate.customerId);
+  const recipientResponse = await params.supabase
+    .from("contact_recipients")
+    .select("linked_entity_id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("linked_entity_type", "customer")
+    .eq("status", "active")
+    .in("linked_entity_id", customerIds);
+
+  if (recipientResponse?.error) {
+    throw recipientResponse.error;
+  }
+
+  const coveredCustomerIds = new Set(
+    (Array.isArray(recipientResponse?.data) ? recipientResponse.data : [])
+      .map((row: any) => asTrimmed(row?.linked_entity_id))
+      .filter(Boolean),
+  );
+
+  const candidates = usable.filter((candidate) => !coveredCustomerIds.has(candidate.customerId));
+  const limit = params.limit && params.limit > 0 ? params.limit : candidates.length;
+
+  return { candidates: candidates.slice(0, limit), scannedCount: customerRows.length };
 }
