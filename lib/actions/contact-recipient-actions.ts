@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import {
-  isSmsConsentSource,
+  SMS_CONSENT_SOURCE_DECLINED_AT_INTAKE,
+  SMS_CONSENT_SOURCE_SERVICE_INTAKE,
   SMS_CONSENT_TEXT_VERSION,
 } from "@/lib/communications/sms-consent-constants";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
@@ -204,10 +205,10 @@ async function insertScopedContactRecipient(params: {
 }
 
 /**
- * One-step consent capture at contact creation: when the form's SMS consent
- * checkbox was checked and the contact has a phone, record opted_in for the
- * on_the_way class in the same flow. Best-effort — the contact save is the
- * primary write and never fails because of consent.
+ * Assumed-consent capture at contact creation: any contact saved with a phone
+ * under the form's disclosure gets an on_the_way consent record — opted_in by
+ * default, opted_out when the "customer declined" box was checked. Best-effort:
+ * the contact save is the primary write and never fails because of consent.
  */
 async function recordOnTheWayConsentBestEffort(params: {
   supabase: any;
@@ -220,26 +221,24 @@ async function recordOnTheWayConsentBestEffort(params: {
   try {
     if (!params.phoneE164 || !params.contactRecipientId) return;
 
-    const optIn = asTrimmed(params.formData.get("sms_consent_opt_in"));
-    if (optIn !== "true" && optIn !== "on") return;
-
-    const rawSource = asTrimmed(params.formData.get("sms_consent_source")).toLowerCase();
-    const source = isSmsConsentSource(rawSource) ? rawSource : "verbal_in_person";
+    const declined = asTrimmed(params.formData.get("sms_decline")) === "true";
     const now = new Date().toISOString();
 
     await params.supabase.from("contact_recipient_consents").insert({
       account_owner_user_id: params.accountOwnerUserId,
       contact_recipient_id: params.contactRecipientId,
       message_class: "on_the_way",
-      consent_status: "opted_in",
-      consent_source: source,
+      consent_status: declined ? "opted_out" : "opted_in",
+      consent_source: declined
+        ? SMS_CONSENT_SOURCE_DECLINED_AT_INTAKE
+        : SMS_CONSENT_SOURCE_SERVICE_INTAKE,
       consent_text_version: SMS_CONSENT_TEXT_VERSION,
       consent_captured_at: now,
       consent_captured_by_user_id: params.userId,
       updated_by_user_id: params.userId,
     });
   } catch {
-    // Best-effort: consent can still be recorded from the customer page block.
+    // Best-effort: consent can still be adjusted from the customer page block.
   }
 }
 

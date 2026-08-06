@@ -263,7 +263,7 @@ describe("addCustomerRoleContactFromForm", () => {
       "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcSaved=1#role-contacts",
     );
 
-    expect(fromCalls).toEqual(["contact_recipients"]);
+    expect(fromCalls[0]).toBe("contact_recipients");
     expect(fromCalls).not.toContain("customers");
     expect(fromCalls).not.toContain("jobs");
   });
@@ -282,7 +282,7 @@ describe("addCustomerRoleContactFromForm", () => {
     expect(fromCalls.some((table) => /sms|email|push|notification/i.test(table))).toBe(false);
   });
 
-  it("records on_the_way consent in the same flow when the opt-in box is checked", async () => {
+  it("records assumed opted_in consent by default when a phone is provided", async () => {
     const { supabase, fromCalls, insertCalls } = makeSessionClientFixture();
     const consentInserts: Array<Record<string, unknown>> = [];
     const originalFrom = supabase.from.bind(supabase);
@@ -304,11 +304,7 @@ describe("addCustomerRoleContactFromForm", () => {
 
     const { addCustomerRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
 
-    await expect(
-      addCustomerRoleContactFromForm(
-        makeFormData({ sms_consent_opt_in: "true", sms_consent_source: "verbal_phone" }),
-      ),
-    ).rejects.toThrow(
+    await expect(addCustomerRoleContactFromForm(makeFormData())).rejects.toThrow(
       "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcSaved=1#role-contacts",
     );
 
@@ -318,18 +314,56 @@ describe("addCustomerRoleContactFromForm", () => {
       contact_recipient_id: "recipient-1",
       message_class: "on_the_way",
       consent_status: "opted_in",
-      consent_source: "verbal_phone",
+      consent_source: "service_intake_number_provided",
     });
   });
 
-  it("does not record consent when the opt-in box is unchecked", async () => {
+  it("records opted_out when the decline box is checked", async () => {
+    const { supabase } = makeSessionClientFixture();
+    const consentInserts: Array<Record<string, unknown>> = [];
+    const originalFrom = supabase.from.bind(supabase);
+    supabase.from = (table: string) => {
+      if (table === "contact_recipient_consents") {
+        return {
+          insert: async (values: Record<string, unknown>) => {
+            consentInserts.push(values);
+            return { error: null };
+          },
+        } as any;
+      }
+      return originalFrom(table);
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClientFixture({ customerInScope: true }));
+
+    const { addCustomerRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
+
+    await expect(
+      addCustomerRoleContactFromForm(makeFormData({ sms_decline: "true" })),
+    ).rejects.toThrow(
+      "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcSaved=1#role-contacts",
+    );
+
+    expect(consentInserts).toHaveLength(1);
+    expect(consentInserts[0]).toMatchObject({
+      consent_status: "opted_out",
+      consent_source: "declined_at_intake",
+    });
+  });
+
+  it("does not record consent when the contact has no phone", async () => {
     const { supabase, fromCalls } = makeSessionClientFixture();
     createClientMock.mockResolvedValue(supabase);
     createAdminClientMock.mockReturnValue(makeAdminClientFixture({ customerInScope: true }));
 
     const { addCustomerRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
 
-    await expect(addCustomerRoleContactFromForm(makeFormData())).rejects.toThrow(
+    await expect(
+      addCustomerRoleContactFromForm(
+        makeFormData({ phone: "", email: "contact@example.com", preferred_contact_method: "email" }),
+      ),
+    ).rejects.toThrow(
       "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcSaved=1#role-contacts",
     );
 

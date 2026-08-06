@@ -95,6 +95,15 @@ export default async function NewCustomerPage() {
                   placeholder="(213) 555-0100"
                   className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
+                <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
+                  By providing a mobile number, the customer agrees to receive service-related
+                  text messages (like technician on-the-way updates). Msg &amp; data rates may
+                  apply. Reply STOP to opt out.
+                </p>
+                <label className="mt-1.5 flex items-start gap-2 text-xs text-slate-700">
+                  <input type="checkbox" name="sms_decline" value="true" className="mt-0.5" />
+                  <span>Customer declined text messages</span>
+                </label>
               </div>
               <div>
                 <label

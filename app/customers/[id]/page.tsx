@@ -2623,25 +2623,15 @@ export default async function CustomerDetailPage(props: {
                   />
                 </div>
                 <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <label className="flex items-start gap-2 text-xs text-slate-700">
-                    <input type="checkbox" name="sms_consent_opt_in" value="true" className="mt-0.5" />
-                    <span>
-                      Customer agreed to receive service text messages at this number (for example
-                      &ldquo;technician on the way&rdquo; updates). They can reply STOP any time.
-                    </span>
+                  <p className="text-[11px] leading-4 text-slate-500">
+                    By providing a mobile number, the customer agrees to receive service-related
+                    text messages (like technician on-the-way updates). Msg &amp; data rates may
+                    apply. Reply STOP to opt out.
+                  </p>
+                  <label className="mt-2 flex items-start gap-2 text-xs text-slate-700">
+                    <input type="checkbox" name="sms_decline" value="true" className="mt-0.5" />
+                    <span>Customer declined text messages</span>
                   </label>
-                  <div className="mt-2">
-                    <select
-                      name="sms_consent_source"
-                      defaultValue="verbal_in_person"
-                      className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-900"
-                    >
-                      <option value="verbal_in_person">Agreed in person</option>
-                      <option value="verbal_phone">Agreed by phone</option>
-                      <option value="written_form">Written / form</option>
-                      <option value="customer_request">Customer requested</option>
-                    </select>
-                  </div>
                 </div>
                 <div className="sm:col-span-2">
                   <button
@@ -2895,25 +2885,15 @@ export default async function CustomerDetailPage(props: {
                                 />
                               </div>
                               <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                                <label className="flex items-start gap-2 text-xs text-slate-700">
-                                  <input type="checkbox" name="sms_consent_opt_in" value="true" className="mt-0.5" />
-                                  <span>
-                                    Contact agreed to receive service text messages at this number.
-                                    They can reply STOP any time.
-                                  </span>
+                                <p className="text-[11px] leading-4 text-slate-500">
+                                  By providing a mobile number, the contact agrees to receive
+                                  service-related text messages. Msg &amp; data rates may apply.
+                                  Reply STOP to opt out.
+                                </p>
+                                <label className="mt-2 flex items-start gap-2 text-xs text-slate-700">
+                                  <input type="checkbox" name="sms_decline" value="true" className="mt-0.5" />
+                                  <span>Contact declined text messages</span>
                                 </label>
-                                <div className="mt-2">
-                                  <select
-                                    name="sms_consent_source"
-                                    defaultValue="verbal_in_person"
-                                    className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900"
-                                  >
-                                    <option value="verbal_in_person">Agreed in person</option>
-                                    <option value="verbal_phone">Agreed by phone</option>
-                                    <option value="written_form">Written / form</option>
-                                    <option value="customer_request">Customer requested</option>
-                                  </select>
-                                </div>
                               </div>
                               <div className="sm:col-span-2">
                                 <button
