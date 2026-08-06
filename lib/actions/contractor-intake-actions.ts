@@ -8,6 +8,7 @@ import {
   requireInternalRole,
 } from "@/lib/auth/internal-user";
 import { createJob, ensureActiveAssignmentAndNotify } from "@/lib/actions/job-actions";
+import { provisionCustomerSmsRecipientAndConsent } from "@/lib/communications/sms-consent-provisioning";
 import { markInternalNewWorkNotificationsResolved } from "@/lib/actions/notification-actions";
 import {
   normalizeContractorIntakeProjectType,
@@ -943,6 +944,17 @@ async function createCustomerInScope(params: {
     .single();
 
   if (error) throw error;
+
+  // Assumed-consent posture: the submitter provided this number when
+  // requesting service. Best-effort; never blocks intake finalization.
+  await provisionCustomerSmsRecipientAndConsent({
+    supabase: admin,
+    accountOwnerUserId,
+    actingUserId: null,
+    customerId: String((data as any).id),
+    displayName: full_name,
+    phoneRaw: phone,
+  });
 
   return {
     id: String((data as any).id),

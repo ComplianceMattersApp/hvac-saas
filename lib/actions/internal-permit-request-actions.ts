@@ -10,6 +10,7 @@ import {
   type PermitRequestEventType,
   type PermitRequestStatus,
 } from "@/lib/permits/permit-request-contracts";
+import { provisionCustomerSmsRecipientAndConsent } from "@/lib/communications/sms-consent-provisioning";
 import { isPermitRequestSchemaUnavailableError } from "@/lib/permits/permit-requests-read-model";
 import { notifyContractorPermitRequestStatusChange } from "@/lib/permits/permit-request-contractor-notifications";
 import { assertPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
@@ -939,6 +940,17 @@ async function createPermitJobCustomer(admin: any, input: {
 
   const customerId = getTrimmedValue((data as any)?.id, 120);
   if (!customerId) throw new Error("Customer could not be created.");
+
+  // Assumed-consent posture: seed SMS recipient + on_the_way consent from the
+  // number provided with the permit request. Best-effort.
+  await provisionCustomerSmsRecipientAndConsent({
+    supabase: admin,
+    accountOwnerUserId: input.accountOwnerUserId,
+    actingUserId: null,
+    customerId,
+    displayName: fullName,
+    phoneRaw: input.phone,
+  });
 
   return normalizeCustomerRow(data, customerId);
 }

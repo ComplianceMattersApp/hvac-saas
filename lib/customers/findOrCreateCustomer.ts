@@ -3,6 +3,7 @@ import {
   normalizePhone10,
   isSameCustomerByNamePhone,
 } from "./duplicate";
+import { provisionCustomerSmsRecipientAndConsent } from "@/lib/communications/sms-consent-provisioning";
 
 export async function findOrCreateCustomer(params: {
   supabase: any;
@@ -11,8 +12,10 @@ export async function findOrCreateCustomer(params: {
   phone?: string | null;
   email?: string | null;
   ownerUserId: string;
+  /** True when staff checked "customer declined text messages" on the form. */
+  smsDeclined?: boolean;
 }) {
-  const { supabase, firstName, lastName, phone, email, ownerUserId } = params;
+  const { supabase, firstName, lastName, phone, email, ownerUserId, smsDeclined } = params;
 
   const inputFullName = normalizeFullName(firstName ?? "", lastName ?? "");
   const inputPhone10 = normalizePhone10(phone ?? "");
@@ -87,6 +90,19 @@ if (hasInputFullName) {
     .single();
 
   if (insertErr) throw insertErr;
+
+  // Assumed-consent posture: seed SMS recipient + on_the_way consent for the
+  // newly created customer (never for reused customers — their existing
+  // consent state stands). Best-effort.
+  await provisionCustomerSmsRecipientAndConsent({
+    supabase,
+    accountOwnerUserId: userId,
+    actingUserId: null,
+    customerId: customer.id as string,
+    displayName: inputFullName || null,
+    phoneRaw: phone,
+    declined: smsDeclined === true,
+  });
 
   return { customerId: customer.id as string, reused: false };
 }

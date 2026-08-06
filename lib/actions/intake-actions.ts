@@ -4,6 +4,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
+import { provisionCustomerSmsRecipientAndConsent } from "@/lib/communications/sms-consent-provisioning";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 
 
@@ -106,6 +107,18 @@ export async function createJobFromIntake(formData: FormData) {
 
   if (customerErr) throw new Error(`Customer insert failed: ${customerErr.message}`);
   const customerId = customer.id as string;
+
+  // Assumed-consent posture: seed the SMS recipient + on_the_way consent from
+  // the intake phone (opt-out when the decline box was checked). Best-effort.
+  await provisionCustomerSmsRecipientAndConsent({
+    supabase: canonicalWriteClient,
+    accountOwnerUserId: canonicalOwnerUserId,
+    actingUserId: userId,
+    customerId,
+    displayName: fullName,
+    phoneRaw: phone,
+    declined: String(formData.get("sms_decline") ?? "").trim() === "true",
+  });
 
   // -----------------------------
   // 2) Create location (service address)

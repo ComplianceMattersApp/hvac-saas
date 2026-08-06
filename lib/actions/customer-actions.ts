@@ -8,6 +8,7 @@ import {
   requireInternalUser,
 } from "@/lib/auth/internal-user";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
+import { provisionCustomerSmsRecipientAndConsent } from "@/lib/communications/sms-consent-provisioning";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
 import { nextDefaultSystemLabel } from "@/lib/customers/system-label";
 import { assertNoClientSuppliedOwnerId, requireScopedEquipmentForMutation } from "@/lib/customers/scoped-equipment";
@@ -382,6 +383,18 @@ export async function createCustomerOnlyFromForm(formData: FormData) {
 
   if (custErr) throw new Error(`Customer insert failed: ${custErr.message}`);
   const customerId = customer.id as string;
+
+  // Assumed-consent posture: seed the SMS recipient + on_the_way consent from
+  // the number provided at creation (opt-out when the decline box was checked).
+  await provisionCustomerSmsRecipientAndConsent({
+    supabase: admin,
+    accountOwnerUserId,
+    actingUserId: String(internalUser.user_id ?? "").trim() || null,
+    customerId,
+    displayName: full_name,
+    phoneRaw: phone,
+    declined: String(formData.get("sms_decline") ?? "").trim() === "true",
+  });
 
   // Optionally create primary service location
   const address_line1 = String(formData.get("address_line1") ?? "").trim() || null;

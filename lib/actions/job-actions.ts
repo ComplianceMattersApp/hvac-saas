@@ -10012,6 +10012,7 @@ const { customerId, reused } = await findOrCreateCustomer({
   phone: customerPhoneRaw,
   email: customerEmailRaw,
   ownerUserId: canonicalOwnerUserId,
+  smsDeclined: String(formData.get("sms_decline") ?? "").trim() === "true",
 });
 
 let locationIdToUse: string;
