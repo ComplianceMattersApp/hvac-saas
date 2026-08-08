@@ -345,6 +345,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     hasFullSchedule,
     hasDirectNarrativeChain,
     hasDirectInvoiceWorkflowAccess,
+    hasUnaddedPricedWorkItemsForIssuedInvoice,
     headerJobTypeLabel,
     internalInvoiceTruth,
     internalNoteBannerMessage,
@@ -1052,6 +1053,43 @@ export default function MobileJobDetailV2Preview(props: any) {
                 {billingPreview.statusLabel}
               </span>
             </div>
+            {/* Add-on invoices were only reachable from the invoice workspace, so work
+                billed after the primary issued had nowhere to show on the job screen. */}
+            {(internalInvoiceTruth?.add_on_invoices ?? []).length > 0 ? (
+              <div className="border-t border-slate-200 px-3 py-2">
+                {internalInvoiceTruth.add_on_invoices.map((addOn: any) => (
+                  <Link
+                    key={addOn.id}
+                    href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(addOn.id))}#invoice-workspace`}
+                    className="flex items-center justify-between gap-2 py-1.5"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-900">{addOn.label}</span>
+                      {addOn.supplemental_reason ? (
+                        <span className="block text-xs text-slate-600">{addOn.supplemental_reason}</span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold text-slate-900">
+                      {addOn.total_text}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            {/* An issued invoice's charges are locked, so newly captured work needs an
+                add-on. Creating one asks for a reason, so this routes to that form
+                rather than firing a bare action from the field. */}
+            {hasUnaddedPricedWorkItemsForIssuedInvoice && internalInvoiceTruth ? (
+              <div className="px-3 pb-3">
+                <Link
+                  href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}#addon-invoice`}
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base font-semibold leading-tight text-emerald-950"
+                >
+                  <span className="min-w-0 break-words text-center">Create Add-On Invoice</span>
+                  <ChevronRightIcon className="h-5 w-5" />
+                </Link>
+              </div>
+            ) : null}
             {canShowNativeExternalBillingAction ? (
               <form action={completeDataEntryFromForm} className="px-3 pb-3">
                 <input type="hidden" name="job_id" value={job.id} />

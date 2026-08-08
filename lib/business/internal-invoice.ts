@@ -394,6 +394,78 @@ export async function resolveLatestVoidedInternalInvoiceByJobId(params: {
   } as InternalInvoiceRecord;
 }
 
+export type JobAddOnInvoiceRecord = {
+  id: string;
+  invoice_display_number: string | null;
+  invoice_number: string;
+  status: InternalInvoiceStatus;
+  total_cents: number;
+  supplemental_reason: string | null;
+  line_items: InternalInvoiceLineItemRecord[];
+};
+
+/**
+ * Add-on (supplemental) invoices for a job, with their line items.
+ *
+ * The job screen's invoice truth resolves the primary invoice only, so anything
+ * billed on an add-on was invisible there — a Work Item billed on an add-on read
+ * as un-billed, and add-on charges never appeared at all. This is the companion
+ * read that lets those surfaces account for the whole family.
+ *
+ * Costs two queries regardless of how many add-ons exist, and one when there are
+ * none. Add-ons are always created with the parent's job_id, so a job_id match
+ * finds them all.
+ */
+export async function resolveJobAddOnInvoicesWithLines(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<JobAddOnInvoiceRecord[]> {
+  const jobId = String(params.jobId ?? "").trim();
+  if (!jobId) return [];
+
+  const { data, error } = await params.supabase
+    .from("internal_invoices")
+    .select(
+      "id, invoice_display_number, invoice_number, status, total_cents, supplemental_reason, created_at",
+    )
+    .eq("job_id", jobId)
+    .eq("invoice_kind", "supplemental")
+    .neq("status", "void")
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+  if (rows.length === 0) return [];
+
+  const { data: lineRows, error: lineError } = await params.supabase
+    .from("internal_invoice_line_items")
+    .select(INTERNAL_INVOICE_LINE_ITEM_SELECT)
+    .in("invoice_id", rows.map((row: any) => String(row.id)))
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (lineError) throw lineError;
+
+  const linesByInvoiceId = new Map<string, InternalInvoiceLineItemRecord[]>();
+  for (const lineRow of Array.isArray(lineRows) ? lineRows : []) {
+    const normalized = normalizeInternalInvoiceLineItemRow(lineRow);
+    const bucket = linesByInvoiceId.get(normalized.invoice_id);
+    if (bucket) bucket.push(normalized);
+    else linesByInvoiceId.set(normalized.invoice_id, [normalized]);
+  }
+
+  return rows.map((row: any) => ({
+    id: String(row.id),
+    invoice_display_number: String(row.invoice_display_number ?? "").trim() || null,
+    invoice_number: String(row.invoice_number ?? "").trim(),
+    status: normalizeInternalInvoiceStatus(row.status),
+    total_cents: Number(row.total_cents ?? 0) || 0,
+    supplemental_reason: String(row.supplemental_reason ?? "").trim() || null,
+    line_items: linesByInvoiceId.get(String(row.id)) ?? [],
+  }));
+}
+
 export async function listInternalInvoicesByJobId(params: {
   supabase: any;
   jobId: string;

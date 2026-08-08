@@ -98,6 +98,8 @@ export type UnlinkedInvoiceCharge = {
   title: string;
   amountText: string;
   mathText: string | null;
+  /** Where the charge lives, e.g. "Added on the invoice" or "Add-on invoice #2190". */
+  sourceLabel: string;
 };
 
 /**
@@ -120,8 +122,10 @@ export function buildUnlinkedInvoiceCharges(params: {
   }> | null | undefined;
   jobId: string;
   isConsolidated?: boolean;
+  sourceLabel?: string;
 }): UnlinkedInvoiceCharge[] {
   const normalizedJobId = String(params.jobId ?? "").trim();
+  const sourceLabel = params.sourceLabel ?? "Added on the invoice";
   const charges: UnlinkedInvoiceCharge[] = [];
 
   for (const lineItem of params.lineItems ?? []) {
@@ -149,10 +153,61 @@ export function buildUnlinkedInvoiceCharges(params: {
         quantity > 1
           ? `${formatQuantity(quantity)} × ${formatCurrencyFromCents(unitPriceCents)} = ${formatCurrencyFromCents(lineSubtotalCents)}`
           : null,
+      sourceLabel,
     });
   }
 
   return charges;
+}
+
+export type InvoiceFamilyBillingView = {
+  billedLines: Record<string, VisitScopeBilledLine>;
+  unlinkedCharges: UnlinkedInvoiceCharge[];
+};
+
+export function formatAddOnInvoiceLabel(displayNumber: string | null | undefined): string {
+  const normalized = String(displayNumber ?? "").trim();
+  return normalized ? `Add-on invoice #${normalized}` : "Add-on invoice";
+}
+
+/**
+ * Folds the primary invoice and every add-on into one view of what this job was
+ * actually billed. Without this, work billed on an add-on reads as un-billed and
+ * add-on charges never surface on the job screen at all.
+ */
+export function buildInvoiceFamilyBillingView(params: {
+  jobId: string;
+  primaryLineItems?: ReadonlyArray<any> | null;
+  isPrimaryConsolidated?: boolean;
+  addOnInvoices?: ReadonlyArray<{
+    invoice_display_number?: string | null;
+    line_items?: ReadonlyArray<any> | null;
+  }> | null;
+}): InvoiceFamilyBillingView {
+  const billedLines = buildVisitScopeBilledLineMap(params.primaryLineItems);
+  const unlinkedCharges = buildUnlinkedInvoiceCharges({
+    lineItems: params.primaryLineItems,
+    jobId: params.jobId,
+    isConsolidated: params.isPrimaryConsolidated,
+  });
+
+  for (const addOn of params.addOnInvoices ?? []) {
+    const label = formatAddOnInvoiceLabel(addOn.invoice_display_number);
+
+    // Later add-ons win: a Work Item re-billed on a newer add-on should report the
+    // charge that actually stands, not the earlier one it supersedes.
+    Object.assign(billedLines, buildVisitScopeBilledLineMap(addOn.line_items));
+
+    unlinkedCharges.push(
+      ...buildUnlinkedInvoiceCharges({
+        lineItems: addOn.line_items,
+        jobId: params.jobId,
+        sourceLabel: label,
+      }),
+    );
+  }
+
+  return { billedLines, unlinkedCharges };
 }
 
 export function resolveVisitScopeItemPriceDisplay(params: {

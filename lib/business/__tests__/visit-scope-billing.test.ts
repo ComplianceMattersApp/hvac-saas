@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildInvoiceFamilyBillingView,
   buildUnlinkedInvoiceCharges,
   buildVisitScopeBilledLineMap,
+  formatAddOnInvoiceLabel,
   resolveVisitScopeItemPriceDisplay,
 } from "@/lib/business/visit-scope-billing";
 
@@ -148,6 +150,7 @@ describe("buildUnlinkedInvoiceCharges", () => {
         title: "Anti-microbial Treatment & Filter Replacement",
         amountText: "$125.00",
         mathText: null,
+        sourceLabel: "Added on the invoice",
       },
     ]);
   });
@@ -201,6 +204,129 @@ describe("buildUnlinkedInvoiceCharges", () => {
       }),
     ).toEqual([]);
     expect(buildUnlinkedInvoiceCharges({ lineItems: null, jobId: JOB_ID })).toEqual([]);
+  });
+});
+
+describe("buildInvoiceFamilyBillingView", () => {
+  const JOB_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const LATER_WORK_ITEM_ID = "33333333-3333-4333-8333-333333333333";
+
+  const PRIMARY_LINES = [
+    {
+      source_kind: "visit_scope",
+      source_visit_scope_item_id: WORK_ITEM_ID,
+      source_job_id: JOB_ID,
+      item_name_snapshot: "Air Duct Cleaning",
+      quantity: 8,
+      unit_price: 45,
+      line_subtotal: 360,
+    },
+  ];
+
+  const ADD_ON = {
+    invoice_display_number: "2190",
+    line_items: [
+      {
+        source_kind: "visit_scope",
+        source_visit_scope_item_id: LATER_WORK_ITEM_ID,
+        source_job_id: JOB_ID,
+        item_name_snapshot: "Blower Motor Replacement",
+        quantity: 1,
+        unit_price: 480,
+        line_subtotal: 480,
+      },
+      {
+        source_kind: "manual",
+        source_visit_scope_item_id: null,
+        source_job_id: JOB_ID,
+        item_name_snapshot: "After-hours trip fee",
+        quantity: 1,
+        unit_price: 95,
+        line_subtotal: 95,
+      },
+    ],
+  };
+
+  it("marks a Work Item billed on an add-on as billed, not an estimate", () => {
+    const view = buildInvoiceFamilyBillingView({
+      jobId: JOB_ID,
+      primaryLineItems: PRIMARY_LINES,
+      addOnInvoices: [ADD_ON],
+    });
+
+    const display = resolveVisitScopeItemPriceDisplay({
+      itemId: LATER_WORK_ITEM_ID,
+      expectedUnitPrice: 0,
+      billedLines: view.billedLines,
+    });
+
+    expect(display.state).toBe("billed");
+    expect(display.amountText).toBe("$480.00");
+  });
+
+  it("keeps primary billing intact when add-ons exist", () => {
+    const view = buildInvoiceFamilyBillingView({
+      jobId: JOB_ID,
+      primaryLineItems: PRIMARY_LINES,
+      addOnInvoices: [ADD_ON],
+    });
+
+    expect(view.billedLines[WORK_ITEM_ID].lineSubtotalCents).toBe(36000);
+  });
+
+  it("labels each unlinked charge with the invoice it lives on", () => {
+    const view = buildInvoiceFamilyBillingView({
+      jobId: JOB_ID,
+      primaryLineItems: [
+        ...PRIMARY_LINES,
+        {
+          source_kind: "pricebook",
+          source_visit_scope_item_id: null,
+          source_job_id: JOB_ID,
+          item_name_snapshot: "Filter",
+          quantity: 1,
+          unit_price: 40,
+          line_subtotal: 40,
+        },
+      ],
+      addOnInvoices: [ADD_ON],
+    });
+
+    expect(view.unlinkedCharges.map((charge) => [charge.title, charge.sourceLabel])).toEqual([
+      ["Filter", "Added on the invoice"],
+      ["After-hours trip fee", "Add-on invoice #2190"],
+    ]);
+  });
+
+  it("lets a later add-on supersede an earlier charge for the same Work Item", () => {
+    const view = buildInvoiceFamilyBillingView({
+      jobId: JOB_ID,
+      primaryLineItems: PRIMARY_LINES,
+      addOnInvoices: [
+        {
+          invoice_display_number: "2190",
+          line_items: [{ ...PRIMARY_LINES[0], quantity: 10, line_subtotal: 450 }],
+        },
+      ],
+    });
+
+    expect(view.billedLines[WORK_ITEM_ID].lineSubtotalCents).toBe(45000);
+  });
+
+  it("behaves like the primary-only view when there are no add-ons", () => {
+    const view = buildInvoiceFamilyBillingView({
+      jobId: JOB_ID,
+      primaryLineItems: PRIMARY_LINES,
+      addOnInvoices: [],
+    });
+
+    expect(view.billedLines).toEqual(buildVisitScopeBilledLineMap(PRIMARY_LINES));
+    expect(view.unlinkedCharges).toEqual([]);
+  });
+
+  it("names an add-on with no display number generically", () => {
+    expect(formatAddOnInvoiceLabel(null)).toBe("Add-on invoice");
+    expect(formatAddOnInvoiceLabel("2190")).toBe("Add-on invoice #2190");
   });
 });
 

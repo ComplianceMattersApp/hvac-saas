@@ -74,11 +74,20 @@ describe("job detail field billing panel wiring", () => {
   });
 
   it("keeps the immediate job-detail invoice read on the active-primary membership resolver", () => {
+    // Bound the slice to the block itself rather than a fixed character count, which
+    // silently drifted out of range as fields were added to the returned shape.
     const immediateReadIndex = source.indexOf('const immediateInvoiceTruthPromise');
-    const immediateReadSlice = source.slice(immediateReadIndex, immediateReadIndex + 1800);
+    const immediateReadEnd = source.indexOf('const serviceCaseSummaryPromise', immediateReadIndex);
+    expect(immediateReadIndex).toBeGreaterThan(-1);
+    expect(immediateReadEnd).toBeGreaterThan(immediateReadIndex);
+    const immediateReadSlice = source.slice(immediateReadIndex, immediateReadEnd);
 
     expect(immediateReadSlice).toContain("resolveInternalInvoiceByJobId({ supabase, jobId })");
     expect(immediateReadSlice).toContain("invoiceTruthRow.line_items");
+    // Add-on invoices are read alongside the primary so work billed after issuing is
+    // not reported as un-billed on the job screen.
+    expect(immediateReadSlice).toContain("resolveJobAddOnInvoicesWithLines({ supabase, jobId })");
+    expect(immediateReadSlice).toContain("buildInvoiceFamilyBillingView({");
   });
 
   it("reads durable job billing disposition for job closeout and invoice labels", () => {

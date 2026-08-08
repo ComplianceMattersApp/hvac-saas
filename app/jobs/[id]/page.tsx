@@ -93,17 +93,19 @@ import {
   resolveLatestVoidedInternalInvoiceByJobId,
   resolveInternalInvoiceByJobId,
   resolveInternalInvoiceJobShareCents,
+  resolveJobAddOnInvoicesWithLines,
   resolveInternalInvoiceFamilySummaryByJobId,
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
 import {
-  buildUnlinkedInvoiceCharges,
-  buildVisitScopeBilledLineMap,
+  buildInvoiceFamilyBillingView,
+  formatAddOnInvoiceLabel,
   type UnlinkedInvoiceCharge,
   type VisitScopeBilledLine,
 } from "@/lib/business/visit-scope-billing";
 import {
   resolveInvoiceCollectedPaymentLedger,
+  resolveInvoiceCollectedPaymentSummary,
   type InternalInvoiceCollectedPaymentSummary,
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
@@ -1852,6 +1854,17 @@ export default async function JobDetailPage({
           visit_scope_source_ids: string[];
           visit_scope_billed_lines: Record<string, VisitScopeBilledLine>;
           unlinked_invoice_charges: UnlinkedInvoiceCharge[];
+          add_on_invoices: Array<{
+            id: string;
+            label: string;
+            status: InternalInvoiceStatus;
+            total_cents: number;
+            total_text: string;
+            balance_due_cents: number;
+            supplemental_reason: string | null;
+          }>;
+          family_total_cents: number;
+          family_balance_due_cents: number;
           member_job_count: number;
         } | null,
         internalInvoicePaymentSummaryTruth: null as InternalInvoiceCollectedPaymentSummary | null,
@@ -1871,29 +1884,65 @@ export default async function JobDetailPage({
 
     const [
       internalInvoicePaymentLedger,
+      addOnInvoiceRows,
     ] = await Promise.all([
       resolveInvoiceCollectedPaymentLedger(
         internalUser.account_owner_user_id,
         String(invoiceTruthRow.id),
         supabase,
       ),
+      // Add-ons are the only way to bill work found after the primary was issued,
+      // so the job screen has to account for them or that work reads as un-billed.
+      resolveJobAddOnInvoicesWithLines({ supabase, jobId }),
     ]);
+
+    const addOnPaymentSummaries = await Promise.all(
+      addOnInvoiceRows.map((addOn) =>
+        resolveInvoiceCollectedPaymentSummary(
+          internalUser.account_owner_user_id,
+          addOn.id,
+          supabase,
+        ),
+      ),
+    );
 
     const invoiceLineItems = invoiceTruthRow.line_items ?? [];
     const visitScopeSourceIds = invoiceLineItems
       .filter((lineItem: any) => lineItem?.source_kind === "visit_scope")
       .map((lineItem: any) => sanitizeVisitScopeItemId(lineItem?.source_visit_scope_item_id))
       .filter(Boolean) as string[];
-    // Work Item rows read the billed charge back off this map so an imported item
-    // reports what the invoice actually says instead of its own frozen capture price.
-    const visitScopeBilledLines = buildVisitScopeBilledLineMap(invoiceLineItems);
-    // Charges with no Work Item behind them still belong in the tech's work list,
-    // otherwise the list visibly falls short of the invoice total.
-    const unlinkedInvoiceCharges = buildUnlinkedInvoiceCharges({
-      lineItems: invoiceLineItems,
+    // Work Item rows read the billed charge back off this view so an imported item
+    // reports what the invoice actually says instead of its own frozen capture price,
+    // across the primary invoice and every add-on.
+    const {
+      billedLines: visitScopeBilledLines,
+      unlinkedCharges: unlinkedInvoiceCharges,
+    } = buildInvoiceFamilyBillingView({
       jobId,
-      isConsolidated: (invoiceTruthRow.member_job_ids?.length ?? 1) > 1,
+      primaryLineItems: invoiceLineItems,
+      isPrimaryConsolidated: (invoiceTruthRow.member_job_ids?.length ?? 1) > 1,
+      addOnInvoices: addOnInvoiceRows,
     });
+
+    const addOnInvoices = addOnInvoiceRows.map((addOn, index) => ({
+      id: addOn.id,
+      label: formatAddOnInvoiceLabel(addOn.invoice_display_number),
+      status: addOn.status,
+      total_cents: addOn.total_cents,
+      total_text: formatCurrencyFromCents(addOn.total_cents),
+      balance_due_cents: Number(addOnPaymentSummaries[index]?.balanceDueCents ?? 0) || 0,
+      supplemental_reason: addOn.supplemental_reason,
+    }));
+
+    const primaryJobShareCents = resolveInternalInvoiceJobShareCents(invoiceTruthRow, jobId);
+    const familyTotalCents = addOnInvoices.reduce(
+      (total, addOn) => total + addOn.total_cents,
+      primaryJobShareCents,
+    );
+    const familyBalanceDueCents = addOnInvoices.reduce(
+      (total, addOn) => total + addOn.balance_due_cents,
+      Number(internalInvoicePaymentLedger.summary?.balanceDueCents ?? 0) || 0,
+    );
 
     return {
       internalInvoiceTruth: {
@@ -1909,6 +1958,9 @@ export default async function JobDetailPage({
         visit_scope_source_ids: visitScopeSourceIds,
         visit_scope_billed_lines: visitScopeBilledLines,
         unlinked_invoice_charges: unlinkedInvoiceCharges,
+        add_on_invoices: addOnInvoices,
+        family_total_cents: familyTotalCents,
+        family_balance_due_cents: familyBalanceDueCents,
         member_job_count: Math.max(1, invoiceTruthRow.member_job_ids?.length ?? 1),
       },
       internalInvoicePaymentSummaryTruth: internalInvoicePaymentLedger.summary,
@@ -3281,11 +3333,19 @@ const eligibleUnaddedPricedWorkItemsTotalCents = unaddedPricedVisitScopeItems.re
   return Number.isFinite(unitPrice) && unitPrice > 0 ? sum + Math.round(unitPrice * 100) : sum;
 }, 0);
 const invoiceHasCharges = Number(internalInvoiceTruth?.line_item_count ?? 0) > 0;
+// Any draft with priced Work Items still off it needs the prompt. This used to also
+// require the draft to be empty, so adding a second Work Item to a draft that already
+// had a charge went completely unannounced — the common case, since the first import
+// creates one.
 const hasUnaddedPricedWorkItemsForDraftInvoice =
   Boolean(internalInvoiceTruth) &&
   internalInvoiceTruth?.status === "draft" &&
-  !invoiceHasCharges &&
-  Number(internalInvoiceTruth?.total_cents ?? 0) === 0 &&
+  eligibleUnaddedPricedWorkItemsTotalCents > 0;
+// Once the primary is issued its charges are locked, so newly captured work can only
+// be billed on an add-on invoice.
+const hasUnaddedPricedWorkItemsForIssuedInvoice =
+  Boolean(internalInvoiceTruth) &&
+  internalInvoiceTruth?.status === "issued" &&
   eligibleUnaddedPricedWorkItemsTotalCents > 0;
 const hasEmptyDraftInvoiceWithoutPricedWorkItems =
   Boolean(internalInvoiceTruth) &&
@@ -3339,8 +3399,20 @@ const jobPageInvoicePaymentSummaryText =
         ? `Paid ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.amountPaidCents)} - Balance ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.balanceDueCents)}`
         : `Balance ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.balanceDueCents)}`
     : null;
+const jobPageAddOnInvoices = internalInvoiceTruth?.add_on_invoices ?? [];
+const jobPageAddOnSummaryText = jobPageAddOnInvoices.length > 0
+  ? jobPageAddOnInvoices
+      .map((addOn) => `${addOn.label}: ${formatCurrencyFromCents(addOn.total_cents)}`)
+      .join(" - ")
+  : null;
 const jobPageInvoiceSummaryText = internalInvoiceTruth
-  ? hasUnaddedPricedWorkItemsForDraftInvoice
+  ? hasUnaddedPricedWorkItemsForIssuedInvoice
+    ? [
+        `Work captured since issuing: ${formatCurrencyFromCents(eligibleUnaddedPricedWorkItemsTotalCents)}`,
+        `${jobPageInvoiceDisplayReference ?? "Invoice"} is issued, so its charges are locked.`,
+        "Create an add-on invoice to bill the newly captured work.",
+      ].join(" ")
+    : hasUnaddedPricedWorkItemsForDraftInvoice
     ? [
         `Work captured: ${formatCurrencyFromCents(eligibleUnaddedPricedWorkItemsTotalCents)}`,
         `Draft invoice: ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)} - ${internalInvoiceTruth.line_item_count} charges.`,
@@ -3358,7 +3430,12 @@ const jobPageInvoiceSummaryText = internalInvoiceTruth
         : null,
       `${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"}`,
       formatCurrencyFromCents(internalInvoiceTruth.total_cents),
-      jobPageInvoicePaymentSummaryText,
+      // Add-ons carry their own balance, so a family total that ignored them
+      // understated what the customer still owes on this job.
+      jobPageAddOnSummaryText,
+      jobPageAddOnInvoices.length > 0
+        ? `Job total ${formatCurrencyFromCents(internalInvoiceTruth.family_total_cents)} - Balance ${formatCurrencyFromCents(internalInvoiceTruth.family_balance_due_cents)}`
+        : jobPageInvoicePaymentSummaryText,
     ].filter(Boolean).join(" - ")
   : hasVisitScopeDefined
     ? `${visitScopeCount} work item${visitScopeCount === 1 ? "" : "s"} ready to price and review.`
@@ -3905,6 +3982,7 @@ const showCorrectionReviewResolution =
           visitScopeCount={visitScopeCount}
           visitScopeBilledLines={visitScopeBilledLines}
           unlinkedInvoiceCharges={unlinkedInvoiceCharges}
+          hasUnaddedPricedWorkItemsForIssuedInvoice={hasUnaddedPricedWorkItemsForIssuedInvoice}
           visitScopeItems={visitScopeItems}
           visitScopeItemsJsonForInlineEdit={visitScopeItemsJsonForInlineEdit}
           VisitScopeJobDetailForm={VisitScopeJobDetailForm}

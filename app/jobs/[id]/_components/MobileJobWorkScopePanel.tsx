@@ -189,7 +189,7 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
                 <div className="mt-1 text-sm font-semibold text-slate-700">{charge.mathText}</div>
               ) : null}
               <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Added on the invoice
+                {charge.sourceLabel}
               </div>
             </div>
           ))}

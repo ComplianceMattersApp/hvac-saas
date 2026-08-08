@@ -58,10 +58,10 @@ import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@
 import {
   resolveInternalInvoiceByJobId,
   resolveInternalInvoiceJobShareCents,
+  resolveJobAddOnInvoicesWithLines,
 } from "@/lib/business/internal-invoice";
 import {
-  buildUnlinkedInvoiceCharges,
-  buildVisitScopeBilledLineMap,
+  buildInvoiceFamilyBillingView,
   resolveVisitScopeItemPriceDisplay,
 } from "@/lib/business/visit-scope-billing";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
@@ -655,11 +655,18 @@ export default async function JobDetailV2Page({
   const invoiceTotal = formatVisitScopeTotal(visitScopeItems);
   // Work Item rows report the invoice charge once imported; invoice edits are never
   // written back to jobs.visit_scope_items, so the captured price alone goes stale.
-  const visitScopeBilledLines = buildVisitScopeBilledLineMap(primaryInvoiceRaw?.line_items);
-  const unlinkedInvoiceCharges = buildUnlinkedInvoiceCharges({
-    lineItems: primaryInvoiceRaw?.line_items,
+  // Work billed on an add-on invoice would otherwise read as un-billed here.
+  const addOnInvoiceRows = primaryInvoiceRaw
+    ? await resolveJobAddOnInvoicesWithLines({ supabase, jobId })
+    : [];
+  const {
+    billedLines: visitScopeBilledLines,
+    unlinkedCharges: unlinkedInvoiceCharges,
+  } = buildInvoiceFamilyBillingView({
     jobId,
-    isConsolidated: (primaryInvoiceRaw?.member_job_ids?.length ?? 1) > 1,
+    primaryLineItems: primaryInvoiceRaw?.line_items,
+    isPrimaryConsolidated: (primaryInvoiceRaw?.member_job_ids?.length ?? 1) > 1,
+    addOnInvoices: addOnInvoiceRows,
   });
 
   type LocationRow = {
@@ -2198,7 +2205,7 @@ export default async function JobDetailV2Page({
                         marginTop: "2px",
                       }}
                     >
-                      {charge.mathText ? `${charge.mathText} · ` : ""}Added on the invoice
+                      {charge.mathText ? `${charge.mathText} · ` : ""}{charge.sourceLabel}
                     </div>
                   </div>
                   <span
