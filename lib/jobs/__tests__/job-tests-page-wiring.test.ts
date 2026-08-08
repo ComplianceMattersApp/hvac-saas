@@ -753,12 +753,18 @@ describe("job detail field operations board layout", () => {
     expect(mobileJobWorkScopePanelSource).not.toContain("primaryVisitScopeItems.slice(0, 2)");
     expect(mobileJobWorkScopePanelSource).not.toContain("more work item");
     expect(mobileJobWorkScopePanelSource).toContain("formatVisitScopeItemKindLabel(item.kind)");
-    expect(mobileJobWorkScopePanelSource).toContain("Number(item.expected_unit_price)");
+    // Prices are resolved against the invoice rather than printed straight off the
+    // job: an imported Work Item reports the billed charge, an un-billed one reads
+    // as an estimate, so the job's frozen capture price never poses as a total.
+    expect(mobileJobWorkScopePanelSource).toContain("resolveVisitScopeItemPriceDisplay({");
+    expect(mobileJobWorkScopePanelSource).toContain("billedLines: visitScopeBilledLines");
+    expect(mobileJobWorkScopePanelSource).toContain("{priceDisplay.amountText}");
+    expect(mobileJobWorkScopePanelSource).toContain("{priceDisplay.badgeLabel}");
+    expect(mobileJobWorkScopePanelSource).toContain("{priceDisplay.mathText}");
     // Slice B cleanup: each saved work item exposes a Remove action wired to the
-    // same visit-scope save action, and quantity math when quantity > 1.
+    // same visit-scope save action.
     expect(mobileJobWorkScopePanelSource).toContain("action={updateJobVisitScopeFromForm}");
     expect(mobileJobWorkScopePanelSource).toContain("Remove");
-    expect(mobileJobWorkScopePanelSource).toContain("showQuantityMath");
   });
 
   it("keeps post-build invoice state visible in the mobile Work & Invoice section", () => {

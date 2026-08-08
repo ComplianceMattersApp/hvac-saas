@@ -196,12 +196,21 @@ function buildBillingPreview(props: {
     Boolean(props.closeoutNeeds?.needsInvoice || props.closeoutNeeds?.needsCerts);
 
   if (props.isReadOnlyState) {
+    // A closed job still has an invoice number, a total and a payment state, and
+    // page.tsx has already built that sentence. Dropping it for generic read-only
+    // copy was why a finished, invoiced job reported nothing about its invoice.
     return {
-      title: "Billing / Closeout",
-      summary: "Review billing, closeout, and history from job records.",
+      // Reuse the resolved invoice state rather than asserting completion: a closed
+      // job can still carry an issued invoice with nothing collected against it.
+      title: props.internalInvoiceTruth
+        ? props.jobPageInvoiceStateLabel || "Billing / Closeout"
+        : "Billing / Closeout",
+      summary:
+        props.jobPageInvoiceSummaryText ||
+        "Review billing, closeout, and history from job records.",
       actionLabel: "",
       hrefAnchor: "",
-      statusLabel: "Read-only",
+      statusLabel: props.internalInvoiceTruth ? "Closed" : "Read-only",
     };
   }
 
@@ -1003,26 +1012,15 @@ export default function MobileJobDetailV2Preview(props: any) {
               </>
             ) : (
               <>
-                {serviceWorkSummary ? (
-                  <div className="px-3 py-3">
-                    <div className="text-sm font-semibold text-slate-500">Work Summary</div>
-                    <p className="mt-1 text-base leading-6 text-slate-800">{serviceWorkSummary}</p>
-                  </div>
-                ) : null}
-                {serviceWorkPreviewItems.length > 0 ? (
-                  <div className="divide-y divide-slate-100">
-                    {serviceWorkPreviewItems.map((item: any, index: number) => (
-                      <div key={`${item.title}-${index}`} className="px-3 py-3">
-                        <div className="font-semibold text-slate-950">{item.title}</div>
-                        {item.details ? <div className="mt-1 text-sm leading-5 text-slate-600">{item.details}</div> : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
+                {/* The panel below renders the same Work Summary and the same items
+                    with their prices, so previewing them here only printed each
+                    string twice. */}
+                {serviceWorkPreviewItems.length === 0
+                  && (internalInvoiceTruth?.unlinked_invoice_charges?.length ?? 0) === 0 ? (
                   <div className="px-3 py-3 text-sm leading-6 text-slate-600">
                     No Work Items saved yet.
                   </div>
-                )}
+                ) : null}
                 <MobileJobWorkScopePanel
                   {...props}
                   presentation="v2DisclosurePanel"
@@ -1034,6 +1032,72 @@ export default function MobileJobDetailV2Preview(props: any) {
                 />
               </>
             )}
+          </div>
+
+          {/* Billing sits inside the work card: at closeout "what we did" and "what
+              we charged" are one decision, and splitting them across two cards put
+              Evidence & Notes between the work list and its own invoice total. */}
+          <div id="mobile-billing-card" className="mt-4 rounded-2xl border border-slate-200">
+            <div className="flex flex-col gap-3 px-3 py-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-500">
+                  Billing / Closeout
+                </div>
+                <h3 className="mt-1 text-base font-semibold leading-tight text-[#071225]">
+                  {billingPreview.title}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{billingPreview.summary}</p>
+              </div>
+              <span className="inline-flex min-h-8 w-fit shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold leading-tight text-slate-600">
+                {billingPreview.statusLabel}
+              </span>
+            </div>
+            {canShowNativeExternalBillingAction ? (
+              <form action={completeDataEntryFromForm} className="px-3 pb-3">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="return_to" value={v2BillingReturnTo} />
+                <SubmitButton
+                  loadingText="Saving..."
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-amber-950"
+                >
+                  Mark External Billing Complete
+                </SubmitButton>
+              </form>
+            ) : canShowNativeInvoiceWorkspaceLink ? (
+              <div className="px-3 pb-3">
+                <Link
+                  href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}#invoice-workspace`}
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
+                >
+                  <span className="min-w-0 break-words text-center">View Invoice</span>
+                  <ChevronRightIcon className="h-5 w-5" />
+                </Link>
+              </div>
+            ) : canShowNativeInvoiceDraftAction ? (
+              <form action={createInternalInvoiceDraftFromForm} className="px-3 pb-3">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                <SubmitButton
+                  loadingText="Starting..."
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
+                >
+                  <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
+                  <ChevronRightIcon className="h-5 w-5" />
+                </SubmitButton>
+              </form>
+            ) : canShowNativeStatusActionLink ? (
+              <div className="px-3 pb-3">
+                <a
+                  href="#mobile-next-service-action"
+                  className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
+                >
+                  <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
+                  <ChevronRightIcon className="h-5 w-5" />
+                </a>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -1075,18 +1139,8 @@ export default function MobileJobDetailV2Preview(props: any) {
               </div>
             </div>
             <div className="v2-work-scope-summary mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
-              {serviceWorkSummary ? (
-                <div className="px-3 py-3">
-                  <div className="text-sm font-semibold text-slate-500">Work Summary</div>
-                  <p className="mt-1 text-base leading-6 text-slate-800">{serviceWorkSummary}</p>
-                </div>
-              ) : null}
-              {serviceWorkPreviewItems.map((item: any, index: number) => (
-                <div key={`${item.title}-${index}`} className="px-3 py-3">
-                  <div className="font-semibold text-slate-950">{item.title}</div>
-                  {item.details ? <div className="mt-1 text-sm leading-5 text-slate-600">{item.details}</div> : null}
-                </div>
-              ))}
+              {/* Same reason as the service lane above: the panel renders this Work
+                  Summary and these items itself, so previewing them here doubled them. */}
               <MobileJobWorkScopePanel
                 {...props}
                 presentation="v2DisclosurePanel"
@@ -1160,65 +1214,6 @@ export default function MobileJobDetailV2Preview(props: any) {
 
         <MobileJobTeamNotesPanel {...props} presentation="v2TargetPanel" />
         {showSharedNotesCard ? <MobileJobSharedNotesPanel {...props} presentation="v2TargetPanel" /> : null}
-
-        <section className={previewSectionClass}>
-          <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
-            <div className="min-w-0">
-              <div className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-500">
-                Billing / Closeout
-              </div>
-              <h2 className="mt-1 text-xl font-semibold leading-tight text-[#071225]">
-                {billingPreview.title}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{billingPreview.summary}</p>
-            </div>
-            <span className="inline-flex min-h-8 w-fit shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold leading-tight text-slate-600">
-              {billingPreview.statusLabel}
-            </span>
-          </div>
-          {canShowNativeExternalBillingAction ? (
-            <form action={completeDataEntryFromForm} className="mt-4">
-              <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="return_to" value={v2BillingReturnTo} />
-              <SubmitButton
-                loadingText="Saving..."
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-amber-950"
-              >
-                Mark External Billing Complete
-              </SubmitButton>
-            </form>
-          ) : canShowNativeInvoiceWorkspaceLink ? (
-            <Link
-              href={`/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(String(internalInvoiceTruth.id))}#invoice-workspace`}
-              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
-            >
-              <span className="min-w-0 break-words text-center">View Invoice</span>
-              <ChevronRightIcon className="h-5 w-5" />
-            </Link>
-          ) : canShowNativeInvoiceDraftAction ? (
-            <form action={createInternalInvoiceDraftFromForm} className="mt-4">
-              <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="tab" value={tab} />
-              <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
-              <input type="hidden" name="auto_import_visit_scope_items" value="1" />
-              <SubmitButton
-                loadingText="Starting..."
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
-              >
-                <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
-                <ChevronRightIcon className="h-5 w-5" />
-              </SubmitButton>
-            </form>
-          ) : canShowNativeStatusActionLink ? (
-            <a
-              href="#mobile-next-service-action"
-              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
-            >
-              <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
-              <ChevronRightIcon className="h-5 w-5" />
-            </a>
-          ) : null}
-        </section>
 
         {canShowReviewAsk ? (
           <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">

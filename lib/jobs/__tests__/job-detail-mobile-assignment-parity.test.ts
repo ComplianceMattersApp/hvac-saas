@@ -359,8 +359,21 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
     expect(mobileJobWorkScopePanelSource).toContain("VisitScopeJobDetailForm");
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
-    expect(mobileJobWorkScopePanelSource).toContain("<span className={previewPillClass ?? \"\"}>Details</span>");
+    // The disclosure body is always rendered, so the header carries no "Details"
+    // pill — it read as a toggle that did nothing.
+    expect(mobileJobWorkScopePanelSource).not.toContain("<span className={previewPillClass ?? \"\"}>Details</span>");
     expect(mobileJobDetailV2PreviewSource).not.toContain("View work details");
+    // Billing lives inside the work card so the work list and its invoice total are
+    // one block, and the panel is the only place work items are listed.
+    expect(mobileJobDetailV2PreviewSource).toContain('<div id="mobile-billing-card"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain("serviceWorkPreviewItems.map(");
+    // A closed job keeps its real invoice sentence instead of generic read-only copy,
+    // and takes its title from the resolved invoice state rather than asserting the
+    // invoice is complete — a closed job can hold an issued invoice with $0 collected.
+    expect(mobileJobDetailV2PreviewSource).toContain(
+      "props.jobPageInvoiceStateLabel || \"Billing / Closeout\"",
+    );
+    expect(mobileJobDetailV2PreviewSource).not.toContain('"Invoice complete"');
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
 

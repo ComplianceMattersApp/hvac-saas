@@ -109,7 +109,8 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("lg:text-right");
     expect(builderSource).toContain('aria-label={`Price for ${item.title.trim() || "scope item"}`}');
     expect(builderSource).toContain("value={item.title}");
-    expect(builderSource).toContain("value={item.expected_unit_price ?? 0}");
+    // An empty price box stays empty and saves as null, so the field renders "" not 0.
+    expect(builderSource).toContain("value={item.expected_unit_price ?? \"\"}");
     expect(builderSource).toContain("value={item.details}");
   });
 

@@ -44,7 +44,8 @@ describe("visit scope inline composer slice 1", () => {
     expect(builderSource).toContain("setExpandedItemId((prev) => (prev === item.id ? null : item.id))");
     expect(builderSource).toContain("value={item.title}");
     expect(builderSource).toContain("onChange={(event) => patchItem(item.id, { title: event.target.value })}");
-    expect(builderSource).toContain("value={item.expected_unit_price ?? 0}");
+    // An empty price box stays empty and saves as null, so the field renders "" not 0.
+    expect(builderSource).toContain("value={item.expected_unit_price ?? \"\"}");
     expect(builderSource).toContain("value={item.details}");
     expect(builderSource).toContain("onChange={(event) => patchItem(item.id, { details: event.target.value })}");
   });
