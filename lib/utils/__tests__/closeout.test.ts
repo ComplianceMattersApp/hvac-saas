@@ -383,8 +383,11 @@ describe("closeout queue projection", () => {
       invoice_complete: true,
     });
 
-    expect(message).toBe("Job closed. Field work and billing are complete.");
+    expect(message).toBe("Job closed. Field and admin work complete.");
     expect(message).not.toContain("ready for closeout");
+    // This projection has no visibility into payments, so it must not claim the
+    // money side is settled — the invoice balance is reported elsewhere.
+    expect(message).not.toMatch(/billing|paid|payment/i);
   });
 
   it("still reports outstanding work on a service job that is not closed yet", () => {

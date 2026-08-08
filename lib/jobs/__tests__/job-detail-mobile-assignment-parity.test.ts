@@ -374,6 +374,13 @@ describe("mobile job detail assignment parity", () => {
       "props.jobPageInvoiceStateLabel || \"Billing / Closeout\"",
     );
     expect(mobileJobDetailV2PreviewSource).not.toContain('"Invoice complete"');
+    // Closing a job is operational, not financial. An unpaid invoice keeps the
+    // lifecycle ribbon and the billing chip reporting money still owed.
+    expect(mobileJobDetailV2PreviewSource).toContain(
+      'props.hasOutstandingInvoiceBalance ? "Invoice still open" : "Job closed"',
+    );
+    expect(mobileJobDetailV2PreviewSource).toContain('? "Balance due"');
+    expect(mobileJobDetailV2PreviewSource).toContain("family_balance_due_cents");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
 

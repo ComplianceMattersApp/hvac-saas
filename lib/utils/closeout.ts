@@ -129,8 +129,11 @@ export function getJobDetailCloseoutReadinessMessage(job: CloseoutProjectionInpu
   // is "ready for closeout" describes work that has in fact been done — the
   // specific ECC/billing messages above still win, this only replaces the generic
   // service fallback.
+  // Deliberately says the *work* is complete, not the money. Whether payment is
+  // still outstanding is reported by the lifecycle ribbon and the billing card,
+  // which have the invoice balance; this projection only sees closeout state.
   if (String(job.ops_status ?? "").toLowerCase() === "closed") {
-    return "Job closed. Field work and billing are complete.";
+    return "Job closed. Field and admin work complete.";
   }
 
   return "Field work complete - ready for closeout.";

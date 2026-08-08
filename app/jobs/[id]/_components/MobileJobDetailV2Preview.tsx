@@ -16,6 +16,7 @@ function buildLifecyclePreview(props: {
   activeWaitingState: any;
   isHistoricalServiceFollowUpContinued: boolean;
   showLinkedRetestCreated: boolean;
+  hasOutstandingInvoiceBalance?: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
   const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
@@ -25,6 +26,7 @@ function buildLifecyclePreview(props: {
     activeWaitingState: props.activeWaitingState,
     isHistoricalServiceFollowUpContinued: props.isHistoricalServiceFollowUpContinued,
     showLinkedRetestCreated: props.showLinkedRetestCreated,
+    hasOutstandingInvoiceBalance: props.hasOutstandingInvoiceBalance,
   });
   const isClosed =
     opsStatus === "closed" ||
@@ -95,6 +97,7 @@ function getLifecycleExceptionLabel(props: {
   activeWaitingState: any;
   isHistoricalServiceFollowUpContinued: boolean;
   showLinkedRetestCreated: boolean;
+  hasOutstandingInvoiceBalance?: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
   const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
@@ -103,7 +106,11 @@ function getLifecycleExceptionLabel(props: {
   if (props.isHistoricalServiceFollowUpContinued || props.showLinkedRetestCreated) return "Linked active job";
   if (opsStatus === "archived" || props.job?.deleted_at) return "Archived";
   if (status === "cancelled") return "Job cancelled";
-  if (opsStatus === "closed") return "Job closed";
+  // Closing a job is an operational milestone, not a financial one. Saying only
+  // "Job closed" over an unpaid invoice reads as nothing being owed.
+  if (opsStatus === "closed") {
+    return props.hasOutstandingInvoiceBalance ? "Invoice still open" : "Job closed";
+  }
   if (waitingLabel) return waitingLabel;
   if (opsStatus === "failed") return "Correction needed";
   if (opsStatus === "pending_office_review") return "Review needed";
@@ -181,6 +188,7 @@ function buildBillingPreview(props: {
   isEccComplianceActive: boolean;
   isFieldComplete: boolean;
   isReadOnlyState: boolean;
+  hasOutstandingInvoiceBalance: boolean;
 }) {
   const hasInvoiceAttention =
     props.showMobileServiceInvoiceFieldAction ||
@@ -210,7 +218,13 @@ function buildBillingPreview(props: {
         "Review billing, closeout, and history from job records.",
       actionLabel: "",
       hrefAnchor: "",
-      statusLabel: props.internalInvoiceTruth ? "Closed" : "Read-only",
+      // "Closed" described the job, not the money. On an issued invoice with a
+      // balance it read as settled when nothing had been collected.
+      statusLabel: !props.internalInvoiceTruth
+        ? "Read-only"
+        : props.hasOutstandingInvoiceBalance
+          ? "Balance due"
+          : "Closed",
     };
   }
 
@@ -473,6 +487,10 @@ export default function MobileJobDetailV2Preview(props: any) {
     hasFullSchedule || job?.scheduled_date || job?.window_start || job?.window_end || mobileAppointmentTimeLabel,
   );
 
+  // Family balance, so an unpaid add-on keeps the job reading as still owed.
+  const hasOutstandingInvoiceBalance =
+    internalInvoiceTruth?.status === "issued" &&
+    Number(internalInvoiceTruth?.family_balance_due_cents ?? 0) > 0;
   const lifecycle = buildLifecyclePreview({
     job,
     isFieldComplete,
@@ -482,6 +500,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     activeWaitingState,
     isHistoricalServiceFollowUpContinued,
     showLinkedRetestCreated,
+    hasOutstandingInvoiceBalance,
   });
   const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
@@ -536,6 +555,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     isEccComplianceActive,
     isFieldComplete,
     isReadOnlyState,
+    hasOutstandingInvoiceBalance,
   });
   const canShowNativeInvoiceSummaryAction =
     billingPreview.hrefAnchor === "mobile-invoice-summary-card" && !isReadOnlyState;
