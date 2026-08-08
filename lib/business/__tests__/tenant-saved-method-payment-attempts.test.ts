@@ -13,6 +13,13 @@ vi.mock("@/lib/business/tenant-stripe-connect-readiness", () => ({
     mockResolveTenantStripeConnectReadiness(...args),
 }));
 
+const mockCheckQboBalanceBeforeCollection = vi.fn(async (..._args: unknown[]) => ({ blocked: false, checked: false }));
+
+vi.mock("@/lib/qbo/qbo-collection-preflight", () => ({
+  checkQboBalanceBeforeCollection: (...args: unknown[]) =>
+    mockCheckQboBalanceBeforeCollection(...args),
+}));
+
 type TestState = {
   invoiceStatus?: string;
   balanceDueCents?: number;
@@ -251,6 +258,47 @@ describe("tenant saved-method payment attempts", () => {
     expect(result.ok).toBe(false);
     expect(result.blockedReason).toBe("duplicate_inflight_attempt");
     expect(stripe.paymentIntents.create).not.toHaveBeenCalled();
+  });
+
+  it("blocks the charge as a precondition when QuickBooks shows the invoice already settled", async () => {
+    const ctx = makeAdmin();
+    ctx.setupMocks();
+    mockCheckQboBalanceBeforeCollection.mockResolvedValueOnce({
+      blocked: true,
+      qboBalanceCents: 0,
+      message: "QuickBooks shows invoice 2116 with only $0.00 left to collect, but this request is for $25.00. A payment may already exist outside EveryStep — reconcile in QuickBooks before collecting again.",
+    } as any);
+
+    const stripe = {
+      paymentIntents: {
+        create: vi.fn(),
+      },
+    };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.attemptStatus).toBe("blocked_precondition");
+    expect(result.failureCode).toBe("qbo_shows_invoice_settled");
+    expect(stripe.paymentIntents.create).not.toHaveBeenCalled();
+    const blockWrite = ctx.writes.find(
+      (write) => write.table === "tenant_saved_method_payment_attempts" && write.op === "update"
+        && write.payload?.failure_code === "qbo_shows_invoice_settled",
+    );
+    expect(blockWrite?.payload).toEqual(
+      expect.objectContaining({ attempt_status: "blocked_precondition" }),
+    );
   });
 
   it("creates attempt row and submits PaymentIntent without direct payment-row writes", async () => {

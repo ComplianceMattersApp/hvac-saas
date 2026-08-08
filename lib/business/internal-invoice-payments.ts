@@ -14,6 +14,7 @@ import {
   derivePlatformApplicationFeeConfig,
 } from "@/lib/business/platform-application-fees";
 import { normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
+import { checkQboBalanceBeforeCollection } from "@/lib/qbo/qbo-collection-preflight";
 
 export const INTERNAL_INVOICE_PAYMENT_STATUSES = [
   "recorded",
@@ -586,6 +587,19 @@ export async function createTenantInvoiceCheckoutSession(params: {
   const eligibility = validateInvoiceEligibleForOnlinePayment(invoice, paymentSummary);
   if (!eligibility.eligible) {
     throw new Error(eligibility.reason ?? "Invoice is not eligible for online payment.");
+  }
+
+  // Double-collection guard: if QuickBooks shows this invoice already settled
+  // (paid via QuickBooks Payments or keyed there manually), refuse to ask the
+  // customer for money EveryStep doesn't know was collected.
+  const qboPreflight = await checkQboBalanceBeforeCollection({
+    supabase: params.supabase,
+    accountOwnerUserId,
+    invoiceId,
+    collectAmountCents: paymentSummary.balanceDueCents,
+  });
+  if (qboPreflight.blocked) {
+    throw new Error(qboPreflight.message);
   }
 
   const readiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, params.supabase);

@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import { getStripeServerClient } from "@/lib/business/platform-billing-stripe";
 import { resolveInvoiceCollectedPaymentSummary } from "@/lib/business/internal-invoice-payments";
+import { checkQboBalanceBeforeCollection } from "@/lib/qbo/qbo-collection-preflight";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import {
   calculatePlatformApplicationFeeAmountCents,
@@ -106,6 +107,42 @@ export async function submitSavedMethodAttemptThroughStripe(
     feeBasisPoints: platformFeeConfig.feeBasisPoints,
     enabled: platformFeeConfig.enabled,
   });
+  // Double-collection guard: this is the last gate before charging a stored
+  // card (manual and scheduled autopay both submit through here). If
+  // QuickBooks shows the invoice already settled outside EveryStep, block the
+  // charge as a precondition failure instead of double-charging the customer.
+  const qboPreflight = await checkQboBalanceBeforeCollection({
+    supabase: admin,
+    accountOwnerUserId,
+    invoiceId,
+    collectAmountCents: amountCents,
+  });
+  if (qboPreflight.blocked) {
+    const { error: blockUpdateErr } = await admin
+      .from("tenant_saved_method_payment_attempts")
+      .update({
+        attempt_status: "blocked_precondition",
+        failure_code: "qbo_shows_invoice_settled",
+        failure_message: qboPreflight.message,
+        resolved_at: nowIso(),
+        updated_at: nowIso(),
+      })
+      .eq("id", attemptId);
+    if (blockUpdateErr) {
+      throw new Error(
+        `Failed to record QBO-settled block on saved-method attempt: ${blockUpdateErr.message ?? "unknown error"}`,
+      );
+    }
+    return {
+      ok: true,
+      attemptId,
+      attemptStatus: "blocked_precondition",
+      stripePaymentIntentId: null,
+      failureCode: "qbo_shows_invoice_settled",
+      failureMessage: qboPreflight.message,
+    };
+  }
+
   const paymentIntentPayload: Stripe.PaymentIntentCreateParams = {
     amount: amountCents,
     currency: "usd",

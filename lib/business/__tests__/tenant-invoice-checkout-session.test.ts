@@ -13,6 +13,13 @@ vi.mock("@/lib/business/tenant-stripe-connect-readiness", () => ({
     resolveTenantStripeConnectReadinessMock(...args),
 }));
 
+const checkQboBalanceBeforeCollectionMock = vi.fn(async (..._args: unknown[]) => ({ blocked: false, checked: false }));
+
+vi.mock("@/lib/qbo/qbo-collection-preflight", () => ({
+  checkQboBalanceBeforeCollection: (...args: unknown[]) =>
+    checkQboBalanceBeforeCollectionMock(...args),
+}));
+
 type SupabaseFixtureOptions = {
   invoiceStatus?: string;
   invoiceTotalCents?: number;
@@ -103,6 +110,8 @@ describe("createTenantInvoiceCheckoutSession", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    checkQboBalanceBeforeCollectionMock.mockResolvedValue({ blocked: false, checked: false });
+
     resolveTenantStripeConnectReadinessMock.mockResolvedValue({
       connectedAccountId: "acct_connected_1",
       onboardingStatus: "complete",
@@ -113,6 +122,32 @@ describe("createTenantInvoiceCheckoutSession", () => {
       lastSyncedAt: "2026-05-19T00:00:00.000Z",
       isReady: true,
     });
+  });
+
+  it("refuses to create a checkout session when QuickBooks shows the invoice already settled", async () => {
+    checkQboBalanceBeforeCollectionMock.mockResolvedValue({
+      blocked: true,
+      qboBalanceCents: 0,
+      message: "QuickBooks shows invoice 2116 with only $0.00 left to collect, but this request is for $100.00. A payment may already exist outside EveryStep — reconcile in QuickBooks before collecting again.",
+    } as any);
+    const fixture = buildSupabaseFixture();
+    const createMock = vi.fn();
+    const stripe = { checkout: { sessions: { create: createMock } } } as any;
+
+    await expect(
+      createTenantInvoiceCheckoutSession({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        stripe,
+        appUrl: "http://localhost:3000",
+      }),
+    ).rejects.toThrow(/QuickBooks shows invoice 2116/);
+    expect(createMock).not.toHaveBeenCalled();
+    expect(checkQboBalanceBeforeCollectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ accountOwnerUserId: "owner-1", invoiceId: "inv-1", collectAmountCents: 10000 }),
+    );
   });
 
   it("ready connected account creates checkout session using stripeAccount", async () => {
