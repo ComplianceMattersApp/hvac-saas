@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { resolve } from "path";
 import { describe, expect, it } from "vitest";
+import { cameraInputBlock } from "./camera-input-block";
 
 const jobTestsPageSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/tests/page.tsx"),
@@ -239,6 +240,8 @@ describe("job tests page wiring", () => {
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('Upload Photo');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('capture="environment"');
     expect(refrigerantChargePhotoEvidencePanelSource.match(/capture=/g) ?? []).toHaveLength(1);
+    expect(cameraInputBlock(refrigerantChargePhotoEvidencePanelSource)).toContain('capture="environment"');
+    expect(cameraInputBlock(refrigerantChargePhotoEvidencePanelSource)).not.toContain('multiple');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('evidenceContext = "refrigerant_charge_photo"');
     expect(refrigerantBlock).toContain('saveWithParentForm');
     expect(refrigerantChargePhotoEvidencePanelSource).toContain('form.addEventListener("submit", handleSubmit)');

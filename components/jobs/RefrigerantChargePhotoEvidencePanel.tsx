@@ -65,8 +65,10 @@ export default function RefrigerantChargePhotoEvidencePanel({
   }
 
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    setPendingFiles(files);
+    const picked = Array.from(event.target.files ?? []);
+    // The camera returns one shot per tap, so keep earlier shots instead of replacing them.
+    const fromCamera = event.target === takePhotoRef.current;
+    setPendingFiles((prev) => (fromCamera ? [...prev, ...picked] : picked));
     event.target.value = "";
   }
 
@@ -185,12 +187,13 @@ export default function RefrigerantChargePhotoEvidencePanel({
 
   return (
     <div ref={rootRef} className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700">
+      {/* No `multiple` here: iOS Safari and Chrome ignore `capture` when `multiple` is set
+          and fall back to the library picker, which makes this button a duplicate of Upload. */}
       <input
         ref={takePhotoRef}
         type="file"
         accept="image/*"
         capture="environment"
-        multiple
         onChange={onPickFiles}
         className="hidden"
         disabled={isPending}

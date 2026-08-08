@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { cameraInputBlock } from "./camera-input-block";
 import {
   buildEquipmentLabelPhotoCaption,
   EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG,
@@ -69,6 +70,15 @@ describe("equipment label photo evidence", () => {
     expect(equipmentCreateFormSource).toContain("onSavedChange={setHasLabelPhotoEvidence}");
     expect(equipmentPhotoPanelSource).toContain("onSavedChange?.(true)");
     expect(equipmentEditCardSource).toContain("<EquipmentLabelPhotoEvidencePanel");
+  });
+
+  it("opens the camera for Take Label Photo instead of falling back to the library picker", () => {
+    const cameraInput = cameraInputBlock(equipmentPhotoPanelSource);
+    expect(cameraInput).toContain('capture="environment"');
+    // `multiple` alongside `capture` makes browsers ignore `capture`.
+    expect(cameraInput).not.toContain("multiple");
+    // Camera shots arrive one per tap, so they must accumulate rather than replace.
+    expect(equipmentPhotoPanelSource).toContain("const fromCamera = event.target === takePhotoRef.current;");
   });
 
   it("saves a selected label photo through the equipment form's final action", () => {

@@ -77,7 +77,10 @@ export default function EquipmentLabelPhotoEvidencePanel({
   }
 
   function onPickFiles(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
+    const picked = Array.from(event.target.files ?? []);
+    // The camera returns one shot per tap, so keep earlier shots instead of replacing them.
+    const fromCamera = event.target === takePhotoRef.current;
+    const files = fromCamera ? [...pendingFiles, ...picked] : picked;
     setPendingFiles(files);
     onSavedChange?.(files.length > 0 || savedCount > 0);
     event.target.value = "";
@@ -209,12 +212,13 @@ export default function EquipmentLabelPhotoEvidencePanel({
 
   return (
     <div ref={rootRef} className={isActionVariant ? "min-w-0 text-xs text-slate-700" : "border-t border-slate-200 pt-3 text-xs text-slate-700"}>
+      {/* No `multiple` here: iOS Safari and Chrome ignore `capture` when `multiple` is set
+          and fall back to the library picker, which makes this button a duplicate of Upload. */}
       <input
         ref={takePhotoRef}
         type="file"
         accept="image/*"
         capture="environment"
-        multiple
         onChange={onPickFiles}
         className="hidden"
         disabled={isPending}
