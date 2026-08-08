@@ -43,12 +43,12 @@ async function main() {
   const { data, error } = await supabase
     .from("jobs")
     .select(
-      "id, title, status, ops_status, scheduled_date, on_the_way_at, field_complete, pending_info_reason, on_hold_reason, updated_at",
+      "id, title, status, ops_status, scheduled_date, on_the_way_at, field_complete, pending_info_reason, on_hold_reason, created_at",
     )
     .in("status", ACTIVE_FIELD_STATUSES)
     .in("ops_status", EXCEPTION_OPS_STATUSES)
     .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
+    .order("on_the_way_at", { ascending: true, nullsFirst: false });
 
   if (error) throw error;
 
@@ -61,7 +61,7 @@ async function main() {
     console.log(`    ${String(row.title ?? "").slice(0, 60)}`);
     console.log(`    status=${row.status}  ops_status=${row.ops_status}  field_complete=${row.field_complete}`);
     console.log(`    on_the_way_at=${row.on_the_way_at ?? "—"} (${daysSince(row.on_the_way_at)} ago)`);
-    console.log(`    last updated ${daysSince(row.updated_at)} ago`);
+    console.log(`    created ${daysSince(row.created_at)} ago`);
     if (reason) console.log(`    reason: ${reason.slice(0, 80)}`);
     console.log("");
   }
