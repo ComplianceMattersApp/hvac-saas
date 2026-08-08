@@ -1564,40 +1564,11 @@ export default async function InternalInvoiceWorkspacePage({
               )}
             </section>
 
-            {invoicePaymentLinkUiState.showPanel && canManageFinancialInvoiceLifecycle ? (
-              <section className={`${panelClass} order-30 p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Link</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Create a customer payment link</h2>
-
-                {invoicePaymentLinkUiState.showCreateButton ? (
-                  <TenantInvoicePaymentLinkPanel
-                    jobId={jobId}
-                    invoiceId={invoice.id}
-                    returnTo={returnTo}
-                    balanceDueDisplay={formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? 0)}
-                    initialCheckoutSessionId={checkoutSessionIdFromQuery}
-                    initialCheckoutSessionUrl={checkoutSessionUrlFromQuery}
-                  />
-                ) : (
-                  <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-sm leading-6 text-amber-900">
-                    <div className="font-semibold">Stripe Connect setup required</div>
-                    <div className="mt-1">
-                      Online customer payment links stay disabled until the company Stripe Connect account is ready.
-                    </div>
-                    <div className="mt-3">
-                      <Link
-                        href={invoicePaymentLinkUiState.setupHref}
-                        className="inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition-[background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
-                      >
-                        Open company profile Stripe setup
-                      </Link>
-                    </div>
-                  </div>
-                )}
-              </section>
-            ) : null}
-
-            {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
+            {/* Only rendered when there is something to review. An empty-state card on
+                a healthy invoice was noise, and Payment History already reports failed
+                and reversed payments as not collected. */}
+            {invoice.status === "issued" && canManageFinancialInvoiceLifecycle
+              && failedAutopayAttentionItems.length > 0 ? (
               <section className={`${panelClass} order-20 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Failed Attempts</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Review failed attempts</h2>
@@ -1605,90 +1576,82 @@ export default async function InternalInvoiceWorkspacePage({
                   Failed attempt - invoice is still unpaid. Review before retrying. Failed attempts are not counted as collected payment.
                 </p>
 
-                {failedAutopayAttentionItems.length === 0 ? (
-                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
-                    No open payment failures for this invoice.
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Open Items</div>
+                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttentionItems.length}</div>
                   </div>
-                ) : (
-                  <>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Open Items</div>
-                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttentionItems.length}</div>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Authentication Required</div>
-                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttention?.countsByCategory.authentication_required ?? 0}</div>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Declined</div>
-                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttention?.countsByCategory.payment_declined ?? 0}</div>
-                      </div>
-                    </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Authentication Required</div>
+                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttention?.countsByCategory.authentication_required ?? 0}</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Declined</div>
+                    <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttention?.countsByCategory.payment_declined ?? 0}</div>
+                  </div>
+                </div>
 
-                    <div className="mt-4 space-y-2">
-                      {failedAutopayAttentionItems.map((item) => (
-                        <div key={item.attemptId} className="rounded-xl border border-amber-200/80 bg-amber-50/50 px-3 py-3 text-sm text-slate-700">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="font-semibold text-slate-900">
-                              {formatAutopayAttentionCategoryLabel(item.attentionCategory)}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-700">
-                                {item.attemptStatus.replaceAll("_", " ")}
-                              </span>
-                              <span className="text-xs text-slate-500">
-                                {item.lastAttemptAt ? formatTimestampDateDisplayLA(item.lastAttemptAt) : "Timestamp unavailable"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-1 text-xs text-slate-700">
-                            Recommended operator action: <span className="font-semibold text-slate-900">{formatAutopayAttentionActionLabel(item.recommendedOperatorAction)}</span>
-                          </div>
-                          {item.failureMessage ? (
-                            <div className="mt-1 text-xs text-slate-600">Failure: {item.failureMessage}</div>
-                          ) : null}
-                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
-                            {item.failureCode ? <span>Code: {item.failureCode}</span> : null}
-                            {item.blockedReasonCode ? <span>Blocked: {item.blockedReasonCode}</span> : null}
-                            {item.requiresActionType ? <span>Action Type: {item.requiresActionType}</span> : null}
-                            <span>Retry Count: {item.retryCount}</span>
-                            {item.nextRetryAt ? <span>Next Retry: {formatTimestampDateDisplayLA(item.nextRetryAt)}</span> : null}
-                            {item.paymentMethod.last4 ? (
-                              <span>
-                                Method: {item.paymentMethod.brand || "card"} •••• {item.paymentMethod.last4}
-                              </span>
-                            ) : null}
-                            {item.consent.consentStatus ? <span>Consent: {item.consent.consentStatus}</span> : null}
-                          </div>
-                          {canShowFailedAutopayRetryControl ? (
-                            <form
-                              action={retryFailedScheduledAutopayAttemptFromForm}
-                              className="mt-3 rounded-lg border border-amber-200 bg-white/90 px-3 py-3"
-                            >
-                              <input type="hidden" name="job_id" value={jobId} />
-                              <input type="hidden" name="invoice_id" value={invoice.id} />
-                              <input type="hidden" name="failed_attempt_id" value={item.attemptId} />
-                              <input type="hidden" name="return_to" value={returnTo} />
-                              <input
-                                type="hidden"
-                                name="retry_reason"
-                                value="manual_retry_from_invoice_workspace"
-                              />
-                              <div className="text-sm font-semibold text-slate-950">Retry saved card</div>
-                              <div className="mt-1 text-xs leading-5 text-slate-600">
-                                This will attempt the saved payment method again. Collected payment updates only after Stripe confirms the result.
-                              </div>
-                              <SubmitButton loadingText="Retrying..." className={`${secondaryButtonClass} mt-3`}>
-                                Retry saved card
-                              </SubmitButton>
-                            </form>
-                          ) : null}
+                <div className="mt-4 space-y-2">
+                  {failedAutopayAttentionItems.map((item) => (
+                    <div key={item.attemptId} className="rounded-xl border border-amber-200/80 bg-amber-50/50 px-3 py-3 text-sm text-slate-700">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-semibold text-slate-900">
+                          {formatAutopayAttentionCategoryLabel(item.attentionCategory)}
                         </div>
-                      ))}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-700">
+                            {item.attemptStatus.replaceAll("_", " ")}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {item.lastAttemptAt ? formatTimestampDateDisplayLA(item.lastAttemptAt) : "Timestamp unavailable"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-700">
+                        Recommended operator action: <span className="font-semibold text-slate-900">{formatAutopayAttentionActionLabel(item.recommendedOperatorAction)}</span>
+                      </div>
+                      {item.failureMessage ? (
+                        <div className="mt-1 text-xs text-slate-600">Failure: {item.failureMessage}</div>
+                      ) : null}
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                        {item.failureCode ? <span>Code: {item.failureCode}</span> : null}
+                        {item.blockedReasonCode ? <span>Blocked: {item.blockedReasonCode}</span> : null}
+                        {item.requiresActionType ? <span>Action Type: {item.requiresActionType}</span> : null}
+                        <span>Retry Count: {item.retryCount}</span>
+                        {item.nextRetryAt ? <span>Next Retry: {formatTimestampDateDisplayLA(item.nextRetryAt)}</span> : null}
+                        {item.paymentMethod.last4 ? (
+                          <span>
+                            Method: {item.paymentMethod.brand || "card"} •••• {item.paymentMethod.last4}
+                          </span>
+                        ) : null}
+                        {item.consent.consentStatus ? <span>Consent: {item.consent.consentStatus}</span> : null}
+                      </div>
+                      {canShowFailedAutopayRetryControl ? (
+                        <form
+                          action={retryFailedScheduledAutopayAttemptFromForm}
+                          className="mt-3 rounded-lg border border-amber-200 bg-white/90 px-3 py-3"
+                        >
+                          <input type="hidden" name="job_id" value={jobId} />
+                          <input type="hidden" name="invoice_id" value={invoice.id} />
+                          <input type="hidden" name="failed_attempt_id" value={item.attemptId} />
+                          <input type="hidden" name="return_to" value={returnTo} />
+                          <input
+                            type="hidden"
+                            name="retry_reason"
+                            value="manual_retry_from_invoice_workspace"
+                          />
+                          <div className="text-sm font-semibold text-slate-950">Retry saved card</div>
+                          <div className="mt-1 text-xs leading-5 text-slate-600">
+                            This will attempt the saved payment method again. Collected payment updates only after Stripe confirms the result.
+                          </div>
+                          <SubmitButton loadingText="Retrying..." className={`${secondaryButtonClass} mt-3`}>
+                            Retry saved card
+                          </SubmitButton>
+                        </form>
+                      ) : null}
                     </div>
-                  </>
-                )}
+                  ))}
+                </div>
               </section>
             ) : null}
 
@@ -1731,19 +1694,58 @@ export default async function InternalInvoiceWorkspacePage({
                   </form>
                 ) : null}
 
+                {/* Two genuinely different things that both used to be called "Create
+                    payment link", one here and one in a separate card further down:
+                    paying now on this device, and sending the customer a link. Same
+                    card now, and each says which it is. */}
                 {invoicePaymentLinkUiState.showCreateButton ? (
                   <form action={collectTenantInvoicePaymentNowFromForm} className="mt-4 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
                     <input type="hidden" name="job_id" value={jobId} />
                     <input type="hidden" name="invoice_id" value={invoice.id} />
                     <input type="hidden" name="tab" value="info" />
                     <input type="hidden" name="return_to" value={returnTo} />
+                    <div className="text-sm font-semibold text-slate-900">Collect payment now</div>
                     <div className="text-sm leading-6 text-slate-700">
-                      Opens secure Stripe Checkout so the customer can pay this invoice now.
+                      Opens secure Stripe Checkout on this device, for taking payment with the customer present.
                     </div>
                     <SubmitButton loadingText="Opening checkout..." className={darkButtonClass}>
-                      Create payment link
+                      Open checkout now
                     </SubmitButton>
                   </form>
+                ) : null}
+
+                {invoicePaymentLinkUiState.showPanel ? (
+                  <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                    <div className="text-sm font-semibold text-slate-900">Send the customer a payment link</div>
+                    <div className="text-sm leading-6 text-slate-700">
+                      Creates a link the customer can pay from later, on their own device.
+                    </div>
+                    {invoicePaymentLinkUiState.showCreateButton ? (
+                      <TenantInvoicePaymentLinkPanel
+                        jobId={jobId}
+                        invoiceId={invoice.id}
+                        returnTo={returnTo}
+                        balanceDueDisplay={formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? 0)}
+                        initialCheckoutSessionId={checkoutSessionIdFromQuery}
+                        initialCheckoutSessionUrl={checkoutSessionUrlFromQuery}
+                      />
+                    ) : (
+                      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-900">
+                        <div className="font-semibold">Stripe Connect setup required</div>
+                        <div className="mt-1">
+                          Online customer payment links stay disabled until the company Stripe Connect account is ready.
+                        </div>
+                        <div className="mt-3">
+                          <Link
+                            href={invoicePaymentLinkUiState.setupHref}
+                            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition-[background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
+                          >
+                            Open company profile Stripe setup
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 ) : null}
 
                 {paymentSummary ? (

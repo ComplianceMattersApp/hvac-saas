@@ -34,8 +34,15 @@ describe("internal invoice workspace saved-card charge wiring", () => {
   });
 
   it("keeps lifecycle and payment controls behind financial lifecycle authorization", () => {
-    expect(source).toContain("invoicePaymentLinkUiState.showPanel && canManageFinancialInvoiceLifecycle");
+    // The payment link panel moved inside Collection Actions, so it is now covered by
+    // that section's issued + financial-lifecycle gate rather than one of its own.
     expect(source).toContain("invoice.status === \"issued\" && canManageFinancialInvoiceLifecycle");
+    const collectionActionsIndex = source.indexOf('id="invoice-payment-actions"');
+    const paymentLinkPanelIndex = source.indexOf("<TenantInvoicePaymentLinkPanel");
+    expect(collectionActionsIndex).toBeGreaterThan(-1);
+    expect(paymentLinkPanelIndex).toBeGreaterThan(collectionActionsIndex);
+    // Exactly one payment-link panel: it used to render in a second standalone card.
+    expect(source.split("<TenantInvoicePaymentLinkPanel").length - 1).toBe(1);
     expect(source).toContain("const canIssueInvoiceLifecycle = hasInvoiceIssueAccess(fieldBillingCapabilities)");
     expect(source).toContain("const canSendInvoiceLifecycle = hasInvoiceSendAccess(fieldBillingCapabilities)");
     expect(source).toContain("invoice.status === \"draft\" && canIssueInvoiceLifecycle");
@@ -231,7 +238,12 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Card collection is not enabled for your role.");
     expect(source).toContain("Online payments are not ready.");
     expect(source).toContain("Record Received Payment is final payment truth.");
-    expect(source).toContain("Create payment link");
+    // Paying now on this device and sending the customer a link are different
+    // actions that were both labelled "Create payment link". Each names itself now.
+    expect(source).toContain("Collect payment now");
+    expect(source).toContain("Open checkout now");
+    expect(source).toContain("Send the customer a payment link");
+    expect(source).toContain("action={collectTenantInvoicePaymentNowFromForm}");
     expect(source).toContain("Record Received Payment");
     expect(source).toContain("collectTenantInvoicePaymentNowFromForm");
     expect(source).toContain("recordInternalInvoicePaymentFromForm");

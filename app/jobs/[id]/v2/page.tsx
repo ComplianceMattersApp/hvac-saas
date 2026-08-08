@@ -56,10 +56,12 @@ import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-pro
 import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { buildJobBillingStateReadModel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import {
+  normalizeInternalInvoiceStatus,
   resolveInternalInvoiceByJobId,
   resolveInternalInvoiceJobShareCents,
   resolveJobAddOnInvoicesWithLines,
 } from "@/lib/business/internal-invoice";
+import { resolveInvoiceCollectedPaymentSummary } from "@/lib/business/internal-invoice-payments";
 import {
   buildInvoiceFamilyBillingView,
   resolveVisitScopeItemPriceDisplay,
@@ -659,6 +661,28 @@ export default async function JobDetailV2Page({
   const addOnInvoiceRows = primaryInvoiceRaw
     ? await resolveJobAddOnInvoicesWithLines({ supabase, jobId })
     : [];
+
+  // This page had no payment data at all, so closeout state was its only notion of
+  // "done" — which let an issued, wholly uncollected invoice read as fully closed out.
+  const invoiceFamilyPaymentSummaries = primaryInvoiceRaw
+    ? await Promise.all(
+        [String(primaryInvoiceRaw.id), ...addOnInvoiceRows.map((addOn) => addOn.id)].map(
+          (invoiceId) =>
+            resolveInvoiceCollectedPaymentSummary(accountOwnerUserId, invoiceId, supabase),
+        ),
+      )
+    : [];
+  const invoiceFamilyBalanceDueCents = invoiceFamilyPaymentSummaries.reduce(
+    (total, summary) => total + (Number(summary?.balanceDueCents ?? 0) || 0),
+    0,
+  );
+  const hasOutstandingInvoiceBalance =
+    normalizeInternalInvoiceStatus(primaryInvoiceRaw?.status) === "issued" &&
+    invoiceFamilyBalanceDueCents > 0;
+  const invoiceFamilyBalanceText = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(invoiceFamilyBalanceDueCents / 100);
   const {
     billedLines: visitScopeBilledLines,
     unlinkedCharges: unlinkedInvoiceCharges,
@@ -939,6 +963,11 @@ export default async function JobDetailV2Page({
     if (closeoutNeeds.needsCerts && closeoutNeeds.needsInvoice) return "Field work complete — send certs and invoice to close this job.";
     if (closeoutNeeds.needsCerts) return "Field work complete — send certs to close this job.";
     if (closeoutNeeds.needsInvoice) return "Invoice needed — send to close out billing.";
+    // Closeout state says nothing about collection, so "fully closed out" claimed a
+    // settled job over an issued invoice with nothing paid against it.
+    if (hasOutstandingInvoiceBalance) {
+      return `Work is closed out — ${invoiceFamilyBalanceText} still due on the invoice.`;
+    }
     return "All done — this job is fully closed out.";
   })();
 
@@ -3821,15 +3850,15 @@ export default async function JobDetailV2Page({
                 style={{
                   padding: "9px 13px",
                   borderRadius: "9px",
-                  border: isFailedUnresolved || hasCloseoutNeeds
+                  border: isFailedUnresolved || hasCloseoutNeeds || hasOutstandingInvoiceBalance
                     ? "1px solid oklch(0.88 0.05 75)"
                     : "1px solid oklch(0.88 0.06 150)",
-                  background: isFailedUnresolved || hasCloseoutNeeds
+                  background: isFailedUnresolved || hasCloseoutNeeds || hasOutstandingInvoiceBalance
                     ? "oklch(0.97 0.025 75)"
                     : "oklch(0.97 0.03 150)",
                   fontSize: "13px",
                   fontWeight: 600,
-                  color: isFailedUnresolved || hasCloseoutNeeds
+                  color: isFailedUnresolved || hasCloseoutNeeds || hasOutstandingInvoiceBalance
                     ? "oklch(0.42 0.09 75)"
                     : "oklch(0.42 0.1 150)",
                   textAlign: "center",
@@ -3839,6 +3868,8 @@ export default async function JobDetailV2Page({
                   ? "Field Complete - Pending"
                   : closeoutNeeds.needsInvoice || closeoutNeeds.needsCerts
                     ? "Field Complete"
+                  : hasOutstandingInvoiceBalance
+                    ? "Balance Due"
                   : "Closed out"}
               </div>
             ) : null}
