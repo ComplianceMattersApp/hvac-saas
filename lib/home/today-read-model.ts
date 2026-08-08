@@ -380,8 +380,39 @@ async function safeQueryAssignedJobIdsForUser(
   }
 }
 
+import {
+  isJobLifecycleExceptionState,
+  isTerminalJobLifecycleState,
+  resolveJobLifecycleState,
+} from "@/lib/jobs/job-lifecycle-state";
+
 const TODAY_JOB_SELECT =
   "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, field_complete_at, deleted_at, created_at";
+
+/**
+ * Whether a job belongs on the Today board as live work.
+ *
+ * The query behind this pulls status=on_the_way / in_process with no date bound and no
+ * ops_status filter. A paused job keeps the field status it stopped at, so a job later
+ * put on hold — or closed outright — stayed on the board as live work indefinitely.
+ *
+ * A job blocked by an exception is still shown when it is scheduled for today, since
+ * that is the day someone has to deal with it; on any other day it is not live work.
+ */
+export function isTodayBoardJob(
+  job: Pick<TodayJobSummary, "status" | "opsStatus" | "scheduledDate">,
+  today: string,
+): boolean {
+  const state = resolveJobLifecycleState({
+    status: job.status,
+    opsStatus: job.opsStatus,
+    hasScheduledAppointment: Boolean(job.scheduledDate),
+  });
+
+  if (isTerminalJobLifecycleState(state)) return false;
+  if (!isJobLifecycleExceptionState(state)) return true;
+  return job.scheduledDate === today;
+}
 
 function normalizeJob(row: any): TodayJobSummary | null {
   const id = String(row?.id ?? "").trim();
@@ -603,7 +634,8 @@ async function safeLoadTodayJobsForRole(params: {
 
     const all: TodayJobSummary[] = ((data ?? []) as unknown[])
       .map((row) => normalizeJob(row))
-      .filter((row: TodayJobSummary | null): row is TodayJobSummary => row != null);
+      .filter((row: TodayJobSummary | null): row is TodayJobSummary => row != null)
+      .filter((row) => isTodayBoardJob(row, today));
 
     // For tech: keep in-progress + today + overdue (date < today) but not field-complete.
     if (role === "tech") {

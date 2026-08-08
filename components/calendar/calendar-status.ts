@@ -1,4 +1,8 @@
 import type { DispatchJob } from '@/lib/actions/calendar';
+import {
+  resolveJobLifecycleState,
+  type JobLifecycleState,
+} from '@/lib/jobs/job-lifecycle-state';
 
 const CALENDAR_STATUS_LABELS: Record<string, string> = {
   open: 'Open',
@@ -64,17 +68,50 @@ export const CALENDAR_STATUS_LEGEND = [
   dot: CALENDAR_STATUS_DOT_CLASSES[key] ?? 'bg-gray-300',
 }));
 
-// Locked hybrid calendar display rule:
-// - use jobs.status for lifecycle/historical markers (cancelled, on_the_way, in_process)
-// - otherwise use jobs.ops_status for operational projection
-export function getCalendarDisplayStatus(job: DispatchJob) {
-  const lifecycleStatus = String(job.status ?? '').trim().toLowerCase();
-  if (lifecycleStatus === 'cancelled') return 'cancelled';
-  if (lifecycleStatus === 'on_the_way') return 'on_my_way';
-  if (lifecycleStatus === 'in_process') return 'in_process';
+const CALENDAR_STATUS_BY_LIFECYCLE_STATE: Record<JobLifecycleState, string> = {
+  linked_active: 'closed',
+  archived: 'cancelled',
+  cancelled: 'cancelled',
+  closed: 'closed',
+  failed: 'failed',
+  pending_office_review: 'pending_office_review',
+  retest_needed: 'retest_needed',
+  waiting: 'on_hold',
+  invoice_required: 'invoice_required',
+  paperwork_required: 'paperwork_required',
+  on_the_way: 'on_my_way',
+  in_process: 'in_process',
+  scheduled: 'scheduled',
+  needs_schedule: 'need_to_schedule',
+  in_progress: 'scheduled',
+};
 
-  const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
-  return opsStatus || 'scheduled';
+// This used to rank jobs.status above jobs.ops_status — the inverse of both job-detail
+// surfaces. Because a paused job keeps the field status it stopped at, a job that was
+// on hold, failed, or closed still showed as "On My Way" here while the job screen
+// reported the blocker. Precedence now comes from the shared resolver; only the
+// calendar's own vocabulary is mapped below.
+export function getCalendarDisplayStatus(job: DispatchJob) {
+  const state = resolveJobLifecycleState({
+    status: job.status,
+    opsStatus: job.ops_status,
+    hasScheduledAppointment: Boolean(
+      (job as { scheduled_date?: unknown }).scheduled_date
+        ?? (job as { window_start?: unknown }).window_start
+        ?? (job as { window_end?: unknown }).window_end,
+    ),
+  });
+
+  // `waiting` collapses pending_info and on_hold, which the calendar legend shows
+  // separately, so keep the specific ops_status when it is one of those.
+  if (state === 'waiting') {
+    const opsStatus = String(job.ops_status ?? '').trim().toLowerCase();
+    return opsStatus === 'pending_info' || opsStatus === 'pending_information'
+      ? opsStatus
+      : 'on_hold';
+  }
+
+  return CALENDAR_STATUS_BY_LIFECYCLE_STATE[state];
 }
 
 export function formatCalendarDisplayStatus(status: string) {
