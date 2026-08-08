@@ -45,6 +45,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createAdminClient: mockCreateAdminClient,
 }));
 
+const mockGetStripeWebhookSecrets = vi.fn(() => ['whsec_test_secret']);
+const mockConstructEvent = vi.fn((payload: string, _signature: string, _secret: string) =>
+  JSON.parse(payload),
+);
+
 vi.mock('@/lib/business/platform-billing-stripe', () => ({
   getPlatformBillingAvailability: vi.fn(() => ({
     checkoutAvailable: true,
@@ -54,9 +59,10 @@ vi.mock('@/lib/business/platform-billing-stripe', () => ({
   })),
   getStripeServerClient: vi.fn(() => ({
     webhooks: {
-      constructEvent: vi.fn((payload: string) => JSON.parse(payload)),
+      constructEvent: mockConstructEvent,
     },
   })),
+  getStripeWebhookSecrets: mockGetStripeWebhookSecrets,
   requireStripeWebhookSecret: vi.fn(() => 'whsec_test_secret'),
   syncPlatformEntitlementFromCheckoutSession: vi.fn(async () => null),
   syncPlatformEntitlementFromStripeSubscriptionEvent: vi.fn(async () => null),
@@ -185,6 +191,55 @@ describe('Stripe webhook route — charge events', () => {
       }),
     );
     expect(mockRecordTenantInvoicePaymentFromCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it('accepts an event that verifies only against the connect destination secret', async () => {
+    mockGetStripeWebhookSecrets.mockReturnValueOnce(['whsec_account', 'whsec_connect']);
+    mockConstructEvent.mockImplementation((payload: string, _signature: string, secret: string) => {
+      if (secret !== 'whsec_connect') throw new Error('No signatures found matching the expected signature for payload.');
+      return JSON.parse(payload);
+    });
+    mockRecordTenantInvoicePaymentFromStripeCharge.mockResolvedValue({
+      recorded: true,
+      paymentId: 'payment-connect-secret',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_connect_secret',
+      account: 'acct_connected_1',
+      type: 'charge.succeeded',
+      data: {
+        object: {
+          id: 'ch_connect_secret',
+          amount: 10000,
+          created: 1747756800,
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            job_id: 'job-1',
+          },
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockConstructEvent).toHaveBeenCalledTimes(2);
+    expect(mockRecordTenantInvoicePaymentFromStripeCharge).toHaveBeenCalledTimes(1);
+    mockConstructEvent.mockImplementation((payload: string) => JSON.parse(payload));
+  });
+
+  it('rejects with 400 when no configured secret verifies the signature', async () => {
+    mockGetStripeWebhookSecrets.mockReturnValueOnce(['whsec_account', 'whsec_connect']);
+    mockConstructEvent.mockImplementation(() => {
+      throw new Error('No signatures found matching the expected signature for payload.');
+    });
+
+    const response = await postWebhook({ id: 'evt_bad_sig', type: 'charge.succeeded', data: { object: {} } });
+
+    expect(response.status).toBe(400);
+    expect(mockConstructEvent).toHaveBeenCalledTimes(2);
+    expect(mockRecordTenantInvoicePaymentFromStripeCharge).not.toHaveBeenCalled();
+    mockConstructEvent.mockImplementation((payload: string) => JSON.parse(payload));
   });
 
   it('routes payment-mode checkout.session.expired to pending-payment close', async () => {

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import {
   getPlatformBillingAvailability,
   getStripeServerClient,
-  requireStripeWebhookSecret,
+  getStripeWebhookSecrets,
   syncPlatformEntitlementFromCheckoutSession,
   syncPlatformEntitlementFromStripeSubscriptionEvent,
 } from "@/lib/business/platform-billing-stripe";
@@ -94,16 +94,23 @@ export async function POST(request: Request) {
   }
 
   const stripe = getStripeServerClient();
-  let event: Stripe.Event;
+  let event: Stripe.Event | null = null;
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      payload,
-      signature,
-      requireStripeWebhookSecret(),
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Invalid Stripe signature.";
+  // One secret per Stripe event destination (account-scoped + connected-accounts),
+  // both pointed at this endpoint — verify against each until one matches.
+  let verificationError: unknown = null;
+  for (const secret of getStripeWebhookSecrets()) {
+    try {
+      event = stripe.webhooks.constructEvent(payload, signature, secret);
+      break;
+    } catch (error) {
+      verificationError = error;
+    }
+  }
+  if (!event) {
+    const message = verificationError instanceof Error
+      ? verificationError.message
+      : "Invalid Stripe signature.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 

@@ -194,6 +194,18 @@ export function requireStripeWebhookSecret() {
   return secret;
 }
 
+/**
+ * All signing secrets the webhook route should try, in order. Stripe issues one
+ * secret per event destination, and this platform uses two destinations pointed
+ * at the same endpoint: the account-scoped destination (STRIPE_WEBHOOK_SECRET,
+ * platform subscription billing) and the connected-accounts destination
+ * (STRIPE_CONNECT_WEBHOOK_SECRET, tenant customer payments).
+ */
+export function getStripeWebhookSecrets(): string[] {
+  const connectSecret = toCleanString(process.env.STRIPE_CONNECT_WEBHOOK_SECRET);
+  return [requireStripeWebhookSecret(), ...(connectSecret ? [connectSecret] : [])];
+}
+
 export function requireStripePriceId() {
   const priceId = toCleanString(process.env.STRIPE_PRICE_ID);
   if (!priceId) throw new Error("STRIPE_PRICE_ID is not configured.");
