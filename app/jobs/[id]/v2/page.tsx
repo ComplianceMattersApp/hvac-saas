@@ -226,6 +226,11 @@ function deriveStatusPill(
 ): StatusPill {
   if (status === "cancelled")
     return { label: "CANCELLED", bg: "oklch(0.96 0.004 250)", fg: "oklch(0.55 0.015 262)", dot: "oklch(0.7 0.02 262)" };
+  // Terminal state has to outrank the scheduled check below. A closed job keeps its
+  // appointment date, so hasScheduledAppointment stayed true and a job that was long
+  // finished still announced itself as SCHEDULED.
+  if (opsStatus === "closed")
+    return { label: "CLOSED", bg: "oklch(0.95 0.04 150)", fg: "oklch(0.45 0.13 150)", dot: "oklch(0.58 0.13 150)" };
   if (status === "on_the_way")
     return { label: "ON THE WAY", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
   if (status === "in_process")

@@ -182,6 +182,28 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).not.toContain('"Failure unresolved"');
   });
 
+  it("does not label a closed job as scheduled", () => {
+    // A closed job keeps its appointment date, so hasScheduledAppointment stays true.
+    // The terminal branch has to be evaluated before the scheduled one or a finished
+    // job announces itself as SCHEDULED forever.
+    const closedBranch = source.indexOf('if (opsStatus === "closed")');
+    const scheduledBranch = source.indexOf('if (opsStatus === "scheduled" || hasScheduledAppointment)');
+
+    expect(closedBranch).toBeGreaterThan(-1);
+    expect(scheduledBranch).toBeGreaterThan(-1);
+    expect(closedBranch).toBeLessThan(scheduledBranch);
+  });
+
+  it("reports an outstanding invoice balance instead of a fully closed-out job", () => {
+    const balanceBranch = source.indexOf("if (hasOutstandingInvoiceBalance) {");
+    const allDone = source.indexOf('return "All done');
+
+    expect(balanceBranch).toBeGreaterThan(-1);
+    expect(balanceBranch).toBeLessThan(allDone);
+    expect(source).toContain('"Balance Due"');
+    expect(source).toContain("still due on the invoice.");
+  });
+
   it("does not describe unresolved failed jobs as fully closed out", () => {
     const failedBranch = source.indexOf('return "Field complete - pending closeout.";');
     const allDoneBranch = source.indexOf('return "All done');
