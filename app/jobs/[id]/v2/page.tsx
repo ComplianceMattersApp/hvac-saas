@@ -63,6 +63,10 @@ import {
 } from "@/lib/business/internal-invoice";
 import { resolveInvoiceCollectedPaymentSummary } from "@/lib/business/internal-invoice-payments";
 import {
+  resolveJobLifecycleState,
+  type JobLifecycleState,
+} from "@/lib/jobs/job-lifecycle-state";
+import {
   buildInvoiceFamilyBillingView,
   resolveVisitScopeItemPriceDisplay,
 } from "@/lib/business/visit-scope-billing";
@@ -219,41 +223,35 @@ type StatusPill = {
   dot: string;
 };
 
+const STATUS_PILL_BY_LIFECYCLE_STATE: Record<JobLifecycleState, StatusPill> = {
+  linked_active: { label: "LINKED ACTIVE JOB", bg: "oklch(0.96 0.004 250)", fg: "oklch(0.55 0.015 262)", dot: "oklch(0.7 0.02 262)" },
+  archived: { label: "ARCHIVED", bg: "oklch(0.96 0.004 250)", fg: "oklch(0.55 0.015 262)", dot: "oklch(0.7 0.02 262)" },
+  cancelled: { label: "CANCELLED", bg: "oklch(0.96 0.004 250)", fg: "oklch(0.55 0.015 262)", dot: "oklch(0.7 0.02 262)" },
+  closed: { label: "CLOSED", bg: "oklch(0.95 0.04 150)", fg: "oklch(0.45 0.13 150)", dot: "oklch(0.58 0.13 150)" },
+  failed: { label: "FAILED", bg: "oklch(0.96 0.04 25)", fg: "oklch(0.5 0.12 25)", dot: "oklch(0.58 0.18 25)" },
+  pending_office_review: { label: "REVIEW NEEDED", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" },
+  retest_needed: { label: "RETEST NEEDED", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" },
+  waiting: { label: "WAITING", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" },
+  invoice_required: { label: "INVOICE REQUIRED", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" },
+  paperwork_required: { label: "PAPERWORK REQUIRED", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" },
+  on_the_way: { label: "ON THE WAY", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" },
+  in_process: { label: "IN PROGRESS · ON SITE", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" },
+  scheduled: { label: "SCHEDULED", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" },
+  needs_schedule: { label: "NEEDS SCHEDULE", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" },
+  in_progress: { label: "IN PROGRESS", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" },
+};
+
+// Precedence lives in resolveJobLifecycleState so this surface and mobile cannot
+// disagree about the job's state; only the presentation below is desktop-specific.
 function deriveStatusPill(
   status: string,
   opsStatus: string,
   hasScheduledAppointment = false,
+  deletedAt: unknown = null,
 ): StatusPill {
-  if (status === "cancelled")
-    return { label: "CANCELLED", bg: "oklch(0.96 0.004 250)", fg: "oklch(0.55 0.015 262)", dot: "oklch(0.7 0.02 262)" };
-  // Terminal state has to outrank the scheduled check below. A closed job keeps its
-  // appointment date, so hasScheduledAppointment stayed true and a job that was long
-  // finished still announced itself as SCHEDULED.
-  if (opsStatus === "closed")
-    return { label: "CLOSED", bg: "oklch(0.95 0.04 150)", fg: "oklch(0.45 0.13 150)", dot: "oklch(0.58 0.13 150)" };
-  if (status === "on_the_way")
-    return { label: "ON THE WAY", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
-  if (status === "in_process")
-    return { label: "IN PROGRESS · ON SITE", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
-  if (opsStatus === "scheduled" || hasScheduledAppointment)
-    return { label: "SCHEDULED", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
-  if (opsStatus === "need_to_schedule" || (!status || status === "open"))
-    return { label: "NEEDS SCHEDULE", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
-  if (opsStatus === "pending_info")
-    return { label: "PENDING INFO", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
-  if (opsStatus === "on_hold")
-    return { label: "ON HOLD", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
-  if (opsStatus === "failed" || status === "failed")
-    return { label: "FAILED", bg: "oklch(0.96 0.04 25)", fg: "oklch(0.5 0.12 25)", dot: "oklch(0.58 0.18 25)" };
-  if (opsStatus === "retest_needed")
-    return { label: "RETEST NEEDED", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
-  if (opsStatus === "invoice_required")
-    return { label: "INVOICE REQUIRED", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
-  if (opsStatus === "paperwork_required")
-    return { label: "PAPERWORK REQUIRED", bg: "oklch(0.96 0.05 75)", fg: "oklch(0.5 0.12 65)", dot: "oklch(0.72 0.15 70)" };
-  if (opsStatus === "closed" || status === "completed")
-    return { label: "CLOSED", bg: "oklch(0.95 0.04 150)", fg: "oklch(0.45 0.13 150)", dot: "oklch(0.58 0.13 150)" };
-  return { label: "IN PROGRESS", bg: "oklch(0.96 0.025 255)", fg: "oklch(0.5 0.13 255)", dot: "oklch(0.55 0.17 255)" };
+  return STATUS_PILL_BY_LIFECYCLE_STATE[
+    resolveJobLifecycleState({ status, opsStatus, hasScheduledAppointment, deletedAt })
+  ];
 }
 
 type FieldStepState = "done" | "now" | "todo";
@@ -655,7 +653,7 @@ export default async function JobDetailV2Page({
     scheduledAppointmentWindowText,
   ].filter(Boolean).join(" - ");
 
-  const statusPill = deriveStatusPill(status, opsStatus, hasScheduledAppointment);
+  const statusPill = deriveStatusPill(status, opsStatus, hasScheduledAppointment, (job as any).deleted_at);
   const fieldSteps = deriveFieldSteps(status, fieldComplete);
 
   const visitScopeItems = sanitizeVisitScopeItems(job.visit_scope_items);

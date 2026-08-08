@@ -1,5 +1,9 @@
 // app/jobs/[id]/_components/MobileJobDetailV2Preview
 
+import {
+  isJobLifecycleExceptionState,
+  resolveJobLifecycleState,
+} from "@/lib/jobs/job-lifecycle-state";
 import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";
 import MobileJobSchedulePanel from "./MobileJobSchedulePanel";
 import MobileJobTeamNotesPanel from "./MobileJobTeamNotesPanel";
@@ -99,24 +103,45 @@ function getLifecycleExceptionLabel(props: {
   showLinkedRetestCreated: boolean;
   hasOutstandingInvoiceBalance?: boolean;
 }) {
-  const status = String(props.job?.status ?? "").trim().toLowerCase();
-  const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
-  const waitingLabel = getWaitingStateLabel(props.activeWaitingState, props.job);
+  // Precedence comes from the shared resolver so this ribbon and the desktop status
+  // pill cannot disagree about the job's state; only the wording below is mobile's.
+  const state = resolveJobLifecycleState({
+    status: props.job?.status,
+    opsStatus: props.job?.ops_status,
+    deletedAt: props.job?.deleted_at,
+    isLinkedToActiveJob:
+      props.isHistoricalServiceFollowUpContinued || props.showLinkedRetestCreated,
+  });
 
-  if (props.isHistoricalServiceFollowUpContinued || props.showLinkedRetestCreated) return "Linked active job";
-  if (opsStatus === "archived" || props.job?.deleted_at) return "Archived";
-  if (status === "cancelled") return "Job cancelled";
-  // Closing a job is an operational milestone, not a financial one. Saying only
-  // "Job closed" over an unpaid invoice reads as nothing being owed.
-  if (opsStatus === "closed") {
-    return props.hasOutstandingInvoiceBalance ? "Invoice still open" : "Job closed";
+  if (!isJobLifecycleExceptionState(state)) return "";
+
+  switch (state) {
+    case "linked_active":
+      return "Linked active job";
+    case "archived":
+      return "Archived";
+    case "cancelled":
+      return "Job cancelled";
+    case "closed":
+      // Closing a job is an operational milestone, not a financial one. Saying only
+      // "Job closed" over an unpaid invoice reads as nothing being owed.
+      return props.hasOutstandingInvoiceBalance ? "Invoice still open" : "Job closed";
+    case "failed":
+      return "Correction needed";
+    case "pending_office_review":
+      return "Review needed";
+    case "retest_needed":
+      return "Retest needed";
+    case "invoice_required":
+      return "Invoice required";
+    case "paperwork_required":
+      return "Paperwork required";
+    case "waiting":
+      // Prefer the specific blocker reason when one was recorded.
+      return getWaitingStateLabel(props.activeWaitingState, props.job) || "Waiting";
+    default:
+      return "";
   }
-  if (waitingLabel) return waitingLabel;
-  if (opsStatus === "failed") return "Correction needed";
-  if (opsStatus === "pending_office_review") return "Review needed";
-  if (opsStatus === "retest_needed") return "Retest needed";
-
-  return "";
 }
 
 function getWaitingStateLabel(activeWaitingState: any, job: any) {

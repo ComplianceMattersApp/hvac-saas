@@ -103,8 +103,6 @@ describe("desktop job detail V2 billing brief", () => {
   });
 
   it("uses scheduled appointment fields before falling back to needs-schedule display", () => {
-    const scheduledBranch = source.indexOf('if (opsStatus === "scheduled" || hasScheduledAppointment)');
-    const needsScheduleBranch = source.indexOf('if (opsStatus === "need_to_schedule" || (!status || status === "open"))');
     const headerBandIndex = source.indexOf("{/* header band */}");
     const jobBriefIndex = source.indexOf("{/* ── JOB BRIEF");
     const nextActionIndex = source.indexOf("{/* NEXT ACTION group */}");
@@ -119,10 +117,7 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).toContain('const scheduledAppointmentWindowText = formatStandardWindowLA(job.window_start, job.window_end);');
     expect(source).toContain("{scheduledAppointmentDateText}");
     expect(source).toContain("{scheduledAppointmentWindowText}");
-    expect(source).toContain('deriveStatusPill(status, opsStatus, hasScheduledAppointment)');
-    expect(scheduledBranch).toBeGreaterThan(-1);
-    expect(needsScheduleBranch).toBeGreaterThan(-1);
-    expect(scheduledBranch).toBeLessThan(needsScheduleBranch);
+    expect(source).toContain('deriveStatusPill(status, opsStatus, hasScheduledAppointment, (job as any).deleted_at)');
     expect(source).toContain('Scheduled ${scheduledAppointmentText}. Mark on the way when the tech is heading out.');
     expect(headerBandIndex).toBeGreaterThan(-1);
     expect(jobBriefIndex).toBeGreaterThan(headerBandIndex);
@@ -182,16 +177,12 @@ describe("desktop job detail V2 billing brief", () => {
     expect(source).not.toContain('"Failure unresolved"');
   });
 
-  it("does not label a closed job as scheduled", () => {
-    // A closed job keeps its appointment date, so hasScheduledAppointment stays true.
-    // The terminal branch has to be evaluated before the scheduled one or a finished
-    // job announces itself as SCHEDULED forever.
-    const closedBranch = source.indexOf('if (opsStatus === "closed")');
-    const scheduledBranch = source.indexOf('if (opsStatus === "scheduled" || hasScheduledAppointment)');
-
-    expect(closedBranch).toBeGreaterThan(-1);
-    expect(scheduledBranch).toBeGreaterThan(-1);
-    expect(closedBranch).toBeLessThan(scheduledBranch);
+  it("takes its status pill precedence from the shared lifecycle resolver", () => {
+    // Ordering is asserted behaviourally in job-lifecycle-state.test.ts. What matters
+    // here is that this surface does not rank states itself again.
+    expect(source).toContain("resolveJobLifecycleState({ status, opsStatus, hasScheduledAppointment, deletedAt })");
+    expect(source).toContain("STATUS_PILL_BY_LIFECYCLE_STATE");
+    expect(source).not.toContain('if (opsStatus === "scheduled" || hasScheduledAppointment)');
   });
 
   it("reports an outstanding invoice balance instead of a fully closed-out job", () => {
