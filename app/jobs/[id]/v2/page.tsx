@@ -59,6 +59,11 @@ import {
   resolveInternalInvoiceByJobId,
   resolveInternalInvoiceJobShareCents,
 } from "@/lib/business/internal-invoice";
+import {
+  buildUnlinkedInvoiceCharges,
+  buildVisitScopeBilledLineMap,
+  resolveVisitScopeItemPriceDisplay,
+} from "@/lib/business/visit-scope-billing";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
@@ -648,6 +653,14 @@ export default async function JobDetailV2Page({
 
   const visitScopeItems = sanitizeVisitScopeItems(job.visit_scope_items);
   const invoiceTotal = formatVisitScopeTotal(visitScopeItems);
+  // Work Item rows report the invoice charge once imported; invoice edits are never
+  // written back to jobs.visit_scope_items, so the captured price alone goes stale.
+  const visitScopeBilledLines = buildVisitScopeBilledLineMap(primaryInvoiceRaw?.line_items);
+  const unlinkedInvoiceCharges = buildUnlinkedInvoiceCharges({
+    lineItems: primaryInvoiceRaw?.line_items,
+    jobId,
+    isConsolidated: (primaryInvoiceRaw?.member_job_ids?.length ?? 1) > 1,
+  });
 
   type LocationRow = {
     id: string; nickname: string | null; label: string | null;
@@ -2062,9 +2075,17 @@ export default async function JobDetailV2Page({
           </div>
 
           {/* work items */}
-          {visitScopeItems.length > 0 ? (
+          {visitScopeItems.length > 0 || unlinkedInvoiceCharges.length > 0 ? (
             <div style={{ marginBottom: "20px" }}>
-              {visitScopeItems.map((item, idx) => (
+              {visitScopeItems.map((item, idx) => {
+                const priceDisplay = resolveVisitScopeItemPriceDisplay({
+                  itemId: item.id,
+                  expectedUnitPrice: item.expected_unit_price,
+                  expectedQuantity: item.expected_quantity,
+                  billedLines: visitScopeBilledLines,
+                });
+
+                return (
                 <div
                   key={item.id ?? idx}
                   style={{
@@ -2077,6 +2098,22 @@ export default async function JobDetailV2Page({
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{item.title}</div>
+                    {priceDisplay.mathText ? (
+                      <div
+                        style={{
+                          fontFamily: S.mono,
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          color:
+                            priceDisplay.state === "billed"
+                              ? "oklch(0.45 0.015 262)"
+                              : "oklch(0.6 0.015 262)",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {priceDisplay.mathText}
+                      </div>
+                    ) : null}
                     {item.details ? (
                       <div
                         style={{
@@ -2105,21 +2142,89 @@ export default async function JobDetailV2Page({
                       Captured
                     </span>
                   ) : null}
-                  {item.expected_unit_price != null ? (
+                  {priceDisplay.badgeLabel ? (
                     <span
                       style={{
                         fontFamily: S.mono,
-                        fontSize: "14px",
+                        fontSize: "11px",
                         fontWeight: 600,
-                        width: "78px",
-                        textAlign: "right",
+                        padding: "4px 9px",
+                        borderRadius: "6px",
+                        background: "oklch(0.95 0.04 150)",
+                        color: "oklch(0.45 0.13 150)",
                       }}
                     >
-                      {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
-                        item.expected_unit_price,
-                      )}
+                      {priceDisplay.badgeLabel}
                     </span>
                   ) : null}
+                  {priceDisplay.amountText ? (
+                    <span
+                      style={{
+                        fontFamily: S.mono,
+                        fontSize: priceDisplay.state === "billed" ? "14px" : "12px",
+                        fontWeight: 600,
+                        minWidth: "78px",
+                        textAlign: "right",
+                        color:
+                          priceDisplay.state === "billed"
+                            ? undefined
+                            : "oklch(0.6 0.015 262)",
+                      }}
+                    >
+                      {priceDisplay.amountText}
+                    </span>
+                  ) : null}
+                </div>
+                );
+              })}
+              {unlinkedInvoiceCharges.map((charge, idx) => (
+                <div
+                  key={`invoice-charge-${idx}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "14px",
+                    padding: "13px 0",
+                    ...S.rowRule,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{charge.title}</div>
+                    <div
+                      style={{
+                        fontFamily: S.mono,
+                        fontSize: "11px",
+                        color: "oklch(0.6 0.015 262)",
+                        marginTop: "2px",
+                      }}
+                    >
+                      {charge.mathText ? `${charge.mathText} · ` : ""}Added on the invoice
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: S.mono,
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      padding: "4px 9px",
+                      borderRadius: "6px",
+                      background: "oklch(0.95 0.04 150)",
+                      color: "oklch(0.45 0.13 150)",
+                    }}
+                  >
+                    Billed
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: S.mono,
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      minWidth: "78px",
+                      textAlign: "right",
+                    }}
+                  >
+                    {charge.amountText}
+                  </span>
                 </div>
               ))}
             </div>

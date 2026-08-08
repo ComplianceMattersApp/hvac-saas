@@ -81,18 +81,23 @@ export function resolveVisitTypeScopeSuggestion(visitType: string | null | undef
   return null;
 }
 
-function normalizeExpectedUnitPrice(value: unknown, fallback = 0) {
+function normalizeExpectedUnitPrice(
+  value: unknown,
+  fallback: number | null = null,
+): number | null {
   if (value === null || value === undefined) return fallback;
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(0, Number(parsed.toFixed(2)));
 }
 
-function parseOptionalPriceInput(value: string) {
+// An empty price box means "not priced", so it saves as null. Coercing it to 0
+// made every unpriced Work Item render a meaningless "$0.00" on the job screen.
+function parseOptionalPriceInput(value: string): number | null {
   const raw = String(value ?? "").trim();
-  if (!raw) return 0;
+  if (!raw) return null;
   const parsed = Number.parseFloat(raw);
-  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
   return Number(parsed.toFixed(2));
 }
 
@@ -511,7 +516,7 @@ export default function VisitScopeBuilder({
       title: selectedTemplate.item_name,
       details: selectedTemplate.default_description ?? "",
       source_pricebook_item_id: selectedTemplate.id,
-      expected_unit_price: normalizeExpectedUnitPrice(selectedTemplate.default_unit_price, 0),
+      expected_unit_price: normalizeExpectedUnitPrice(selectedTemplate.default_unit_price, null),
       unit_label: selectedTemplate.unit_label,
       item_type: selectedTemplate.item_type,
       category: selectedTemplate.category,
@@ -822,7 +827,7 @@ export default function VisitScopeBuilder({
                             type="number"
                             min="0"
                             step="0.01"
-                            value={item.expected_unit_price ?? 0}
+                            value={item.expected_unit_price ?? ""}
                             onChange={(event) =>
                               patchItem(item.id, {
                                 expected_unit_price: parseOptionalPriceInput(event.target.value),

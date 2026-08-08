@@ -97,6 +97,12 @@ import {
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
 import {
+  buildUnlinkedInvoiceCharges,
+  buildVisitScopeBilledLineMap,
+  type UnlinkedInvoiceCharge,
+  type VisitScopeBilledLine,
+} from "@/lib/business/visit-scope-billing";
+import {
   resolveInvoiceCollectedPaymentLedger,
   type InternalInvoiceCollectedPaymentSummary,
   type InternalInvoicePaymentRow,
@@ -1844,6 +1850,8 @@ export default async function JobDetailPage({
           billing_email: string | null;
           line_item_count: number;
           visit_scope_source_ids: string[];
+          visit_scope_billed_lines: Record<string, VisitScopeBilledLine>;
+          unlinked_invoice_charges: UnlinkedInvoiceCharge[];
           member_job_count: number;
         } | null,
         internalInvoicePaymentSummaryTruth: null as InternalInvoiceCollectedPaymentSummary | null,
@@ -1876,6 +1884,16 @@ export default async function JobDetailPage({
       .filter((lineItem: any) => lineItem?.source_kind === "visit_scope")
       .map((lineItem: any) => sanitizeVisitScopeItemId(lineItem?.source_visit_scope_item_id))
       .filter(Boolean) as string[];
+    // Work Item rows read the billed charge back off this map so an imported item
+    // reports what the invoice actually says instead of its own frozen capture price.
+    const visitScopeBilledLines = buildVisitScopeBilledLineMap(invoiceLineItems);
+    // Charges with no Work Item behind them still belong in the tech's work list,
+    // otherwise the list visibly falls short of the invoice total.
+    const unlinkedInvoiceCharges = buildUnlinkedInvoiceCharges({
+      lineItems: invoiceLineItems,
+      jobId,
+      isConsolidated: (invoiceTruthRow.member_job_ids?.length ?? 1) > 1,
+    });
 
     return {
       internalInvoiceTruth: {
@@ -1889,6 +1907,8 @@ export default async function JobDetailPage({
         billing_email: String(invoiceTruthRow.billing_email ?? "").trim() || null,
         line_item_count: invoiceLineItems.length,
         visit_scope_source_ids: visitScopeSourceIds,
+        visit_scope_billed_lines: visitScopeBilledLines,
+        unlinked_invoice_charges: unlinkedInvoiceCharges,
         member_job_count: Math.max(1, invoiceTruthRow.member_job_ids?.length ?? 1),
       },
       internalInvoicePaymentSummaryTruth: internalInvoicePaymentLedger.summary,
@@ -3249,6 +3269,8 @@ const visitScopeReadyTotalCents = visitScopeItems.reduce((sum, item) => {
   return sum + Math.round(unitPrice * 100);
 }, 0);
 const invoiceVisitScopeSourceIds = new Set(internalInvoiceTruth?.visit_scope_source_ids ?? []);
+const visitScopeBilledLines = internalInvoiceTruth?.visit_scope_billed_lines ?? {};
+const unlinkedInvoiceCharges = internalInvoiceTruth?.unlinked_invoice_charges ?? [];
 const unaddedPricedVisitScopeItems = visitScopeItems.filter((item) => {
   const unitPrice = Number(item.expected_unit_price ?? 0);
   const itemId = sanitizeVisitScopeItemId(item.id);
@@ -3881,6 +3903,8 @@ const showCorrectionReviewResolution =
           jobTitleText={jobTitleText}
           visitReasonText={visitReasonText}
           visitScopeCount={visitScopeCount}
+          visitScopeBilledLines={visitScopeBilledLines}
+          unlinkedInvoiceCharges={unlinkedInvoiceCharges}
           visitScopeItems={visitScopeItems}
           visitScopeItemsJsonForInlineEdit={visitScopeItemsJsonForInlineEdit}
           VisitScopeJobDetailForm={VisitScopeJobDetailForm}

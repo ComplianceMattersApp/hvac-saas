@@ -375,6 +375,29 @@ describe("closeout queue projection", () => {
     ).toBe("Invoice");
   });
 
+  it("reports a closed service job as finished rather than ready for closeout", () => {
+    const message = getJobDetailCloseoutReadinessMessage({
+      field_complete: true,
+      job_type: "service",
+      ops_status: "closed",
+      invoice_complete: true,
+    });
+
+    expect(message).toBe("Job closed. Field work and billing are complete.");
+    expect(message).not.toContain("ready for closeout");
+  });
+
+  it("still reports outstanding work on a service job that is not closed yet", () => {
+    expect(
+      getJobDetailCloseoutReadinessMessage({
+        field_complete: true,
+        job_type: "service",
+        ops_status: "field_complete",
+        invoice_complete: true,
+      }),
+    ).toBe("Field work complete - ready for closeout.");
+  });
+
   it("uses retest/review closeout banner copy for failed ECC after billing is complete", () => {
     const message = getJobDetailCloseoutReadinessMessage({
       field_complete: true,

@@ -1,4 +1,14 @@
+import { resolveVisitScopeItemPriceDisplay } from "@/lib/business/visit-scope-billing";
+
 type MobileJobWorkScopePanelProps = Record<string, any>;
+
+// Pricebook items copy their name into the description, so title and details land
+// on screen as the same sentence twice. Only render details when they add something.
+function isEchoOf(candidate: unknown, source: unknown) {
+  const normalize = (value: unknown) => String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  const normalizedCandidate = normalize(candidate);
+  return normalizedCandidate.length > 0 && normalizedCandidate === normalize(source);
+}
 
 function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
   const {
@@ -12,7 +22,9 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
     tab,
     updateJobVisitScopeFromForm,
     updateJobTitleFromForm,
+    unlinkedInvoiceCharges,
     visitReasonText,
+    visitScopeBilledLines,
     visitScopeItems,
     visitScopeItemsJsonForInlineEdit,
     VisitScopeJobDetailForm,
@@ -70,7 +82,7 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
         </div>
       </div>
 
-      {String(job?.service_visit_reason ?? "").trim() ? (
+      {String(job?.service_visit_reason ?? "").trim() && !isEchoOf(visitReasonText, jobTitleText) ? (
         <div id="mobile-visit-reason-card" className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
           <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
           <div className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-800">{visitReasonText}</div>
@@ -80,13 +92,15 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
       {visitScopeItems.length > 0 ? (
         <div className="space-y-2">
           {visitScopeItems.map((item: any, index: number) => {
-            const hasPrice = item.expected_unit_price !== null && item.expected_unit_price !== undefined;
-            const unitPrice = hasPrice ? Number(item.expected_unit_price) : null;
-            // Slice B cleanup (Fix 5): Work Items have no quantity field today, so this
-            // stays a flat price. Reading defensively lights up the math line automatically
-            // if a per-item quantity is ever added, matching the invoice charge card.
-            const quantity = Number(item.quantity ?? item.expected_quantity ?? 1);
-            const showQuantityMath = hasPrice && Number.isFinite(quantity) && quantity > 1;
+            // Once this Work Item has been imported onto an invoice, the charge is the
+            // money truth and the row shows it — the captured price on the job is a
+            // frozen snapshot that invoice edits never write back to.
+            const priceDisplay = resolveVisitScopeItemPriceDisplay({
+              itemId: item.id,
+              expectedUnitPrice: item.expected_unit_price,
+              expectedQuantity: item.expected_quantity,
+              billedLines: visitScopeBilledLines,
+            });
             // Slice B cleanup (Fix 4): removal re-saves visit_scope_items without this row
             // through the same updateJobVisitScopeFromForm action the Adjust Work builder uses.
             const remainingItemsJson = JSON.stringify(
@@ -96,15 +110,32 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
               <div key={`mobile-primary-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.24)]">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 text-base font-semibold leading-6 text-slate-950">{item.title}</div>
-                  {hasPrice && !showQuantityMath ? (
-                    <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                      ${unitPrice!.toFixed(2)}
-                    </span>
+                  {priceDisplay.state !== "none" ? (
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      {priceDisplay.badgeLabel ? (
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                          {priceDisplay.badgeLabel}
+                        </span>
+                      ) : null}
+                      <span
+                        className={
+                          priceDisplay.state === "billed"
+                            ? "rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-900"
+                            : "rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-500"
+                        }
+                      >
+                        {priceDisplay.amountText}
+                      </span>
+                    </div>
                   ) : null}
                 </div>
-                {showQuantityMath ? (
-                  <div className="mt-1 text-sm font-semibold text-slate-700">
-                    {quantity.toFixed(2)} × ${unitPrice!.toFixed(2)} = ${(quantity * unitPrice!).toFixed(2)}
+                {priceDisplay.mathText ? (
+                  <div
+                    className={`mt-1 text-sm font-semibold ${
+                      priceDisplay.state === "billed" ? "text-slate-700" : "text-slate-500"
+                    }`}
+                  >
+                    {priceDisplay.mathText}
                   </div>
                 ) : null}
                 {item.kind === "companion_service" ? (
@@ -112,7 +143,7 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
                     {formatVisitScopeItemKindLabel(item.kind)}
                   </div>
                 ) : null}
-                {item.details ? (
+                {item.details && !isEchoOf(item.details, item.title) ? (
                   <div className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-700">{item.details}</div>
                 ) : null}
                 {isInternalUser ? (
@@ -130,6 +161,38 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
               </div>
             );
           })}
+        </div>
+      ) : null}
+
+      {/* Charges added straight onto the invoice have no Work Item to hang off, but
+          the tech still needs to see them — without these the list reads as the whole
+          job while the billing total below it says something larger. */}
+      {(unlinkedInvoiceCharges ?? []).length > 0 ? (
+        <div className="space-y-2">
+          {(unlinkedInvoiceCharges ?? []).map((charge: any, index: number) => (
+            <div
+              key={`mobile-invoice-charge-${index}-${charge.title}`}
+              className="rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-3 py-2.5"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 text-base font-semibold leading-6 text-slate-950">{charge.title}</div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                    Billed
+                  </span>
+                  <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-900">
+                    {charge.amountText}
+                  </span>
+                </div>
+              </div>
+              {charge.mathText ? (
+                <div className="mt-1 text-sm font-semibold text-slate-700">{charge.mathText}</div>
+              ) : null}
+              <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Added on the invoice
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 
@@ -222,6 +285,8 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
   if (presentation === "v2DisclosurePanel") {
     return (
       <div id="mobile-work-scope">
+        {/* The body below is always rendered, so this is a plain section header —
+            it used to carry a "Details" pill that looked like a toggle but wasn't. */}
         <div className={previewRowClass ?? ""}>
           <span className={previewRowTextClass ?? ""}>
             <span className="block font-semibold text-slate-950">{disclosureLabel ?? "Work details"}</span>
@@ -229,7 +294,6 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
               {disclosureHelper ?? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"} recorded`}
             </span>
           </span>
-          <span className={previewPillClass ?? ""}>Details</span>
         </div>
         <div className="space-y-3 border-t border-slate-200 px-3 py-3">
           <MobileJobWorkScopeBody {...props} />
