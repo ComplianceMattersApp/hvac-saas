@@ -341,8 +341,10 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobWorkScopePanel from "./MobileJobWorkScopePanel";');
     expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobWorkScopePanel {...props} presentation="v2InlineBody" />');
     expect(mobileJobDetailV2PreviewSource).toContain('presentation="v2DisclosurePanel"');
-    expect(mobileJobDetailV2PreviewSource).toContain("disclosureLabel={surfaceProfile.labels.workItems}");
-    expect(mobileJobDetailV2PreviewSource).toContain('disclosureLabel="Service Work"');
+    // The disclosure header is gone: the enclosing card is already titled Work
+    // Performed, so a second "Work Items" heading restated it.
+    expect(mobileJobDetailV2PreviewSource).not.toContain("disclosureLabel=");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("disclosureHelper=");
     expect(mobileJobDetailV2PreviewSource).toContain("const showEccWorkScopeLane =");
     expect(mobileJobDetailV2PreviewSource).toContain("{showEccWorkScopeLane ? (");
     expect(mobileJobDetailV2PreviewSource).toContain("Work Scope");
@@ -350,7 +352,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Compliance details");
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2DisclosurePanel"');
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2InlineBody"');
-    expect(mobileJobWorkScopePanelSource).toContain('<div id="mobile-work-scope">');
+    expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).not.toContain('<details id="mobile-work-scope"');
     expect(mobileJobWorkScopePanelSource).toContain('presentation === "v2TargetPanel"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-work-scope"');

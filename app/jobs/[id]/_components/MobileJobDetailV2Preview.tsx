@@ -1070,11 +1070,6 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <MobileJobWorkScopePanel
                   {...props}
                   presentation="v2DisclosurePanel"
-                  disclosureLabel={surfaceProfile.labels.workItems}
-                  disclosureHelper={serviceWorkCount > 0 ? `${getVisitScopeCountLabel(serviceWorkCount)} recorded` : "View details"}
-                  previewPillClass={previewPillClass}
-                  previewRowClass={previewRowClass}
-                  previewRowTextClass={previewRowTextClass}
                 />
               </>
             )}
@@ -1227,11 +1222,6 @@ export default function MobileJobDetailV2Preview(props: any) {
               <MobileJobWorkScopePanel
                 {...props}
                 presentation="v2DisclosurePanel"
-                disclosureLabel="Service Work"
-                disclosureHelper={`${getVisitScopeCountLabel(serviceWorkCount)} recorded`}
-                previewPillClass={previewPillClass}
-                previewRowClass={previewRowClass}
-                previewRowTextClass={previewRowTextClass}
               />
             </div>
           </section>

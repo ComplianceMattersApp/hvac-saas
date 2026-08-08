@@ -648,9 +648,10 @@ describe("job detail field operations board layout", () => {
     expect(mobileJobWorkScopePanelSource).toContain("{visitReasonText}");
     expect(jobPageSource).toContain('id="visit-reason-card"');
     expect(mobileJobWorkScopePanelSource).toContain('id="mobile-visit-reason-card"');
-    expect(mobileJobWorkScopePanelSource).toContain('id="mobile-job-title-card"');
-    expect(mobileJobWorkScopePanelSource).toContain("updateJobTitleFromForm");
-    expect(mobileJobWorkScopePanelSource).toContain('name="title"');
+    // The job title is the hero heading at the top of the mobile view, so the work
+    // card no longer restates it. Editing it stays on the desktop/ops surfaces.
+    expect(mobileJobWorkScopePanelSource).not.toContain('id="mobile-job-title-card"');
+    expect(mobileJobWorkScopePanelSource).not.toContain("updateJobTitleFromForm");
     expect(mobileJobWorkScopePanelSource).toContain("updateJobVisitScopeFromForm");
     expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_summary"');
     expect(mobileJobWorkScopePanelSource).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
@@ -804,9 +805,13 @@ describe("job detail field operations board layout", () => {
     expect(mobileJobWorkScopePanelSource).toContain('const showWorkSummary = Boolean(');
     expect(mobileJobWorkScopePanelSource).toContain('job?.field_complete || normalizedStatus === "completed" || normalizedOpsStatus === "closed"');
     expect(mobileJobWorkScopePanelSource).toContain('{showWorkSummary && (visitScopeSummary || isInternalUser) ? (');
-    expect(mobileJobWorkScopePanelSource).toContain('group-open:hidden');
-    expect(mobileJobWorkScopePanelSource).toContain('group-open:block');
-    expect(mobileJobWorkScopePanelSource).toContain('A brief breakdown of what happened, what was found, and what work was completed.');
+    // No longer a disclosure: the saved summary is the textarea's value, so the field
+    // is visible without a tap and the guidance sits in its placeholder rather than
+    // taking a line of its own under a heading that already says Work Summary.
+    expect(mobileJobWorkScopePanelSource).not.toContain('group-open:hidden');
+    expect(mobileJobWorkScopePanelSource).not.toContain('group-open:block');
+    expect(mobileJobWorkScopePanelSource).toContain('placeholder="Briefly describe what happened, what you found, and what work was completed."');
+    expect(mobileJobWorkScopePanelSource).toContain('defaultValue={visitScopeSummary ?? ""}');
   });
 
   it("removes the mobile Tools jump button while preserving lower tools", () => {

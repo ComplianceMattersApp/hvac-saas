@@ -21,7 +21,6 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
     SubmitButton,
     tab,
     updateJobVisitScopeFromForm,
-    updateJobTitleFromForm,
     unlinkedInvoiceCharges,
     visitReasonText,
     visitScopeBilledLines,
@@ -39,49 +38,6 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
 
   return (
     <>
-      <div id="mobile-job-title-card" className="rounded-xl border border-slate-200/80 bg-slate-50/75 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)]">
-        {isInternalUser ? (
-          <details className="group">
-            <summary className="cursor-pointer list-none">
-              <div className="flex items-start justify-between gap-3">
-                <div className="text-sm font-semibold text-[#0f1f35]">Job Title</div>
-                <span className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors group-hover:bg-slate-50">
-                  Edit
-                </span>
-              </div>
-            </summary>
-            <form action={updateJobTitleFromForm} className="mt-3 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="tab" value={tab} />
-              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-job-title-card`} />
-              <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Job Title
-              </label>
-              <input
-                name="title"
-                defaultValue={jobTitleText ?? ""}
-                maxLength={200}
-                required
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-              />
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
-                  Save
-                </SubmitButton>
-                <a href="#mobile-job-title-card" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                  Cancel
-                </a>
-              </div>
-            </form>
-          </details>
-        ) : (
-          <div className="text-sm font-semibold text-[#0f1f35]">Job Title</div>
-        )}
-        <div className="mt-1 whitespace-pre-wrap break-words text-base font-semibold leading-6 text-slate-950">
-          {jobTitleText || "No job title saved yet."}
-        </div>
-      </div>
-
       {String(job?.service_visit_reason ?? "").trim() && !isEchoOf(visitReasonText, jobTitleText) ? (
         <div id="mobile-visit-reason-card" className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
           <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
@@ -197,31 +153,40 @@ function MobileJobWorkScopeBody(props: MobileJobWorkScopePanelProps) {
       ) : null}
 
       {showWorkSummary && (visitScopeSummary || isInternalUser) ? (
-        <details className="group rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-          <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
-            Work Summary
-          </summary>
-          <p className="mt-1 text-sm leading-5 text-slate-500 group-open:hidden">
-            A brief breakdown of what happened, what was found, and what work was completed.
-          </p>
-          <div className="mt-2 whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-base leading-6 text-slate-700 group-open:hidden">
-            {visitScopeSummary || "No work summary saved yet."}
-          </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+          {/* Was a collapsed disclosure that swapped the saved summary out for the
+              form on open, so neither the text nor the field was visible without a
+              tap. The textarea carries the saved text, so showing it outright covers
+              both reading it and adding to it. */}
           {isInternalUser ? (
-            <form action={updateJobVisitScopeFromForm} className="mt-3 hidden border-t border-slate-200 pt-3 group-open:block">
+            <form action={updateJobVisitScopeFromForm}>
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="tab" value={tab} />
               <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} />
               <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
-              <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">Work Summary</label>
-              <p className="mt-1 text-sm leading-5 text-slate-500">
-                Briefly describe what happened, what you found, and what work was completed.
-              </p>
-              <textarea name="visit_scope_summary" defaultValue={visitScopeSummary ?? ""} rows={3} maxLength={600} className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm" />
+              <label className="block text-base font-semibold text-slate-900">Work Summary</label>
+              {/* The guidance lives in the field itself: it was a separate paragraph
+                  under a heading that already said "Work Summary", so the block spent
+                  three lines before reaching anywhere you could type. */}
+              <textarea
+                name="visit_scope_summary"
+                defaultValue={visitScopeSummary ?? ""}
+                rows={4}
+                maxLength={600}
+                placeholder="Briefly describe what happened, what you found, and what work was completed."
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-base leading-6 text-slate-900 shadow-sm"
+              />
               <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} mt-3`}>Save Work Summary</SubmitButton>
             </form>
-          ) : null}
-        </details>
+          ) : (
+            <>
+              <div className="text-base font-semibold text-slate-900">Work Summary</div>
+              <div className="mt-2 whitespace-pre-wrap break-words text-base leading-6 text-slate-700">
+                {visitScopeSummary || "No work summary saved yet."}
+              </div>
+            </>
+          )}
+        </div>
       ) : null}
 
       {isInternalUser ? (
@@ -274,30 +239,15 @@ export default function MobileJobWorkScopePanel(props: MobileJobWorkScopePanelPr
     tab,
     ToolIcon,
     visitScopeCount,
-    disclosureHelper,
-    disclosureLabel,
-    previewPillClass,
-    previewRowClass,
-    previewRowTextClass,
   } = props;
   const presentation = props.presentation ?? "current";
 
   if (presentation === "v2DisclosurePanel") {
     return (
-      <div id="mobile-work-scope">
-        {/* The body below is always rendered, so this is a plain section header —
-            it used to carry a "Details" pill that looked like a toggle but wasn't. */}
-        <div className={previewRowClass ?? ""}>
-          <span className={previewRowTextClass ?? ""}>
-            <span className="block font-semibold text-slate-950">{disclosureLabel ?? "Work details"}</span>
-            <span className="block text-sm text-slate-600">
-              {disclosureHelper ?? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"} recorded`}
-            </span>
-          </span>
-        </div>
-        <div className="space-y-3 border-t border-slate-200 px-3 py-3">
-          <MobileJobWorkScopeBody {...props} />
-        </div>
+      // The card this renders inside is already headed "Work Performed", so the
+      // second header restated it. The body is the content.
+      <div id="mobile-work-scope" className="space-y-3 px-3 py-3">
+        <MobileJobWorkScopeBody {...props} />
       </div>
     );
   }
