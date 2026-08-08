@@ -8,6 +8,7 @@ import {
   syncPlatformEntitlementFromStripeSubscriptionEvent,
 } from "@/lib/business/platform-billing-stripe";
 import {
+  closeTenantInvoicePendingPaymentFromExpiredCheckoutSession,
   recordTenantInvoicePaymentFromCheckoutSession,
   recordTenantInvoicePaymentFromStripeCharge,
   recordTenantInvoicePaymentFailureFromStripeCharge,
@@ -62,6 +63,7 @@ async function notifyNewRecordedPayment(result: { recorded: boolean; paymentId?:
 
 const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.completed",
+  "checkout.session.expired",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
@@ -167,6 +169,14 @@ export async function POST(request: Request) {
         eventId: event.id,
         stripe,
       });
+    }
+
+    if (event.type === "checkout.session.expired") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.mode === "payment") {
+        await closeTenantInvoicePendingPaymentFromExpiredCheckoutSession({ session });
+      }
+      return NextResponse.json({ received: true });
     }
 
     if (

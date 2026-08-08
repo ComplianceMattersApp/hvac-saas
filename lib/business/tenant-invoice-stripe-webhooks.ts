@@ -17,6 +17,7 @@ import {
   resolveManualSavedMethodAttemptFromWebhook,
 } from '@/lib/business/tenant-saved-method-payment-attempts';
 import { resolveTenantStripeConnectReadiness } from '@/lib/business/tenant-stripe-connect-readiness';
+import { closeVerifiedAbandonedStripeSession } from '@/lib/business/stripe-abandoned-session-cleanup';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 
 function toCleanString(value: unknown): string {
@@ -973,6 +974,73 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     recorded: true,
     paymentId: insertedPayment?.id,
   };
+}
+
+/**
+ * Closes the pending payment row for a checkout session Stripe has expired.
+ * Expired sessions can no longer collect money, so the pending row would
+ * otherwise sit in the attention center forever. This only resolves which row
+ * the session belongs to; the close itself is delegated to
+ * closeVerifiedAbandonedStripeSession — the single writer for this transition —
+ * which re-retrieves the session from Stripe and re-verifies tenant scope,
+ * amount, and expired/unpaid status before flipping 'pending' to 'failed'.
+ */
+export async function closeTenantInvoicePendingPaymentFromExpiredCheckoutSession(params: {
+  session: Stripe.Checkout.Session;
+  admin?: any;
+  stripe?: Stripe;
+}): Promise<{
+  closed: boolean;
+  reason?: string;
+  paymentId?: string;
+}> {
+  const admin = params.admin ?? createAdminClient();
+  const session = params.session;
+  const sessionId = toCleanString(session.id);
+
+  if (!sessionId) {
+    return { closed: false, reason: 'Missing checkout session id' };
+  }
+
+  if (session.mode !== 'payment') {
+    return { closed: false, reason: 'Checkout session is not payment mode' };
+  }
+
+  if (toCleanString(session.payment_status).toLowerCase() === 'paid') {
+    return { closed: false, reason: 'Checkout session is paid; nothing to close' };
+  }
+
+  const { data: pendingRows, error } = await admin
+    .from('internal_invoice_payments')
+    .select('id, account_owner_user_id')
+    .eq('stripe_checkout_session_id', sessionId)
+    .eq('payment_status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (error) {
+    throw new Error(
+      `Failed to load pending payment for expired checkout session: ${error.message ?? 'unknown error'}`,
+    );
+  }
+
+  const pending = Array.isArray(pendingRows) ? pendingRows[0] : null;
+  if (!pending?.id) {
+    return { closed: false, reason: 'No pending payment row for session' };
+  }
+
+  const result = await closeVerifiedAbandonedStripeSession({
+    admin,
+    accountOwnerUserId: toCleanString(pending.account_owner_user_id),
+    paymentId: toCleanString(pending.id),
+    stripe: params.stripe,
+  });
+
+  if (!result.closed) {
+    return { closed: false, reason: result.reason };
+  }
+
+  return { closed: true, paymentId: result.paymentId };
 }
 
 /**

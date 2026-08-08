@@ -26,12 +26,6 @@ export async function closeVerifiedAbandonedStripeSession(params: {
   const createdAt = new Date(clean(pending.created_at)).getTime();
   if (!Number.isFinite(createdAt) || createdAt > Date.now() - 15 * 60 * 1000) return { closed: false, reason: "session_not_stale" } as const;
 
-  const { data: recorded, error: recordedError } = await params.admin.from("internal_invoice_payments")
-    .select("id").eq("account_owner_user_id", ownerId).eq("invoice_id", pending.invoice_id)
-    .eq("payment_status", "recorded").limit(1);
-  if (recordedError) throw new Error(`Failed to verify recorded payment: ${recordedError.message ?? "unknown error"}`);
-  if (!(recorded ?? []).length) return { closed: false, reason: "invoice_has_no_recorded_payment" } as const;
-
   const readiness = await resolveTenantStripeConnectReadiness(ownerId, params.admin);
   if (!readiness.isReady || !readiness.connectedAccountId) return { closed: false, reason: "stripe_connect_not_ready" } as const;
   const stripe = params.stripe ?? getStripeServerClient();
@@ -41,11 +35,24 @@ export async function closeVerifiedAbandonedStripeSession(params: {
     && clean(session.metadata?.job_id) === clean(pending.job_id);
   if (!scoped) return { closed: false, reason: "metadata_mismatch" } as const;
   if (Number(session.amount_total ?? 0) !== Number(pending.amount_cents ?? 0)) return { closed: false, reason: "amount_mismatch" } as const;
-  if (session.status !== "open" || session.payment_status === "paid") return { closed: false, reason: "session_not_abandoned" } as const;
-
-  await stripe.checkout.sessions.expire(sessionId, {}, { stripeAccount: readiness.connectedAccountId });
+  // Two closeable states: an open session an operator verified is abandoned, and a
+  // session Stripe already expired (~24h after creation) that can never collect money.
+  if (session.payment_status === "paid" || (session.status !== "open" && session.status !== "expired")) {
+    return { closed: false, reason: "session_not_abandoned" } as const;
+  }
+  if (session.status === "open") {
+    const { data: recorded, error: recordedError } = await params.admin.from("internal_invoice_payments")
+      .select("id").eq("account_owner_user_id", ownerId).eq("invoice_id", pending.invoice_id)
+      .eq("payment_status", "recorded").limit(1);
+    if (recordedError) throw new Error(`Failed to verify recorded payment: ${recordedError.message ?? "unknown error"}`);
+    if (!(recorded ?? []).length) return { closed: false, reason: "invoice_has_no_recorded_payment" } as const;
+    await stripe.checkout.sessions.expire(sessionId, {}, { stripeAccount: readiness.connectedAccountId });
+  }
+  const closeNote = session.status === "expired"
+    ? `Stripe checkout session ${sessionId} expired without payment.`
+    : `Abandoned Stripe checkout session ${sessionId} expired after another payment was recorded.`;
   const { data: updated, error: updateError } = await params.admin.from("internal_invoice_payments")
-    .update({ payment_status: "failed", notes: `Abandoned Stripe checkout session ${sessionId} expired after another payment was recorded.` })
+    .update({ payment_status: "failed", notes: closeNote })
     .eq("id", paymentId).eq("account_owner_user_id", ownerId).eq("payment_status", "pending").select("id").maybeSingle();
   if (updateError) throw new Error(`Failed to close abandoned pending payment: ${updateError.message ?? "unknown error"}`);
   if (!updated?.id) return { closed: false, reason: "pending_row_changed" } as const;

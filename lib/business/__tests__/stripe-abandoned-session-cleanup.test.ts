@@ -28,14 +28,24 @@ describe("closeVerifiedAbandonedStripeSession", () => {
     expect(stripe.checkout.sessions.expire).toHaveBeenCalledWith("cs_open", {}, { stripeAccount: "acct_1" });
   });
 
-  it("does not expire when no other recorded payment exists", async () => {
+  it("does not expire an open session when no other recorded payment exists", async () => {
     const pending = query({ data: { id: "11111111-1111-4111-8111-111111111111", invoice_id: "inv-1", job_id: "job-1", amount_cents: 41000, created_at: "2026-07-15T00:00:00Z", payment_status: "pending", processor_name: "stripe", payment_method: "card_stripe_online", stripe_checkout_session_id: "cs_open" }, error: null }, true);
     const recorded = query({ data: [], error: null });
     const client = { from: vi.fn().mockReturnValueOnce(pending).mockReturnValueOnce(recorded) };
-    const stripe: any = { checkout: { sessions: { retrieve: vi.fn(), expire: vi.fn() } } };
+    const stripe: any = { checkout: { sessions: { retrieve: vi.fn(async () => openSession), expire: vi.fn() } } };
     const result = await closeVerifiedAbandonedStripeSession({ admin: client, stripe, accountOwnerUserId: "owner-1", paymentId: "11111111-1111-4111-8111-111111111111" });
     expect(result).toEqual({ closed: false, reason: "invoice_has_no_recorded_payment" });
-    expect(stripe.checkout.sessions.retrieve).not.toHaveBeenCalled(); expect(stripe.checkout.sessions.expire).not.toHaveBeenCalled();
+    expect(stripe.checkout.sessions.expire).not.toHaveBeenCalled();
+  });
+
+  it("closes a session Stripe already expired even when the invoice has no recorded payment", async () => {
+    const pendingRow = { id: "11111111-1111-4111-8111-111111111111", invoice_id: "inv-1", job_id: "job-1", amount_cents: 41000, created_at: "2026-07-15T00:00:00Z", payment_status: "pending", processor_name: "stripe", payment_method: "card_stripe_online", stripe_checkout_session_id: "cs_open" };
+    const queries = [query({ data: pendingRow, error: null }, true), query({ data: { id: pendingRow.id }, error: null }, true)];
+    const client = { from: vi.fn(() => queries.shift()) };
+    const stripe: any = { checkout: { sessions: { retrieve: vi.fn(async () => ({ ...openSession, status: "expired" })), expire: vi.fn() } } };
+    const result = await closeVerifiedAbandonedStripeSession({ admin: client, stripe, accountOwnerUserId: "owner-1", paymentId: "11111111-1111-4111-8111-111111111111" });
+    expect(result).toEqual({ closed: true, paymentId: "11111111-1111-4111-8111-111111111111" });
+    expect(stripe.checkout.sessions.expire).not.toHaveBeenCalled();
   });
 
   it("does not expire a session Stripe now reports paid", async () => {

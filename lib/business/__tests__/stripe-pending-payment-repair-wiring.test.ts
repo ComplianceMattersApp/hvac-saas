@@ -48,4 +48,15 @@ describe("Stripe pending-payment repair safety wiring", () => {
     expect(page).toContain("Close abandoned session");
     expect(page).not.toContain("Close all abandoned");
   });
+
+  it("closes sessions Stripe already expired without requiring a recorded payment", () => {
+    expect(cleanup).toContain('session.status === "expired"');
+    expect(cleanup).toContain("expired without payment");
+    expect(page).toContain("expired_unpaid");
+  });
+
+  it("auto-closes expired sessions during the reconciliation sweep", () => {
+    expect(repair).toContain('"expired_session_closed"');
+    expect(repair).toContain("closeVerifiedAbandonedStripeSession");
+  });
 });

@@ -50,9 +50,9 @@ export default async function StripeReconciliationPage({ searchParams }: { searc
           <span className="text-xs font-semibold">Stripe payment confirmed; EveryStep will re-check every safety condition.</span>
           <SubmitButton loadingText="Reconciling…" className="rounded-lg bg-amber-900 px-3 py-2 text-xs font-semibold text-white">Reconcile confirmed payment</SubmitButton>
         </form> : null}</div>
-        {item.diagnosis === "still_open" ? <form action={closeAbandonedStripeSessionFromForm} className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-300 bg-white/80 p-3">
+        {item.diagnosis === "still_open" || item.diagnosis === "expired_unpaid" ? <form action={closeAbandonedStripeSessionFromForm} className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-slate-300 bg-white/80 p-3">
           <input type="hidden" name="payment_id" value={item.paymentId} />
-          <label className="flex items-center gap-2 text-xs font-semibold"><input required type="checkbox" name="confirm_close" value="yes" />I verified another payment was recorded for this invoice.</label>
+          <label className="flex items-center gap-2 text-xs font-semibold"><input required type="checkbox" name="confirm_close" value="yes" />{item.diagnosis === "expired_unpaid" ? "I confirmed this checkout expired in Stripe without payment." : "I verified another payment was recorded for this invoice."}</label>
           <SubmitButton loadingText="Closing…" className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-white">Close abandoned session</SubmitButton>
         </form> : null}
       </article>)}

@@ -24,7 +24,7 @@ export type StripePendingPaymentInspection = {
   chargeSuffix: string | null;
   checkoutStatus: string;
   paymentStatus: string;
-  diagnosis: "succeeded_match" | "still_open" | "not_paid" | "metadata_mismatch" | "amount_mismatch" | "retrieve_error";
+  diagnosis: "succeeded_match" | "still_open" | "expired_unpaid" | "not_paid" | "metadata_mismatch" | "amount_mismatch" | "retrieve_error";
   detail: string;
 };
 
@@ -110,6 +110,7 @@ export async function inspectStaleStripePendingPayments(params: {
       if (!metadataMatches) { diagnosis = "metadata_mismatch"; detail = "Stripe metadata does not match this tenant, invoice, and job."; }
       else if (!amountMatches) { diagnosis = "amount_mismatch"; detail = "Stripe and EveryStep amounts do not match."; }
       else if (session.payment_status === "paid") { diagnosis = "succeeded_match"; detail = "Stripe shows paid with matching scope and amount. Review before any repair."; }
+      else if (session.status === "expired") { diagnosis = "expired_unpaid"; detail = "Stripe expired this checkout without payment. It can no longer collect money and is safe to close."; }
       else if (session.status === "open") { diagnosis = "still_open"; detail = "Checkout remains open and has not been paid."; }
       return { ...base, paymentIntentSuffix: suffix(paymentIntentId), chargeSuffix: suffix(chargeId), checkoutStatus: clean(session.status) || "unknown", paymentStatus: clean(session.payment_status) || "unknown", diagnosis, detail };
     } catch (error) {

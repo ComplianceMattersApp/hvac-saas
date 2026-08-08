@@ -89,6 +89,56 @@ export async function getQboInvoicePaymentContext(
   };
 }
 
+export type QboLinkedInvoicePayment = {
+  id: string;
+  totalAmount: number;
+  /**
+   * The portion of this payment applied to the requested invoice. A payment's
+   * TotalAmt can span several invoices, so matching must use this, not the total.
+   */
+  appliedToInvoiceAmount: number;
+  paymentRefNum: string | null;
+  txnDate: string | null;
+};
+
+/**
+ * QBO's query language cannot filter Payment by LinkedTxn, so this pulls the
+ * customer's payments (newest first — the settling payment is typically recent
+ * and the window is capped at 100) and filters client-side for lines applied
+ * to the invoice.
+ */
+export async function findQboPaymentsLinkedToInvoice(
+  params: QboRequestBase & { customerRef: string; invoiceId: string },
+): Promise<QboLinkedInvoicePayment[]> {
+  const customerRef = String(params.customerRef ?? "").trim();
+  const invoiceId = String(params.invoiceId ?? "").trim();
+  if (!customerRef || !invoiceId) return [];
+  const found = await qboFetch({
+    accessToken: params.accessToken,
+    realmId: params.realmId,
+    baseUrl: params.baseUrl,
+    path: "query",
+    method: "GET",
+    query: `select * from Payment where CustomerRef = '${escapeQboQueryValue(customerRef)}' orderby TxnDate desc maxresults 100`,
+  });
+  const payments: any[] = found?.QueryResponse?.Payment ?? [];
+  const lineLinksInvoice = (line: any) => (line?.LinkedTxn ?? []).some((txn: any) =>
+    String(txn?.TxnType ?? "") === "Invoice" && String(txn?.TxnId ?? "") === invoiceId,
+  );
+  return payments
+    .filter((payment) => (payment?.Line ?? []).some(lineLinksInvoice))
+    .map((payment) => ({
+      id: String(payment.Id),
+      totalAmount: Number(payment.TotalAmt ?? 0),
+      appliedToInvoiceAmount: (payment?.Line ?? []).reduce(
+        (sum: number, line: any) => (lineLinksInvoice(line) ? sum + Number(line?.Amount ?? 0) : sum),
+        0,
+      ),
+      paymentRefNum: String(payment.PaymentRefNum ?? "").trim() || null,
+      txnDate: String(payment.TxnDate ?? "").trim() || null,
+    }));
+}
+
 export async function findQboInvoiceByDocNumber(
   params: QboRequestBase & { docNumber: string },
 ): Promise<QboSyncedEntity | null> {

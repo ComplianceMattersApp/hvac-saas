@@ -3,12 +3,13 @@ import type Stripe from "stripe";
 import { getStripeServerClient } from "@/lib/business/platform-billing-stripe";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { recordTenantInvoicePaymentFromCheckoutSession } from "@/lib/business/tenant-invoice-stripe-webhooks";
+import { closeVerifiedAbandonedStripeSession } from "@/lib/business/stripe-abandoned-session-cleanup";
 import { upsertInvoicePaymentAllocationForPaymentRow } from "@/lib/business/payment-allocations";
 import { autoSyncRecordedPaymentToQbo } from "@/lib/qbo/qbo-payment-auto-sync";
 import { deliverInternalPaymentReceivedEmail } from "@/lib/payments/payment-received-email";
 
 const clean = (value: unknown) => String(value ?? "").trim();
-export type StripePaymentReconciliationOutcome = "exact_paid_match_reconciled" | "already_reconciled" | "allocation_repaired" | "still_processing" | "not_paid" | "ambiguous_multiple_successes" | "amount_mismatch" | "currency_mismatch" | "connected_account_mismatch" | "invoice_scope_mismatch" | "customer_scope_mismatch" | "invoice_ineligible" | "refunded_or_disputed" | "transient_provider_error" | "blocked_unsafe";
+export type StripePaymentReconciliationOutcome = "exact_paid_match_reconciled" | "already_reconciled" | "allocation_repaired" | "still_processing" | "not_paid" | "expired_session_closed" | "ambiguous_multiple_successes" | "amount_mismatch" | "currency_mismatch" | "connected_account_mismatch" | "invoice_scope_mismatch" | "customer_scope_mismatch" | "invoice_ineligible" | "refunded_or_disputed" | "transient_provider_error" | "blocked_unsafe";
 export type StripePaymentReconciliationResult = { outcome: StripePaymentReconciliationOutcome; paymentId?: string; financialMutation: boolean; qboStatus?: "synced" | "pending" };
 
 export async function reconcileStripeSuccessfulPayment(params: { admin: any; accountOwnerUserId: string; paymentId: string; stripe?: Stripe; syncQbo?: typeof autoSyncRecordedPaymentToQbo; sendReceipt?: typeof deliverInternalPaymentReceivedEmail }): Promise<StripePaymentReconciliationResult> {
@@ -31,7 +32,16 @@ export async function reconcileStripeSuccessfulPayment(params: { admin: any; acc
     const inspected = await Promise.all((candidates ?? []).map(async (candidate: any) => ({ candidate, session: await stripe.checkout.sessions.retrieve(clean(candidate.stripe_checkout_session_id), {}, { stripeAccount: readiness.connectedAccountId! }) })));
     const paid = inspected.filter(({ session }) => session.status === "complete" && session.payment_status === "paid");
     if (paid.length > 1) return { outcome: "ambiguous_multiple_successes", financialMutation: false };
-    if (!paid.length) return { outcome: inspected.some(({ session }) => session.status === "open") ? "still_processing" : "not_paid", financialMutation: false };
+    if (!paid.length) {
+      // A session Stripe already expired can never collect money; close its pending
+      // row so it stops surfacing as an open exception. Money truth is untouched.
+      const selectedSession = inspected.find(({ candidate }) => clean(candidate.id) === paymentId)?.session;
+      if (selectedSession?.status === "expired" && selectedSession.payment_status !== "paid") {
+        const closed = await closeVerifiedAbandonedStripeSession({ admin: params.admin, accountOwnerUserId: ownerId, paymentId, stripe });
+        if (closed.closed) return { outcome: "expired_session_closed", paymentId, financialMutation: false };
+      }
+      return { outcome: inspected.some(({ session }) => session.status === "open") ? "still_processing" : "not_paid", financialMutation: false };
+    }
     if (clean(paid[0].candidate.id) !== paymentId) return { outcome: "ambiguous_multiple_successes", financialMutation: false };
     const session = paid[0].session;
     if (session.mode !== "payment" || clean(session.metadata?.account_owner_user_id) !== ownerId || clean(session.metadata?.invoice_id) !== clean(selected.invoice_id) || clean(session.metadata?.job_id) !== clean(selected.job_id)) return { outcome: "invoice_scope_mismatch", financialMutation: false };
