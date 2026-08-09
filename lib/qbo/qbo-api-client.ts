@@ -390,12 +390,6 @@ export interface QboInvoiceSnapshot {
    * so a zeroed synced invoice means it was voided in QBO already.
    */
   looksVoided: boolean;
-  /**
-   * Raw QBO Invoice payload. Kept because QBO can reject a sparse void with
-   * "Required parameter Line is missing" and needs the existing lines echoed
-   * back — see voidQboInvoice.
-   */
-  raw: any;
 }
 
 /**
@@ -433,19 +427,7 @@ export async function findQboInvoiceById(
     balance,
     totalAmount,
     looksVoided: totalAmount === 0 && balance === 0,
-    raw: invoice,
   };
-}
-
-/**
- * QBO rejected the request as an incomplete FULL update rather than accepting it
- * as a sparse void — observed in production as "Required parameter Line is
- * missing in the request".
- */
-function isMissingRequiredLineFault(error: unknown): boolean {
-  if (!(error instanceof QboApiError)) return false;
-  const message = String(error.message ?? "").toLowerCase();
-  return message.includes("required") && message.includes("line");
 }
 
 /**
@@ -456,35 +438,29 @@ function isMissingRequiredLineFault(error: unknown): boolean {
  * in history" semantics. `syncToken` must be the live one, not the stored one.
  */
 export async function voidQboInvoice(
-  params: QboRequestBase & {
-    qboInvoiceId: string;
-    syncToken: string;
-    /** Live invoice payload from findQboInvoiceById, used only by the retry below. */
-    invoice?: any;
-  },
+  params: QboRequestBase & { qboInvoiceId: string; syncToken: string },
 ): Promise<QboSyncedEntity> {
-  const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken, invoice } = params;
-  const post = (body: Record<string, unknown>) =>
-    qboFetch({ accessToken, realmId, baseUrl, path: "invoice", method: "POST", operation: "void", body });
+  const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken } = params;
 
-  let voided: any;
-  try {
-    // `sparse` marks this as a partial write so QBO does not validate it as a
-    // full invoice update.
-    voided = await post({ Id: qboInvoiceId, SyncToken: syncToken, sparse: true });
-  } catch (error) {
-    // Some invoices are still validated as a full update and demand their lines.
-    // Echo back the live Line/CustomerRef only — never computed fields like
-    // TotalAmt or Balance, which QBO owns. operate=void still voids the invoice
-    // regardless of the body, so this changes nothing but the validator's mind.
-    if (!isMissingRequiredLineFault(error) || !invoice?.Line) throw error;
-    voided = await post({
-      Id: qboInvoiceId,
-      SyncToken: syncToken,
-      Line: invoice.Line,
-      ...(invoice.CustomerRef ? { CustomerRef: invoice.CustomerRef } : {}),
-    });
-  }
+  // Intuit's documented void: a sparse {Id, SyncToken} body to ?operate=void.
+  //
+  // Nothing else may be sent here. Production has returned "Required parameter
+  // Line is missing" for this exact call, which means QBO sometimes validates it
+  // as a FULL update instead of honoring operate=void. Echoing the lines back to
+  // satisfy that validator was tried and is WRONG: a full update rewrites the
+  // invoice and clears every field omitted from the payload (DocNumber, TxnDate,
+  // PrivateNote), so it silently mutates a customer-facing record without ever
+  // voiding it. Fail loudly instead — and note that a 2xx here is NOT proof of a
+  // void; callers must confirm by re-reading the invoice.
+  const voided = await qboFetch({
+    accessToken,
+    realmId,
+    baseUrl,
+    path: "invoice",
+    method: "POST",
+    operation: "void",
+    body: { Id: qboInvoiceId, SyncToken: syncToken },
+  });
 
   const inv = voided?.Invoice;
   if (!inv?.Id) throw new QboApiError(0, "QBO invoice void returned no Id");

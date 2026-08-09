@@ -179,13 +179,36 @@ export async function voidInvoiceInQbo(params: {
       baseUrl,
       qboInvoiceId,
       syncToken: snapshot.syncToken,
-      invoice: snapshot.raw,
     });
+
+    // Confirm against QBO instead of trusting the response. Production has
+    // returned 2xx from the void endpoint on an invoice that stayed open, and
+    // recording an unverified "voided" is worse than recording a failure: it
+    // retires the row from the sweep and from the attention center, so the drift
+    // becomes invisible again — the exact bug this lane exists to prevent.
+    const confirmation = await findQboInvoiceById({
+      accessToken: token.accessToken,
+      realmId: token.realmId,
+      baseUrl,
+      qboInvoiceId,
+    });
+    if (confirmation && !confirmation.looksVoided) {
+      const message =
+        `QuickBooks accepted the void request but invoice ${invoiceLabel(invoiceRow)} is still open there `
+        + `(total $${confirmation.totalAmount.toFixed(2)}, balance $${confirmation.balance.toFixed(2)}). `
+        + `EveryStep did not modify it. Void it directly in QuickBooks, or retry.`;
+      await recordVoidState(supabase, invoiceId, {
+        qbo_void_status: "error",
+        qbo_sync_token: confirmation.syncToken,
+        qbo_void_error: message,
+      });
+      return { invoiceId, status: "error", error: message };
+    }
 
     await recordVoidState(supabase, invoiceId, {
       qbo_void_status: "voided",
       qbo_voided_at: new Date().toISOString(),
-      qbo_sync_token: voided.syncToken,
+      qbo_sync_token: confirmation?.syncToken ?? voided.syncToken,
       qbo_void_error: null,
     });
     return { invoiceId, status: "voided" };
