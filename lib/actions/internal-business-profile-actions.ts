@@ -12,6 +12,7 @@ import {
   parseInternalBusinessProfileLogoStorageRef,
 } from "@/lib/business/internal-business-profile";
 import { isValidIanaTimeZone, normalizeAccountTimeZone } from "@/lib/utils/account-time-zone";
+import { geocodeAddress } from "@/lib/routing/geocode-address";
 import {
   createTenantStripeConnectOnboardingLink,
   normalizeStripeConnectError,
@@ -144,6 +145,14 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   const hasTimeZoneInput = formData.has("time_zone");
   const timeZone = normalizeText(formData.get("time_zone"));
   const hasBillingModeInput = formData.has("billing_mode");
+  // Dispatch home base (route planning). Gated on field presence so forms that
+  // predate these inputs — and databases that predate the columns — keep working.
+  const hasDispatchAddressInput = formData.has("dispatch_address_line1");
+  const dispatchAddressLine1 = normalizeNullableText(formData.get("dispatch_address_line1"));
+  const dispatchAddressLine2 = normalizeNullableText(formData.get("dispatch_address_line2"));
+  const dispatchCity = normalizeNullableText(formData.get("dispatch_city"));
+  const dispatchState = normalizeNullableText(formData.get("dispatch_state"));
+  const dispatchZip = normalizeNullableText(formData.get("dispatch_zip"));
   const logoFileEntry = formData.get("logo_file");
   const removeLogo = String(formData.get("remove_logo") ?? "").trim() === "1";
 
@@ -198,15 +207,33 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
     redirect("/forbidden");
   }
 
-  const { data: existingProfile, error: existingProfileError } = await admin
+  // The dispatch columns are only read when the form posts dispatch fields —
+  // in that case the migration is a hard prerequisite for the upsert anyway.
+  const existingProfileSelect = hasDispatchAddressInput
+    ? "logo_url, billing_mode, time_zone, dispatch_address_line1, dispatch_address_line2, dispatch_city, dispatch_state, dispatch_zip, dispatch_latitude, dispatch_longitude"
+    : "logo_url, billing_mode, time_zone";
+  const { data: existingProfileRaw, error: existingProfileError } = await admin
     .from("internal_business_profiles")
-    .select("logo_url, billing_mode, time_zone")
+    .select(existingProfileSelect as "logo_url, billing_mode, time_zone")
     .eq("account_owner_user_id", internalUser.account_owner_user_id)
     .maybeSingle();
 
   if (existingProfileError) {
     redirect(withNotice("save_failed"));
   }
+
+  const existingProfile = existingProfileRaw as {
+    logo_url?: string | null;
+    billing_mode?: string | null;
+    time_zone?: string | null;
+    dispatch_address_line1?: string | null;
+    dispatch_address_line2?: string | null;
+    dispatch_city?: string | null;
+    dispatch_state?: string | null;
+    dispatch_zip?: string | null;
+    dispatch_latitude?: number | null;
+    dispatch_longitude?: number | null;
+  } | null;
 
   const existingLogoRef = parseInternalBusinessProfileLogoStorageRef(existingProfile?.logo_url ?? null);
   const billingMode = hasBillingModeInput
@@ -237,6 +264,58 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
     nextLogoUrl = buildInternalBusinessProfileLogoStorageRef(storagePath);
   }
 
+  let dispatchColumns: Record<string, unknown> = {};
+  if (hasDispatchAddressInput) {
+    const existingDispatch = existingProfile;
+
+    const dispatchAddressChanged =
+      (dispatchAddressLine1 ?? "") !== String(existingDispatch?.dispatch_address_line1 ?? "").trim() ||
+      (dispatchCity ?? "") !== String(existingDispatch?.dispatch_city ?? "").trim() ||
+      (dispatchState ?? "") !== String(existingDispatch?.dispatch_state ?? "").trim() ||
+      (dispatchZip ?? "") !== String(existingDispatch?.dispatch_zip ?? "").trim();
+    const existingDispatchCoordinatesMissing =
+      existingDispatch?.dispatch_latitude == null || existingDispatch?.dispatch_longitude == null;
+
+    // Geocode best-effort on change (or when coordinates were never captured).
+    // A failed geocode never blocks the save — the address persists and the
+    // coordinates stay null rather than pointing at the previous address.
+    let dispatchLatitude: number | null = dispatchAddressChanged
+      ? null
+      : existingDispatch?.dispatch_latitude ?? null;
+    let dispatchLongitude: number | null = dispatchAddressChanged
+      ? null
+      : existingDispatch?.dispatch_longitude ?? null;
+
+    if (dispatchAddressLine1 && (dispatchAddressChanged || existingDispatchCoordinatesMissing)) {
+      const geocoded = await geocodeAddress({
+        addressLine1: dispatchAddressLine1,
+        city: dispatchCity,
+        state: dispatchState,
+        zip: dispatchZip,
+      });
+      if (geocoded.status === "ok") {
+        dispatchLatitude = geocoded.coordinates.latitude;
+        dispatchLongitude = geocoded.coordinates.longitude;
+      } else {
+        console.warn("dispatch_home_base_geocode_failed", {
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          status: geocoded.status,
+          reason: geocoded.status === "unavailable" ? geocoded.reason : null,
+        });
+      }
+    }
+
+    dispatchColumns = {
+      dispatch_address_line1: dispatchAddressLine1,
+      dispatch_address_line2: dispatchAddressLine2,
+      dispatch_city: dispatchCity,
+      dispatch_state: dispatchState,
+      dispatch_zip: dispatchZip,
+      dispatch_latitude: dispatchAddressLine1 ? dispatchLatitude : null,
+      dispatch_longitude: dispatchAddressLine1 ? dispatchLongitude : null,
+    };
+  }
+
   const { error } = await admin
     .from("internal_business_profiles")
     .upsert(
@@ -250,6 +329,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
         billing_mode: billingMode,
         time_zone: normalizeAccountTimeZone(hasTimeZoneInput ? timeZone : existingProfile?.time_zone),
         profile_reviewed_at: new Date().toISOString(),
+        ...dispatchColumns,
       },
       {
         onConflict: "account_owner_user_id",

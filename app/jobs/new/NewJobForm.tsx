@@ -514,6 +514,11 @@ export default function NewJobForm({
   const [newLocationNickname, setNewLocationNickname] = useState("");
   const [newLocationAddressLine1, setNewLocationAddressLine1] = useState("");
   const [newLocationAddressLine2, setNewLocationAddressLine2] = useState("");
+  // Autocomplete-supplied coordinates for the new-location address. Cleared on
+  // any manual edit to line 1 / city / state / zip so stored coordinates can
+  // never contradict the submitted address (line 2 edits don't move the pin).
+  const [newLocationLatitude, setNewLocationLatitude] = useState("");
+  const [newLocationLongitude, setNewLocationLongitude] = useState("");
   const [newLocationCity, setNewLocationCity] = useState("");
   const [newLocationState, setNewLocationState] = useState("");
   const [newLocationZip, setNewLocationZip] = useState("");
@@ -934,6 +939,16 @@ const [billingRecipient, setBillingRecipient] = useState<
     setNewLocationCity(merged.city);
     setNewLocationState(merged.state);
     setNewLocationZip(merged.zip);
+    const hasCoordinates =
+      typeof selected.latitude === "number" && typeof selected.longitude === "number";
+    setNewLocationLatitude(hasCoordinates ? String(selected.latitude) : "");
+    setNewLocationLongitude(hasCoordinates ? String(selected.longitude) : "");
+  }
+
+  function editNewLocationAddressField(setter: (value: string) => void, value: string) {
+    setter(value);
+    setNewLocationLatitude("");
+    setNewLocationLongitude("");
   }
 
   function onQuickWindowChange(value: string) {
@@ -2412,13 +2427,19 @@ const [billingRecipient, setBillingRecipient] = useState<
                             onAddressSelected={applyAutocompleteSelection}
                           />
                         ) : null}
+                        {newLocationLatitude && newLocationLongitude ? (
+                          <>
+                            <input type="hidden" name="location_latitude" value={newLocationLatitude} />
+                            <input type="hidden" name="location_longitude" value={newLocationLongitude} />
+                          </>
+                        ) : null}
                         <input
                           className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
                           name="address_line1"
                           placeholder="Address"
                           required
                           value={newLocationAddressLine1}
-                          onChange={(e) => setNewLocationAddressLine1(e.target.value)}
+                          onChange={(e) => editNewLocationAddressField(setNewLocationAddressLine1, e.target.value)}
                         />
                         <input
                           className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -2434,7 +2455,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                             placeholder="City"
                             required
                             value={newLocationCity}
-                            onChange={(e) => setNewLocationCity(e.target.value)}
+                            onChange={(e) => editNewLocationAddressField(setNewLocationCity, e.target.value)}
                           />
                           <input
                             className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -2442,7 +2463,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                             placeholder="State"
                             required
                             value={newLocationState}
-                            onChange={(e) => setNewLocationState(e.target.value)}
+                            onChange={(e) => editNewLocationAddressField(setNewLocationState, e.target.value)}
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -2452,7 +2473,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                             placeholder="ZIP"
                             required
                             value={newLocationZip}
-                            onChange={(e) => setNewLocationZip(e.target.value)}
+                            onChange={(e) => editNewLocationAddressField(setNewLocationZip, e.target.value)}
                           />
                         </div>
                         {matchingLocationHints.length > 0 ? (
@@ -2549,13 +2570,19 @@ const [billingRecipient, setBillingRecipient] = useState<
                       onAddressSelected={applyAutocompleteSelection}
                     />
                   ) : null}
+                  {newLocationLatitude && newLocationLongitude ? (
+                    <>
+                      <input type="hidden" name="location_latitude" value={newLocationLatitude} />
+                      <input type="hidden" name="location_longitude" value={newLocationLongitude} />
+                    </>
+                  ) : null}
                   <input
                     className="w-full rounded-md border border-slate-300 bg-white p-2"
                     name="address_line1"
                     placeholder="Address"
                     required
                     value={newLocationAddressLine1}
-                    onChange={(e) => setNewLocationAddressLine1(e.target.value)}
+                    onChange={(e) => editNewLocationAddressField(setNewLocationAddressLine1, e.target.value)}
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <input
@@ -2564,7 +2591,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       placeholder="City"
                       required
                       value={newLocationCity}
-                      onChange={(e) => setNewLocationCity(e.target.value)}
+                      onChange={(e) => editNewLocationAddressField(setNewLocationCity, e.target.value)}
                     />
                     <input
                       className="w-full rounded-md border border-slate-300 bg-white p-2"
@@ -2572,7 +2599,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       placeholder="State"
                       required
                       value={newLocationState}
-                      onChange={(e) => setNewLocationState(e.target.value)}
+                      onChange={(e) => editNewLocationAddressField(setNewLocationState, e.target.value)}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -2582,7 +2609,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       placeholder="ZIP"
                       required
                       value={newLocationZip}
-                      onChange={(e) => setNewLocationZip(e.target.value)}
+                      onChange={(e) => editNewLocationAddressField(setNewLocationZip, e.target.value)}
                     />
                   </div>
                 </div>

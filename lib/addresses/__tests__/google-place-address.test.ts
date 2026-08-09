@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseGoogleAddressComponents,
+  parseGooglePlaceLocation,
   preserveAddressLine2,
   type GoogleAddressComponent,
 } from "../google-place-address";
@@ -79,5 +80,41 @@ describe("parseGoogleAddressComponents", () => {
       addressLine2: "Building B",
       suggestedUnit: "Unit 9",
     });
+  });
+});
+
+describe("parseGooglePlaceLocation", () => {
+  it("reads LatLng-style locations whose lat/lng are methods", () => {
+    expect(parseGooglePlaceLocation({ lat: () => 37.9857765, lng: () => -121.3320771 })).toEqual({
+      latitude: 37.985777,
+      longitude: -121.332077,
+    });
+  });
+
+  it("reads serialized locations whose lat/lng are numbers", () => {
+    expect(parseGooglePlaceLocation({ lat: 37.95776, lng: -121.2908 })).toEqual({
+      latitude: 37.95776,
+      longitude: -121.2908,
+    });
+  });
+
+  it("returns null for absent, malformed, or out-of-range locations", () => {
+    expect(parseGooglePlaceLocation(null)).toBeNull();
+    expect(parseGooglePlaceLocation(undefined)).toBeNull();
+    expect(parseGooglePlaceLocation({})).toBeNull();
+    expect(parseGooglePlaceLocation({ lat: "not-a-number", lng: -121.29 })).toBeNull();
+    expect(parseGooglePlaceLocation({ lat: 99, lng: -181 })).toBeNull();
+    expect(parseGooglePlaceLocation({ lat: 0, lng: 0 })).toBeNull();
+  });
+
+  it("survives a LatLng whose accessor throws", () => {
+    expect(
+      parseGooglePlaceLocation({
+        lat: () => {
+          throw new Error("boom");
+        },
+        lng: () => -121.29,
+      }),
+    ).toBeNull();
   });
 });

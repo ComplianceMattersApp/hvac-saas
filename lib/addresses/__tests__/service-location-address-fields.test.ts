@@ -85,6 +85,15 @@ describe("shared service-location address fields", () => {
     expect(componentSource).toContain("name={addressLine1Name}");
   });
 
+  it("submits provider coordinates as hidden fields and drops them on manual edits", () => {
+    // Coordinates ride along only while the address still matches the
+    // autocomplete selection; any manual edit except line 2 clears them.
+    expect(componentSource).toContain("name={LOCATION_LATITUDE_FIELD}");
+    expect(componentSource).toContain("name={LOCATION_LONGITUDE_FIELD}");
+    expect(componentSource).toContain('type="hidden"');
+    expect(componentSource).toContain('if (field !== "addressLine2") setCoordinates(null);');
+  });
+
   it("uses the adjacent assistant without submit, action, or identity behavior", () => {
     expect(componentSource).toContain("<GoogleAddressAutocomplete");
     expect(componentSource).not.toContain("requestSubmit");

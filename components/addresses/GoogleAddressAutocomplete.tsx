@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
   parseGoogleAddressComponents,
+  parseGooglePlaceLocation,
   type GoogleAddressComponent,
+  type GooglePlaceLocationLike,
   type SelectedServiceAddress,
 } from "@/lib/addresses/google-place-address";
 import {
@@ -43,13 +45,16 @@ export default function GoogleAddressAutocomplete({
 
       try {
         const place = placePrediction.toPlace();
-        await place.fetchFields({ fields: ["addressComponents"] });
+        await place.fetchFields({ fields: ["addressComponents", "location"] });
         if (cancelled) return;
-        callbackRef.current(
-          parseGoogleAddressComponents(
+        const coordinates = parseGooglePlaceLocation(place.location as GooglePlaceLocationLike);
+        callbackRef.current({
+          ...parseGoogleAddressComponents(
             place.addressComponents as readonly GoogleAddressComponent[] | null | undefined,
           ),
-        );
+          latitude: coordinates?.latitude ?? null,
+          longitude: coordinates?.longitude ?? null,
+        });
       } catch {
         if (!cancelled) setState("unavailable");
       }

@@ -550,6 +550,68 @@ export default async function AdminCompanyProfilePage({
                       helper="Paste your Google Business review link. When set, a review-ask button appears on completed jobs so you can request reviews from satisfied customers."
                       className="sm:col-span-2"
                     />
+                    <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                      <div className="text-sm font-semibold text-[#0f1f35]">Dispatch home base</div>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        The shop or office your technicians start from. Route planning uses this
+                        address as the start and end of each day&apos;s route.
+                      </p>
+                      {profile?.dispatch_address_line1 && profile?.dispatch_latitude == null ? (
+                        <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs leading-5 text-amber-900">
+                          We couldn&apos;t place this address on the map yet. Check the address and
+                          save again.
+                        </p>
+                      ) : null}
+                      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                        <TextField
+                          id="dispatch_address_line1"
+                          name="dispatch_address_line1"
+                          label="Street address"
+                          requirement="optional"
+                          defaultValue={profile?.dispatch_address_line1 ?? ""}
+                          placeholder="1200 Shop Street"
+                          autoComplete="address-line1"
+                          className="sm:col-span-2"
+                        />
+                        <TextField
+                          id="dispatch_address_line2"
+                          name="dispatch_address_line2"
+                          label="Suite or unit"
+                          requirement="optional"
+                          defaultValue={profile?.dispatch_address_line2 ?? ""}
+                          placeholder="Suite B"
+                          autoComplete="address-line2"
+                          className="sm:col-span-2"
+                        />
+                        <TextField
+                          id="dispatch_city"
+                          name="dispatch_city"
+                          label="City"
+                          requirement="optional"
+                          defaultValue={profile?.dispatch_city ?? ""}
+                          placeholder="Stockton"
+                          autoComplete="address-level2"
+                        />
+                        <TextField
+                          id="dispatch_state"
+                          name="dispatch_state"
+                          label="State"
+                          requirement="optional"
+                          defaultValue={profile?.dispatch_state ?? ""}
+                          placeholder="CA"
+                          autoComplete="address-level1"
+                        />
+                        <TextField
+                          id="dispatch_zip"
+                          name="dispatch_zip"
+                          label="ZIP"
+                          requirement="optional"
+                          defaultValue={profile?.dispatch_zip ?? ""}
+                          placeholder="95207"
+                          autoComplete="postal-code"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </SectionForm>
               </SettingsSection>

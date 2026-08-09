@@ -1,3 +1,5 @@
+import { normalizeCoordinatePair, type CoordinatePair } from "@/lib/routing/coordinates";
+
 export type GoogleAddressComponent = {
   longText?: string | null;
   shortText?: string | null;
@@ -10,6 +12,13 @@ export type SelectedServiceAddress = {
   state: string;
   zip: string;
   suggestedUnit: string;
+  /**
+   * Present only when the provider supplied geometry for the selection.
+   * Manual entry and legacy callers leave these absent; consumers must treat
+   * missing coordinates as "not geocoded", never as 0,0.
+   */
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 function clean(value: unknown): string {
@@ -54,6 +63,36 @@ export function parseGoogleAddressComponents(
     zip: postalCode && postalSuffix ? `${postalCode}-${postalSuffix}` : postalCode,
     suggestedUnit: longText(safeComponents, "subpremise"),
   };
+}
+
+/**
+ * The new Places API exposes `Place.location` as a LatLng whose lat/lng are
+ * methods, while serialized payloads carry plain numbers. Accept both.
+ */
+export type GooglePlaceLocationLike =
+  | { lat?: unknown; lng?: unknown }
+  | null
+  | undefined;
+
+function unwrapLatLngValue(raw: unknown): unknown {
+  if (typeof raw === "function") {
+    try {
+      return (raw as () => unknown)();
+    } catch {
+      return null;
+    }
+  }
+  return raw;
+}
+
+export function parseGooglePlaceLocation(
+  location: GooglePlaceLocationLike,
+): CoordinatePair | null {
+  if (!location || typeof location !== "object") return null;
+  return normalizeCoordinatePair(
+    unwrapLatLngValue((location as { lat?: unknown }).lat),
+    unwrapLatLngValue((location as { lng?: unknown }).lng),
+  );
 }
 
 export type EditableServiceAddress = SelectedServiceAddress & {

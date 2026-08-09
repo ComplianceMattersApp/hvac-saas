@@ -29,6 +29,7 @@ import { createOnTheWayIntentFromEvent } from "@/lib/communications/sms-on-the-w
 import { attemptLiveOnTheWaySend } from "@/lib/communications/sms-live-send";
 import { formatAppointmentContext } from "@/lib/communications/sms-on-the-way-token-renderer";
 import { resolveCanonicalOwner } from "@/lib/auth/canonical-owner";
+import { coordinateWriteColumns, readCoordinateFormFields } from "@/lib/routing/coordinates";
 import {
   loadScopedInternalJobForMutation,
   loadScopedInternalServiceCaseForMutation,
@@ -8987,6 +8988,10 @@ if (!canonicalOwnerUserId) {
     String(existingLocationSnapshot?.address_line1 ?? "").trim();
   const address_line2 = String(formData.get("address_line2") || "").trim() || null;
 
+  // Coordinates ride along as hidden fields only when the address autocomplete
+  // filled the posted address; manual edits clear them client-side.
+  const capturedServiceCoordinates = readCoordinateFormFields(formData);
+
   const city = postedCity || String(existingLocationSnapshot?.city ?? "").trim();
   const state =
     postedState ||
@@ -9885,6 +9890,7 @@ if (existingCustomerId && !existingLocationId) {
         zip,
         postal_code: zip,
         owner_user_id: canonicalOwnerUserId,
+        ...coordinateWriteColumns(capturedServiceCoordinates, "places_autocomplete"),
       })
       .select("id")
       .single();
@@ -10034,6 +10040,7 @@ if (reusableLocation?.id) {
       zip,
       postal_code: zip,
       owner_user_id: canonicalOwnerUserId,
+      ...coordinateWriteColumns(capturedServiceCoordinates, "places_autocomplete"),
     })
     .select("id")
     .single();

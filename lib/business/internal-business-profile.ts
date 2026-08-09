@@ -17,6 +17,13 @@ export type InternalBusinessProfile = {
   google_review_url: string | null;
   billing_mode: BillingMode;
   time_zone: string;
+  dispatch_address_line1: string | null;
+  dispatch_address_line2: string | null;
+  dispatch_city: string | null;
+  dispatch_state: string | null;
+  dispatch_zip: string | null;
+  dispatch_latitude: number | null;
+  dispatch_longitude: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -97,6 +104,13 @@ function normalizeInternalBusinessProfileRow(row: any): InternalBusinessProfile 
     google_review_url: row?.google_review_url ?? null,
     billing_mode: normalizeBillingMode(String(row?.billing_mode ?? "")),
     time_zone: normalizeAccountTimeZone(row?.time_zone),
+    dispatch_address_line1: String(row?.dispatch_address_line1 ?? "").trim() || null,
+    dispatch_address_line2: String(row?.dispatch_address_line2 ?? "").trim() || null,
+    dispatch_city: String(row?.dispatch_city ?? "").trim() || null,
+    dispatch_state: String(row?.dispatch_state ?? "").trim() || null,
+    dispatch_zip: String(row?.dispatch_zip ?? "").trim() || null,
+    dispatch_latitude: Number.isFinite(row?.dispatch_latitude) ? Number(row.dispatch_latitude) : null,
+    dispatch_longitude: Number.isFinite(row?.dispatch_longitude) ? Number(row.dispatch_longitude) : null,
     created_at: String(row?.created_at ?? "").trim(),
     updated_at: String(row?.updated_at ?? "").trim(),
   };
@@ -114,10 +128,26 @@ export async function getInternalBusinessProfileByAccountOwnerId(params: {
   const { data, error } = await supabase
     .from("internal_business_profiles")
     .select(
-      "account_owner_user_id, display_name, support_email, support_phone, logo_url, google_review_url, billing_mode, time_zone, created_at, updated_at",
+      "account_owner_user_id, display_name, support_email, support_phone, logo_url, google_review_url, billing_mode, time_zone, dispatch_address_line1, dispatch_address_line2, dispatch_city, dispatch_state, dispatch_zip, dispatch_latitude, dispatch_longitude, created_at, updated_at",
     )
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
+
+  // 42703 = dispatch home-base columns not migrated yet on this database.
+  // The profile powers many surfaces (invoices, jobs, ops) — degrade to the
+  // legacy column list instead of breaking them during the deploy/migration gap.
+  if (error && String((error as { code?: string })?.code ?? "") === "42703") {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from("internal_business_profiles")
+      .select(
+        "account_owner_user_id, display_name, support_email, support_phone, logo_url, google_review_url, billing_mode, time_zone, created_at, updated_at",
+      )
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+
+    if (legacyError) throw legacyError;
+    return normalizeInternalBusinessProfileRow(legacyData);
+  }
 
   if (error) throw error;
 

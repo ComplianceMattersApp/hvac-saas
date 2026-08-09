@@ -7,6 +7,10 @@ import {
   type SelectedServiceAddress,
   type ServiceAddressFieldValues,
 } from "@/lib/addresses/google-place-address";
+import {
+  LOCATION_LATITUDE_FIELD,
+  LOCATION_LONGITUDE_FIELD,
+} from "@/lib/routing/coordinates";
 
 export type ServiceLocationAddressFieldsProps = {
   initialValues?: Partial<ServiceAddressFieldValues>;
@@ -46,17 +50,36 @@ export default function ServiceLocationAddressFields({
   ].join(" ");
   const labelClassName = `grid gap-1 ${compact ? "text-xs text-slate-600" : "text-sm text-gray-700"} font-medium`;
 
+  // Provider-supplied coordinates for the selected suggestion. Cleared the
+  // moment the user manually edits any address field (except line 2 — a unit
+  // number doesn't move the building), so stored coordinates can never
+  // contradict the submitted address.
+  const [coordinates, setCoordinates] = useState<{ latitude: string; longitude: string } | null>(null);
+
   function applySelection(selected: SelectedServiceAddress) {
     setValues((current) => mergeSelectedServiceAddressFields(current, selected));
+    setCoordinates(
+      typeof selected.latitude === "number" && typeof selected.longitude === "number"
+        ? { latitude: String(selected.latitude), longitude: String(selected.longitude) }
+        : null,
+    );
   }
 
   function update(field: keyof ServiceAddressFieldValues, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
+    if (field !== "addressLine2") setCoordinates(null);
   }
 
   return (
     <div className={`space-y-3 ${className}`} data-service-location-address-fields="true">
       <GoogleAddressAutocomplete label={assistantLabel} onAddressSelected={applySelection} />
+
+      {coordinates ? (
+        <>
+          <input type="hidden" name={LOCATION_LATITUDE_FIELD} value={coordinates.latitude} />
+          <input type="hidden" name={LOCATION_LONGITUDE_FIELD} value={coordinates.longitude} />
+        </>
+      ) : null}
 
       <label className={labelClassName} htmlFor={`${id}-address-line-1`}>
         Address Line 1

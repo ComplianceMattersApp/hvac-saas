@@ -2,7 +2,10 @@ export const GOOGLE_MAPS_SCRIPT_ID = "everystep-google-maps-javascript";
 
 export type PlaceLike = {
   addressComponents?: readonly unknown[] | null;
-  fetchFields(options: { fields: readonly ["addressComponents"] }): Promise<void>;
+  location?: unknown;
+  fetchFields(options: {
+    fields: readonly ("addressComponents" | "location")[];
+  }): Promise<void>;
 };
 
 type PlacePredictionLike = {
