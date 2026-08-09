@@ -56,8 +56,9 @@ import {
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
-import { syncSingleInvoiceToQboFromForm, syncSinglePaymentToQboFromForm } from "@/lib/actions/qbo-sync-actions";
+import { retryQboInvoiceVoidFromForm, syncSingleInvoiceToQboFromForm, syncSinglePaymentToQboFromForm } from "@/lib/actions/qbo-sync-actions";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
+import { readInvoiceQboVoidState } from "@/lib/qbo/qbo-void-state";
 import {
   collectIssuedInvoiceCardPaymentFromForm,
   collectTenantInvoicePaymentNowFromForm,
@@ -229,6 +230,9 @@ function bannerMessage(value?: string | null) {
     internal_invoice_qbo_not_configured: "QuickBooks isn't configured for this environment.",
     internal_invoice_payment_qbo_synced: "Payment synced to QuickBooks.",
     internal_invoice_payment_qbo_sync_failed: "Payment did not sync to QuickBooks. Review the error and try again.",
+    internal_invoice_qbo_voided: "Invoice voided in QuickBooks.",
+    internal_invoice_qbo_void_failed: "The void did not reach QuickBooks — review the error and retry.",
+    internal_invoice_qbo_void_blocked: "QuickBooks shows a payment applied to this invoice, so it was not voided there. Reconcile the payment in QuickBooks, then retry.",
     internal_invoice_supplemental_draft_created: "Supplemental draft invoice created.",
     internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
@@ -597,6 +601,15 @@ export default async function InternalInvoiceWorkspacePage({
     workspaceHref: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(familyInvoice.id)}#invoice-workspace`,
     isSelected: familyInvoice.id === invoice?.id,
   }));
+  // Void-propagation state lives outside INTERNAL_INVOICE_SELECT so a lagging
+  // migration can never break invoice reads — see lib/qbo/qbo-void-state.ts.
+  const qboVoidState = invoice?.status === "void" && invoice.qbo_invoice_id
+    ? await readInvoiceQboVoidState({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        invoiceId: invoice.id,
+      })
+    : null;
   const duplicateChargeRisks = invoice?.status === "draft"
     ? await resolveInternalInvoiceDuplicateRisks({
         supabase,
@@ -2078,6 +2091,57 @@ export default async function InternalInvoiceWorkspacePage({
               ) : invoice.status === "draft" ? (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-600">
                   Invoice issue authority is not available for your current role.
+                </div>
+              ) : invoice.status === "void" ? (
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-slate-300 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-700">
+                    This invoice is void. It stays in history as a voided record.
+                  </div>
+                  {qboVoidState ? (
+                    <div
+                      className={`rounded-xl border px-3 py-2.5 text-sm ${
+                        qboVoidState.status === "voided"
+                          ? "border-emerald-200 bg-emerald-50/75 text-emerald-900"
+                          : qboVoidState.status === "blocked" || !qboVoidState.status
+                            ? "border-amber-300 bg-amber-50/80 text-amber-950"
+                            : "border-rose-200 bg-rose-50/80 text-rose-900"
+                      }`}
+                    >
+                      <div className="font-semibold">
+                        {qboVoidState.status === "voided"
+                          ? "Voided in QuickBooks"
+                          : qboVoidState.status === "blocked"
+                            ? "QuickBooks needs a decision"
+                            : qboVoidState.status
+                              ? "Void has not reached QuickBooks"
+                              : "Not confirmed in QuickBooks"}
+                      </div>
+                      {qboVoidState.status === "voided" ? (
+                        <p className="mt-1 text-xs leading-5">
+                          QuickBooks no longer shows this invoice as open
+                          {qboVoidState.voidedAt ? ` (${formatTimestampDateDisplayLA(qboVoidState.voidedAt)})` : ""}.
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-xs leading-5">
+                          {qboVoidState.error
+                            ?? "QuickBooks may still show this invoice as open. Retry to bring it in line."}
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                  {getQboAvailability().available
+                  && canManageFinancialInvoiceLifecycle
+                  && invoice.qbo_invoice_id
+                  && qboVoidState
+                  && qboVoidState.status !== "voided" ? (
+                    <form action={retryQboInvoiceVoidFromForm}>
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input type="hidden" name="invoice_id" value={invoice.id} />
+                      <SubmitButton loadingText="Voiding in QuickBooks..." className={`${darkButtonClass} w-full`}>
+                        {qboVoidState.status === "blocked" ? "Retry void (payment reconciled)" : "Retry QuickBooks void"}
+                      </SubmitButton>
+                    </form>
+                  ) : null}
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">

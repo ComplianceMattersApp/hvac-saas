@@ -182,11 +182,14 @@ async function qboFetch(opts: {
   method: "GET" | "POST";
   body?: unknown;
   query?: string;
+  /** QBO "sparse operation" selector, e.g. `void` on POST /invoice. */
+  operation?: string;
 }): Promise<any> {
-  const { accessToken, realmId, baseUrl, path, method, body, query } = opts;
+  const { accessToken, realmId, baseUrl, path, method, body, query, operation } = opts;
   const url = new URL(`${baseUrl}/v3/company/${realmId}/${path}`);
   url.searchParams.set("minorversion", QBO_MINOR_VERSION);
   if (query) url.searchParams.set("query", query);
+  if (operation) url.searchParams.set("operate", operation);
 
   const response = await fetch(url.toString(), {
     method,
@@ -372,6 +375,84 @@ export async function updateQboInvoice(
   const inv = updated?.Invoice;
   if (!inv?.Id) throw new QboApiError(0, "QBO invoice update returned no Id");
   return { id: String(inv.Id), syncToken: String(inv.SyncToken) };
+}
+
+export interface QboInvoiceSnapshot {
+  id: string;
+  syncToken: string;
+  docNumber: string | null;
+  balance: number;
+  totalAmount: number;
+  /**
+   * QBO exposes no explicit "voided" flag on Invoice — voiding zeroes every line,
+   * so TotalAmt and Balance both land on 0. An invoice can only reach EveryStep's
+   * QBO sync with a positive total (the zero_or_invalid_total eligibility gate),
+   * so a zeroed synced invoice means it was voided in QBO already.
+   */
+  looksVoided: boolean;
+}
+
+/**
+ * Read one QBO invoice by its QBO Id. Returns null when QBO has no such invoice
+ * (deleted there, or the stored id is stale).
+ *
+ * The live SyncToken matters: applying a payment or editing in QBO bumps it, so
+ * the token stored at push time goes stale and any write using it fails with a
+ * 5010 stale-object fault. Callers that mutate should always re-read first.
+ */
+export async function findQboInvoiceById(
+  params: QboRequestBase & { qboInvoiceId: string },
+): Promise<QboInvoiceSnapshot | null> {
+  const { accessToken, realmId, baseUrl } = params;
+  const qboInvoiceId = String(params.qboInvoiceId ?? "").trim();
+  if (!qboInvoiceId) return null;
+
+  const found = await qboFetch({
+    accessToken,
+    realmId,
+    baseUrl,
+    path: "query",
+    method: "GET",
+    query: `select * from Invoice where Id = '${escapeQboQueryValue(qboInvoiceId)}'`,
+  });
+  const invoice = found?.QueryResponse?.Invoice?.[0];
+  if (!invoice?.Id) return null;
+
+  const balance = Number(invoice.Balance ?? 0);
+  const totalAmount = Number(invoice.TotalAmt ?? 0);
+  return {
+    id: String(invoice.Id),
+    syncToken: String(invoice.SyncToken ?? "0"),
+    docNumber: String(invoice.DocNumber ?? "").trim() || null,
+    balance,
+    totalAmount,
+    looksVoided: totalAmount === 0 && balance === 0,
+  };
+}
+
+/**
+ * Void a QBO invoice (POST /invoice?operate=void with a sparse Id + SyncToken).
+ *
+ * Void, not delete: QBO keeps the invoice, its number, and its audit trail, and
+ * zeroes the amounts — which matches EveryStep's own "voiding keeps the invoice
+ * in history" semantics. `syncToken` must be the live one, not the stored one.
+ */
+export async function voidQboInvoice(
+  params: QboRequestBase & { qboInvoiceId: string; syncToken: string },
+): Promise<QboSyncedEntity> {
+  const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken } = params;
+  const voided = await qboFetch({
+    accessToken,
+    realmId,
+    baseUrl,
+    path: "invoice",
+    method: "POST",
+    operation: "void",
+    body: { Id: qboInvoiceId, SyncToken: syncToken },
+  });
+  const inv = voided?.Invoice;
+  if (!inv?.Id) throw new QboApiError(0, "QBO invoice void returned no Id");
+  return { id: String(inv.Id), syncToken: String(inv.SyncToken ?? syncToken) };
 }
 
 export async function createQboPayment(

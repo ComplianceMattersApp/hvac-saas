@@ -19,7 +19,7 @@ function clean(value: unknown) { return String(value ?? "").trim(); }
 export async function buildAttentionCenterReadModel(params: { admin: any; accountOwnerUserId: string }) {
   const ownerId = clean(params.accountOwnerUserId);
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const [paymentResult, invoiceErrorResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
+  const [paymentResult, invoiceErrorResult, voidDriftResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
     params.admin.from("internal_invoice_payments")
       .select("id, invoice_id, job_id, amount_cents, paid_at, qbo_sync_status, qbo_sync_error, processor_name")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "recorded")
@@ -27,6 +27,13 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     params.admin.from("internal_invoices")
       .select("id, job_id, invoice_number, invoice_display_number, qbo_sync_error, updated_at")
       .eq("account_owner_user_id", ownerId).eq("qbo_sync_status", "error").order("updated_at", { ascending: false }).limit(100),
+    // Voids that have not reached QuickBooks. Tolerated separately because the
+    // qbo_void_* columns may not be deployed yet — a missing column degrades to
+    // "no items", never to a broken attention center.
+    params.admin.from("internal_invoices")
+      .select("id, job_id, invoice_number, invoice_display_number, qbo_void_status, qbo_void_error, voided_at")
+      .eq("account_owner_user_id", ownerId).eq("status", "void")
+      .in("qbo_void_status", ["pending", "blocked", "error"]).order("voided_at", { ascending: false }).limit(100),
     params.admin.from("internal_invoice_payments")
       .select("id, invoice_id, job_id, amount_cents, created_at, stripe_checkout_session_id")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "pending").eq("processor_name", "stripe")
@@ -66,6 +73,22 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       title: `QuickBooks invoice sync failed · ${clean(invoice.invoice_display_number) || clean(invoice.invoice_number) || invoiceId}`,
       detail: clean(invoice.qbo_sync_error) || "Invoice did not post to QuickBooks.", truth: "Invoice exists in EveryStep but its QuickBooks record needs attention.",
       occurredAt: clean(invoice.updated_at) || null, href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`, actionLabel: "Open invoice sync",
+    });
+  }
+  // voidDriftResult is intentionally excluded from the throwing guard above: the
+  // qbo_void_* columns are additive, so an undeployed migration must degrade to
+  // zero items rather than breaking the whole attention center.
+  for (const invoice of voidDriftResult.error ? [] : (voidDriftResult.data ?? [])) {
+    const invoiceId = clean(invoice.id); const jobId = clean(invoice.job_id);
+    const blocked = clean(invoice.qbo_void_status) === "blocked";
+    items.push({ id: `qbo-invoice-void-${invoiceId}`, category: "qbo_invoice", severity: "critical",
+      title: `QuickBooks still shows a voided invoice · ${clean(invoice.invoice_display_number) || clean(invoice.invoice_number) || invoiceId}`,
+      detail: clean(invoice.qbo_void_error) || "The void has not been confirmed in QuickBooks.",
+      truth: blocked
+        ? "This invoice is void in EveryStep, but QuickBooks has a payment applied to it — voiding there would leave that payment unapplied."
+        : "This invoice is void in EveryStep. QuickBooks may still count it as open revenue.",
+      occurredAt: clean(invoice.voided_at) || null, href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`,
+      actionLabel: blocked ? "Reconcile in QuickBooks" : "Retry QuickBooks void",
     });
   }
   for (const payment of staleResult.data ?? []) {

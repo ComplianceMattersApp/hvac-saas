@@ -70,9 +70,10 @@ export default function TermsOfServicePage() {
         </h2>
         <p className="text-stone-700 leading-relaxed">
           When the QuickBooks Online integration is enabled, EveryStep FieldWorks may synchronize
-          eligible invoice and recorded payment information with QuickBooks Online. Synchronization is
-          provided as a convenience feature and depends on account configuration, authorization,
-          provider availability, and successful record matching. EveryStep remains the operational
+          eligible invoice and recorded payment information with QuickBooks Online, including voiding a
+          QuickBooks Online invoice when you void the corresponding invoice in EveryStep.
+          Synchronization is provided as a convenience feature and depends on account configuration,
+          authorization, provider availability, and successful record matching. EveryStep remains the operational
           system of record for jobs, invoices, and recorded payment status. QuickBooks Online does not
           replace EveryStep as the operational source of truth. You are responsible for ensuring your
           use of this integration complies with Intuit&apos;s terms of service. We are not affiliated

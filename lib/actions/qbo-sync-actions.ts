@@ -9,6 +9,7 @@ import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { getQboConnectionForAccount } from "@/lib/qbo/qbo-connection";
 import { syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
 import { syncPaymentToQbo } from "@/lib/qbo/qbo-payment-sync";
+import { voidAllPendingInvoiceVoidsInQbo, voidInvoiceInQbo } from "@/lib/qbo/qbo-void-sync";
 
 const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
 
@@ -52,6 +53,47 @@ export async function syncSingleInvoiceToQboFromForm(formData: FormData): Promis
   revalidatePath(`/jobs/${jobId}/invoice`);
   redirect(
     href(result.status === "synced" ? "internal_invoice_qbo_synced" : "internal_invoice_qbo_sync_failed"),
+  );
+}
+
+/**
+ * Explicit per-invoice void retry, triggered from the invoice workspace. Also
+ * the only way to re-attempt a 'blocked' void (QBO showed payments applied) —
+ * the automatic sweep deliberately leaves those alone, so clearing them is a
+ * conscious operator action taken after reconciling the payment in QuickBooks.
+ */
+export async function retryQboInvoiceVoidFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalRole("admin", { supabase });
+
+  const invoiceId = String(formData.get("invoice_id") ?? "").trim();
+  const jobId = String(formData.get("job_id") ?? "").trim();
+  const href = (banner: string) =>
+    `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}&banner=${banner}#invoice-workspace`;
+
+  if (!invoiceId || !jobId) redirect(href("internal_invoice_qbo_void_failed"));
+  if (!getQboAvailability().available) redirect(href("internal_invoice_qbo_not_configured"));
+
+  const connection = await getQboConnectionForAccount({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  if (!connection) redirect(href("internal_invoice_qbo_not_connected"));
+
+  const result = await voidInvoiceInQbo({
+    supabase: createAdminClient(),
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    invoiceId,
+  });
+  revalidatePath(`/jobs/${jobId}/invoice`);
+  redirect(
+    href(
+      result.status === "voided"
+        ? "internal_invoice_qbo_voided"
+        : result.status === "blocked"
+          ? "internal_invoice_qbo_void_blocked"
+          : "internal_invoice_qbo_void_failed",
+    ),
   );
 }
 
@@ -131,17 +173,30 @@ export async function syncAllPendingInvoicesToQboFromForm(
       dryRun: false,
     });
 
+    // Same run also drains voids that have not reached QBO — including invoices
+    // voided before this lane existed, which are otherwise silent drift.
+    const voids = await voidAllPendingInvoiceVoidsInQbo({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+
     revalidatePath(COMPANY_PROFILE_PATH);
 
-    const message =
+    const baseMessage =
       result.errors > 0
         ? `Synced ${result.synced} invoice(s), ${result.errors} failed to sync — check individual invoices for details.`
         : `Synced ${result.synced} invoice(s), ${result.skipped} skipped, 0 errors.`;
+    const voidParts = [
+      voids.voided > 0 ? `voided ${voids.voided} in QuickBooks` : null,
+      voids.blocked > 0 ? `${voids.blocked} void(s) blocked by applied payments — reconcile in QuickBooks` : null,
+      voids.errors > 0 ? `${voids.errors} void(s) failed` : null,
+    ].filter((part): part is string => Boolean(part));
+    const message = voidParts.length > 0 ? `${baseMessage} Also ${voidParts.join("; ")}.` : baseMessage;
 
     return {
       synced: result.synced,
       skipped: result.skipped,
-      errors: result.errors,
+      errors: result.errors + voids.errors,
       message,
     };
   } catch (error) {

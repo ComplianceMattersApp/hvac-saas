@@ -76,9 +76,11 @@ export default function PrivacyPolicyPage() {
           encryption. EveryStep FieldWorks may synchronize eligible invoice and recorded payment
           information with QuickBooks Online when an account has enabled the integration. After a
           payment is successfully confirmed and recorded in EveryStep, EveryStep may create a related
-          QuickBooks Online payment and apply it to the corresponding invoice. Synchronization depends
-          on account configuration, provider availability, authorization status, and successful record
-          matching.
+          QuickBooks Online payment and apply it to the corresponding invoice. If you void an invoice
+          in EveryStep, EveryStep may void the corresponding QuickBooks Online invoice so both systems
+          reflect the same status; an invoice that QuickBooks Online shows as already paid is left
+          unchanged for your review. Synchronization depends on account configuration, provider
+          availability, authorization status, and successful record matching.
         </p>
         <p className="mt-3 text-stone-700 leading-relaxed">
           QuickBooks Online is used as a downstream accounting synchronization service. EveryStep

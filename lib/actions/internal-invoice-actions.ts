@@ -36,6 +36,7 @@ import {
   buildVisitScopeInvoiceLineSource,
 } from '@/lib/business/internal-invoice-source';
 import { autoSyncIssuedInvoiceToQbo } from '@/lib/qbo/qbo-auto-sync';
+import { autoVoidInvoiceInQbo } from '@/lib/qbo/qbo-void-sync';
 import { resolveOperationalTenantIdentity } from '@/lib/email/operational-tenant-branding';
 import {
   normalizeInternalInvoiceItemType,
@@ -2179,6 +2180,17 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
         source: 'internal_invoice_void_recompute',
       });
     }
+  }
+
+  // Propagate the void to QuickBooks. EveryStep is the source of truth, so this
+  // is best-effort and never throws: a QBO failure is recorded on the invoice
+  // (qbo_void_status='error'/'pending') and retried by the bulk sweep, rather
+  // than leaving QBO holding a live invoice with nothing surfacing the drift.
+  if (context.invoice.qbo_invoice_id) {
+    await autoVoidInvoiceInQbo({
+      accountOwnerUserId: context.internalUser.account_owner_user_id,
+      invoiceId: context.invoice.id,
+    });
   }
 
   revalidatePath(`/jobs/${context.jobId}`);
