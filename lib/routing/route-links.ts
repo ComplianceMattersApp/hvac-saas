@@ -34,6 +34,8 @@ export function buildRouteStaticMapUrl(params: {
   stops: RouteMapStop[];
   /** Optional emphasized pin (e.g. the customer being called), drawn green. */
   highlight?: CoordinatePair | null;
+  /** Already-booked stops drawn as small slate context dots. */
+  contextStops?: CoordinatePair[];
   width?: number;
   height?: number;
 }): string | null {
@@ -55,6 +57,9 @@ export function buildRouteStaticMapUrl(params: {
       "markers",
       label ? `color:0x2563eb|label:${label}|${point(stop)}` : `color:0x2563eb|${point(stop)}`,
     );
+  }
+  for (const context of params.contextStops ?? []) {
+    query.append("markers", `size:small|color:0x64748b|${point(context)}`);
   }
   if (params.highlight) {
     query.append("markers", `color:0x059669|label:C|${point(params.highlight)}`);

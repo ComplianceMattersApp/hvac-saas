@@ -101,6 +101,9 @@ export type PlannedDay = {
   totalDriveMinutes: number;
   projectedEndMinutes: number;
   projectedEndLabel: string;
+  /** When to roll out of the base so stop 1 lands on time; null with no stops. */
+  leaveBaseMinutes: number | null;
+  leaveBaseLabel: string | null;
 };
 
 export type UnplannedJob = {
@@ -276,11 +279,11 @@ function clusterAffinityKm(cluster: Located[], referencePoints: CoordinatePair[]
 // inserted wherever they add the least driving.
 // ---------------------------------------------------------------------------
 
-function orderDayRoute(
+export function orderDayRoute(
   anchors: PlanAnchor[],
-  queued: Located[],
+  queued: LocatedPlanJob[],
   homeBase: CoordinatePair | null,
-): Array<PlanAnchor | Located> {
+): Array<PlanAnchor | LocatedPlanJob> {
   const skeleton: Array<PlanAnchor | Located> = [...anchors].sort((a, b) => {
     const aStart = parseTimeToMinutes(a.windowStart) ?? Number.MAX_SAFE_INTEGER;
     const bStart = parseTimeToMinutes(b.windowStart) ?? Number.MAX_SAFE_INTEGER;
@@ -331,6 +334,7 @@ function buildDayTimeline(
   let totalDriveKm = 0;
   let totalDriveMinutes = 0;
 
+  let firstDriveMinutes = 0;
   route.forEach((stop, index) => {
     const point = stop.coordinates;
     const driveKm = cursorPoint && point ? haversineKm(cursorPoint, point) : 0;
@@ -338,11 +342,24 @@ function buildDayTimeline(
     totalDriveKm += driveKm;
     totalDriveMinutes += driveMinutes;
 
-    let arrival = cursorMinutes + driveMinutes;
     const anchor = isAnchor(stop);
-    if (anchor) {
-      const windowStart = parseTimeToMinutes((stop as PlanAnchor).windowStart);
-      if (windowStart !== null && arrival < windowStart) arrival = windowStart;
+    let arrival: number;
+    if (index === 0) {
+      // A window is an ARRIVAL commitment: the crew leaves base early enough
+      // that stop 1 lands at day start (or its window start), not day start
+      // plus the first drive.
+      firstDriveMinutes = driveMinutes;
+      arrival = options.dayStartMinutes;
+      if (anchor) {
+        const windowStart = parseTimeToMinutes((stop as PlanAnchor).windowStart);
+        if (windowStart !== null && windowStart > arrival) arrival = windowStart;
+      }
+    } else {
+      arrival = cursorMinutes + driveMinutes;
+      if (anchor) {
+        const windowStart = parseTimeToMinutes((stop as PlanAnchor).windowStart);
+        if (windowStart !== null && arrival < windowStart) arrival = windowStart;
+      }
     }
 
     const duration = stop.durationMinutes ?? options.defaultDurationMinutes;
@@ -400,6 +417,9 @@ function buildDayTimeline(
     if (point) cursorPoint = point;
   });
 
+  const leaveBaseMinutes =
+    stops.length > 0 ? stops[0].projectedArrivalMinutes - firstDriveMinutes : null;
+
   return {
     date,
     stops,
@@ -409,6 +429,8 @@ function buildDayTimeline(
     totalDriveMinutes,
     projectedEndMinutes: cursorMinutes,
     projectedEndLabel: minutesToLabel(cursorMinutes),
+    leaveBaseMinutes,
+    leaveBaseLabel: leaveBaseMinutes !== null ? minutesToLabel(leaveBaseMinutes) : null,
   };
 }
 
@@ -432,6 +454,7 @@ export function planJobOnDay(
       projectedArrivalLabel: string;
       proposedWindows: PlannedStop["proposedWindows"];
       overflowsDay: boolean;
+      leaveBaseLabel: string | null;
     }
   | { status: "full" }
   | { status: "missing_coordinates" } {
@@ -450,6 +473,7 @@ export function planJobOnDay(
     projectedArrivalLabel: stop.projectedArrivalLabel,
     proposedWindows: stop.proposedWindows,
     overflowsDay: stop.overflowsDay,
+    leaveBaseLabel: day.leaveBaseLabel,
   };
 }
 

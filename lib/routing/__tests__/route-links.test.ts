@@ -26,6 +26,17 @@ describe("buildRouteStaticMapUrl", () => {
     expect(decodeURIComponent(url)).not.toContain("label:H");
   });
 
+  it("renders booked context stops as small slate dots", () => {
+    const url = buildRouteStaticMapUrl({
+      apiKey: "k",
+      homeBase: HOME,
+      stops: [STOP_1],
+      contextStops: [{ latitude: 38.05, longitude: -121.3 }],
+    })!;
+    const decoded = decodeURIComponent(url);
+    expect(decoded).toContain("size:small|color:0x64748b|38.05,-121.3");
+  });
+
   it("labels stops past 9 with letters and drops labels past 35", () => {
     const url = buildRouteStaticMapUrl({
       apiKey: "k",

@@ -17,6 +17,7 @@ import { buildRouteStaticMapUrl, type RouteMapStop } from "@/lib/routing/route-l
 import {
   clusterJobsByArea,
   hasCoordinates,
+  orderDayRoute,
   planJobOnDay,
   suggestTargetDates,
   type LocatedPlanJob,
@@ -286,13 +287,14 @@ export async function RoutePlanView({
             anchorsByDate={anchorsByDate}
             horizonDates={horizonDates}
             homeBase={homeBase}
+            staticMapKey={staticMapKey}
             dayFitsFor={dayFitsFor}
           />
         ))}
 
         {soloStops.length > 0 ? (
-          <section className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-            <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+          <section className="rounded-xl border border-slate-200 shadow-sm">
+            <div className="rounded-t-[11px] border-b border-slate-200 bg-slate-50/80 px-4 py-3">
               <h3 className="text-sm font-bold text-[#0f1f35]">On their own</h3>
               <p className="mt-0.5 text-xs text-slate-500">
                 No queued work nearby yet — pair them with a green day, or wait for neighbors.
@@ -306,6 +308,7 @@ export async function RoutePlanView({
                   ageDays={ageByJobId.get(job.id) ?? null}
                   date={date}
                   dayFits={dayFitsFor(job)}
+                  anchorsByDate={anchorsByDate}
                 />
               ))}
             </ol>
@@ -344,39 +347,72 @@ export async function RoutePlanView({
 // Day-fit strip
 // ---------------------------------------------------------------------------
 
-function stripCellClasses(kind: DayFit["kind"]): string {
-  if (kind === "near_work") {
-    return "border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200";
+/** Deeper green = cheaper detour, so the strip itself hints at the ranking. */
+function stripCellClasses(fit: DayFit): string {
+  if (fit.kind === "near_work") {
+    const detour = fit.detourMinutes ?? 99;
+    if (detour <= 12) return "border-emerald-400 bg-emerald-200 text-emerald-950 hover:bg-emerald-300";
+    if (detour <= 25) return "border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200";
+    return "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100";
   }
-  if (kind === "open") {
+  if (fit.kind === "open") {
     return "border-slate-200 bg-white text-slate-600 hover:bg-slate-50";
   }
   return "border-slate-200 bg-slate-100 text-slate-300";
 }
 
-function stripCellTitle(fit: DayFit): string {
-  const label = dayLabel(fit.date);
+function fitSummaryLine(fit: DayFit): string {
   if (fit.kind === "near_work") {
-    return `${label} — near ${fit.nearestAnchorLabel ?? "booked work"} (~${fit.detourMinutes ?? "?"} min away)`;
+    return `Near ${fit.nearestAnchorLabel ?? "booked work"} — ~${fit.detourMinutes ?? "?"} min away`;
   }
   if (fit.kind === "open") {
-    return fit.roundTripMinutes
-      ? `${label} — open day, ~${fit.roundTripMinutes} min round trip`
-      : `${label} — open day`;
+    return fit.roundTripMinutes ? `Open — solo trip, ~${fit.roundTripMinutes} min round trip` : "Open day";
   }
-  return `${label} — full`;
+  return "Full";
+}
+
+function anchorPeekLabel(anchor: PlanAnchor): string {
+  const time = anchor.windowStart ? String(anchor.windowStart).slice(0, 5) : "—";
+  const who = anchor.customerName ?? anchor.title;
+  return [time, anchor.city, who].filter(Boolean).join(" · ");
+}
+
+function DayPeekCard({ fit, anchors }: { fit: DayFit; anchors: PlanAnchor[] }) {
+  const shown = anchors.slice(0, 4);
+  return (
+    <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-1.5 hidden w-60 -translate-x-1/2 rounded-lg border border-slate-300 bg-white p-2.5 text-left shadow-xl group-hover:block">
+      <p className="text-xs font-bold text-slate-900">{dayLabel(fit.date)}</p>
+      <p className="mt-0.5 text-[11px] leading-4 text-slate-600">{fitSummaryLine(fit)}</p>
+      {shown.length > 0 ? (
+        <ul className="mt-1.5 space-y-0.5 border-t border-slate-100 pt-1.5">
+          {shown.map((anchor) => (
+            <li key={anchor.id} className="truncate text-[11px] leading-4 text-slate-700">
+              {anchorPeekLabel(anchor)}
+            </li>
+          ))}
+          {anchors.length > shown.length ? (
+            <li className="text-[11px] text-slate-400">+{anchors.length - shown.length} more</li>
+          ) : null}
+        </ul>
+      ) : (
+        <p className="mt-1 text-[11px] text-slate-400">Nothing booked yet.</p>
+      )}
+    </div>
+  );
 }
 
 function DayFitStrip({
   jobId,
   date,
   dayFits,
+  anchorsByDate,
   selectedDay,
   size,
 }: {
   jobId: string;
   date: string;
   dayFits: DayFit[];
+  anchorsByDate: Record<string, PlanAnchor[]>;
   selectedDay?: string | null;
   size: "compact" | "large";
 }) {
@@ -389,10 +425,17 @@ function DayFitStrip({
     <div className="flex flex-wrap gap-1" aria-label="Day fit for the next two weeks">
       {dayFits.map((fit) => {
         const { weekday, dayOfMonth } = shortDayLabel(fit.date);
+        const anchors = anchorsByDate[fit.date] ?? [];
         const isSelected = selectedDay === fit.date;
-        const className = `${cellBase} ${stripCellClasses(fit.kind)} ${
+        const className = `${cellBase} ${stripCellClasses(fit)} ${
           isSelected ? "ring-2 ring-blue-500 ring-offset-1" : ""
         }`;
+        const countBadge =
+          fit.anchorCount > 0 ? (
+            <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#0f1f35] px-0.5 text-[8px] font-bold leading-none text-white">
+              {fit.anchorCount}
+            </span>
+          ) : null;
         const content = (
           <>
             <span className={size === "large" ? "text-[9px] font-medium opacity-70" : "sr-only"}>
@@ -401,22 +444,19 @@ function DayFitStrip({
             <span>{dayOfMonth}</span>
           </>
         );
-        if (fit.kind === "full") {
-          return (
-            <span key={fit.date} title={stripCellTitle(fit)} className={className}>
-              {content}
-            </span>
-          );
-        }
+
         return (
-          <Link
-            key={fit.date}
-            href={worksheetHref(date, { focus: jobId, day: fit.date })}
-            title={stripCellTitle(fit)}
-            className={className}
-          >
-            {content}
-          </Link>
+          <span key={fit.date} className="group relative inline-flex">
+            {fit.kind === "full" ? (
+              <span className={className}>{content}</span>
+            ) : (
+              <Link href={worksheetHref(date, { focus: jobId, day: fit.date })} className={className}>
+                {content}
+              </Link>
+            )}
+            {countBadge}
+            <DayPeekCard fit={fit} anchors={anchors} />
+          </span>
         );
       })}
     </div>
@@ -434,6 +474,7 @@ function GroupingCard({
   anchorsByDate,
   horizonDates,
   homeBase,
+  staticMapKey,
   dayFitsFor,
 }: {
   cluster: LocatedPlanJob[];
@@ -442,6 +483,7 @@ function GroupingCard({
   anchorsByDate: Record<string, PlanAnchor[]>;
   horizonDates: string[];
   homeBase: CoordinatePair | null;
+  staticMapKey: string | null;
   dayFitsFor: (job: LocatedPlanJob) => DayFit[];
 }) {
   const cities = Array.from(
@@ -453,9 +495,40 @@ function GroupingCard({
   const backup = targets[1] ?? null;
   const targetAnchors = target ? anchorsByDate[target.date] ?? [] : [];
 
+  // Suggested drive order for the target day: cluster jobs slotted around that
+  // day's committed stops. Pins on the map and numbers on the rows match.
+  const route = orderDayRoute(targetAnchors, cluster, homeBase);
+  const clusterIds = new Set(cluster.map((job) => job.id));
+  const orderByJobId = new Map<string, number>();
+  let orderCounter = 0;
+  for (const stop of route) {
+    if (clusterIds.has(stop.id)) {
+      orderCounter += 1;
+      orderByJobId.set(stop.id, orderCounter);
+    }
+  }
+  const orderedCluster = [...cluster].sort(
+    (a, b) => (orderByJobId.get(a.id) ?? 99) - (orderByJobId.get(b.id) ?? 99),
+  );
+
+  const mapStops: RouteMapStop[] = orderedCluster.map((job) => ({
+    ...job.coordinates,
+    order: orderByJobId.get(job.id) ?? 0,
+  }));
+  const mapUrl = buildRouteStaticMapUrl({
+    apiKey: staticMapKey,
+    homeBase,
+    stops: mapStops,
+    contextStops: targetAnchors
+      .map((anchor) => anchor.coordinates)
+      .filter((point): point is CoordinatePair => point !== null),
+    width: 640,
+    height: 260,
+  });
+
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+    <section className="rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-[11px] border-b border-slate-200 bg-slate-50/80 px-4 py-3">
         <div>
           <h3 className="text-sm font-bold text-[#0f1f35]">
             {label} · {cluster.length} jobs together
@@ -472,14 +545,28 @@ function GroupingCard({
           )}
         </div>
       </div>
+
+      {mapUrl ? (
+        <div className="flex justify-center border-b border-slate-200 bg-slate-100/60 px-4 py-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={mapUrl}
+            alt={`Map of the ${label} grouping in suggested drive order`}
+            className="h-auto w-full max-w-2xl rounded-lg border border-slate-200 shadow-sm"
+          />
+        </div>
+      ) : null}
+
       <ol className="divide-y divide-slate-100">
-        {cluster.map((job) => (
+        {orderedCluster.map((job) => (
           <WorksheetJobRow
             key={job.id}
             job={job}
+            orderNumber={orderByJobId.get(job.id) ?? null}
             ageDays={ageByJobId.get(job.id) ?? null}
             date={date}
             dayFits={dayFitsFor(job)}
+            anchorsByDate={anchorsByDate}
           />
         ))}
       </ol>
@@ -489,18 +576,27 @@ function GroupingCard({
 
 function WorksheetJobRow({
   job,
+  orderNumber,
   ageDays,
   date,
   dayFits,
+  anchorsByDate,
 }: {
   job: LocatedPlanJob;
+  orderNumber?: number | null;
   ageDays: number | null;
   date: string;
   dayFits: DayFit[];
+  anchorsByDate: Record<string, PlanAnchor[]>;
 }) {
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
+        {orderNumber ? (
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
+            {orderNumber}
+          </span>
+        ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -524,7 +620,13 @@ function WorksheetJobRow({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <DayFitStrip jobId={job.id} date={date} dayFits={dayFits} size="compact" />
+          <DayFitStrip
+            jobId={job.id}
+            date={date}
+            dayFits={dayFits}
+            anchorsByDate={anchorsByDate}
+            size="compact"
+          />
           <Link
             href={worksheetHref(date, { focus: job.id })}
             className="inline-flex min-h-9 items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
@@ -567,6 +669,17 @@ function FocusPanel({
     ? planJobOnDay({ job, date: selectedDay, anchors: selectedAnchors, homeBase })
     : null;
 
+  // Least-impact ranking: every viable day priced in added drive minutes, so a
+  // forced bad day is an informed surrender, not a blind one.
+  const impactOf = (fit: DayFit): number | null =>
+    fit.kind === "near_work" ? fit.detourMinutes : fit.kind === "open" ? fit.roundTripMinutes : null;
+  const rankedDays = dayFits
+    .filter((fit) => fit.kind !== "full")
+    .map((fit) => ({ fit, impact: impactOf(fit) }))
+    .sort((a, b) => (a.impact ?? 9999) - (b.impact ?? 9999));
+  const bestImpact = rankedDays.length > 0 ? rankedDays[0].impact : null;
+  const selectedImpact = selectedFit ? impactOf(selectedFit) : null;
+
   const mapStops: RouteMapStop[] = selectedAnchors
     .filter((anchor) => anchor.coordinates !== null)
     .map((anchor, index) => ({ ...anchor.coordinates!, order: index + 1 }));
@@ -582,8 +695,8 @@ function FocusPanel({
     : null;
 
   return (
-    <section className="overflow-hidden rounded-xl border-2 border-blue-200 shadow-md">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/60 px-4 py-3">
+    <section className="rounded-xl border-2 border-blue-200 shadow-md">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-t-[10px] border-b border-blue-100 bg-blue-50/60 px-4 py-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-base font-bold text-[#0f1f35]">{job.customerName ?? job.title}</h3>
@@ -641,9 +754,36 @@ function FocusPanel({
       <div className="space-y-3 px-4 py-4">
         <div>
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Which day works? <span className="font-normal normal-case">green = near booked work · white = open (solo trip) · gray = full</span>
+            Which day works? <span className="font-normal normal-case">green = near booked work (deeper = cheaper) · white = open (solo trip) · gray = full · hover for the day&apos;s rundown</span>
           </p>
-          <DayFitStrip jobId={job.id} date={date} dayFits={dayFits} selectedDay={selectedDay} size="large" />
+          <DayFitStrip
+            jobId={job.id}
+            date={date}
+            dayFits={dayFits}
+            anchorsByDate={anchorsByDate}
+            selectedDay={selectedDay}
+            size="large"
+          />
+          {rankedDays.length > 0 ? (
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+              <span className="font-semibold text-slate-700">Least impact:</span>
+              {rankedDays.slice(0, 5).map(({ fit, impact }, index) => (
+                <Link
+                  key={fit.date}
+                  href={worksheetHref(date, { focus: job.id, day: fit.date })}
+                  className={`rounded-full border px-2 py-0.5 font-medium transition ${
+                    index === 0
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {dayLabel(fit.date).replace(", ", " ")}
+                  {impact !== null ? ` +${impact}m` : ""}
+                  {fit.kind === "open" ? " solo" : ""}
+                </Link>
+              ))}
+            </p>
+          ) : null}
         </div>
 
         {selectedDay && selectedFit ? (
@@ -663,6 +803,26 @@ function FocusPanel({
               </span>
             </p>
 
+            {selectedImpact !== null && bestImpact !== null && selectedImpact > bestImpact ? (
+              <p className="mt-1 text-xs text-slate-600">
+                Adds ~{selectedImpact} min of driving vs ~{bestImpact} min on your best day — the
+                price of keeping them happy.
+              </p>
+            ) : null}
+
+            {selectedAnchors.length > 0 ? (
+              <ul className="mt-2 space-y-0.5 rounded-md border border-slate-200 bg-white px-2.5 py-2">
+                <li className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                  Already booked this day
+                </li>
+                {selectedAnchors.map((anchor) => (
+                  <li key={anchor.id} className="truncate text-xs leading-5 text-slate-700">
+                    {anchorPeekLabel(anchor)}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
             {placement?.status === "ok" ? (
               <>
                 {placement.overflowsDay ? (
@@ -672,7 +832,11 @@ function FocusPanel({
                 ) : (
                   <p className="mt-1 text-xs text-slate-600">
                     Slotting into this day&apos;s route puts arrival around{" "}
-                    <span className="font-semibold">{placement.projectedArrivalLabel}</span>. Offer:
+                    <span className="font-semibold">{placement.projectedArrivalLabel}</span>
+                    {placement.leaveBaseLabel ? (
+                      <> — leave base ~{placement.leaveBaseLabel}</>
+                    ) : null}
+                    . Offer:
                   </p>
                 )}
                 {!placement.overflowsDay ? (

@@ -136,6 +136,22 @@ describe("buildRoutePlan", () => {
     ]);
   });
 
+  it("anchors the first stop's arrival at day start and back-computes leave-base", () => {
+    // A window is an arrival commitment: stop 1 lands at 8:00, not 8:00+drive.
+    const plan = buildRoutePlan({
+      homeBase: HOME,
+      queuedJobs: [queuedJob("q1", { coordinates: north(18) })], // ~20 km out
+      anchorsByDate: {},
+      horizonDates: ["2026-08-10"],
+    });
+
+    const day = plan.days[0];
+    expect(day.stops[0].projectedArrivalMinutes).toBe(8 * 60);
+    expect(day.leaveBaseMinutes).toBeLessThan(8 * 60);
+    expect(day.leaveBaseMinutes).toBe(8 * 60 - day.stops[0].driveMinutesFromPrevious);
+    expect(day.leaveBaseLabel).toMatch(/AM$/);
+  });
+
   it("keeps anchors in window order and waits for a not-yet-open window", () => {
     const plan = buildRoutePlan({
       homeBase: HOME,
