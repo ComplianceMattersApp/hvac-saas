@@ -85,7 +85,12 @@ describe("internal new-job address autocomplete pilot", () => {
     for (const name of ["address_line1", "address_line2", "city", "state", "zip"]) {
       expect(formSource).toContain(`name="${name}"`);
     }
-    expect(formSource).toContain("onChange={(e) => setNewLocationAddressLine1(e.target.value)}");
+    // Line 1 edits route through the coordinate-clearing helper so stored
+    // coordinates can never contradict a manually edited address; line 2
+    // stays a plain setter (a unit number doesn't move the building).
+    expect(formSource).toContain(
+      "onChange={(e) => editNewLocationAddressField(setNewLocationAddressLine1, e.target.value)}",
+    );
     expect(formSource).toContain("onChange={(e) => setNewLocationAddressLine2(e.target.value)}");
   });
 
@@ -93,7 +98,9 @@ describe("internal new-job address autocomplete pilot", () => {
     expect(formSource).toContain('const [newLocationState, setNewLocationState] = useState("")');
     expect(formSource).not.toContain('const [newLocationState, setNewLocationState] = useState("CA")');
     expect(formSource).toContain('placeholder="State"');
-    expect(formSource).toContain("onChange={(e) => setNewLocationState(e.target.value)}");
+    expect(formSource).toContain(
+      "onChange={(e) => editNewLocationAddressField(setNewLocationState, e.target.value)}",
+    );
   });
 
   it("uses one application-owned selection handler without submit, action, or identity mutations", () => {
