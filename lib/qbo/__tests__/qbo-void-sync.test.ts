@@ -55,6 +55,7 @@ beforeEach(() => {
     balance: 500,
     totalAmount: 500,
     looksVoided: false,
+    raw: { Id: "Q1", SyncToken: "3", Line: [{ Amount: 500 }] },
   });
   voidQboInvoice.mockResolvedValue({ id: "Q1", syncToken: "4" });
 });
@@ -65,7 +66,13 @@ describe("voidInvoiceInQbo", () => {
     const result = await voidInvoiceInQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv1" });
 
     expect(result.status).toBe("voided");
-    expect(voidQboInvoice).toHaveBeenCalledWith(expect.objectContaining({ qboInvoiceId: "Q1", syncToken: "3" }));
+    expect(voidQboInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      qboInvoiceId: "Q1",
+      syncToken: "3",
+      // Passed through so the client can retry with real lines if QBO rejects
+      // the sparse void — the failure that hit invoice 2109 in production.
+      invoice: { Id: "Q1", SyncToken: "3", Line: [{ Amount: 500 }] },
+    }));
     expect(updates.at(-1)).toMatchObject({ qbo_void_status: "voided", qbo_void_error: null, qbo_sync_token: "4" });
   });
 

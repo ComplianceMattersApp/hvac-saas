@@ -179,6 +179,7 @@ export async function voidInvoiceInQbo(params: {
       baseUrl,
       qboInvoiceId,
       syncToken: snapshot.syncToken,
+      invoice: snapshot.raw,
     });
 
     await recordVoidState(supabase, invoiceId, {
