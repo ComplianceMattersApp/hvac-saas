@@ -193,9 +193,14 @@ export async function voidInvoiceInQbo(params: {
       qboInvoiceId,
     });
     if (confirmation && !confirmation.looksVoided) {
+      // The QBO doc number is reported back deliberately. Production secrets are
+      // Sensitive in Vercel and cannot be read locally, so this message is the
+      // only window into what QuickBooks actually holds — and a blank or changed
+      // doc number is the tell that something rewrote the invoice.
       const message =
         `QuickBooks accepted the void request but invoice ${invoiceLabel(invoiceRow)} is still open there `
-        + `(total $${confirmation.totalAmount.toFixed(2)}, balance $${confirmation.balance.toFixed(2)}). `
+        + `(QBO id ${confirmation.id}, doc number ${confirmation.docNumber ?? "(EMPTY)"}, `
+        + `total $${confirmation.totalAmount.toFixed(2)}, balance $${confirmation.balance.toFixed(2)}). `
         + `EveryStep did not modify it. Void it directly in QuickBooks, or retry.`;
       await recordVoidState(supabase, invoiceId, {
         qbo_void_status: "error",
