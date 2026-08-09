@@ -1640,6 +1640,12 @@ export async function CalendarView(props: Props) {
                   {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
                 </Link>
               ))}
+              <Link
+                href={buildCalendarHref('plan', data.anchorDate, { tech: activeCalendarTechParam })}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg px-4 py-1.5 text-sm font-semibold text-white/65 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+              >
+                Plan
+              </Link>
             </div>
           </div>
         </div>

@@ -39,6 +39,9 @@ export type DispatchJob = {
   assignment_primary_name: string | null;
   latest_event_type: string | null;
   latest_event_at: string | null;
+  location_latitude: number | null;
+  location_longitude: number | null;
+  estimated_duration_minutes: number | null;
 };
 
 export type DispatchCalendarData = {
@@ -102,7 +105,11 @@ type JobDispatchRow = {
   contractor_id: string | null;
   contractors: { name: string | null } | { name: string | null }[] | null;
   customers: { phone: string | null } | { phone: string | null }[] | null;
-  locations: { city: string | null } | { city: string | null }[] | null;
+  locations:
+    | { city: string | null; latitude?: number | null; longitude?: number | null }
+    | { city: string | null; latitude?: number | null; longitude?: number | null }[]
+    | null;
+  estimated_duration_minutes?: number | null;
   visit_scope_summary?: string | null;
   visit_scope_items?: unknown;
   created_at: string | null;
@@ -264,9 +271,17 @@ function mergeJobRow(params: {
   const jobId = String(row?.id ?? '');
   const assignment = assignmentFieldsFromMap(assignmentMap, jobId);
   const latestEvent = latestEventByJob.get(jobId);
-  const canonicalCity = Array.isArray(row.locations)
-    ? String(row.locations[0]?.city ?? '').trim()
-    : String(row.locations?.city ?? '').trim();
+  const locationRecord = Array.isArray(row.locations) ? row.locations[0] : row.locations;
+  const canonicalCity = String(locationRecord?.city ?? '').trim();
+  const locationLatitude = Number.isFinite(locationRecord?.latitude)
+    ? Number(locationRecord?.latitude)
+    : null;
+  const locationLongitude = Number.isFinite(locationRecord?.longitude)
+    ? Number(locationRecord?.longitude)
+    : null;
+  const estimatedDurationMinutes = Number.isFinite(row?.estimated_duration_minutes)
+    ? Number(row?.estimated_duration_minutes)
+    : null;
   const canonicalPhone = Array.isArray(row.customers)
     ? String(row.customers[0]?.phone ?? '').trim()
     : String(row.customers?.phone ?? '').trim();
@@ -305,6 +320,9 @@ function mergeJobRow(params: {
     assignment_primary_name: assignment.assignment_primary_name,
     latest_event_type: latestEvent?.event_type ?? null,
     latest_event_at: latestEvent?.created_at ?? null,
+    location_latitude: locationLatitude,
+    location_longitude: locationLongitude,
+    estimated_duration_minutes: estimatedDurationMinutes,
   };
 }
 
@@ -588,7 +606,8 @@ async function loadCalendarContext(
     'contractor_id',
     'contractors(name)',
     'customers:customer_id(phone)',
-    'locations:location_id(city)',
+    'locations:location_id(city, latitude, longitude)',
+    'estimated_duration_minutes',
     'visit_scope_summary',
     'visit_scope_items',
     'created_at',

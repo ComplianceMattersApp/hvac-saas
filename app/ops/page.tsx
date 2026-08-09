@@ -1824,16 +1824,22 @@ export default async function OpsPage({
       unassigned: queueHealthUnassigned,
       breakdown: Array.from(queueHealthBreakdown.entries()).map(([label, count]) => ({ label, count })),
     };
-    const opsBoardHeaderRightActionByBucket: Partial<Record<string, { label: string; href: string }>> = canCreateEccBatchInvoice
-      ? {
-          closeout: {
-            label: "Batch Contractor Invoice",
-            href: contractorScopeFilter
-              ? `/billing/ready-to-bill?contractor=${encodeURIComponent(contractorScopeFilter)}`
-              : "/billing/ready-to-bill",
-          },
-        }
-      : {};
+    const opsBoardHeaderRightActionByBucket: Partial<Record<string, { label: string; href: string }>> = {
+      pending: {
+        label: "Plan routes →",
+        href: "/calendar?view=plan",
+      },
+      ...(canCreateEccBatchInvoice
+        ? {
+            closeout: {
+              label: "Batch Contractor Invoice",
+              href: contractorScopeFilter
+                ? `/billing/ready-to-bill?contractor=${encodeURIComponent(contractorScopeFilter)}`
+                : "/billing/ready-to-bill",
+            },
+          }
+        : {}),
+    };
     // Every queue chip navigates (server round-trip) rather than switching the
     // panel purely client-side. The board's SSR-only surfaces — the Contractor
     // Focus picker and Queue Health — are computed for whichever bucket the

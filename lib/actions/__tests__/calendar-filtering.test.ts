@@ -40,6 +40,9 @@ function makeJob(params: {
     assignment_primary_name: params.assignmentUserIds[0] ?? null,
     latest_event_type: null,
     latest_event_at: null,
+    location_latitude: null,
+    location_longitude: null,
+    estimated_duration_minutes: null,
   };
 }
 

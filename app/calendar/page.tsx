@@ -1,4 +1,5 @@
 import { CalendarView } from '@/components/calendar/calendar-view';
+import { RoutePlanView } from '@/components/calendar/RoutePlanView';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 
@@ -56,6 +57,14 @@ export default async function CalendarPage({
   const userAgent = (await headers()).get('user-agent');
   const defaultView = resolveCalendarDefaultView(isLikelyMobileUserAgent(userAgent));
   const view = requestedView || defaultView;
+
+  if (view === 'plan') {
+    return (
+      <div className="min-h-screen w-full bg-slate-50 px-3 py-4 text-slate-950 sm:px-6 sm:py-5">
+        <RoutePlanView date={date} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-slate-50 px-3 py-4 text-slate-950 sm:px-6 sm:py-5">

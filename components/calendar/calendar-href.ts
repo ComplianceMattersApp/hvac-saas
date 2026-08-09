@@ -1,4 +1,4 @@
-export type CalendarHrefView = "day" | "week" | "list" | "month";
+export type CalendarHrefView = "day" | "week" | "list" | "month" | "plan";
 
 export type CalendarHrefParams = {
   banner?: string;
