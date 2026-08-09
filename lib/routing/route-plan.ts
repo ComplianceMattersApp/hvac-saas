@@ -44,6 +44,12 @@ export type RoutePlanInput = {
   anchorsByDate: Record<string, PlanAnchor[]>;
   /** Ordered YMD dates the planner may propose (earliest first). */
   horizonDates: string[];
+  /**
+   * Dispatcher dismissals: jobId → YMD dates the job must NOT be proposed on
+   * ("✕ not this day"). The job re-plans onto its next-best allowed day; a job
+   * dismissed from every feasible day surfaces as unplanned ("dismissed").
+   */
+  excludedDatesByJobId?: Record<string, string[]>;
 };
 
 export type RoutePlanOptions = {
@@ -97,7 +103,7 @@ export type PlannedDay = {
 
 export type UnplannedJob = {
   job: PlanJob;
-  reason: "missing_coordinates" | "no_capacity";
+  reason: "missing_coordinates" | "no_capacity" | "dismissed";
 };
 
 export type PlanCluster = {
@@ -342,8 +348,13 @@ export function buildRoutePlan(
     capacityByDate.set(date, Math.max(0, options.maxStopsPerDay - anchors.length));
   }
 
+  const excludedDatesFor = (jobId: string): Set<string> =>
+    new Set(input.excludedDatesByJobId?.[jobId] ?? []);
+
   // Assign clusters to days — largest clusters first so cohesive groups get
   // first pick of the days with room; ties broken by queue order (stable sort).
+  // Jobs place individually along the cluster's ranked days so a dismissal
+  // ("✕ not this day") reroutes one job without breaking up its cluster.
   const assignedByDate = new Map<string, Located[]>();
   const orderedClusters = [...clusters].sort((a, b) => b.length - a.length);
 
@@ -359,18 +370,17 @@ export function buildRoutePlan(
       })
       .sort((a, b) => a.score - b.score);
 
-    let remaining = [...cluster];
-    for (const candidate of rankedDates) {
-      if (remaining.length === 0) break;
-      const capacity = capacityByDate.get(candidate.date) ?? 0;
-      if (capacity <= 0) continue;
-      const taking = remaining.slice(0, capacity);
-      remaining = remaining.slice(capacity);
-      capacityByDate.set(candidate.date, capacity - taking.length);
-      assignedByDate.set(candidate.date, [...(assignedByDate.get(candidate.date) ?? []), ...taking]);
-    }
-    for (const job of remaining) {
-      unplanned.push({ job, reason: "no_capacity" });
+    for (const job of cluster) {
+      const excluded = excludedDatesFor(job.id);
+      const target = rankedDates.find(
+        (candidate) => (capacityByDate.get(candidate.date) ?? 0) > 0 && !excluded.has(candidate.date),
+      );
+      if (!target) {
+        unplanned.push({ job, reason: excluded.size > 0 ? "dismissed" : "no_capacity" });
+        continue;
+      }
+      capacityByDate.set(target.date, (capacityByDate.get(target.date) ?? 0) - 1);
+      assignedByDate.set(target.date, [...(assignedByDate.get(target.date) ?? []), job]);
     }
   }
 
@@ -383,22 +393,25 @@ export function buildRoutePlan(
   let carryover: Located[] = [];
   for (const date of input.horizonDates) {
     const anchors = input.anchorsByDate[date] ?? [];
-    let queued = [...(assignedByDate.get(date) ?? []), ...carryover];
-    carryover = [];
+    // Carryover honors dismissals too — an overflowed job never lands on a
+    // day the dispatcher already said no to.
+    const eligibleCarryover = carryover.filter((job) => !excludedDatesFor(job.id).has(date));
+    carryover = carryover.filter((job) => excludedDatesFor(job.id).has(date));
+    let queued = [...(assignedByDate.get(date) ?? []), ...eligibleCarryover];
 
     let day = buildDayTimeline(date, orderDayRoute(anchors, queued, input.homeBase), input.homeBase, options);
     const overflowIds = new Set(
       day.stops.filter((stop) => stop.kind === "proposed" && stop.overflowsDay).map((stop) => stop.job.id),
     );
     if (overflowIds.size > 0) {
-      carryover = queued.filter((job) => overflowIds.has(job.id));
+      carryover = [...carryover, ...queued.filter((job) => overflowIds.has(job.id))];
       queued = queued.filter((job) => !overflowIds.has(job.id));
       day = buildDayTimeline(date, orderDayRoute(anchors, queued, input.homeBase), input.homeBase, options);
     }
     days.push(day);
   }
   for (const job of carryover) {
-    unplanned.push({ job, reason: "no_capacity" });
+    unplanned.push({ job, reason: excludedDatesFor(job.id).size > 0 ? "dismissed" : "no_capacity" });
   }
 
   return {
@@ -409,6 +422,6 @@ export function buildRoutePlan(
       jobIds: cluster.map((job) => job.id),
     })),
     queuedJobCount: input.queuedJobs.length,
-    plannedJobCount: plannable.length - unplanned.filter((u) => u.reason === "no_capacity").length,
+    plannedJobCount: plannable.length - unplanned.filter((u) => u.reason !== "missing_coordinates").length,
   };
 }

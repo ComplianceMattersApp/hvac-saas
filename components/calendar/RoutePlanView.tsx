@@ -33,6 +33,30 @@ import {
  */
 
 const HORIZON_DAYS = 7;
+const MAX_DISMISSALS = 50;
+const DISMISSAL_PATTERN = /^([0-9a-f-]{8,64})@(\d{4}-\d{2}-\d{2})$/i;
+
+/**
+ * Dismissals ("✕ not this day") ride the URL as repeatable `exclude=jobId@date`
+ * params — ephemeral by design, like the plan itself. Malformed entries are
+ * ignored; volume is capped so a hand-built URL can't balloon the plan input.
+ */
+export function parseDismissals(raw: string | string[] | undefined): Record<string, string[]> {
+  const entries = (Array.isArray(raw) ? raw : raw ? [raw] : []).slice(0, MAX_DISMISSALS);
+  const byJobId: Record<string, string[]> = {};
+  for (const entry of entries) {
+    const match = DISMISSAL_PATTERN.exec(String(entry ?? "").trim());
+    if (!match) continue;
+    const [, jobId, date] = match;
+    if (!byJobId[jobId]) byJobId[jobId] = [];
+    if (!byJobId[jobId].includes(date)) byJobId[jobId].push(date);
+  }
+  return byJobId;
+}
+
+function dismissalParams(byJobId: Record<string, string[]>): string[] {
+  return Object.entries(byJobId).flatMap(([jobId, dates]) => dates.map((date) => `${jobId}@${date}`));
+}
 
 function addDaysYmd(ymd: string, days: number): string {
   const date = new Date(`${ymd}T00:00:00Z`);
@@ -82,11 +106,22 @@ function toPlanAnchor(job: DispatchJob): PlanAnchor | null {
   };
 }
 
-function planHref(date: string): string {
-  return `/calendar?view=plan&date=${encodeURIComponent(date)}`;
+function planHref(date: string, dismissals: Record<string, string[]> = {}, extraDismissal?: string): string {
+  const query = new URLSearchParams();
+  query.set("view", "plan");
+  query.set("date", date);
+  for (const value of dismissalParams(dismissals)) query.append("exclude", value);
+  if (extraDismissal) query.append("exclude", extraDismissal);
+  return `/calendar?${query.toString()}`;
 }
 
-export async function RoutePlanView({ date }: { date: string }) {
+export async function RoutePlanView({
+  date,
+  exclude,
+}: {
+  date: string;
+  exclude?: string | string[];
+}) {
   let accountOwnerUserId: string;
   try {
     const { internalUser } = await requireInternalUser();
@@ -122,13 +157,22 @@ export async function RoutePlanView({ date }: { date: string }) {
       .filter((anchor): anchor is PlanAnchor => anchor !== null);
   }
 
+  const dismissals = parseDismissals(exclude);
   const queuedJobs = queueData.unassignedScheduledJobs.map(toPlanJob);
-  const plan = buildRoutePlan({ homeBase, queuedJobs, anchorsByDate, horizonDates });
+  const plan = buildRoutePlan({
+    homeBase,
+    queuedJobs,
+    anchorsByDate,
+    horizonDates,
+    excludedDatesByJobId: dismissals,
+  });
 
   const staticMapKey = String(process.env.GOOGLE_MAPS_API_KEY ?? "").trim() || null;
-  const returnTo = planHref(date);
+  const returnTo = planHref(date, dismissals);
+  const hasDismissals = dismissalParams(dismissals).length > 0;
   const missingCoordinates = plan.unplanned.filter((u) => u.reason === "missing_coordinates");
   const noCapacity = plan.unplanned.filter((u) => u.reason === "no_capacity");
+  const dismissedOut = plan.unplanned.filter((u) => u.reason === "dismissed");
   const daysWithWork = plan.days.filter((day) => day.stops.length > 0);
 
   return (
@@ -196,10 +240,28 @@ export async function RoutePlanView({ date }: { date: string }) {
           </div>
         ) : null}
 
+        {hasDismissals ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+            <span>
+              {dismissalParams(dismissals).length} suggestion
+              {dismissalParams(dismissals).length === 1 ? "" : "s"} dismissed — dismissed jobs re-plan
+              onto their next-best day.
+            </span>
+            <Link
+              href={planHref(date)}
+              className="font-semibold text-blue-700 underline-offset-2 hover:underline"
+            >
+              Reset suggestions
+            </Link>
+          </div>
+        ) : null}
+
         {daysWithWork.map((day) => (
           <PlanDayCard
             key={day.date}
             day={day}
+            planDate={date}
+            dismissals={dismissals}
             homeBase={homeBase}
             staticMapKey={staticMapKey}
             returnTo={returnTo}
@@ -224,6 +286,31 @@ export async function RoutePlanView({ date }: { date: string }) {
                   <span className="text-xs text-amber-800">
                     {[job.address, job.city].filter(Boolean).join(", ") || "No address on file"}
                   </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {dismissedOut.length > 0 ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-slate-800">
+              Dismissed from every suggested day ({dismissedOut.length})
+            </p>
+            <p className="mt-0.5 text-xs leading-5 text-slate-600">
+              These jobs have no allowed day left in this week&apos;s plan.{" "}
+              <Link href={planHref(date)} className="font-semibold underline underline-offset-2">
+                Reset suggestions
+              </Link>{" "}
+              or open the job to schedule it by hand.
+            </p>
+            <ul className="mt-2 space-y-1 text-sm text-slate-700">
+              {dismissedOut.map(({ job }) => (
+                <li key={job.id}>
+                  <Link href={`/jobs/${job.id}`} className="font-medium underline underline-offset-2">
+                    {job.title}
+                  </Link>{" "}
+                  <span className="text-xs text-slate-500">{job.city ?? ""}</span>
                 </li>
               ))}
             </ul>
@@ -261,11 +348,15 @@ export async function RoutePlanView({ date }: { date: string }) {
 
 function PlanDayCard({
   day,
+  planDate,
+  dismissals,
   homeBase,
   staticMapKey,
   returnTo,
 }: {
   day: PlannedDay;
+  planDate: string;
+  dismissals: Record<string, string[]>;
   homeBase: { latitude: number; longitude: number } | null;
   staticMapKey: string | null;
   returnTo: string;
@@ -327,7 +418,17 @@ function PlanDayCard({
 
       <ol className="divide-y divide-slate-100">
         {day.stops.map((stop) => (
-          <PlanStopRow key={stop.job.id} stop={stop} date={day.date} returnTo={returnTo} />
+          <PlanStopRow
+            key={stop.job.id}
+            stop={stop}
+            date={day.date}
+            dismissHref={
+              stop.kind === "proposed"
+                ? planHref(planDate, dismissals, `${stop.job.id}@${day.date}`)
+                : null
+            }
+            returnTo={returnTo}
+          />
         ))}
       </ol>
     </section>
@@ -337,10 +438,12 @@ function PlanDayCard({
 function PlanStopRow({
   stop,
   date,
+  dismissHref,
   returnTo,
 }: {
   stop: PlannedStop;
   date: string;
+  dismissHref: string | null;
   returnTo: string;
 }) {
   const isAnchor = stop.kind === "anchor";
@@ -418,6 +521,16 @@ function PlanStopRow({
                 </button>
               </form>
             ))}
+            {dismissHref ? (
+              <Link
+                href={dismissHref}
+                title="Not this day — suggest a different day for this job"
+                aria-label={`Dismiss ${stop.job.title} from this day`}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
+              >
+                ✕
+              </Link>
+            ) : null}
           </div>
         ) : null}
       </div>

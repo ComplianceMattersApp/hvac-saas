@@ -235,6 +235,62 @@ describe("buildRoutePlan", () => {
     expect([plan.days[0].stops[0].job.id, plan.unplanned[0].job.id].sort()).toEqual(["q1", "q2"]);
   });
 
+  it("re-plans a dismissed job onto its next-best allowed day", () => {
+    const plan = buildRoutePlan({
+      homeBase: HOME,
+      queuedJobs: [queuedJob("q1"), queuedJob("q2", { coordinates: north(2) })],
+      anchorsByDate: {},
+      horizonDates: ["2026-08-10", "2026-08-11"],
+      excludedDatesByJobId: { q1: ["2026-08-10"] },
+    });
+
+    expect(plan.days[0].stops.map((s) => s.job.id)).toEqual(["q2"]);
+    expect(plan.days[1].stops.map((s) => s.job.id)).toEqual(["q1"]);
+    expect(plan.unplanned).toEqual([]);
+  });
+
+  it("surfaces a job dismissed from every day as unplanned/dismissed", () => {
+    const plan = buildRoutePlan({
+      homeBase: HOME,
+      queuedJobs: [queuedJob("q1")],
+      anchorsByDate: {},
+      horizonDates: ["2026-08-10", "2026-08-11"],
+      excludedDatesByJobId: { q1: ["2026-08-10", "2026-08-11"] },
+    });
+
+    expect(plan.days.every((day) => day.stops.length === 0)).toBe(true);
+    expect(plan.unplanned).toEqual([
+      expect.objectContaining({ reason: "dismissed", job: expect.objectContaining({ id: "q1" }) }),
+    ]);
+    expect(plan.plannedJobCount).toBe(0);
+  });
+
+  it("never cascades overflow onto a dismissed day", () => {
+    // Both long jobs start on day 1; the overflowing one may not land on
+    // day 2 (dismissed), so it skips to day 3.
+    const plan = buildRoutePlan(
+      {
+        homeBase: HOME,
+        queuedJobs: [
+          queuedJob("q1", { durationMinutes: 300, coordinates: north(1) }),
+          queuedJob("q2", { durationMinutes: 300, coordinates: north(2) }),
+        ],
+        anchorsByDate: {},
+        horizonDates: ["2026-08-10", "2026-08-11", "2026-08-12"],
+        excludedDatesByJobId: {
+          q1: ["2026-08-11"],
+          q2: ["2026-08-11"],
+        },
+      },
+      { dayStartMinutes: 8 * 60, dayEndMinutes: 13 * 60 + 30, maxStopsPerDay: 8 },
+    );
+
+    expect(plan.days[0].stops).toHaveLength(1);
+    expect(plan.days[1].stops).toHaveLength(0);
+    expect(plan.days[2].stops).toHaveLength(1);
+    expect(plan.unplanned).toEqual([]);
+  });
+
   it("reports cluster labels from member cities", () => {
     const plan = buildRoutePlan({
       homeBase: HOME,
