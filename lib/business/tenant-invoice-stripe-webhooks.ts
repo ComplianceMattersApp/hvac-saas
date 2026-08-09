@@ -18,6 +18,7 @@ import {
 } from '@/lib/business/tenant-saved-method-payment-attempts';
 import { resolveTenantStripeConnectReadiness } from '@/lib/business/tenant-stripe-connect-readiness';
 import { closeVerifiedAbandonedStripeSession } from '@/lib/business/stripe-abandoned-session-cleanup';
+import { VOIDED_INVOICE_CHARGE_MARKER } from '@/lib/business/voided-invoice-charge-marker';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 
 function toCleanString(value: unknown): string {
@@ -45,6 +46,67 @@ async function resolveInternalInvoiceById(params: {
   }
 
   return data;
+}
+
+/**
+ * A Stripe charge succeeded against an invoice that is void in EveryStep.
+ *
+ * Voiding expires open checkout sessions, but a customer can complete payment in
+ * the moments before that lands. The money must NOT be recorded against a void
+ * invoice — that would resurrect a retired balance — but it must never be
+ * silently dropped either: the customer's card really was charged.
+ *
+ * So the pending row is left `pending` (no ledger impact, still not counted as
+ * collected) and annotated with the charge id. The attention center reads that
+ * annotation and raises it as money needing a refund decision.
+ */
+async function flagStripeChargeAgainstVoidedInvoice(params: {
+  admin: any;
+  accountOwnerUserId: string;
+  invoiceId: string;
+  jobId: string;
+  chargeId: string;
+  amountCents: number;
+}): Promise<void> {
+  const { admin, accountOwnerUserId, invoiceId, chargeId } = params;
+  const note = `${VOIDED_INVOICE_CHARGE_MARKER} Stripe charge ${chargeId} succeeded for $${(params.amountCents / 100).toFixed(2)} after this invoice was voided. The customer WAS charged. Refund or reallocate it in Stripe — it is deliberately not recorded against the void invoice.`;
+
+  try {
+    await admin
+      .from('internal_invoice_payments')
+      .update({ notes: note })
+      .eq('account_owner_user_id', accountOwnerUserId)
+      .eq('invoice_id', invoiceId)
+      .eq('payment_status', 'pending')
+      .eq('processor_name', 'stripe');
+  } catch (error) {
+    console.error('Could not annotate a Stripe charge against a voided invoice', {
+      invoiceId, chargeId, message: error instanceof Error ? error.message : 'unknown_error',
+    });
+  }
+
+  try {
+    await insertJobEvent({
+      admin,
+      jobId: toCleanString(params.jobId),
+      eventType: 'stripe_charge_on_voided_invoice',
+      meta: { invoice_id: invoiceId, charge_id: chargeId, amount_cents: params.amountCents },
+    } as any);
+  } catch {
+    /* audit trail is best-effort; the annotation above is what surfaces it */
+  }
+}
+
+/** Reads the invoice WITHOUT the void filter, so callers can tell void from missing. */
+async function resolveInvoiceStatusById(params: { admin: any; invoiceId: string }): Promise<string | null> {
+  const invoiceId = toCleanString(params.invoiceId);
+  if (!invoiceId) return null;
+  const { data } = await params.admin
+    .from('internal_invoices')
+    .select('id, status, job_id')
+    .eq('id', invoiceId)
+    .maybeSingle();
+  return data ? toCleanString(data.status).toLowerCase() : null;
 }
 
 type StripePaymentIdentityRow = {
@@ -1128,6 +1190,23 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
   });
 
   if (!invoice) {
+    // Distinguish void from genuinely missing. A void invoice means the customer
+    // was charged for something we retired — real money that needs a decision,
+    // not a no-op. Anything else stays the old "not found" no-op.
+    if (await resolveInvoiceStatusById({ admin, invoiceId }) === 'void') {
+      await flagStripeChargeAgainstVoidedInvoice({
+        admin,
+        accountOwnerUserId,
+        invoiceId,
+        jobId,
+        chargeId: toCleanString(charge.id),
+        amountCents: Number(charge.amount ?? 0),
+      });
+      return {
+        recorded: false,
+        reason: 'Invoice is void — charge flagged for refund review',
+      };
+    }
     return {
       recorded: false,
       reason: 'Invoice not found',

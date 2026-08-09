@@ -1,3 +1,4 @@
+import { VOIDED_INVOICE_CHARGE_MARKER } from "@/lib/business/voided-invoice-charge-marker";
 import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 
@@ -19,7 +20,7 @@ function clean(value: unknown) { return String(value ?? "").trim(); }
 export async function buildAttentionCenterReadModel(params: { admin: any; accountOwnerUserId: string }) {
   const ownerId = clean(params.accountOwnerUserId);
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const [paymentResult, invoiceErrorResult, voidDriftResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
+  const [paymentResult, invoiceErrorResult, voidDriftResult, chargedAfterVoidResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
     params.admin.from("internal_invoice_payments")
       .select("id, invoice_id, job_id, amount_cents, paid_at, qbo_sync_status, qbo_sync_error, processor_name")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "recorded")
@@ -34,6 +35,13 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       .select("id, job_id, invoice_number, invoice_display_number, qbo_void_status, qbo_void_error, voided_at")
       .eq("account_owner_user_id", ownerId).eq("status", "void")
       .in("qbo_void_status", ["pending", "blocked", "error"]).order("voided_at", { ascending: false }).limit(100),
+    // Charges the Stripe webhook flagged as landing after a void. No time filter:
+    // real money that cannot be attributed should surface immediately, not after
+    // the 15-minute staleness window used for abandoned sessions.
+    params.admin.from("internal_invoice_payments")
+      .select("id, invoice_id, job_id, amount_cents, created_at, notes")
+      .eq("account_owner_user_id", ownerId).eq("payment_status", "pending").eq("processor_name", "stripe")
+      .like("notes", `${VOIDED_INVOICE_CHARGE_MARKER}%`).order("created_at", { ascending: false }).limit(100),
     params.admin.from("internal_invoice_payments")
       .select("id, invoice_id, job_id, amount_cents, created_at, stripe_checkout_session_id")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "pending").eq("processor_name", "stripe")
@@ -47,7 +55,10 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     if (result.error) throw new Error(`Failed to load attention center: ${result.error.message ?? "unknown error"}`);
   }
 
-  const invoiceIds = [...new Set((paymentResult.data ?? []).map((row: any) => clean(row.invoice_id)).filter(Boolean))];
+  const invoiceIds = [...new Set([
+    ...(paymentResult.data ?? []).map((row: any) => clean(row.invoice_id)),
+    ...(chargedAfterVoidResult.error ? [] : (chargedAfterVoidResult.data ?? [])).map((row: any) => clean(row.invoice_id)),
+  ].filter(Boolean))];
   const labelsResult = invoiceIds.length
     ? await params.admin.from("internal_invoices").select("id, invoice_number, invoice_display_number").eq("account_owner_user_id", ownerId).in("id", invoiceIds)
     : { data: [], error: null };
@@ -91,7 +102,26 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       actionLabel: blocked ? "Reconcile in QuickBooks" : "Retry QuickBooks void",
     });
   }
+  // Charges that landed after the invoice was voided. These sit in the same
+  // pending rows as abandoned sessions, but they are the opposite situation:
+  // the customer WAS charged. They must not inherit the "not collected" truth
+  // statement below, so they are pulled out first and reported as critical.
+  const paidAfterVoid = new Set<string>();
+  for (const payment of chargedAfterVoidResult.error ? [] : (chargedAfterVoidResult.data ?? [])) {
+    const paymentId = clean(payment.id);
+    paidAfterVoid.add(paymentId);
+    const invoiceId = clean(payment.invoice_id); const jobId = clean(payment.job_id);
+    items.push({ id: `stripe-paid-after-void-${paymentId}`, category: "stripe_pending", severity: "critical",
+      title: `Customer charged after the invoice was voided · ${labels.get(invoiceId) ?? invoiceId}`,
+      detail: clean(payment.notes) || "A Stripe charge succeeded after this invoice was voided.",
+      truth: "The customer's card WAS charged. This is deliberately not recorded against the void invoice, so it needs a refund or reallocation in Stripe.",
+      occurredAt: clean(payment.created_at) || null,
+      href: jobId ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace` : "/reports/stripe-reconciliation",
+      actionLabel: "Refund or reallocate in Stripe", paymentId,
+    });
+  }
   for (const payment of staleResult.data ?? []) {
+    if (paidAfterVoid.has(clean(payment.id))) continue;
     items.push({ id: `stripe-pending-${payment.id}`, category: "stripe_pending", severity: "warning",
       title: "Stale Stripe checkout session", detail: "A Stripe checkout session has remained pending longer than 15 minutes.",
       truth: "This is not counted as collected money until Stripe confirms payment.", occurredAt: clean(payment.created_at) || null,

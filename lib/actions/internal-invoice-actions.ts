@@ -2182,6 +2182,24 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
     }
   }
 
+  // Kill the payment surface. Stripe does not know this invoice was voided, so a
+  // checkout session left open would still happily take the customer's card —
+  // and the webhook then refuses to record it, because the invoice is void. That
+  // is a charge with nowhere to land. Expiring the sessions closes the window.
+  // Best-effort: a Stripe outage must never block a void.
+  try {
+    await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+      accountOwnerUserId: context.internalUser.account_owner_user_id,
+      invoiceId: context.invoice.id,
+      supabase: context.supabase,
+    });
+  } catch (error) {
+    console.warn('Open Stripe checkout sessions could not be expired on invoice void', {
+      invoiceId: context.invoice.id,
+      message: error instanceof Error ? error.message : 'unknown_error',
+    });
+  }
+
   // Propagate the void to QuickBooks. EveryStep is the source of truth, so this
   // is best-effort and never throws: a QBO failure is recorded on the invoice
   // (qbo_void_status='error'/'pending') and retried by the bulk sweep, rather

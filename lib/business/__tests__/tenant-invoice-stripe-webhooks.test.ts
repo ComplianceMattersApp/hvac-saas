@@ -1016,6 +1016,57 @@ describe('tenant invoice Stripe webhook handlers', () => {
     });
   });
 
+  describe('charge that lands after the invoice was voided', () => {
+    it('does not record it, but flags it as collected money needing a refund decision', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, update } = makeAdminInsertSuccess({
+        invoiceRow: { id: 'inv-1', account_owner_user_id: 'owner-1', job_id: 'job-1', status: 'void' },
+      });
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge({ id: 'ch_after_void', amount: 48500 } as Partial<Stripe.Charge>),
+        eventId: 'evt_after_void',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      // Never credited to a void invoice — that would resurrect a retired balance.
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toContain('void');
+      // ...but never silently dropped either: the customer really was charged.
+      const lastUpdate = update.mock.calls.at(-1) as unknown as [{ notes?: string }] | undefined;
+      const notes = String(lastUpdate?.[0]?.notes ?? '');
+      expect(notes).toContain('[PAID AFTER VOID]');
+      expect(notes).toContain('ch_after_void');
+      expect(notes).toContain('485.00');
+    });
+
+    it('still treats a genuinely missing invoice as a plain no-op', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, update } = makeAdminInsertSuccess({ invoiceRow: undefined as any });
+      // Force both the void-filtered read and the status read to find nothing.
+      admin.from = vi.fn(() => ({
+        select: vi.fn(() => ({ eq: vi.fn(function self(): any { return { eq: self, maybeSingle: async () => ({ data: null, error: null }) }; }), maybeSingle: async () => ({ data: null, error: null }) })),
+        update,
+      })) as any;
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_missing',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toBe('Invoice not found');
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('existing validation behavior remains', () => {
     it('requires account_owner_user_id in charge metadata', async () => {
       const { recordTenantInvoicePaymentFromStripeCharge } = await import('@/lib/business/tenant-invoice-stripe-webhooks');
