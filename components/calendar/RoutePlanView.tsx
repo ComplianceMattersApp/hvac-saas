@@ -619,7 +619,9 @@ function WorksheetJobRow({
             {[job.title, job.address, job.city].filter(Boolean).join(" · ")}
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        {/* Full-width on phones so the 14-day strip wraps instead of running
+            off-screen; inline to the right of the job details on desktop. */}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">
           <DayFitStrip
             jobId={job.id}
             date={date}
@@ -714,7 +716,7 @@ function FocusPanel({
             {[job.title, job.address, job.city].filter(Boolean).join(" · ")}
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {job.phone ? (
             <a
               href={`tel:${job.phone}`}
