@@ -42,6 +42,7 @@ export type DispatchJob = {
   location_latitude: number | null;
   location_longitude: number | null;
   estimated_duration_minutes: number | null;
+  created_at: string | null;
 };
 
 export type DispatchCalendarData = {
@@ -323,6 +324,7 @@ function mergeJobRow(params: {
     location_latitude: locationLatitude,
     location_longitude: locationLongitude,
     estimated_duration_minutes: estimatedDurationMinutes,
+    created_at: row?.created_at ? String(row.created_at) : null,
   };
 }
 

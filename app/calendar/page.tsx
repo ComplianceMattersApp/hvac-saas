@@ -32,7 +32,8 @@ export default async function CalendarPage({
     tech?: string | string[];
     inspector?: string;
     prefill_date?: string;
-    exclude?: string | string[];
+    focus?: string;
+    day?: string;
   }>;
 }) {
   const supabase = await createClient();
@@ -62,7 +63,7 @@ export default async function CalendarPage({
   if (view === 'plan') {
     return (
       <div className="min-h-screen w-full bg-slate-50 px-3 py-4 text-slate-950 sm:px-6 sm:py-5">
-        <RoutePlanView date={date} exclude={sp.exclude} />
+        <RoutePlanView date={date} focus={sp.focus} day={sp.day} />
       </div>
     );
   }

@@ -32,11 +32,13 @@ export function buildRouteStaticMapUrl(params: {
   apiKey: string | null | undefined;
   homeBase: CoordinatePair | null;
   stops: RouteMapStop[];
+  /** Optional emphasized pin (e.g. the customer being called), drawn green. */
+  highlight?: CoordinatePair | null;
   width?: number;
   height?: number;
 }): string | null {
   const apiKey = String(params.apiKey ?? "").trim();
-  if (!apiKey || params.stops.length === 0) return null;
+  if (!apiKey || (params.stops.length === 0 && !params.highlight)) return null;
 
   const query = new URLSearchParams({
     size: `${params.width ?? 640}x${params.height ?? 320}`,
@@ -53,6 +55,9 @@ export function buildRouteStaticMapUrl(params: {
       "markers",
       label ? `color:0x2563eb|label:${label}|${point(stop)}` : `color:0x2563eb|${point(stop)}`,
     );
+  }
+  if (params.highlight) {
+    query.append("markers", `color:0x059669|label:C|${point(params.highlight)}`);
   }
 
   return `https://maps.googleapis.com/maps/api/staticmap?${query.toString()}`;

@@ -43,6 +43,7 @@ function makeJob(params: {
     location_latitude: null,
     location_longitude: null,
     estimated_duration_minutes: null,
+    created_at: null,
   };
 }
 

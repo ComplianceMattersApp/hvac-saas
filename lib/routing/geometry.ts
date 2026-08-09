@@ -43,6 +43,24 @@ export function kmToMiles(km: number): number {
   return km / KM_PER_MILE;
 }
 
+/** Initial great-circle bearing from `a` to `b`, degrees 0–360 (0 = north). */
+export function bearingDegrees(a: CoordinatePair, b: CoordinatePair): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  const degrees = (Math.atan2(y, x) * 180) / Math.PI;
+  return (degrees + 360) % 360;
+}
+
+/** Smallest angle between two bearings, 0–180 degrees. */
+export function angularDifferenceDegrees(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
 /** Parses "HH:MM" or "HH:MM:SS" into minutes since midnight; null if invalid. */
 export function parseTimeToMinutes(raw: string | null | undefined): number | null {
   const text = String(raw ?? "").trim();

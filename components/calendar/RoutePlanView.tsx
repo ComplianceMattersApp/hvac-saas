@@ -7,56 +7,33 @@ import {
   type DispatchJob,
 } from "@/lib/actions/calendar";
 import { updateJobScheduleFromForm } from "@/lib/actions";
+import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { getCachedInternalBusinessProfile } from "@/lib/business/tenant-reference-cache";
-import { normalizeCoordinatePair } from "@/lib/routing/coordinates";
+import { normalizeCoordinatePair, type CoordinatePair } from "@/lib/routing/coordinates";
+import { scoreDayFitsForJob, type DayFit } from "@/lib/routing/day-fit";
 import { kmToMiles } from "@/lib/routing/geometry";
+import { buildRouteStaticMapUrl, type RouteMapStop } from "@/lib/routing/route-links";
 import {
-  buildMultiStopDirectionsUrl,
-  buildRouteStaticMapUrl,
-  type RouteMapStop,
-} from "@/lib/routing/route-links";
-import {
-  buildRoutePlan,
+  clusterJobsByArea,
+  hasCoordinates,
+  planJobOnDay,
+  suggestTargetDates,
+  type LocatedPlanJob,
   type PlanAnchor,
   type PlanJob,
-  type PlannedDay,
-  type PlannedStop,
 } from "@/lib/routing/route-plan";
 
 /**
- * Route-first planning view (/calendar?view=plan). Reads the same scoped
- * loaders as the dispatch board, proposes per-day call plans from the
- * unscheduled queue, and schedules jobs through the existing
- * updateJobScheduleFromForm action. Proposals are recomputed on every render —
- * a decline, a drag on the grid, or a new intake simply re-flows the plan.
+ * Call Worksheet (/calendar?view=plan): the route-first scheduling companion.
+ * Nothing is pre-committed — the queue is shown as geographic groupings with a
+ * target day in mind, each customer carries a two-week day-fit strip for
+ * mid-call negotiation ("how about Tuesday?" answered at a glance), and every
+ * booked window becomes an anchor that re-scores everything else on the next
+ * render. Failure is a first-class outcome: log the attempt and move on.
  */
 
-const HORIZON_DAYS = 7;
-const MAX_DISMISSALS = 50;
-const DISMISSAL_PATTERN = /^([0-9a-f-]{8,64})@(\d{4}-\d{2}-\d{2})$/i;
-
-/**
- * Dismissals ("✕ not this day") ride the URL as repeatable `exclude=jobId@date`
- * params — ephemeral by design, like the plan itself. Malformed entries are
- * ignored; volume is capped so a hand-built URL can't balloon the plan input.
- */
-export function parseDismissals(raw: string | string[] | undefined): Record<string, string[]> {
-  const entries = (Array.isArray(raw) ? raw : raw ? [raw] : []).slice(0, MAX_DISMISSALS);
-  const byJobId: Record<string, string[]> = {};
-  for (const entry of entries) {
-    const match = DISMISSAL_PATTERN.exec(String(entry ?? "").trim());
-    if (!match) continue;
-    const [, jobId, date] = match;
-    if (!byJobId[jobId]) byJobId[jobId] = [];
-    if (!byJobId[jobId].includes(date)) byJobId[jobId].push(date);
-  }
-  return byJobId;
-}
-
-function dismissalParams(byJobId: Record<string, string[]>): string[] {
-  return Object.entries(byJobId).flatMap(([jobId, dates]) => dates.map((date) => `${jobId}@${date}`));
-}
+const HORIZON_DAYS = 14;
 
 function addDaysYmd(ymd: string, days: number): string {
   const date = new Date(`${ymd}T00:00:00Z`);
@@ -73,9 +50,24 @@ function dayLabel(ymd: string): string {
   }).format(new Date(`${ymd}T12:00:00Z`));
 }
 
+function shortDayLabel(ymd: string): { weekday: string; dayOfMonth: string } {
+  const target = new Date(`${ymd}T12:00:00Z`);
+  return {
+    weekday: new Intl.DateTimeFormat("en-US", { weekday: "narrow", timeZone: "UTC" }).format(target),
+    dayOfMonth: String(target.getUTCDate()),
+  };
+}
+
 function formatMiles(km: number): string {
   const miles = kmToMiles(km);
   return `${miles < 10 ? miles.toFixed(1) : Math.round(miles)} mi`;
+}
+
+function ageDaysFrom(createdAt: string | null): number | null {
+  if (!createdAt) return null;
+  const created = Date.parse(createdAt);
+  if (!Number.isFinite(created)) return null;
+  return Math.max(0, Math.floor((Date.now() - created) / (24 * 60 * 60 * 1000)));
 }
 
 function toPlanJob(job: DispatchJob): PlanJob {
@@ -106,21 +98,25 @@ function toPlanAnchor(job: DispatchJob): PlanAnchor | null {
   };
 }
 
-function planHref(date: string, dismissals: Record<string, string[]> = {}, extraDismissal?: string): string {
+function worksheetHref(date: string, params: { focus?: string | null; day?: string | null } = {}): string {
   const query = new URLSearchParams();
   query.set("view", "plan");
   query.set("date", date);
-  for (const value of dismissalParams(dismissals)) query.append("exclude", value);
-  if (extraDismissal) query.append("exclude", extraDismissal);
+  if (params.focus) query.set("focus", params.focus);
+  if (params.day) query.set("day", params.day);
   return `/calendar?${query.toString()}`;
 }
 
+const YMD_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export async function RoutePlanView({
   date,
-  exclude,
+  focus,
+  day,
 }: {
   date: string;
-  exclude?: string | string[];
+  focus?: string;
+  day?: string;
 }) {
   let accountOwnerUserId: string;
   try {
@@ -144,50 +140,60 @@ export async function RoutePlanView({
     getCachedInternalBusinessProfile(accountOwnerUserId),
   ]);
 
-  const homeBase = normalizeCoordinatePair(
-    profile?.dispatch_latitude,
-    profile?.dispatch_longitude,
-  );
-
+  const homeBase = normalizeCoordinatePair(profile?.dispatch_latitude, profile?.dispatch_longitude);
   const horizonDates = Array.from({ length: HORIZON_DAYS }, (_, index) => addDaysYmd(date, index));
+
   const anchorsByDate: Record<string, PlanAnchor[]> = {};
-  for (const day of boardData.range.days) {
-    anchorsByDate[day.date] = day.jobs
+  for (const boardDay of boardData.range.days) {
+    anchorsByDate[boardDay.date] = boardDay.jobs
       .map(toPlanAnchor)
       .filter((anchor): anchor is PlanAnchor => anchor !== null);
   }
 
-  const dismissals = parseDismissals(exclude);
-  const queuedJobs = queueData.unassignedScheduledJobs.map(toPlanJob);
-  const plan = buildRoutePlan({
-    homeBase,
-    queuedJobs,
-    anchorsByDate,
-    horizonDates,
-    excludedDatesByJobId: dismissals,
+  const queueRows = queueData.unassignedScheduledJobs;
+  const ageByJobId = new Map(queueRows.map((row) => [row.id, ageDaysFrom(row.created_at)]));
+  const queuedJobs = queueRows.map(toPlanJob);
+  const located = queuedJobs.filter(hasCoordinates);
+  const missingCoordinates = queuedJobs.filter((job) => !hasCoordinates(job));
+
+  const clusters = clusterJobsByArea(located, { homeBase }).sort((a, b) => {
+    if (b.length !== a.length) return b.length - a.length;
+    const oldest = (cluster: LocatedPlanJob[]) =>
+      Math.max(...cluster.map((job) => ageByJobId.get(job.id) ?? 0));
+    return oldest(b) - oldest(a);
   });
+  const groupings = clusters.filter((cluster) => cluster.length > 1);
+  const soloStops = clusters.filter((cluster) => cluster.length === 1).flat();
+
+  const focusedJob = focus ? located.find((job) => job.id === focus) ?? null : null;
+  const selectedDay = day && YMD_PATTERN.test(day) && horizonDates.includes(day) ? day : null;
 
   const staticMapKey = String(process.env.GOOGLE_MAPS_API_KEY ?? "").trim() || null;
-  const returnTo = planHref(date, dismissals);
-  const hasDismissals = dismissalParams(dismissals).length > 0;
-  const missingCoordinates = plan.unplanned.filter((u) => u.reason === "missing_coordinates");
-  const noCapacity = plan.unplanned.filter((u) => u.reason === "no_capacity");
-  const dismissedOut = plan.unplanned.filter((u) => u.reason === "dismissed");
-  const daysWithWork = plan.days.filter((day) => day.stops.length > 0);
+  const buildingDays = horizonDates
+    .map((horizonDate) => ({ date: horizonDate, anchors: anchorsByDate[horizonDate] ?? [] }))
+    .filter((entry) => entry.anchors.length > 0);
+
+  const dayFitsFor = (job: LocatedPlanJob): DayFit[] =>
+    scoreDayFitsForJob({
+      coordinates: job.coordinates,
+      anchorsByDate,
+      horizonDates,
+      homeBase,
+    });
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/70 shadow-[0_24px_52px_-30px_rgba(15,31,53,0.34)]">
-      {/* Identity band, matching the dispatch workspace */}
       <div className="bg-gradient-to-br from-[#0f1f35] to-[#162640] px-5 py-4 sm:px-6 sm:py-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-blue-300/80">
               Dispatch Workspace
             </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">Route Planning</h2>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">Call Worksheet</h2>
             <p className="mt-1.5 max-w-xl text-sm leading-6 text-white/55">
-              Proposed call order for the unscheduled queue. Offer a window on the phone, click it
-              to schedule, and the plan re-flows around the confirmed stop.
+              Work the queue grouping by grouping. Call with the target day in mind; when the
+              customer counters, their day strip answers &ldquo;how about Tuesday?&rdquo; at a
+              glance. Every booking re-scores the rest.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-1 rounded-xl border border-white/10 bg-white/5 p-1 sm:self-start">
@@ -201,72 +207,110 @@ export async function RoutePlanView({
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-[12px] font-semibold">
           <span className="rounded-full bg-white/10 px-3 py-1 text-white/85">
-            {plan.queuedJobCount} in queue
+            {queuedJobs.length} to call
           </span>
-          <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-emerald-200">
-            {plan.plannedJobCount} planned
+          <span className="rounded-full bg-white/10 px-3 py-1 text-white/70">
+            {groupings.length} grouping{groupings.length === 1 ? "" : "s"} · {soloStops.length} solo
           </span>
-          {plan.unplanned.length > 0 ? (
-            <span className="rounded-full bg-amber-400/15 px-3 py-1 text-amber-200">
-              {plan.unplanned.length} need attention
+          {buildingDays.length > 0 ? (
+            <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-emerald-200">
+              {buildingDays.reduce((sum, entry) => sum + entry.anchors.length, 0)} booked across{" "}
+              {buildingDays.length} day{buildingDays.length === 1 ? "" : "s"}
             </span>
           ) : null}
-          {plan.clusters.map((cluster) => (
-            <span key={cluster.jobIds.join("-")} className="rounded-full bg-white/10 px-3 py-1 text-white/70">
-              {cluster.label}: {cluster.jobIds.length}
-            </span>
-          ))}
         </div>
       </div>
 
       <div className="space-y-5 bg-white px-4 py-5 sm:px-5">
         {!homeBase ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm leading-6 text-amber-900">
-            No dispatch home base is set, so routes have no start point and day proposals lean on
-            each day&apos;s existing stops.{" "}
+            No dispatch home base is set — solo-trip costs can&apos;t be estimated.{" "}
             <Link href="/ops/admin/company-profile" className="font-semibold underline underline-offset-2">
               Set your shop address
             </Link>{" "}
-            to anchor route planning.
+            to sharpen day suggestions.
           </div>
         ) : null}
 
-        {plan.queuedJobCount === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-            <p className="text-sm font-medium text-slate-600">The unscheduled queue is empty.</p>
-            <p className="mt-1 text-xs text-slate-400">
-              New intake will appear here with a proposed day and call window.
-            </p>
-          </div>
-        ) : null}
-
-        {hasDismissals ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
-            <span>
-              {dismissalParams(dismissals).length} suggestion
-              {dismissalParams(dismissals).length === 1 ? "" : "s"} dismissed — dismissed jobs re-plan
-              onto their next-best day.
-            </span>
-            <Link
-              href={planHref(date)}
-              className="font-semibold text-blue-700 underline-offset-2 hover:underline"
-            >
-              Reset suggestions
-            </Link>
-          </div>
-        ) : null}
-
-        {daysWithWork.map((day) => (
-          <PlanDayCard
-            key={day.date}
-            day={day}
-            planDate={date}
-            dismissals={dismissals}
+        {focusedJob ? (
+          <FocusPanel
+            job={focusedJob}
+            ageDays={ageByJobId.get(focusedJob.id) ?? null}
+            date={date}
+            selectedDay={selectedDay}
+            dayFits={dayFitsFor(focusedJob)}
+            anchorsByDate={anchorsByDate}
             homeBase={homeBase}
             staticMapKey={staticMapKey}
-            returnTo={returnTo}
+          />
+        ) : null}
+
+        {buildingDays.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Building
+            </span>
+            {buildingDays.map((entry) => {
+              const cities = Array.from(
+                new Set(entry.anchors.map((anchor) => String(anchor.city ?? "").trim()).filter(Boolean)),
+              ).slice(0, 2);
+              return (
+                <Link
+                  key={entry.date}
+                  href={`/calendar?view=day&date=${encodeURIComponent(entry.date)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-900 transition hover:bg-blue-100"
+                >
+                  {dayLabel(entry.date)} · {entry.anchors.length} stop{entry.anchors.length === 1 ? "" : "s"}
+                  {cities.length > 0 ? (
+                    <span className="font-normal text-blue-700">({cities.join(", ")})</span>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {queuedJobs.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
+            <p className="text-sm font-medium text-slate-600">The unscheduled queue is empty.</p>
+            <p className="mt-1 text-xs text-slate-400">New intake will appear here, grouped by area.</p>
+          </div>
+        ) : null}
+
+        {groupings.map((cluster) => (
+          <GroupingCard
+            key={cluster.map((job) => job.id).join("-")}
+            cluster={cluster}
+            date={date}
+            ageByJobId={ageByJobId}
+            anchorsByDate={anchorsByDate}
+            horizonDates={horizonDates}
+            homeBase={homeBase}
+            dayFitsFor={dayFitsFor}
           />
         ))}
+
+        {soloStops.length > 0 ? (
+          <section className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+            <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+              <h3 className="text-sm font-bold text-[#0f1f35]">On their own</h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                No queued work nearby yet — pair them with a green day, or wait for neighbors.
+              </p>
+            </div>
+            <ol className="divide-y divide-slate-100">
+              {soloStops.map((job) => (
+                <WorksheetJobRow
+                  key={job.id}
+                  job={job}
+                  ageDays={ageByJobId.get(job.id) ?? null}
+                  date={date}
+                  dayFits={dayFitsFor(job)}
+                />
+              ))}
+            </ol>
+          </section>
+        ) : null}
 
         {missingCoordinates.length > 0 ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
@@ -274,11 +318,11 @@ export async function RoutePlanView({
               Needs an address check ({missingCoordinates.length})
             </p>
             <p className="mt-0.5 text-xs leading-5 text-amber-800">
-              These jobs have no map position yet, so they can&apos;t be routed. Open the job and
-              re-pick the address with the autocomplete, or run the geocode backfill.
+              No map position yet, so they can&apos;t join a grouping. Open the job and re-pick the
+              address with the autocomplete, or run the geocode backfill.
             </p>
             <ul className="mt-2 space-y-1.5">
-              {missingCoordinates.map(({ job }) => (
+              {missingCoordinates.map((job) => (
                 <li key={job.id} className="flex flex-wrap items-center gap-2 text-sm text-amber-950">
                   <Link href={`/jobs/${job.id}`} className="font-semibold underline underline-offset-2">
                     {job.title}
@@ -291,143 +335,151 @@ export async function RoutePlanView({
             </ul>
           </div>
         ) : null}
-
-        {dismissedOut.length > 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-800">
-              Dismissed from every suggested day ({dismissedOut.length})
-            </p>
-            <p className="mt-0.5 text-xs leading-5 text-slate-600">
-              These jobs have no allowed day left in this week&apos;s plan.{" "}
-              <Link href={planHref(date)} className="font-semibold underline underline-offset-2">
-                Reset suggestions
-              </Link>{" "}
-              or open the job to schedule it by hand.
-            </p>
-            <ul className="mt-2 space-y-1 text-sm text-slate-700">
-              {dismissedOut.map(({ job }) => (
-                <li key={job.id}>
-                  <Link href={`/jobs/${job.id}`} className="font-medium underline underline-offset-2">
-                    {job.title}
-                  </Link>{" "}
-                  <span className="text-xs text-slate-500">{job.city ?? ""}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {noCapacity.length > 0 ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-800">
-              Beyond this week&apos;s capacity ({noCapacity.length})
-            </p>
-            <p className="mt-0.5 text-xs leading-5 text-slate-600">
-              The next {HORIZON_DAYS} days are full. These stay in the queue —{" "}
-              <Link href={planHref(addDaysYmd(date, HORIZON_DAYS))} className="font-semibold underline underline-offset-2">
-                plan the following week
-              </Link>{" "}
-              to place them.
-            </p>
-            <ul className="mt-2 space-y-1 text-sm text-slate-700">
-              {noCapacity.map(({ job }) => (
-                <li key={job.id}>
-                  <Link href={`/jobs/${job.id}`} className="font-medium underline underline-offset-2">
-                    {job.title}
-                  </Link>{" "}
-                  <span className="text-xs text-slate-500">{job.city ?? ""}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
       </div>
     </div>
   );
 }
 
-function PlanDayCard({
-  day,
-  planDate,
-  dismissals,
-  homeBase,
-  staticMapKey,
-  returnTo,
+// ---------------------------------------------------------------------------
+// Day-fit strip
+// ---------------------------------------------------------------------------
+
+function stripCellClasses(kind: DayFit["kind"]): string {
+  if (kind === "near_work") {
+    return "border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200";
+  }
+  if (kind === "open") {
+    return "border-slate-200 bg-white text-slate-600 hover:bg-slate-50";
+  }
+  return "border-slate-200 bg-slate-100 text-slate-300";
+}
+
+function stripCellTitle(fit: DayFit): string {
+  const label = dayLabel(fit.date);
+  if (fit.kind === "near_work") {
+    return `${label} — near ${fit.nearestAnchorLabel ?? "booked work"} (~${fit.detourMinutes ?? "?"} min away)`;
+  }
+  if (fit.kind === "open") {
+    return fit.roundTripMinutes
+      ? `${label} — open day, ~${fit.roundTripMinutes} min round trip`
+      : `${label} — open day`;
+  }
+  return `${label} — full`;
+}
+
+function DayFitStrip({
+  jobId,
+  date,
+  dayFits,
+  selectedDay,
+  size,
 }: {
-  day: PlannedDay;
-  planDate: string;
-  dismissals: Record<string, string[]>;
-  homeBase: { latitude: number; longitude: number } | null;
-  staticMapKey: string | null;
-  returnTo: string;
+  jobId: string;
+  date: string;
+  dayFits: DayFit[];
+  selectedDay?: string | null;
+  size: "compact" | "large";
 }) {
-  const routedStops: RouteMapStop[] = day.stops
-    .filter((stop) => stop.job.coordinates !== null)
-    .map((stop) => ({ ...stop.job.coordinates!, order: stop.order }));
-  const mapUrl = buildRouteStaticMapUrl({
-    apiKey: staticMapKey,
-    homeBase,
-    stops: routedStops,
-    width: 640,
-    height: 280,
-  });
-  const directionsUrl = buildMultiStopDirectionsUrl({
-    homeBase,
-    stops: routedStops,
-  });
+  const cellBase =
+    size === "large"
+      ? "flex h-11 w-9 flex-col items-center justify-center rounded-md border text-[11px] font-semibold"
+      : "flex h-8 w-7 flex-col items-center justify-center rounded border text-[10px] font-semibold";
+
+  return (
+    <div className="flex flex-wrap gap-1" aria-label="Day fit for the next two weeks">
+      {dayFits.map((fit) => {
+        const { weekday, dayOfMonth } = shortDayLabel(fit.date);
+        const isSelected = selectedDay === fit.date;
+        const className = `${cellBase} ${stripCellClasses(fit.kind)} ${
+          isSelected ? "ring-2 ring-blue-500 ring-offset-1" : ""
+        }`;
+        const content = (
+          <>
+            <span className={size === "large" ? "text-[9px] font-medium opacity-70" : "sr-only"}>
+              {weekday}
+            </span>
+            <span>{dayOfMonth}</span>
+          </>
+        );
+        if (fit.kind === "full") {
+          return (
+            <span key={fit.date} title={stripCellTitle(fit)} className={className}>
+              {content}
+            </span>
+          );
+        }
+        return (
+          <Link
+            key={fit.date}
+            href={worksheetHref(date, { focus: jobId, day: fit.date })}
+            title={stripCellTitle(fit)}
+            className={className}
+          >
+            {content}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Grouping card and job rows
+// ---------------------------------------------------------------------------
+
+function GroupingCard({
+  cluster,
+  date,
+  ageByJobId,
+  anchorsByDate,
+  horizonDates,
+  homeBase,
+  dayFitsFor,
+}: {
+  cluster: LocatedPlanJob[];
+  date: string;
+  ageByJobId: Map<string, number | null>;
+  anchorsByDate: Record<string, PlanAnchor[]>;
+  horizonDates: string[];
+  homeBase: CoordinatePair | null;
+  dayFitsFor: (job: LocatedPlanJob) => DayFit[];
+}) {
+  const cities = Array.from(
+    new Set(cluster.map((job) => String(job.city ?? "").trim()).filter(Boolean)),
+  );
+  const label = cities.length > 0 ? cities.slice(0, 3).join(" / ") : "Grouping";
+  const targets = suggestTargetDates({ cluster, anchorsByDate, horizonDates, homeBase });
+  const target = targets[0] ?? null;
+  const backup = targets[1] ?? null;
+  const targetAnchors = target ? anchorsByDate[target.date] ?? [] : [];
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/80 px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <h3 className="text-sm font-bold text-[#0f1f35]">{dayLabel(day.date)}</h3>
-          <span className="text-xs text-slate-500">
-            {day.anchorCount} scheduled · {day.proposedCount} proposed
-          </span>
-        </div>
-        <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
-          <span>
-            ~{formatMiles(day.totalDriveKm)} · {day.totalDriveMinutes} min driving
-          </span>
-          <span>wraps ~{day.projectedEndLabel}</span>
-          {directionsUrl ? (
-            <a
-              href={directionsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-md border border-slate-300 bg-white px-2.5 py-1 font-semibold text-slate-800 transition hover:bg-slate-50"
-            >
-              Preview route →
-            </a>
-          ) : null}
+        <div>
+          <h3 className="text-sm font-bold text-[#0f1f35]">
+            {label} · {cluster.length} jobs together
+          </h3>
+          {target ? (
+            <p className="mt-0.5 text-xs text-slate-600">
+              Call these with <span className="font-semibold text-slate-900">{dayLabel(target.date)}</span> in
+              mind
+              {targetAnchors.length > 0 ? ` (already ${targetAnchors.length} booked that day)` : " (day is open)"}
+              {backup ? ` — backup: ${dayLabel(backup.date)}` : ""}
+            </p>
+          ) : (
+            <p className="mt-0.5 text-xs text-slate-600">No day with room in the next two weeks.</p>
+          )}
         </div>
       </div>
-
-      {mapUrl ? (
-        // Natural aspect ratio at a bounded width: nothing crops (every pin
-        // stays visible) and the map reads as an overview card, not the hero.
-        <div className="flex justify-center border-b border-slate-200 bg-slate-100/60 px-4 py-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={mapUrl}
-            alt={`Route map for ${dayLabel(day.date)}`}
-            className="h-auto w-full max-w-2xl rounded-lg border border-slate-200 shadow-sm"
-          />
-        </div>
-      ) : null}
-
       <ol className="divide-y divide-slate-100">
-        {day.stops.map((stop) => (
-          <PlanStopRow
-            key={stop.job.id}
-            stop={stop}
-            date={day.date}
-            dismissHref={
-              stop.kind === "proposed"
-                ? planHref(planDate, dismissals, `${stop.job.id}@${day.date}`)
-                : null
-            }
-            returnTo={returnTo}
+        {cluster.map((job) => (
+          <WorksheetJobRow
+            key={job.id}
+            job={job}
+            ageDays={ageByJobId.get(job.id) ?? null}
+            date={date}
+            dayFits={dayFitsFor(job)}
           />
         ))}
       </ol>
@@ -435,105 +487,236 @@ function PlanDayCard({
   );
 }
 
-function PlanStopRow({
-  stop,
+function WorksheetJobRow({
+  job,
+  ageDays,
   date,
-  dismissHref,
-  returnTo,
+  dayFits,
 }: {
-  stop: PlannedStop;
+  job: LocatedPlanJob;
+  ageDays: number | null;
   date: string;
-  dismissHref: string | null;
-  returnTo: string;
+  dayFits: DayFit[];
 }) {
-  const isAnchor = stop.kind === "anchor";
   return (
-    <li className={`px-4 py-3 ${isAnchor ? "bg-blue-50/40" : "bg-white"}`}>
-      <div className="flex flex-wrap items-start gap-3">
-        <span
-          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-            isAnchor ? "bg-[#0f1f35] text-white" : "bg-blue-600 text-white"
-          }`}
-        >
-          {stop.order}
-        </span>
+    <li className="px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              href={`/jobs/${stop.job.id}`}
+              href={worksheetHref(date, { focus: job.id })}
               className="text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
             >
-              {stop.job.title}
+              {job.customerName ?? job.title}
             </Link>
-            {isAnchor ? (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-800">
-                Scheduled
-                {stop.assignmentNames.length > 0 ? ` · ${stop.assignmentNames.join(", ")}` : ""}
-              </span>
-            ) : (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-                Call to book
-              </span>
-            )}
-            {stop.overflowsDay ? (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-                Runs past day end
+            {ageDays !== null && ageDays > 0 ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  ageDays >= 30 ? "bg-rose-100 text-rose-800" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {ageDays}d
               </span>
             ) : null}
           </div>
           <p className="mt-0.5 text-xs text-slate-600">
-            {[stop.job.customerName, stop.job.address, stop.job.city].filter(Boolean).join(" · ")}
-          </p>
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            {stop.driveMinutesFromPrevious > 0
-              ? `${formatMiles(stop.driveKmFromPrevious)} · ${stop.driveMinutesFromPrevious} min from previous stop · `
-              : ""}
-            arrive ~{stop.projectedArrivalLabel}
-            {isAnchor && stop.committedWindow?.start
-              ? ` (window ${String(stop.committedWindow.start).slice(0, 5)}–${String(
-                  stop.committedWindow.end ?? "",
-                ).slice(0, 5)})`
-              : ""}
+            {[job.title, job.address, job.city].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {!isAnchor ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-            {stop.job.phone ? (
-              <a
-                href={`tel:${stop.job.phone}`}
-                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-50"
-              >
-                Call{stop.job.customerName ? ` ${stop.job.customerName.split(" ")[0]}` : ""}
-              </a>
-            ) : null}
-            {stop.proposedWindows.map((window) => (
-              <form key={window.startHHMM} action={updateJobScheduleFromForm}>
-                <input type="hidden" name="job_id" value={stop.job.id} />
-                <input type="hidden" name="scheduled_date" value={date} />
-                <input type="hidden" name="window_start" value={window.startHHMM} />
-                <input type="hidden" name="window_end" value={window.endHHMM} />
-                <input type="hidden" name="return_to" value={returnTo} />
-                <button
-                  type="submit"
-                  className="inline-flex min-h-9 items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
-                >
-                  Book {window.label}
-                </button>
-              </form>
-            ))}
-            {dismissHref ? (
-              <Link
-                href={dismissHref}
-                title="Not this day — suggest a different day for this job"
-                aria-label={`Dismiss ${stop.job.title} from this day`}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-500 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700"
-              >
-                ✕
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          <DayFitStrip jobId={job.id} date={date} dayFits={dayFits} size="compact" />
+          <Link
+            href={worksheetHref(date, { focus: job.id })}
+            className="inline-flex min-h-9 items-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
+          >
+            Prep call
+          </Link>
+        </div>
       </div>
     </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Focus panel — the live call surface
+// ---------------------------------------------------------------------------
+
+function FocusPanel({
+  job,
+  ageDays,
+  date,
+  selectedDay,
+  dayFits,
+  anchorsByDate,
+  homeBase,
+  staticMapKey,
+}: {
+  job: LocatedPlanJob;
+  ageDays: number | null;
+  date: string;
+  selectedDay: string | null;
+  dayFits: DayFit[];
+  anchorsByDate: Record<string, PlanAnchor[]>;
+  homeBase: CoordinatePair | null;
+  staticMapKey: string | null;
+}) {
+  const returnTo = worksheetHref(date);
+  const selectedFit = selectedDay ? dayFits.find((fit) => fit.date === selectedDay) ?? null : null;
+  const selectedAnchors = selectedDay ? anchorsByDate[selectedDay] ?? [] : [];
+  const placement = selectedDay
+    ? planJobOnDay({ job, date: selectedDay, anchors: selectedAnchors, homeBase })
+    : null;
+
+  const mapStops: RouteMapStop[] = selectedAnchors
+    .filter((anchor) => anchor.coordinates !== null)
+    .map((anchor, index) => ({ ...anchor.coordinates!, order: index + 1 }));
+  const mapUrl = selectedDay
+    ? buildRouteStaticMapUrl({
+        apiKey: staticMapKey,
+        homeBase,
+        stops: mapStops,
+        highlight: job.coordinates,
+        width: 640,
+        height: 240,
+      })
+    : null;
+
+  return (
+    <section className="overflow-hidden rounded-xl border-2 border-blue-200 shadow-md">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 bg-blue-50/60 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-bold text-[#0f1f35]">{job.customerName ?? job.title}</h3>
+            {ageDays !== null && ageDays > 0 ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  ageDays >= 30 ? "bg-rose-100 text-rose-800" : "bg-slate-200 text-slate-700"
+                }`}
+              >
+                waiting {ageDays}d
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-0.5 text-xs text-slate-600">
+            {[job.title, job.address, job.city].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          {job.phone ? (
+            <a
+              href={`tel:${job.phone}`}
+              className="inline-flex min-h-9 items-center rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700"
+            >
+              Call {job.customerName ? job.customerName.split(" ")[0] : ""} · {job.phone}
+            </a>
+          ) : null}
+          <form action={logCustomerContactAttemptFromForm}>
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="method" value="call" />
+            <input type="hidden" name="result" value="no_answer" />
+            <input type="hidden" name="return_to" value={returnTo} />
+            <button
+              type="submit"
+              className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              No answer — log it
+            </button>
+          </form>
+          <Link
+            href={`/jobs/${job.id}`}
+            className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Open job
+          </Link>
+          <Link
+            href={returnTo}
+            aria-label="Close call prep"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-500 transition hover:bg-slate-50"
+          >
+            ✕
+          </Link>
+        </div>
+      </div>
+
+      <div className="space-y-3 px-4 py-4">
+        <div>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Which day works? <span className="font-normal normal-case">green = near booked work · white = open (solo trip) · gray = full</span>
+          </p>
+          <DayFitStrip jobId={job.id} date={date} dayFits={dayFits} selectedDay={selectedDay} size="large" />
+        </div>
+
+        {selectedDay && selectedFit ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+            <p className="text-sm font-semibold text-slate-900">
+              {dayLabel(selectedDay)}
+              <span className="ml-2 font-normal text-slate-600">
+                {selectedFit.kind === "near_work"
+                  ? `near ${selectedFit.nearestAnchorLabel ?? "booked work"} — ${
+                      selectedFit.nearestAnchorKm !== null ? formatMiles(selectedFit.nearestAnchorKm) : "?"
+                    } / ~${selectedFit.detourMinutes ?? "?"} min away`
+                  : selectedFit.kind === "open"
+                    ? selectedFit.roundTripMinutes
+                      ? `open day — ~${selectedFit.roundTripMinutes} min round trip`
+                      : "open day"
+                    : "full"}
+              </span>
+            </p>
+
+            {placement?.status === "ok" ? (
+              <>
+                {placement.overflowsDay ? (
+                  <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
+                    Fits only after the day end — booking here would run past 6 PM.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-600">
+                    Slotting into this day&apos;s route puts arrival around{" "}
+                    <span className="font-semibold">{placement.projectedArrivalLabel}</span>. Offer:
+                  </p>
+                )}
+                {!placement.overflowsDay ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {placement.proposedWindows.map((window) => (
+                      <form key={window.startHHMM} action={updateJobScheduleFromForm}>
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="scheduled_date" value={selectedDay} />
+                        <input type="hidden" name="window_start" value={window.startHHMM} />
+                        <input type="hidden" name="window_end" value={window.endHHMM} />
+                        <input type="hidden" name="return_to" value={returnTo} />
+                        <button
+                          type="submit"
+                          className="inline-flex min-h-9 items-center rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                        >
+                          Book {window.label}
+                        </button>
+                      </form>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : placement?.status === "full" ? (
+              <p className="mt-1 text-xs text-slate-600">This day has no room left.</p>
+            ) : null}
+
+            {mapUrl ? (
+              <div className="mt-3 flex justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={mapUrl}
+                  alt={`${dayLabel(selectedDay)} stops and this customer`}
+                  className="h-auto w-full max-w-xl rounded-lg border border-slate-200 shadow-sm"
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Pick a day on the strip to see projected arrival, offerable windows, and that day&apos;s
+            map before you dial.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

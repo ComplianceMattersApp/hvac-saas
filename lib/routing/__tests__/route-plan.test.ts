@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildRoutePlan, clusterJobs, type PlanAnchor, type PlanJob } from "../route-plan";
+import {
+  buildRoutePlan,
+  clusterJobs,
+  planJobOnDay,
+  suggestTargetDates,
+  type LocatedPlanJob,
+  type PlanAnchor,
+  type PlanJob,
+} from "../route-plan";
 
 /**
  * Grid intuition for the fixtures: near Stockton, 0.01° latitude ≈ 1.11 km.
@@ -303,5 +311,93 @@ describe("buildRoutePlan", () => {
     });
     expect(plan.clusters).toHaveLength(1);
     expect(plan.clusters[0].label).toBe("Stockton / Lodi");
+  });
+});
+
+describe("planJobOnDay", () => {
+  const located = (id: string, steps: number) =>
+    queuedJob(id, { coordinates: north(steps) }) as LocatedPlanJob;
+
+  it("projects arrival and offers windows when the day has room", () => {
+    const result = planJobOnDay({
+      job: located("q1", 2),
+      date: "2026-08-10",
+      anchors: [anchorJob("a1", "2026-08-10", { coordinates: north(1) })],
+      homeBase: HOME,
+    });
+
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.projectedArrivalMinutes).toBeGreaterThanOrEqual(8 * 60);
+    expect(result.overflowsDay).toBe(false);
+    expect(result.proposedWindows.length).toBeGreaterThanOrEqual(1);
+    expect(result.proposedWindows[0].startHHMM).toMatch(/^\d{2}:\d{2}$/);
+  });
+
+  it("reports a full day at stop capacity", () => {
+    const anchors = Array.from({ length: 8 }, (_, i) =>
+      anchorJob(`a${i}`, "2026-08-10", { coordinates: north(1) }),
+    );
+    expect(
+      planJobOnDay({ job: located("q1", 2), date: "2026-08-10", anchors, homeBase: HOME }).status,
+    ).toBe("full");
+  });
+
+  it("reports missing coordinates rather than guessing", () => {
+    expect(
+      planJobOnDay({
+        job: queuedJob("q1", { coordinates: null }),
+        date: "2026-08-10",
+        anchors: [],
+        homeBase: HOME,
+      }).status,
+    ).toBe("missing_coordinates");
+  });
+
+  it("flags a booking that would run past day end", () => {
+    // 300-minute job into a day that ends 200 minutes after start.
+    const result = planJobOnDay(
+      {
+        job: queuedJob("q1", { durationMinutes: 300, coordinates: north(1) }) as LocatedPlanJob,
+        date: "2026-08-10",
+        anchors: [],
+        homeBase: HOME,
+      },
+      { dayStartMinutes: 8 * 60, dayEndMinutes: 8 * 60 + 200 },
+    );
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    expect(result.overflowsDay).toBe(true);
+  });
+});
+
+describe("suggestTargetDates", () => {
+  it("ranks the day with nearby committed work first despite being later", () => {
+    const cluster = [
+      queuedJob("q1", { coordinates: north(20) }) as LocatedPlanJob,
+      queuedJob("q2", { coordinates: north(21) }) as LocatedPlanJob,
+    ];
+    const ranked = suggestTargetDates({
+      cluster,
+      anchorsByDate: { "2026-08-11": [anchorJob("a1", "2026-08-11", { coordinates: north(19) })] },
+      horizonDates: ["2026-08-10", "2026-08-11"],
+      homeBase: HOME,
+    });
+
+    expect(ranked[0].date).toBe("2026-08-11");
+  });
+
+  it("skips full days entirely", () => {
+    const anchors = Array.from({ length: 8 }, (_, i) =>
+      anchorJob(`a${i}`, "2026-08-10", { coordinates: north(1) }),
+    );
+    const ranked = suggestTargetDates({
+      cluster: [queuedJob("q1") as LocatedPlanJob],
+      anchorsByDate: { "2026-08-10": anchors },
+      horizonDates: ["2026-08-10", "2026-08-11"],
+      homeBase: HOME,
+    });
+
+    expect(ranked.map((r) => r.date)).toEqual(["2026-08-11"]);
   });
 });

@@ -1,5 +1,7 @@
 import type { CoordinatePair } from "./coordinates";
 import {
+  angularDifferenceDegrees,
+  bearingDegrees,
   estimateDriveMinutes,
   haversineKm,
   minutesToHHMM,
@@ -119,9 +121,10 @@ export type RoutePlan = {
   plannedJobCount: number;
 };
 
-type Located = PlanJob & { coordinates: CoordinatePair };
+export type LocatedPlanJob = PlanJob & { coordinates: CoordinatePair };
+type Located = LocatedPlanJob;
 
-function hasCoordinates(job: PlanJob): job is Located {
+export function hasCoordinates(job: PlanJob): job is LocatedPlanJob {
   return job.coordinates !== null;
 }
 
@@ -130,6 +133,92 @@ function hasCoordinates(job: PlanJob): job is Located {
 // the threshold of ANY member. Deterministic given input order (callers pass
 // queue order, which is stable).
 // ---------------------------------------------------------------------------
+
+/**
+ * Area clustering the way dispatchers think — three rules layered:
+ *
+ *  1. Group by city, merge neighboring cities (~30-minute reach) into one
+ *     working territory: "Stockton / Lodi", "Sacramento / Elk Grove / Galt".
+ *  2. Cap the territory's span so two metro areas never chain into one blob
+ *     through a city that borders both.
+ *  3. Stay in the lane: outlying cities only share a territory when they sit
+ *     in roughly the same direction from the home base. Stockton→Lodi points
+ *     a day north; Manteca — close, but the other way — belongs to a
+ *     southbound day. Home-city jobs are "on the way out" for any lane, so
+ *     they attach to whichever lane carries the most work.
+ *
+ * Suggestions only — the dispatcher can always make the call to break a lane.
+ */
+export function clusterJobsByArea(
+  jobs: Located[],
+  options: {
+    homeBase?: CoordinatePair | null;
+    neighborKm?: number;
+    maxSpanKm?: number;
+    laneSectorDegrees?: number;
+    homeRadiusKm?: number;
+  } = {},
+): Located[][] {
+  const neighborKm = options.neighborKm ?? 25;
+  const maxSpanKm = options.maxSpanKm ?? 45;
+  const laneSectorDegrees = options.laneSectorDegrees ?? 75;
+  const homeRadiusKm = options.homeRadiusKm ?? 10;
+  const homeBase = options.homeBase ?? null;
+
+  type CityGroup = {
+    city: string;
+    jobs: Located[];
+    centroid: CoordinatePair;
+    /** null when the city is within the home radius (lane-exempt) or no home base. */
+    laneBearing: number | null;
+  };
+
+  const byCity = new Map<string, Located[]>();
+  for (const job of jobs) {
+    const city = String(job.city ?? "").trim().toLowerCase() || `@${job.id}`;
+    byCity.set(city, [...(byCity.get(city) ?? []), job]);
+  }
+
+  const cityGroups: CityGroup[] = Array.from(byCity.entries()).map(([city, members]) => {
+    const centroid = {
+      latitude: members.reduce((sum, job) => sum + job.coordinates.latitude, 0) / members.length,
+      longitude: members.reduce((sum, job) => sum + job.coordinates.longitude, 0) / members.length,
+    };
+    const laneBearing =
+      homeBase && haversineKm(homeBase, centroid) > homeRadiusKm
+        ? bearingDegrees(homeBase, centroid)
+        : null;
+    return { city, jobs: members, centroid, laneBearing };
+  });
+
+  // Biggest city-groups seed areas first; ties keep input order (stable sort).
+  cityGroups.sort((a, b) => b.jobs.length - a.jobs.length);
+
+  const areas: CityGroup[][] = [];
+  for (const group of cityGroups) {
+    const area = areas.find((candidate) => {
+      const distances = candidate.map((member) => haversineKm(member.centroid, group.centroid));
+      if (Math.min(...distances) > neighborKm) return false;
+      if (Math.max(...distances) > maxSpanKm) return false;
+      if (group.laneBearing !== null) {
+        const laneCompatible = candidate.every(
+          (member) =>
+            member.laneBearing === null ||
+            angularDifferenceDegrees(member.laneBearing, group.laneBearing!) <= laneSectorDegrees,
+        );
+        if (!laneCompatible) return false;
+      }
+      return true;
+    });
+    if (area) {
+      area.push(group);
+    } else {
+      areas.push([group]);
+    }
+  }
+
+  return areas.map((area) => area.flatMap((group) => group.jobs));
+}
 
 export function clusterJobs(jobs: Located[], thresholdKm: number): Located[][] {
   const clusters: Located[][] = [];
@@ -321,6 +410,74 @@ function buildDayTimeline(
     projectedEndMinutes: cursorMinutes,
     projectedEndLabel: minutesToLabel(cursorMinutes),
   };
+}
+
+/**
+ * What booking THIS job on THIS day would look like: cheapest insertion into
+ * the day's committed stops, projected arrival, and offerable windows. Powers
+ * the mid-call "how about Tuesday?" answer.
+ */
+export function planJobOnDay(
+  params: {
+    job: PlanJob;
+    date: string;
+    anchors: PlanAnchor[];
+    homeBase: CoordinatePair | null;
+  },
+  optionOverrides: Partial<RoutePlanOptions> = {},
+):
+  | {
+      status: "ok";
+      projectedArrivalMinutes: number;
+      projectedArrivalLabel: string;
+      proposedWindows: PlannedStop["proposedWindows"];
+      overflowsDay: boolean;
+    }
+  | { status: "full" }
+  | { status: "missing_coordinates" } {
+  const options: RoutePlanOptions = { ...DEFAULT_OPTIONS, ...optionOverrides };
+  if (!hasCoordinates(params.job)) return { status: "missing_coordinates" };
+  if (params.anchors.length >= options.maxStopsPerDay) return { status: "full" };
+
+  const route = orderDayRoute(params.anchors, [params.job], params.homeBase);
+  const day = buildDayTimeline(params.date, route, params.homeBase, options);
+  const stop = day.stops.find((candidate) => candidate.job.id === params.job.id);
+  if (!stop) return { status: "full" };
+
+  return {
+    status: "ok",
+    projectedArrivalMinutes: stop.projectedArrivalMinutes,
+    projectedArrivalLabel: stop.projectedArrivalLabel,
+    proposedWindows: stop.proposedWindows,
+    overflowsDay: stop.overflowsDay,
+  };
+}
+
+/**
+ * Ranks horizon days for a cluster (affinity to each day's committed stops
+ * plus a mild sooner-is-better lean), skipping full days. The worksheet's
+ * "call with this day in mind" suggestion.
+ */
+export function suggestTargetDates(params: {
+  cluster: Located[];
+  anchorsByDate: Record<string, PlanAnchor[]>;
+  horizonDates: string[];
+  homeBase: CoordinatePair | null;
+  maxStopsPerDay?: number;
+}): Array<{ date: string; score: number }> {
+  const maxStopsPerDay = params.maxStopsPerDay ?? DEFAULT_OPTIONS.maxStopsPerDay;
+  return params.horizonDates
+    .map((date, index) => {
+      const anchors = params.anchorsByDate[date] ?? [];
+      if (anchors.length >= maxStopsPerDay) return null;
+      const references = dayReferencePoints(anchors, params.homeBase);
+      return {
+        date,
+        score: clusterAffinityKm(params.cluster, references) + index * LATER_DAY_PENALTY_KM,
+      };
+    })
+    .filter((entry): entry is { date: string; score: number } => entry !== null)
+    .sort((a, b) => a.score - b.score);
 }
 
 export function buildRoutePlan(

@@ -41,6 +41,12 @@ describe("route plan view wiring", () => {
     }
   });
 
+  it("logs failed calls through the canonical contact-attempt action", () => {
+    expect(planViewSource).toContain("action={logCustomerContactAttemptFromForm}");
+    expect(planViewSource).toContain('name="method"');
+    expect(planViewSource).toContain('name="result"');
+  });
+
   it("keeps coordinates and duration flowing through the dispatch select", () => {
     expect(calendarActionsSource).toContain("'locations:location_id(city, latitude, longitude)'");
     expect(calendarActionsSource).toContain("'estimated_duration_minutes'");
