@@ -182,14 +182,20 @@ async function qboFetch(opts: {
   method: "GET" | "POST";
   body?: unknown;
   query?: string;
-  /** QBO "sparse operation" selector, e.g. `void` on POST /invoice. */
-  operation?: string;
+  /**
+   * QBO operation selector, e.g. void on POST /invoice. The parameter NAME is
+   * explicit because Intuit is inconsistent about it: `operation=` appears in
+   * the entity docs and in node-quickbooks, `operate=` in other examples. Using
+   * the wrong one is silent — QBO ignores it and processes the request as a full
+   * update instead, which is what broke invoice 2109 in production.
+   */
+  operation?: { name: "operation" | "operate"; value: string };
 }): Promise<any> {
   const { accessToken, realmId, baseUrl, path, method, body, query, operation } = opts;
   const url = new URL(`${baseUrl}/v3/company/${realmId}/${path}`);
   url.searchParams.set("minorversion", QBO_MINOR_VERSION);
   if (query) url.searchParams.set("query", query);
-  if (operation) url.searchParams.set("operate", operation);
+  if (operation) url.searchParams.set(operation.name, operation.value);
 
   const response = await fetch(url.toString(), {
     method,
@@ -442,29 +448,46 @@ export async function voidQboInvoice(
 ): Promise<QboSyncedEntity> {
   const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken } = params;
 
-  // Intuit's documented void: a sparse {Id, SyncToken} body to ?operate=void.
-  //
-  // Nothing else may be sent here. Production has returned "Required parameter
-  // Line is missing" for this exact call, which means QBO sometimes validates it
-  // as a FULL update instead of honoring operate=void. Echoing the lines back to
-  // satisfy that validator was tried and is WRONG: a full update rewrites the
-  // invoice and clears every field omitted from the payload (DocNumber, TxnDate,
-  // PrivateNote), so it silently mutates a customer-facing record without ever
-  // voiding it. Fail loudly instead — and note that a 2xx here is NOT proof of a
-  // void; callers must confirm by re-reading the invoice.
-  const voided = await qboFetch({
-    accessToken,
-    realmId,
-    baseUrl,
-    path: "invoice",
-    method: "POST",
-    operation: "void",
-    body: { Id: qboInvoiceId, SyncToken: syncToken },
-  });
+  // The body is exactly {Id, SyncToken} and must stay that way. It is also the
+  // safety property of this call: with no Line, an unrecognized operation makes
+  // QBO validate the request as a full update, which fails with 400 and cannot
+  // mutate anything. Adding Line to satisfy that validator was tried and is
+  // WRONG — a full update rewrites the invoice, clearing every field omitted
+  // (DocNumber, TxnDate, PrivateNote), without ever voiding it.
+  const body = { Id: qboInvoiceId, SyncToken: syncToken };
+  const post = (name: "operation" | "operate") =>
+    qboFetch({
+      accessToken, realmId, baseUrl, path: "invoice", method: "POST",
+      operation: { name, value: "void" }, body,
+    });
+
+  // `operation=void` is what the Intuit entity docs and node-quickbooks use.
+  // `operate=void` appears in other Intuit examples; production rejected it with
+  // "Required parameter Line is missing", i.e. QBO ignored it and fell through to
+  // full-update validation. Try the documented spelling, keep the other as a
+  // fallback, and let any unrelated fault surface immediately.
+  let voided: any;
+  try {
+    voided = await post("operation");
+  } catch (error) {
+    if (!isMissingRequiredLineFault(error)) throw error;
+    voided = await post("operate");
+  }
 
   const inv = voided?.Invoice;
   if (!inv?.Id) throw new QboApiError(0, "QBO invoice void returned no Id");
+  // A 2xx is NOT proof of a void — callers must confirm by re-reading.
   return { id: String(inv.Id), syncToken: String(inv.SyncToken ?? syncToken) };
+}
+
+/**
+ * QBO ignored the operation selector and validated the request as a full update.
+ * Surfaces as "Required parameter Line is missing in the request".
+ */
+function isMissingRequiredLineFault(error: unknown): boolean {
+  if (!(error instanceof QboApiError)) return false;
+  const message = String(error.message ?? "").toLowerCase();
+  return message.includes("required") && message.includes("line");
 }
 
 export async function createQboPayment(

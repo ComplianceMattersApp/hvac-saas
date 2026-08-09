@@ -35,14 +35,29 @@ function urlOf(callIndex: number) {
 }
 
 describe("voidQboInvoice", () => {
-  it("posts exactly {Id, SyncToken} to operate=void", async () => {
+  it("posts exactly {Id, SyncToken} to the documented operation=void", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "4676", SyncToken: "2" } }));
 
     const result = await voidQboInvoice({ ...BASE, qboInvoiceId: "4676", syncToken: "1" });
 
     expect(result).toEqual({ id: "4676", syncToken: "2" });
-    expect(urlOf(0)).toContain("operate=void");
+    expect(urlOf(0)).toContain("operation=void");
     expect(bodyOf(0)).toEqual({ Id: "4676", SyncToken: "1" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to operate=void when QBO ignores operation= and demands Line", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(MISSING_LINE_FAULT, false, 400))
+      .mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "4534", SyncToken: "6" } }));
+
+    const result = await voidQboInvoice({ ...BASE, qboInvoiceId: "4534", syncToken: "5" });
+
+    expect(result).toEqual({ id: "4534", syncToken: "6" });
+    expect(urlOf(0)).toContain("operation=void");
+    expect(urlOf(1)).toContain("operate=void");
+    // The fallback must still carry no Line — otherwise it rewrites the invoice.
+    expect(bodyOf(1)).toEqual({ Id: "4534", SyncToken: "5" });
   });
 
   it("never sends Line — echoing lines back makes QBO rewrite the invoice instead of voiding it", async () => {
@@ -56,21 +71,26 @@ describe("voidQboInvoice", () => {
     expect(body).not.toHaveProperty("TotalAmt");
   });
 
-  it("fails loudly on the missing-Line fault rather than retrying as a full update", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(MISSING_LINE_FAULT, false, 400));
+  it("gives up after both spellings rather than ever sending Line", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(MISSING_LINE_FAULT, false, 400))
+      .mockResolvedValueOnce(jsonResponse(MISSING_LINE_FAULT, false, 400));
 
     await expect(voidQboInvoice({ ...BASE, qboInvoiceId: "4534", syncToken: "5" }))
       .rejects.toThrow(/Line is missing/);
-    // One attempt only. A second, line-bearing attempt would mutate the invoice.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const call of fetchMock.mock.calls) {
+      expect(JSON.parse(call[1].body)).not.toHaveProperty("Line");
+    }
   });
 
-  it("surfaces an unrelated fault as-is", async () => {
+  it("surfaces an unrelated fault immediately without trying the fallback", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ Fault: { Error: [{ Message: "Stale Object Error", Detail: "" }] } }, false, 400),
     );
     await expect(voidQboInvoice({ ...BASE, qboInvoiceId: "4534", syncToken: "0" }))
       .rejects.toThrow("Stale Object Error");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

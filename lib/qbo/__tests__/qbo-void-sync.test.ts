@@ -152,8 +152,13 @@ describe("voidInvoiceInQbo", () => {
     const { builder, updates } = makeSupabase(VOIDED_ROW);
     const result = await voidInvoiceInQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv1" });
 
-    expect(result).toMatchObject({ status: "error", error: "Stale Object Error" });
-    expect(updates.at(-1)).toMatchObject({ qbo_void_status: "error", qbo_void_error: "Stale Object Error" });
+    expect(result.status).toBe("error");
+    // The fault, plus what QuickBooks actually holds — the only view into the
+    // live record, since prod QBO secrets cannot be read outside the deployed app.
+    expect(result.error).toContain("Stale Object Error");
+    expect(result.error).toContain("doc number 1042");
+    expect(result.error).toContain("total $500.00");
+    expect(updates.at(-1)).toMatchObject({ qbo_void_status: "error" });
   });
 
   it("degrades to a skip when the qbo_void_* columns are not deployed", async () => {

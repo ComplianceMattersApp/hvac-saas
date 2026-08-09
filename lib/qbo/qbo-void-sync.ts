@@ -74,6 +74,10 @@ export async function voidInvoiceInQbo(params: {
   invoiceId: string;
 }): Promise<QboInvoiceVoidResult> {
   const { supabase, accountOwnerUserId, invoiceId } = params;
+  // Held outside the try so a failure can report what QuickBooks actually holds.
+  // Production QBO secrets are Sensitive in Vercel and unreadable locally, so
+  // this is the only way to observe the live record.
+  let observed: { docNumber: string | null; totalAmount: number; balance: number } | null = null;
 
   try {
     if (!getQboAvailability().available) {
@@ -133,6 +137,14 @@ export async function voidInvoiceInQbo(params: {
       baseUrl,
       qboInvoiceId,
     });
+
+    if (snapshot) {
+      observed = {
+        docNumber: snapshot.docNumber,
+        totalAmount: snapshot.totalAmount,
+        balance: snapshot.balance,
+      };
+    }
 
     // Gone from QBO (deleted there, or a stale id) — nothing left to void.
     if (!snapshot) {
@@ -218,7 +230,11 @@ export async function voidInvoiceInQbo(params: {
     });
     return { invoiceId, status: "voided" };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown QBO void error";
+    const reason = error instanceof Error ? error.message : "Unknown QBO void error";
+    const message = observed
+      ? `${reason} — QuickBooks currently holds: doc number ${observed.docNumber ?? "(EMPTY)"}, `
+        + `total $${observed.totalAmount.toFixed(2)}, balance $${observed.balance.toFixed(2)}.`
+      : reason;
     await recordVoidState(supabase, invoiceId, {
       qbo_void_status: "error",
       qbo_void_error: message,
