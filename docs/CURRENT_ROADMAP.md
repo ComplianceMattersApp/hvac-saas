@@ -49,20 +49,30 @@ These hold in every session regardless of which lane is active. They restate the
 
 EveryStep FieldWorks is core-complete and live-use proven; the phase is **post-completion maturation**, not foundation building. The foundation is no longer the problem — the priority is making the complete operational loop clearer, faster, and more commercially mature for real users on real devices.
 
-A structured competitive review (HouseCall Pro, FieldProMax, Jobber, ServiceTitan) confirmed the primary gap is **field-invoicing friction and commercial packaging clarity**, not missing features. EveryStep's truth model and ECC differentiation are stronger; the gap to close is UX speed and commercial completeness perception.
+### Strategic focus: the ECC lane (owner decision, 2026-08-09)
 
-Milestone position: service model buildout (milestone 1) is closed; billing/invoice workflow is in its owner-designated final proof and communication closeout; reporting/analytics (milestone 3) is substantially complete; Payments P1 foundation is closed at the current baseline. Current product focus is the maturation lanes below.
+**The ECC/HERS compliance lane is the designated product focus. HVAC-service feature parity is sequenced after it — deferred, not abandoned.**
+
+The reasoning, from a competitive review refreshed with live research on 2026-08-09:
+
+- **ECC is a category we own outright.** No FSM competitor models energy-code compliance testing, ECC-Rater workflow, or cross-account work-sharing. Housecall Pro, Jobber, ServiceTitan and Workiz all serve general home services.
+- **The regime just changed in our favour.** Effective 2026-01-01 the HERS program became ECC; HERS raters are now ECC-Raters. CalCERTS ceased HERS operations in 2024 and the residential registry consolidated under CHEERS. Our codebase carries zero CalCERTS references and already uses ECC/CHEERS vocabulary, so we are current on a regime raters are actively transitioning through.
+- **The service-side gaps are catch-up in a fight we are not picking.** Customer portal, online booking, reviews/marketing and AI receptionist are all sold hard by competitors — Jobber's AI Receptionist is a $99/month add-on. Chasing them means competing on their terms with no advantage.
+
+**What this means in practice:** build depth for raters first. Revisit HVAC-service parity — the customer portal above all — as a deliberate later lane once the ECC lane is deep. The portal remains a real gap for HVAC service companies and is expected to be closed; it is simply not first.
+
+Milestone position: service model buildout (milestone 1) is closed; reporting/analytics (milestone 3) is substantially complete; Payments P1 foundation is closed and Payments V2 has partially shipped (autopay, saved methods, refunds/disputes). Field Invoice Flow V1 is closed. Current product focus is the ECC lane below.
 
 ### Immediate next moves (quick reference)
 
-1. **Invoice Work Final Closeout is the owner-designated next lane.** Contractor saved-card self-service was explicitly pulled forward first; then run the production truth sweep, close delivery/customer-receipt communication, and perform the final field/desk exception pass. Plan: [Invoice_Work_Final_Closeout_Plan_2026-07.md](./ACTIVE/Invoice_Work_Final_Closeout_Plan_2026-07.md).
-2. **Do not pull the remaining Payments V2 expansion into invoice closeout.** ACH, refunds/disputes, broad customer portal history, and broader recurring automation remain separate later lanes.
-3. Resume **Lane 4 (SMS to Toggle-Ready)** after invoice closeout unless the owner explicitly reorders it again.
+1. **Ask CHEERS what EDDS access looks like for an ECC-Rater Company's software.** This is a conversation, not a sprint, and it gates the flagship ECC build below. CHEERS is approved to provide an external digital data source; no public API documentation was found, so their answer decides whether we build filing or a structured export.
+2. **Ship Routes API drive times** (`lib/routing/geometry.ts` is the single seam). Already scoped, and it closes the one routing claim ServiceTitan can currently beat us on.
+3. **Owner smoke ECC/HERS Work-Sharing** in production — code is on `main`, loop unconfirmed.
 
 If you are starting a session and just need the shortest answer to "what now?":
 
 1. **Owner smoke ECC/HERS Work-Sharing** in live prod — its code is fully on `main` (incoming/decided/returned surfaces, receiver panel, migrations) and the feature branch is gone, but the end-to-end loop has not been confirmed against production. *(Company Profile Console was the other track here; it was smoked in production on 2026-08-09 and is now Closed.)*
-2. **Lane 4 (SMS to Toggle-Ready)** remains the next non-invoice build lane after the owner-designated invoice closeout pass.
+2. **SMS needs an owner action, not a build.** The Twilio campaign was approved 2026-08-05 and production smoke passed; lift the test-phone suppression and press Activate.
 3. **PERF Slice 3** and the **Documentation consolidation Phase 2+** are safe, well-scoped parallel work that does not touch product runtime behavior.
 
 Anything not in the Active lanes list is deferred or runbook-gated — do not start it without an explicit owner decision.
@@ -70,6 +80,20 @@ Anything not in the Active lanes list is deferred or runbook-gated — do not st
 ---
 
 ## Active lanes
+
+### ECC Lane — Close the CHEERS Loop ◀ DESIGNATED FOCUS (2026-08-09)
+
+- **Status:** Not started. Gated on an external answer, not on engineering capacity.
+- **The gap, in the product's own words:** the ECC test system captures every diagnostic result, applies the rules engine (`lib/ecc/test-applicability.ts`, `scenario-resolver.ts`, `rule-profiles.ts`) to decide which tests apply, and then produces a **printable "CHEERS Entry Summary" described as "compact saved values for end-of-day CHEERS entry."** The rater retypes it into the registry. We take them to the doorstep and hand them a transcription sheet.
+- **Why it is the flagship:** double entry is the daily time sink for the exact user we own, and a transcription error becomes a compliance error on a certificate that follows the property permanently. Closing it turns the ECC system from record keeping into compliance filing. No FSM competitor can follow us here — none of them model ECC at all.
+- **Next safe slice:** **email CHEERS about EDDS access for an ECC-Rater Company's software.** CHEERS is CEC-approved to provide an external digital data source; no public API documentation exists, so their answer decides the build. If an API exists, build filing. If not, the fallback is a structured export shaped to their import format, which still removes most of the retyping. **Do not scope engineering before that answer.**
+- **Guardrails:** the registry is the authority for filed compliance state — EveryStep must never present an unfiled result as filed, and must never imply registry acceptance it has not received. Same posture as QBO: downstream system, verified rather than assumed. Filing is a financial/compliance-grade action and belongs behind the same fail-closed discipline as payment truth.
+
+### ECC Lane — supporting depth (after the CHEERS answer)
+
+- Work-sharing is the acquisition channel, not just a feature: a rater's HVAC contractor customers can send work cross-account, which no competitor offers. Prod smoke first, then consider how a non-EveryStep sender requests a rater.
+- Being demonstrably current on the 2025 Energy Code and ECC vocabulary is a sales asset with raters living the transition. Keep it current.
+
 
 ### Invoice Work Final Closeout ◀ NEXT ACTIVE LANE
 
@@ -162,7 +186,7 @@ One-liner per lane (detail lives in the ledgers):
 These are future/business-layer modules, not spine failures. Each stays parked unless an explicit owner decision reopens it.
 
 **Product-surface deferrals**
-- **Customer portal / client hub** — out of current release scope. *Unlock:* explicit owner scope decision. There is no customer portal in current scope.
+- **Customer portal / client hub** — **sequenced behind the ECC lane, not abandoned (owner decision 2026-08-09).** Verified 2026-08-09 as the largest genuine competitive gap for the HVAC-service side: Jobber's Client Hub, Housecall Pro's self-serve portal with booking/cancel/reschedule, and ServiceTitan all sell it hard, and it partially unlocks online booking and customer self-service payment too. It is deferred because the ECC lane is the strategy, **not** because it is unimportant — the owner intends to close this gap when service-side work resumes. Today only the *contractor* portal exists (`app/portal`), authorized by frozen billing identity. *Unlock:* owner reopens the HVAC-service parity lane.
 - **Reviews / marketing suite beyond the Google review ask** — out of scope. *Unlock:* owner decision.
 - **Online booking; AI receptionist / call tracking** — out of current product scope. *Unlock:* owner decision.
 - ~~**Route Builder / Schedule Assist** — nice-to-have, not operationally urgent.~~ **BUILT — no longer deferred (corrected 2026-08-09).** Route planning shipped 2026-08-08: `lib/routing/` (geocoding, geometry, area clustering, day-fit, route plan engine, route links) with test coverage, a plan view at `/calendar?view=plan`, and migrations backfilled on both databases. Documented in [Route_Planning_V1_Current_State.md](./ACTIVE/Route_Planning_V1_Current_State.md). *Next slice:* live drive times via the Google Routes API (`geometry.ts` is the single seam) and per-job duration entry — every unknown job is currently planned as 120 minutes.
