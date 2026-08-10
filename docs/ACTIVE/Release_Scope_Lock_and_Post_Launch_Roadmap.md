@@ -29,7 +29,7 @@ Date: 2026-05-08
 - Status: CLOSED for current implementation lanes.
 - Current-state truth is owned by [PROJECT_TRUTH.md](../PROJECT_TRUTH.md).
 - Customer/location boundaries are governed by [source-of-truth-strategy.md](./source-of-truth-strategy.md).
-- ECC retest and guided-workflow boundaries are governed by [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md) and [Guided_Workflow_Maturation_Closeout.md](./Guided_Workflow_Maturation_Closeout.md).
+- ECC retest and guided-workflow boundaries are governed by [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md) and [Guided_Workflow_Maturation_Closeout.md](../ARCHIVE/Guided_Workflow_Maturation_Closeout.md).
 - Recent tactical polish and minor-fix closeouts are recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
 - Deferred/parked items remain roadmap-visible only when they affect future sequencing or unlock criteria.
 
@@ -57,7 +57,7 @@ Date: 2026-05-08
 ## ECC/Test Workflow Maturity Closeout
 
 - Status: CLOSED — implemented, smoked by owner, and ready as current ECC field-entry standard.
-- Focused closeout: [ECC_Test_Workflow_Maturity_Closeout.md](./ECC_Test_Workflow_Maturity_Closeout.md).
+- Focused closeout: [ECC_Test_Workflow_Maturity_Closeout.md](../ARCHIVE/ECC_Test_Workflow_Maturity_Closeout.md).
 - Completed current-scope maturity pass for Duct Leakage, Airflow, Refrigerant Charge, Completion Report, and the main ECC test hub/matrix.
 - Current ECC test-entry standard is now field-first and mobile-friendly: clear test title, Exception first, reason required only when exception is selected, setup/context collapsed by default, one compact Results area, inline live calculated feedback, no duplicate dashboard/result cards, no side-by-side mobile field entry, and Complete Test returning to the job detail test section.
 - Completion Report is now treated as a print-first report surface, with Print, Back, and Download controls preserved while workspace/test-entry clutter is suppressed.

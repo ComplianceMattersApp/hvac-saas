@@ -6,10 +6,10 @@ Status: MODEL LOCK / DOCS ONLY.
 
 Authority: subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
-- `docs/ACTIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B7A_Authorized_Field_Invoice_Mode_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B7E_Field_Payment_Collection_Reconciliation_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7A_Authorized_Field_Invoice_Mode_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7E_Field_Payment_Collection_Reconciliation_Audit.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
 
 Scope: model-lock the smallest safe persistence foundation for per-user field billing/payment capabilities. This document authorizes no runtime implementation by itself.

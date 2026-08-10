@@ -46,7 +46,7 @@ Use [PROJECT_TRUTH.md](../PROJECT_TRUTH.md) for current product truth, [Release_
 ## 1.1 Recent access / portal / location / workflow closeout confirmations
 
 - Current launch baseline confirms the recent access, portal, customer/location, ECC retest, equipment-intake, signup/reactivation, and device-setup polish lanes are closed for current scope.
-- Canonical current-state details live in [PROJECT_TRUTH.md](../PROJECT_TRUTH.md), with domain boundaries in [source-of-truth-strategy.md](./source-of-truth-strategy.md), [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md), and [Guided_Workflow_Maturation_Closeout.md](./Guided_Workflow_Maturation_Closeout.md).
+- Canonical current-state details live in [PROJECT_TRUTH.md](../PROJECT_TRUTH.md), with domain boundaries in [source-of-truth-strategy.md](./source-of-truth-strategy.md), [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md), and [Guided_Workflow_Maturation_Closeout.md](../ARCHIVE/Guided_Workflow_Maturation_Closeout.md).
 - Tactical minor-fix/polish evidence lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
 - This checklist should track only launch gates and operator readiness; parked/deferred items remain in the roadmap unless they become launch blockers.
 

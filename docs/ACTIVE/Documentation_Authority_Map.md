@@ -30,6 +30,20 @@ Current control-plane authority:
 | Tactical punch-list ledger | Minor fix closeout record | Low-risk UI polish, small regressions, duplicate-submit guards, tactical performance fixes, verified commit evidence | Durable domain model contracts, strategic roadmap decisions |
 | Historical closeout docs | Supporting evidence | Lane-specific completion evidence and validation history | Current-state master truth unless explicitly linked by a canonical doc |
 
+## Archive Rule (added 2026-08-09)
+
+`docs/ACTIVE/` is the folder an agent trusts. When it holds nearly every document, the label carries no information — it reached 95 files against 5 archived, and several were describing shipped work as unstarted.
+
+A document belongs in [`docs/ARCHIVE/`](../ARCHIVE/README.md) once it is a finished record: a lane closeout, phase evidence, or an audit whose recommendation was adopted or abandoned. The test is its own status line plus the state of the lane — CLOSED, COMPLETE, SUPERSEDED, or "audit complete" for work that has since shipped.
+
+Three rules make the move safe:
+
+1. **Move by evidence, not by filename.** A document that names itself an audit may still govern; one that says CLOSED does not.
+2. **Move tightly-linked clusters as a unit,** so internal cross-links survive. Repoint every inbound link from documents that stayed, in the same commit.
+3. **Keep anything a current document depends on,** even if its own status reads historical. A broken link costs more than a stale label.
+
+Use `git mv` so history follows the file. Never delete or reword during an archive pass — it is a move, and it must stay reversible.
+
 ## Update Rules
 
 1. A completed feature that changes durable product truth may update the relevant domain spec and the Active Spine with a short current-state summary and backlink.

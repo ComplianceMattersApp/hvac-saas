@@ -4,7 +4,7 @@
 
 Status: B4-D audit complete as docs-only planning.
 
-Authority: This placement audit follows `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`, `docs/ACTIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`, `docs/ACTIVE/Workflow_Modernization_B4B_Field_Outcome_Exception_Reason_Audit.md`, `docs/ACTIVE/Active Spine V4.0 Current.md`, and `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`.
+Authority: This placement audit follows `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`, `docs/ARCHIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`, `docs/ARCHIVE/Workflow_Modernization_B4B_Field_Outcome_Exception_Reason_Audit.md`, `docs/ACTIVE/Active Spine V4.0 Current.md`, and `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`.
 
 Recent implementation context:
 

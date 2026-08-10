@@ -8,15 +8,15 @@ Authority: Subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
 - `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
-- `docs/ACTIVE/Workflow_Modernization_B7A_Authorized_Field_Invoice_Mode_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B7E_Field_Payment_Collection_Reconciliation_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B7H_Supplemental_Add_On_Invoice_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7A_Authorized_Field_Invoice_Mode_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7E_Field_Payment_Collection_Reconciliation_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7H_Supplemental_Add_On_Invoice_Audit.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
 - `docs/ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md`
-- `docs/ACTIVE/Workflow_Modernization_B6_Field_Billing_Proposal_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B6E_Field_Charge_Proposal_Wrapper_Model_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6_Field_Billing_Proposal_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6E_Field_Charge_Proposal_Wrapper_Model_Audit.md`
 
 Scope: closeout documentation only. This closeout records the completed B7-A through B7-T2 modernization slices and the locked model boundaries for field billing, supplemental/add-on invoice handling, field payment reporting, and office verification.
 

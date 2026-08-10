@@ -33,7 +33,7 @@ Do not move or blur these model truths out of the Maintenance Agreements spec:
 | Due/overdue summary and Ops/read-only drilldown | This ledger | Maintenance Agreements model spec |
 | Manual Create Work Order from Service Plan | This ledger | Maintenance Agreements model spec |
 | Visit link table, link creation, counting, and next-due confirmation | This ledger | Maintenance Agreements model spec |
-| Service Plan command-center cleanup | This ledger plus [Service_Plans_Command_Center_Cleanup_Closeout.md](./Service_Plans_Command_Center_Cleanup_Closeout.md) | Maintenance Agreements model spec |
+| Service Plan command-center cleanup | This ledger plus [Service_Plans_Command_Center_Cleanup_Closeout.md](../ARCHIVE/Service_Plans_Command_Center_Cleanup_Closeout.md) | Maintenance Agreements model spec |
 | Service-plan billing/payment closeouts | Domain model evidence ledger and Payments V2 spec | Payments V2 spec plus Maintenance Agreements model spec for operational boundaries |
 
 ## Group 9A-2: Schema / RLS / Read Model Foundation

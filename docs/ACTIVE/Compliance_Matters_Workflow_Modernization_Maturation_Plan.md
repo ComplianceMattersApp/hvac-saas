@@ -23,7 +23,7 @@ Recent committed/pushed polish lanes are closed for the current baseline, but th
 
 - Current-state workflow constraints are summarized in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md).
 - Customer/location source-of-truth details remain in [source-of-truth-strategy.md](./source-of-truth-strategy.md).
-- ECC retest/guided-workflow details remain in [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md) and [Guided_Workflow_Maturation_Closeout.md](./Guided_Workflow_Maturation_Closeout.md).
+- ECC retest/guided-workflow details remain in [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md) and [Guided_Workflow_Maturation_Closeout.md](../ARCHIVE/Guided_Workflow_Maturation_Closeout.md).
 - Tactical polish evidence is recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
 - Deferred workflow modernization items remain governed by this plan and the release roadmap when they affect future sequencing.
 
@@ -33,10 +33,10 @@ Recent committed/pushed polish lanes are closed for the current baseline, but th
 
 The following workflow-modernization lanes are no longer memory-only or future-only items:
 
-- Return Visit V1 is complete for the current intended scope: linked unscheduled office/dispatch-owned return visits preserve service-case continuity and become field My Work only after scheduling/assignment. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
-- Callback Visit V1 is complete for the current intended scope: callback reporting writes append-only event truth and can create linked callback child visits without rewriting the original job history. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
-- Different Issue Found is complete for the current intended scope as a callback/revisit-only field outcome that routes the completed callback/revisit responsibility to office review without creating payment, invoice, estimate, ECC, or new visit side effects. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
-- Field payment + office verification is complete for the current intended scope: field-reported cash/check/other payments remain pending workflow truth until authorized Confirm Payment verification creates final payment truth. Evidence: [Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md](./Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md) and [Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md](./Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md).
+- Return Visit V1 is complete for the current intended scope: linked unscheduled office/dispatch-owned return visits preserve service-case continuity and become field My Work only after scheduling/assignment. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](../ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+- Callback Visit V1 is complete for the current intended scope: callback reporting writes append-only event truth and can create linked callback child visits without rewriting the original job history. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](../ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+- Different Issue Found is complete for the current intended scope as a callback/revisit-only field outcome that routes the completed callback/revisit responsibility to office review without creating payment, invoice, estimate, ECC, or new visit side effects. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](../ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+- Field payment + office verification is complete for the current intended scope: field-reported cash/check/other payments remain pending workflow truth until authorized Confirm Payment verification creates final payment truth. Evidence: [Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md](../ARCHIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md) and [Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md](../ARCHIVE/Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md).
 
 Deferred follow-ups remain separate: callback/return timeline polish, field line-item/charge UX simplification, correction/void workflows for field-reported payments, refunds/reversals/export expansion, SMS/customer communications, QBO, and broader payment/customer portal add-ons.
 
@@ -156,7 +156,7 @@ Admin/Owner can see both.
 ### 4.5 ECC guided workflow separation
 
 ECC guided workflow is locked separately in `docs/ACTIVE/ECC_Guided_Workflow_Separation_Model_Lock.md`.
-The current service/ECC guided maturation pass is closed in `docs/ACTIVE/Guided_Workflow_Maturation_Closeout.md`.
+The current service/ECC guided maturation pass is closed in `docs/ARCHIVE/Guided_Workflow_Maturation_Closeout.md`.
 
 Service follow-up and ECC workflow must not be blended:
 
@@ -336,7 +336,7 @@ Recommended workflow:
 
 ## 8. Return visit workflow
 
-Current status: complete for Return Visit V1 current scope. See [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+Current status: complete for Return Visit V1 current scope. See [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](../ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
 
 Return visit is for continuation of unresolved work, not a completed job that later failed.
 
@@ -353,7 +353,7 @@ Recommended workflow:
 
 ## 9. Callback workflow
 
-Current status: complete for Callback Visit V1 current scope. See [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+Current status: complete for Callback Visit V1 current scope. See [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](../ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
 
 Callback is separate from return visit.
 

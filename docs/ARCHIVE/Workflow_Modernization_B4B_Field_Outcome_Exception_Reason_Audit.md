@@ -4,7 +4,7 @@
 
 Status: B4-B audit complete as docs-only planning.
 
-Authority: This audit is subordinate to `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`, `docs/ACTIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`, `docs/ACTIVE/Active Spine V4.0 Current.md`, and `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`.
+Authority: This audit is subordinate to `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`, `docs/ARCHIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`, `docs/ACTIVE/Active Spine V4.0 Current.md`, and `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`.
 
 Scope: Current-state mapping of field completion, outcome, waiting/exception reason, notes/photos/diagnostics, visit scope/work items, job events, return/follow-up, callback-like, and retest seams. This audit determines where a future lightweight "What happened today?" finish flow should attach.
 

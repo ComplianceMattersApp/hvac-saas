@@ -9,9 +9,9 @@ Authority: Subordinate to:
 - `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
 - `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`
-- `docs/ACTIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B4B_Field_Outcome_Exception_Reason_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B4D_Job_Detail_Finish_Flow_Placement_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4B_Field_Outcome_Exception_Reason_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4D_Job_Detail_Finish_Flow_Placement_Audit.md`
 
 Scope: B4 closeout documentation for default field finish flow behavior delivered across B4-C through B4-I.
 
@@ -171,7 +171,7 @@ Continuation truth:
 - The child return job appears according to its own scheduling/assignment rules.
 - The workflow avoids same-visit resume or ready-to-continue language.
 
-See `docs/ACTIVE/Guided_Workflow_Maturation_Closeout.md` for the current canonical closeout across service and ECC guided workflows.
+See `docs/ARCHIVE/Guided_Workflow_Maturation_Closeout.md` for the current canonical closeout across service and ECC guided workflows.
 
 ## 11. Future Recommended Next Lanes
 
@@ -198,8 +198,8 @@ Relevant commits on `main` / `origin/main`:
 - `aa46a95` `feat(jobs): route unable to complete field outcome`
 
 Documentation alignment references:
-- `docs/ACTIVE/Workflow_Modernization_B4B_Field_Outcome_Exception_Reason_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B4D_Job_Detail_Finish_Flow_Placement_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4B_Field_Outcome_Exception_Reason_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4D_Job_Detail_Finish_Flow_Placement_Audit.md`
 
 ## 13. Explicit Non-Actions
 

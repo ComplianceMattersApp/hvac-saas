@@ -6,10 +6,10 @@ Status: CLOSED.
 
 Authority: subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
-- `docs/ACTIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B8B1_Field_Billing_Capability_Persistence_Model_Lock.md`
-- `docs/ACTIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B7E_Field_Payment_Collection_Reconciliation_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8B1_Field_Billing_Capability_Persistence_Model_Lock.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7E_Field_Payment_Collection_Reconciliation_Audit.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
 - `docs/ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md`
 - `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`

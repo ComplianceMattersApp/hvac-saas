@@ -5,11 +5,11 @@
 Status: CLOSED (field billing proposal foundation implemented, validated, and ready for push)
 
 Authority: Subordinate to:
-- `docs/ACTIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B6E_Field_Charge_Proposal_Wrapper_Model_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6E_Field_Charge_Proposal_Wrapper_Model_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
 - `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`

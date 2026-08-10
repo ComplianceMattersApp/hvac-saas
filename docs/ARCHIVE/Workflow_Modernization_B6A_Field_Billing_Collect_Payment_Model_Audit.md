@@ -9,8 +9,8 @@ Authority: Subordinate to:
 - `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
 - `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
 - `docs/ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md`
 
@@ -436,8 +436,8 @@ Explicit non-actions:
 ## Source References Reviewed
 
 Docs:
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
 - `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`

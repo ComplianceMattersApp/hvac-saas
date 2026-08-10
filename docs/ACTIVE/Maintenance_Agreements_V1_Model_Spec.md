@@ -12,7 +12,7 @@ Duplicated closeout sections may be shortened against the evidence ledger when t
 
 ## Service Plan / Payment Closeout Evidence Summary
 
-Historical closeout proof for the Service Plans command-center cleanup, Phase 6F-C manual saved-card charge, Phase 6G scheduled-autopay attempt smoke, Phase 6H failed-autopay attention/retry, and Phase 6I failed-payment reconciliation visibility is preserved in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md). Full Service Plans command-center cleanup detail remains in [Service_Plans_Command_Center_Cleanup_Closeout.md](./Service_Plans_Command_Center_Cleanup_Closeout.md).
+Historical closeout proof for the Service Plans command-center cleanup, Phase 6F-C manual saved-card charge, Phase 6G scheduled-autopay attempt smoke, Phase 6H failed-autopay attention/retry, and Phase 6I failed-payment reconciliation visibility is preserved in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md). Full Service Plans command-center cleanup detail remains in [Service_Plans_Command_Center_Cleanup_Closeout.md](../ARCHIVE/Service_Plans_Command_Center_Cleanup_Closeout.md).
 
 This spec keeps the durable Maintenance Agreements / Recurring Services contracts:
 

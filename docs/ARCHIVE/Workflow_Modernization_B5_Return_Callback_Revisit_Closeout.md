@@ -5,11 +5,11 @@
 Status: CLOSED (implementation complete and validated)
 
 Authority: Subordinate to:
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B5B_Return_Callback_Model_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B5B_Return_Callback_Model_Audit.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
 - `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`
-- `docs/ACTIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B1_Current_Queue_Contract_Audit.md`
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
 - `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`
 

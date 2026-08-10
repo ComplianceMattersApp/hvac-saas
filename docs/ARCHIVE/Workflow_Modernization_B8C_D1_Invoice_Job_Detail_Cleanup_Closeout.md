@@ -6,10 +6,10 @@ Status: CLOSED.
 
 Authority: subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
-- `docs/ACTIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
 - `docs/ACTIVE/ECC_Guided_Workflow_Separation_Model_Lock.md`
 
@@ -155,7 +155,7 @@ Plain-language outcome:
 - Job page became the work and billing readiness surface.
 - Print invoice became the clean customer-facing invoice output.
 - No database truth layers were collapsed.
-- For ECC, invoice/payment/no-charge truth remains separate from cert closeout truth. ECC invoice send may be allowed while cert closeout remains blocked by Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, or Retest Ready. Invoice send, payment collection, no-charge handling, and external billing must not auto-clear ECC blockers. See `docs/ACTIVE/Guided_Workflow_Maturation_Closeout.md` for the current service/ECC guided workflow closeout.
+- For ECC, invoice/payment/no-charge truth remains separate from cert closeout truth. ECC invoice send may be allowed while cert closeout remains blocked by Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, or Retest Ready. Invoice send, payment collection, no-charge handling, and external billing must not auto-clear ECC blockers. See `docs/ARCHIVE/Guided_Workflow_Maturation_Closeout.md` for the current service/ECC guided workflow closeout.
 
 ## 6. Explicit Non-Actions
 

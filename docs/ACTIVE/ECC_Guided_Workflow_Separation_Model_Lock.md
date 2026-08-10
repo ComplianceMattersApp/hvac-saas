@@ -4,7 +4,7 @@ Status: ACTIVE MODEL LOCK - current ECC guided workflow slices implemented for P
 
 Purpose: Freeze the ECC guided workflow model and record the current implemented state. This document separates ECC blocker, failure, retest, handoff, and cert-closeout behavior from the service follow-up workflow.
 
-Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and aligned with `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ACTIVE/ECC_Test_Workflow_Maturity_Closeout.md`, and current invoice/payment source-of-truth specs.
+Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and aligned with `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ARCHIVE/ECC_Test_Workflow_Maturity_Closeout.md`, and current invoice/payment source-of-truth specs.
 
 Mode: Docs/model lock only. This document authorizes no new product code, schema, migration, Supabase, portal, invoice, payment, service workflow, or runtime behavior changes by itself.
 

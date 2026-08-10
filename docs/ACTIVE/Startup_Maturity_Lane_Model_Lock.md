@@ -678,7 +678,7 @@ Required docs:
 - `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md`
 - `docs/ACTIVE/Compliance_Matters_Prelaunch_Confirmation_Checklist.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
 - `docs/ACTIVE/Support_Console_Production_Enablement_Runbook.md`
 
 Additional docs:

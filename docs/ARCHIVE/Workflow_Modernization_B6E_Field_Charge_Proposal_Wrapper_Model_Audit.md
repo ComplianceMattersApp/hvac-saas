@@ -5,10 +5,10 @@
 Status: ACTIVE PLANNING / MODEL LOCK CANDIDATE
 
 Authority: Subordinate to:
-- `docs/ACTIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
 - `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`
 - `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
@@ -362,10 +362,10 @@ Explicit non-actions:
 - no invoice line conversion implementation
 
 Source references reviewed:
-- `docs/ACTIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6A_Field_Billing_Collect_Payment_Model_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B6B_Field_Charge_Line_Item_Authority_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md`
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
 - `docs/ACTIVE/Workflow_Modernization_B0_Ownership_Matrix.md`
 - `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`

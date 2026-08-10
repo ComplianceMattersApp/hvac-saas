@@ -29,7 +29,7 @@ Do not move payment invariants, billing-period contracts, service-plan lifecycle
 | Allocation foundation and backfill/parity proof | This ledger | Financial Ledger / Payments Register V1 model spec |
 | Saved-card manual charge, scheduled autopay, failed autopay, reconciliation visibility | This ledger | Payments V2 / Service Plan Billing Foundation model spec plus Financial Ledger for register truth |
 | Service-plan billing periods and invoice linking | This ledger | Payments V2 / Service Plan Billing Foundation model spec |
-| Maintenance agreements, service-plan command center, service-plan UI closeouts | [Service_Plan_Model_Closeout_Evidence_Ledger.md](./Service_Plan_Model_Closeout_Evidence_Ledger.md), this ledger for payment/billing overlap, plus [Service_Plans_Command_Center_Cleanup_Closeout.md](./Service_Plans_Command_Center_Cleanup_Closeout.md) | Maintenance Agreements / Recurring Services V1 model spec |
+| Maintenance agreements, service-plan command center, service-plan UI closeouts | [Service_Plan_Model_Closeout_Evidence_Ledger.md](./Service_Plan_Model_Closeout_Evidence_Ledger.md), this ledger for payment/billing overlap, plus [Service_Plans_Command_Center_Cleanup_Closeout.md](../ARCHIVE/Service_Plans_Command_Center_Cleanup_Closeout.md) | Maintenance Agreements / Recurring Services V1 model spec |
 
 ## Payment Register / Manual Payment / Stripe Payment Truth
 
@@ -131,7 +131,7 @@ Preserved evidence category:
 - Full template management moved to `/service-plans/templates`.
 - Customer plan actions deep-link to the customer Service Plans tab with `maFocus` and agreement anchor.
 - Service plan UI closeout preserved boundaries: no service plan billing logic change, no visit generation change, no payment/invoice truth change, no Stripe/webhook change, no Confirm Payment change, no customer portal behavior change, no schema/migration change, and no role/capability change.
-- Full detail remains in [Service_Plans_Command_Center_Cleanup_Closeout.md](./Service_Plans_Command_Center_Cleanup_Closeout.md).
+- Full detail remains in [Service_Plans_Command_Center_Cleanup_Closeout.md](../ARCHIVE/Service_Plans_Command_Center_Cleanup_Closeout.md).
 
 Durable truth to keep in the model specs:
 

@@ -7,9 +7,9 @@ Purpose: Document the workflow model that is now implemented, committed, and pus
 Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and aligned with:
 
 - `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`
-- `docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md`
 - `docs/ACTIVE/ECC_Guided_Workflow_Separation_Model_Lock.md`
-- `docs/ACTIVE/ECC_Test_Workflow_Maturity_Closeout.md`
+- `docs/ARCHIVE/ECC_Test_Workflow_Maturity_Closeout.md`
 - invoice/payment source-of-truth docs where billing separation is defined
 
 Mode: Documentation/model closeout only. This document authorizes no product code, schema, migration, Supabase data, Stripe/payment, portal, handoff, or new workflow implementation changes by itself.

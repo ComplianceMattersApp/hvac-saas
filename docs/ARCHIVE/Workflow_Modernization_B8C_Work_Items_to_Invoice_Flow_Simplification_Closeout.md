@@ -6,10 +6,10 @@ Status: CLOSED (docs-only closeout for the B8-C Work Items to Invoice Flow Simpl
 
 Authority: subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
-- `docs/ACTIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
 
 Scope: closeout documentation only. This document records completed B8-C work and model boundaries for simplifying the visible path from Work Items to invoice-ready charges and payment readiness.

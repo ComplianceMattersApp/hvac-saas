@@ -6,9 +6,9 @@ Status: ACTIVE AUDIT / MODEL DIRECTION.
 
 Authority: subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
-- `docs/ACTIVE/Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md`
-- `docs/ACTIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
-- `docs/ACTIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md`
+- `docs/ARCHIVE/Workflow_Modernization_B8A_Invoice_Payment_Workspace_Field_First_UX_Audit.md`
+- `docs/ARCHIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
 - `docs/ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md`
 
