@@ -45,11 +45,13 @@ type FindExistingContractorReportEmailDeliveryInput = {
 
 type InternalReviewRequestEmailEventType =
   | "contractor_correction_submission"
-  | "retest_ready_requested";
+  | "retest_ready_requested"
+  | "contractor_note";
 
 type InternalReviewRequestEmailNotificationType =
   | "internal_contractor_correction_submission_email"
-  | "internal_retest_ready_requested_email";
+  | "internal_retest_ready_requested_email"
+  | "internal_contractor_note_email";
 
 const EVENT_TO_SUBJECT: Record<NotificationTriggerEventType, string> = {
   contractor_report_sent: "Contractor report sent",
@@ -85,6 +87,7 @@ const INTERNAL_REVIEW_REQUEST_EMAIL_NOTIFICATION_TYPE_BY_EVENT: Record<
 > = {
   contractor_correction_submission: "internal_contractor_correction_submission_email",
   retest_ready_requested: "internal_retest_ready_requested_email",
+  contractor_note: "internal_contractor_note_email",
 };
 
 type MarkInternalNewWorkNotificationsResolvedInput = {
@@ -102,7 +105,7 @@ function isInternalAwarenessEventType(value: NotificationTriggerEventType): bool
 function isInternalReviewRequestEmailEventType(
   value: NotificationTriggerEventType,
 ): value is InternalReviewRequestEmailEventType {
-  return value === "contractor_correction_submission" || value === "retest_ready_requested";
+  return value === "contractor_correction_submission" || value === "retest_ready_requested" || value === "contractor_note";
 }
 
 function formatServiceAddress(job: any): string {
@@ -161,6 +164,7 @@ function buildInternalContractorReviewRequestEmailHtml(args: {
   companyLogoUrl: string | null;
   supportPhone: string | null;
   supportEmail: string | null;
+  note: string | null;
 }) {
   const ctaBlock = args.jobUrl
     ? `
@@ -169,6 +173,9 @@ function buildInternalContractorReviewRequestEmailHtml(args: {
       </div>
       <div style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">If the button does not open, use this link: <a href="${escapeHtml(args.jobUrl)}">${escapeHtml(args.jobUrl)}</a></div>
     `
+    : "";
+  const noteBlock = args.note
+    ? `<div style="margin: 12px 0; border-left: 4px solid #2563eb; background: #f8fafc; padding: 12px 14px; color: #0f172a;">${escapeHtml(args.note)}</div>`
     : "";
 
   return renderOperationalEmailLayout({
@@ -179,6 +186,7 @@ function buildInternalContractorReviewRequestEmailHtml(args: {
     supportEmail: args.supportEmail,
     bodyHtml: `
       <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.6; color: #334155;">${escapeHtml(args.summaryLine)}</p>
+      ${noteBlock}
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; border: 1px solid #dbe4f0; border-radius: 12px; overflow: hidden; background: #ffffff;">
         <tr>
           <td colspan="2" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155; font-weight: 700; border-bottom: 1px solid #dbe4f0;">Review Context</td>
@@ -190,7 +198,7 @@ function buildInternalContractorReviewRequestEmailHtml(args: {
         <tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Location</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.serviceAddress)}</td></tr>
       </table>
       ${ctaBlock}
-      <p style="margin: 14px 0 0 0; font-size: 13px; line-height: 1.6; color: #475569;">Review the job before updating test outcomes or closeout status.</p>
+      <p style="margin: 14px 0 0 0; font-size: 13px; line-height: 1.6; color: #475569;">Open the job to review the update and respond.</p>
     `,
   });
 }
@@ -265,7 +273,7 @@ async function sendInternalContractorReviewRequestEmailForEvent(input: {
 
   const { data: latestEvent, error: latestEventErr } = await admin
     .from("job_events")
-    .select("id")
+    .select("id, meta")
     .eq("job_id", jobId)
     .eq("event_type", input.eventType)
     .order("created_at", { ascending: false })
@@ -328,19 +336,28 @@ async function sendInternalContractorReviewRequestEmailForEvent(input: {
   const serviceAddress = formatServiceAddress(job) || String((job as any)?.city ?? "").trim() || "Address not available";
   const appUrl = resolveOpsAlertAppUrl();
   const jobUrl = appUrl ? `${appUrl}/jobs/${jobId}?tab=ops` : null;
+  const note = input.eventType === "contractor_note"
+    ? String((latestEvent as { meta?: { note?: unknown } } | null)?.meta?.note ?? "").trim() || null
+    : null;
 
   const requestTypeLabel =
-    input.eventType === "contractor_correction_submission"
+    input.eventType === "contractor_note"
+      ? "Contractor note received"
+      : input.eventType === "contractor_correction_submission"
       ? "Correction submitted for review"
       : "Retest review requested";
 
   const subject =
-    input.eventType === "contractor_correction_submission"
+    input.eventType === "contractor_note"
+      ? `Contractor note received: ${jobTitle}`
+      : input.eventType === "contractor_correction_submission"
       ? `Correction submitted for review: ${jobTitle}`
       : `Retest review requested: ${jobTitle}`;
 
   const summaryLine =
-    input.eventType === "contractor_correction_submission"
+    input.eventType === "contractor_note"
+      ? `${contractorName} added a shared note to ${jobTitle}.`
+      : input.eventType === "contractor_correction_submission"
       ? `A contractor submitted a correction for review on ${jobTitle}. Review the job before updating the test or closeout status.`
       : `A contractor requested retest review on ${jobTitle}. Review the job and determine the next step.`;
 
@@ -361,6 +378,7 @@ async function sendInternalContractorReviewRequestEmailForEvent(input: {
     companyLogoUrl: tenantIdentity.logoUrl,
     supportPhone: tenantIdentity.supportPhone,
     supportEmail: tenantIdentity.supportEmail,
+    note,
   });
 
   const payload: Record<string, unknown> = {

@@ -438,7 +438,7 @@ describe("insertInternalNotificationForEvent email parity", () => {
                           return {
                             limit() {
                               return {
-                                maybeSingle: async () => ({ data: { id: "event-1" }, error: null }),
+                                maybeSingle: async () => ({ data: { id: "event-1", meta: { note: "Please confirm the return visit." } }, error: null }),
                               };
                             },
                           };
@@ -592,6 +592,31 @@ describe("insertInternalNotificationForEvent email parity", () => {
     expect(notificationUpdates).toEqual(
       expect.arrayContaining([expect.objectContaining({ status: "failed" })]),
     );
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("emails internal operations recipients when a contractor adds a shared note", async () => {
+    const rpcMock = vi.fn(async () => ({ data: "notif-inapp-note", error: null }));
+    const { admin, notificationInserts } = makeAdminSupabase();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const { insertInternalNotificationForEvent } = await import("@/lib/actions/notification-actions");
+    await insertInternalNotificationForEvent({
+      supabase: { rpc: rpcMock },
+      jobId: "job-1",
+      eventType: "contractor_note",
+      actorUserId: "contractor-user-1",
+    });
+
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      to: ["ops@example.com"],
+      subject: "Contractor note received: ECC Follow-up",
+      html: expect.stringContaining("Please confirm the return visit."),
+    }));
+    expect(notificationInserts[0]).toEqual(expect.objectContaining({
+      channel: "email",
+      notification_type: "internal_contractor_note_email",
+    }));
     expect(rpcMock).toHaveBeenCalledTimes(1);
   });
 });
