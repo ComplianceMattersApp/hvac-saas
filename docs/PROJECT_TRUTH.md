@@ -1,7 +1,7 @@
-# EveryStep JobWorks — PROJECT TRUTH
+# EveryStep FieldWorks — PROJECT TRUTH
 
 Status: STABLE PRODUCT TRUTH (rarely changes)
-Purpose: The durable facts, locked architecture, source-of-truth boundaries, and standing constraints for EveryStep JobWorks. An agent reads this to understand what the system IS and which rules never bend.
+Purpose: The durable facts, locked architecture, source-of-truth boundaries, and standing constraints for EveryStep FieldWorks. An agent reads this to understand what the system IS and which rules never bend.
 
 This document absorbs the locked (`§§1–20`) content of the retired `Active Spine V4.0 Current.md`. Locked rules are reproduced faithfully. Closeout evidence, completed-work narratives, roadmap sequencing, and lane status have been intentionally removed — where a Spine section mixed locked rules with closeout prose, the rules were kept and the prose was dropped (noted inline).
 
@@ -34,11 +34,11 @@ Closeout and operator paths: [Contractor_Payment_Communications_Closeout_2026-07
 
 ## 1. Product Identity
 
-Product name: EveryStep JobWorks
+Product name: EveryStep FieldWorks
 Legal entity: Compliance Matters CA
 Platform type: Field service management (FSM) for HVAC service companies and ECC/HERS compliance raters
 
-EveryStep JobWorks is an event-driven operational workflow system for compliance and service work, with scheduling, staffing, contractor collaboration, and audit-backed job resolution.
+EveryStep FieldWorks is an event-driven operational workflow system for compliance and service work, with scheduling, staffing, contractor collaboration, and audit-backed job resolution.
 
 It is not:
 - a simple job tracker
@@ -53,7 +53,9 @@ It is:
 - source-of-truth disciplined
 - additive by design
 
-> Branding note: many older docs still say "Compliance Matters." The current product name is EveryStep JobWorks; Compliance Matters CA is the legal entity. Tenant operational identity (per-account display name/logo/support contact) is separate from the global product brand — see §18.
+> Branding note: many older docs still say "Compliance Matters." The current product name is EveryStep FieldWorks; Compliance Matters CA is the legal entity. Tenant operational identity (per-account display name/logo/support contact) is separate from the global product brand — see §18.
+>
+> Name correction (2026-08-09): this document previously said "EveryStep JobWorks" while the shipped app shell, migration headers, and most of the repository said **FieldWorks**. FieldWorks is canonical, confirmed by the owner. Historical docs written under the old name were left as written; only control-plane and current-state docs were renamed. `docs/WORKING/Internal_Invoice_PDF_Delivery_V1_Audit_and_Implementation_Plan.md` noticed the discrepancy at the time and resolved it the other way — that note is superseded by this one.
 
 ---
 
@@ -565,7 +567,7 @@ The platform is payment-active for manual/off-platform payment recording and Str
 The platform supports live invoice collection through Stripe and durable manual/off-platform payment recording. Future payment rails and features must extend the existing register, allocation, and webhook-confirmed truth model without redesigning it.
 
 ### 19.3 Ownership model (locked)
-- EveryStep JobWorks = operational source of truth for payment visibility, payment-related workflow state, and operational tracking.
+- EveryStep FieldWorks = operational source of truth for payment visibility, payment-related workflow state, and operational tracking.
 - Stripe = processor truth for implemented platform subscription and tenant invoice payment flows, including connected-account Checkout and eligible saved-method PaymentIntents.
 - QBO = account-configured optional downstream accounting synchronization for eligible invoices and recorded payments; never operational or payment truth.
 
@@ -647,4 +649,4 @@ Where things live in the new structure:
 - **[ACTIVE/Documentation_Authority_Map.md](./ACTIVE/Documentation_Authority_Map.md)** — which doc owns what; naming the authority target before editing.
 - Domain model specs, runbooks, and evidence ledgers under `docs/ACTIVE/` remain the canonical owners of their detail; this file links to them rather than duplicating them.
 
-One-line definition: EveryStep JobWorks is a stabilized, event-driven operational system for compliance and service workflows, with complete scheduling and staffing foundations, strong auditability, a completed payment/deposits reporting foundation, controlled money-flow proof still gated, and future-ready business-layer expansion.
+One-line definition: EveryStep FieldWorks is a stabilized, event-driven operational system for compliance and service workflows, with complete scheduling and staffing foundations, strong auditability, a completed payment/deposits reporting foundation, controlled money-flow proof still gated, and future-ready business-layer expansion.

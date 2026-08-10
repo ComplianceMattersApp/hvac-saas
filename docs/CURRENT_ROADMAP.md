@@ -1,4 +1,4 @@
-# EveryStep JobWorks — CURRENT ROADMAP
+# EveryStep FieldWorks — CURRENT ROADMAP
 
 Status: ACTIVE ROADMAP POSTURE (updated at lane close)
 Purpose: Where the build currently stands and what work is safe to continue. An agent reads this to pick up the next safe slice per lane without re-deriving the whole product.
@@ -47,7 +47,7 @@ These hold in every session regardless of which lane is active. They restate the
 
 ## Current posture
 
-EveryStep JobWorks is core-complete and live-use proven; the phase is **post-completion maturation**, not foundation building. The foundation is no longer the problem — the priority is making the complete operational loop clearer, faster, and more commercially mature for real users on real devices.
+EveryStep FieldWorks is core-complete and live-use proven; the phase is **post-completion maturation**, not foundation building. The foundation is no longer the problem — the priority is making the complete operational loop clearer, faster, and more commercially mature for real users on real devices.
 
 A structured competitive review (HouseCall Pro, FieldProMax, Jobber, ServiceTitan) confirmed the primary gap is **field-invoicing friction and commercial packaging clarity**, not missing features. EveryStep's truth model and ECC differentiation are stronger; the gap to close is UX speed and commercial completeness perception.
 

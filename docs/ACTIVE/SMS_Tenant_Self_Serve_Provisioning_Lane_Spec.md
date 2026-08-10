@@ -1,4 +1,4 @@
-# EveryStep JobWorks — SMS Tenant Self-Serve Provisioning Lane (Planning)
+# EveryStep FieldWorks — SMS Tenant Self-Serve Provisioning Lane (Planning)
 
 Status: ACTIVE planning/model spec — committed future lane, not started
 Authority: Subordinate to docs/ACTIVE/SMS_Provider_Twilio_Readiness_Spec.md and docs/CURRENT_ROADMAP.md

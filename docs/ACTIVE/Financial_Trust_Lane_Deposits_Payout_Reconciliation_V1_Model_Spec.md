@@ -25,7 +25,7 @@ This section records current shipped runtime truth and supersedes older phase-lo
 - Idempotency remains anchored to Stripe connected-account plus balance-transaction identity. The uniqueness repair is not weakened and no duplicate settlement row is intended.
 - Report diagnostics distinguish recorded Stripe payments, synced settlement records, awaiting sync, pending payout, sync failures, and filters excluding existing records.
 - Query failures fail closed through a clear report-unavailable state and must never masquerade as authoritative `$0.00` totals.
-- Compliance Matters / EveryStep JobWorks provides a **supporting breakdown**, not bank-reconciliation proof. Stripe payout status explains what should reach the bank; the bank statement or connected accounting feed remains authoritative for what actually arrived.
+- Compliance Matters / EveryStep FieldWorks provides a **supporting breakdown**, not bank-reconciliation proof. Stripe payout status explains what should reach the bank; the bank statement or connected accounting feed remains authoritative for what actually arrived.
 - No manual `matched to bank`, `reconciled`, or certification state is created by this V1.
 - No invoice paid/balance mutation, payment-row mutation, allocation mutation, charge creation, refund/dispute behavior, or bank-feed behavior is introduced by settlement sync or reporting.
 

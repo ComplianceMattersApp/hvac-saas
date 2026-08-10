@@ -4,7 +4,7 @@ Copy this block, fill the [BRACKETS], and paste it to brief the agent. Delete th
 
 ---
 
-**Product:** EveryStep JobWorks — field service management (FSM) for HVAC service companies and ECC/HERS compliance raters. Event-driven operational workflow system: scheduling, staffing, contractor collaboration, audit-backed job resolution. Not a CRUD app, not a calendar toy, not portal-first.
+**Product:** EveryStep FieldWorks — field service management (FSM) for HVAC service companies and ECC/HERS compliance raters. Event-driven operational workflow system: scheduling, staffing, contractor collaboration, audit-backed job resolution. Not a CRUD app, not a calendar toy, not portal-first.
 
 **Deeper context (read if you need it):**
 - Stable truth, locked architecture, standing constraints → `docs/PROJECT_TRUTH.md`
