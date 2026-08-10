@@ -310,11 +310,10 @@ export function buildUpcomingService(params: {
   dueInNext30Days: number | null;
   notScheduled: number | null;
 }): UpcomingService {
-  const canViewScheduling = params.role === "admin" || params.role === "office";
-  const visible =
-    params.maintenanceAgreementsEnabled &&
-    params.productMode !== "ecc_hers" &&
-    canViewScheduling;
+  // Match the Service Plans workspace access contract: every authenticated
+  // internal role can open /service-plans when the feature is enabled. Today
+  // must not silently apply narrower role or product-mode gates.
+  const visible = params.maintenanceAgreementsEnabled;
 
   if (!visible) {
     return { visible: false, totalAttentionCount: 0, items: [], href: "/service-plans" };

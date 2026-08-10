@@ -74,8 +74,8 @@ describe("canViewBusinessPulseForRole", () => {
 });
 
 describe("buildUpcomingService", () => {
-  it("shows actionable service-plan windows to admin and office roles", () => {
-    for (const role of ["admin", "office"] as const) {
+  it("shows actionable service-plan windows to every internal role", () => {
+    for (const role of ["admin", "office", "billing", "tech"] as const) {
       const result = buildUpcomingService({
         role,
         productMode: "hvac_service",
@@ -111,7 +111,7 @@ describe("buildUpcomingService", () => {
     expect(result.totalAttentionCount).toBe(0);
   });
 
-  it("does not expose the scheduling section to tech, billing, disabled, or ECC/HERS contexts", () => {
+  it("matches Service Plans access across product modes and only hides when disabled", () => {
     const base = {
       maintenanceAgreementsEnabled: true,
       overdue: 2,
@@ -120,9 +120,9 @@ describe("buildUpcomingService", () => {
       notScheduled: 1,
     };
 
-    expect(buildUpcomingService({ ...base, role: "tech", productMode: "hvac_service" }).visible).toBe(false);
-    expect(buildUpcomingService({ ...base, role: "billing", productMode: "hvac_service" }).visible).toBe(false);
-    expect(buildUpcomingService({ ...base, role: "admin", productMode: "ecc_hers" }).visible).toBe(false);
+    expect(buildUpcomingService({ ...base, role: "tech", productMode: "hvac_service" }).visible).toBe(true);
+    expect(buildUpcomingService({ ...base, role: "billing", productMode: "hvac_service" }).visible).toBe(true);
+    expect(buildUpcomingService({ ...base, role: "admin", productMode: "ecc_hers" }).visible).toBe(true);
     expect(buildUpcomingService({ ...base, role: "admin", productMode: "hybrid", maintenanceAgreementsEnabled: false }).visible).toBe(false);
   });
 });
