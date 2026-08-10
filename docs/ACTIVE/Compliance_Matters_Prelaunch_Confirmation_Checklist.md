@@ -1,4 +1,4 @@
-﻿# Compliance Matters Software â€” Pre-Launch Confirmation Checklist
+﻿# Compliance Matters Software — Pre-Launch Confirmation Checklist
 
 **Status:** ACTIVE PRE-LAUNCH PLANNING SUPPORT DOC  
 **Authority:** Subordinate to `docs/PROJECT_TRUTH.md`
@@ -386,7 +386,7 @@ Use [PROJECT_TRUTH.md](../PROJECT_TRUTH.md) for current product truth, [Release_
 - Pre-launch sequence is explicitly resumed in this order:
   1. Performance/responsiveness batch closeout and documentation (closed for the current pass)
   2. Support Console production-readiness planning (controlled, read-only, audited, careful flag-enable planning, no impersonation, no tenant mutation unless explicitly approved later)
-  3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) â€” readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
+  3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) — readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
   4. Field-ready installable/PWA plus True App Package / Device-App Experience closeout lane (completed for controlled rollout)
   5. Final launch confirmation sweep (intake, internal job creation, scheduling, field lifecycle, invoice-tracking honesty, reports, flags, disabled/deferred features, production smoke)
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
@@ -846,7 +846,7 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 
 ### 2.6.4 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
-- Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.
+- Confirmed: full validation passed — 89 test files, 1057 tests, TSC_OK.
 - Confirmed: production smoke passed.
 - Confirmed: two test-only mock repairs committed during main validation (`job-ops-waiting-state.test.ts`, `service-case-reconciliation-wiring.test.ts`); no product behavior change.
 - Confirmed guarded operational mutation families:

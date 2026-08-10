@@ -166,22 +166,25 @@ These are future/business-layer modules, not spine failures. Each stays parked u
 - **Reviews / marketing suite beyond the Google review ask** — out of scope. *Unlock:* owner decision.
 - **Online booking; AI receptionist / call tracking** — out of current product scope. *Unlock:* owner decision.
 - ~~**Route Builder / Schedule Assist** — nice-to-have, not operationally urgent.~~ **BUILT — no longer deferred (corrected 2026-08-09).** Route planning shipped 2026-08-08: `lib/routing/` (geocoding, geometry, area clustering, day-fit, route plan engine, route links) with test coverage, a plan view at `/calendar?view=plan`, and migrations backfilled on both databases. Documented in [Route_Planning_V1_Current_State.md](./ACTIVE/Route_Planning_V1_Current_State.md). *Next slice:* live drive times via the Google Routes API (`geometry.ts` is the single seam) and per-job duration entry — every unknown job is currently planned as 120 minutes.
-- **GPS / location timers** — sequenced after QBO and app wrap. *Unlock:* after Lanes 5–6.
+- **GPS / location timers** — **partly built (corrected 2026-08-09).** The *timer* half shipped: `lib/time-clock/` holds mutations, read model, and settings controls with test coverage. The *GPS/location* half does not exist — nothing in `lib/time-clock/` captures coordinates. Still deferred: attaching location to clock events. *Unlock:* owner decision; the QBO/app-wrap sequencing note is obsolete now that Lane 5 is live.
 - **Additional dispatch UX micro-polish** — core scheduling is complete (PROJECT_TRUTH §10); this is UX-only and opportunistic.
 
 **Payments / billing deferrals**
-- **Deeper Payments V2** (ACH, autopay expansion, saved-method self-service) — beyond the P1 tracking foundation. *Unlock:* after Lane 5 (QBO) posture is set + owner decision. **Refunds and disputes are no longer deferred** — inbound Stripe handling shipped 2026-08-09 (full refund reverses, partial is raised for manual allocation, dispute reverses only when lost). Still deferred within that area: operator-initiated refunds from inside EveryStep, and pushing a reversal into QuickBooks rather than surfacing it for manual removal.
+- **Deeper Payments V2** — **only ACH is still deferred (corrected 2026-08-09).** *Unlock:* owner decision; the "after Lane 5 (QBO) posture is set" condition is met, since QBO went live 2026-08-03. The rest of this entry has shipped and should not be re-planned:
+  - **Autopay** — scheduled autopay attempt submission and failed-autopay manual retry are implemented with test coverage (`lib/business/tenant-saved-method-payment-attempts.ts`).
+  - **Saved-method self-service** — pulled into active implementation 2026-07-16 (PROJECT_TRUTH §Payments).
+  - **Refunds and disputes** — inbound Stripe handling shipped 2026-08-09: a full refund reverses the payment, a partial refund is raised for manual allocation, a dispute reverses only when lost. Still deferred *within* this: operator-initiated refunds from inside EveryStep, and pushing a reversal into QuickBooks rather than surfacing it for manual removal. See [Payment_Controls_Hardening_Closeout_2026-08-09.md](./ACTIVE/Payment_Controls_Hardening_Closeout_2026-08-09.md).
 - **Service Plan billing / autopay / generated-invoice expansion** — beyond the current maintenance-agreement baseline. *Unlock:* owner decision + Payments V2 sequencing.
 - **Controlled production money-flow / deposit proof** — COMPLETE; live gross/fee/net, detail/CSV, and payout/bank explanation smoke passed.
 
 **Platform / packaging deferrals**
-- **Native app-store wrapper ahead of Lane 6** — Web/PWA is the baseline; the wrap is deliberately last. *Unlock:* everything above Lane 6 solid.
+- **Native app-store wrapper ahead of Lane 6** — **the shell already exists (corrected 2026-08-09).** A Capacitor 8 remote-URL Android shell is scaffolded and validated: `capacitor.config.ts` and the `android/` project are in the repo. What is deferred is *store distribution*, not the wrapper. Outstanding: a local Android toolchain build, replacing the stopgap splash, and a `/.well-known/` proxy allow for `assetlinks`. Web/PWA remains the baseline and the wrap stays deliberately last. *Unlock:* everything above Lane 6 solid.
 - **Deeper offline mode** — not operationally urgent. *Unlock:* owner decision.
 - **Full support-system buildout beyond runbook-gated posture** — see runbook-gated items.
 
 **Field-workflow deferrals**
 - **Checklist Phase 2 — Field Mode** — target surface `MobileJobDetailV2Preview`; not part of Field Invoice Flow V1. *Unlock:* separate mobile-surface audit + explicit owner sign-off.
-- **Tech dispatch phone notifications** (PROJECT_TRUTH §11.9 backlog) — a tech assigned/dispatched should receive a phone notification, with a later on/off preference. *Unlock:* notification + preference/toggle work is scheduled.
+- **Tech dispatch phone notifications** (PROJECT_TRUTH §11.9 backlog) — a tech assigned/dispatched should receive a phone notification, with a later on/off preference. Genuinely still deferred: nothing fires on assignment. **But the delivery mechanism now exists** — account-scoped web push (`lib/notifications/web-push-delivery.ts`) is live and already wired for permit requests and notification actions, so this is a trigger-and-preference slice rather than building push from scratch. *Unlock:* owner decision.
 - **Inventory, job costing, payroll, financing, mileage / expense capture, broad customer-specific pricing complexity** — out of current product scope. *Unlock:* owner decision.
 
 ---
