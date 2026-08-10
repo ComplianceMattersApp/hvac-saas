@@ -20,7 +20,7 @@ function clean(value: unknown) { return String(value ?? "").trim(); }
 export async function buildAttentionCenterReadModel(params: { admin: any; accountOwnerUserId: string }) {
   const ownerId = clean(params.accountOwnerUserId);
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const [paymentResult, invoiceErrorResult, voidDriftResult, chargedAfterVoidResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
+  const [paymentResult, invoiceErrorResult, voidDriftResult, moneyOutResult, chargedAfterVoidResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
     params.admin.from("internal_invoice_payments")
       .select("id, invoice_id, job_id, amount_cents, paid_at, qbo_sync_status, qbo_sync_error, processor_name")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "recorded")
@@ -35,6 +35,15 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       .select("id, job_id, invoice_number, invoice_display_number, qbo_void_status, qbo_void_error, voided_at")
       .eq("account_owner_user_id", ownerId).eq("status", "void")
       .in("qbo_void_status", ["pending", "blocked", "error"]).order("voided_at", { ascending: false }).limit(100),
+    // Money leaving that still needs a human: a live chargeback, a partial refund
+    // the app cannot allocate on its own, or a reversal QuickBooks has not heard
+    // about. Left un-thrown below so an undeployed migration degrades to zero
+    // items rather than breaking the whole center.
+    params.admin.from("internal_invoice_payments")
+      .select("id, invoice_id, job_id, amount_cents, payment_status, paid_at, dispute_status, dispute_reason, stripe_refunded_amount_cents, qbo_sync_status")
+      .eq("account_owner_user_id", ownerId)
+      .or("dispute_status.in.(open,lost),and(stripe_refunded_amount_cents.not.is.null,payment_status.eq.recorded),and(payment_status.eq.reversed,qbo_sync_status.eq.synced)")
+      .order("paid_at", { ascending: false }).limit(200),
     // Charges the Stripe webhook flagged as landing after a void. No time filter:
     // real money that cannot be attributed should surface immediately, not after
     // the 15-minute staleness window used for abandoned sessions.
@@ -58,6 +67,7 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
   const invoiceIds = [...new Set([
     ...(paymentResult.data ?? []).map((row: any) => clean(row.invoice_id)),
     ...(chargedAfterVoidResult.error ? [] : (chargedAfterVoidResult.data ?? [])).map((row: any) => clean(row.invoice_id)),
+    ...(moneyOutResult.error ? [] : (moneyOutResult.data ?? [])).map((row: any) => clean(row.invoice_id)),
   ].filter(Boolean))];
   const labelsResult = invoiceIds.length
     ? await params.admin.from("internal_invoices").select("id, invoice_number, invoice_display_number").eq("account_owner_user_id", ownerId).in("id", invoiceIds)
@@ -101,6 +111,44 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       occurredAt: clean(invoice.voided_at) || null, href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`,
       actionLabel: blocked ? "Reconcile in QuickBooks" : "Retry QuickBooks void",
     });
+  }
+  for (const payment of moneyOutResult.error ? [] : (moneyOutResult.data ?? [])) {
+    const paymentId = clean(payment.id); const invoiceId = clean(payment.invoice_id); const jobId = clean(payment.job_id);
+    const label = labels.get(invoiceId) ?? invoiceId;
+    const href = jobId ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace` : "/reports/payments";
+    const disputeStatus = clean(payment.dispute_status);
+    const amount = `$${(Number(payment.amount_cents ?? 0) / 100).toFixed(2)}`;
+
+    if (disputeStatus === "open") {
+      items.push({ id: `stripe-dispute-open-${paymentId}`, category: "qbo_payment", severity: "critical",
+        title: `Payment disputed · Invoice ${label}`,
+        detail: clean(payment.dispute_reason) ? `Stripe reason: ${clean(payment.dispute_reason)}` : "A chargeback was filed against this payment.",
+        truth: `${amount} is held by Stripe while the dispute runs. It is still counted as collected because the dispute may be won — respond in Stripe before the deadline.`,
+        occurredAt: clean(payment.paid_at) || null, href, actionLabel: "Respond in Stripe", paymentId,
+      });
+    } else if (disputeStatus === "lost") {
+      items.push({ id: `stripe-dispute-lost-${paymentId}`, category: "qbo_payment", severity: "critical",
+        title: `Dispute lost · Invoice ${label}`,
+        detail: "The chargeback was decided against this account and the payment has been reversed.",
+        truth: `${amount} is gone. The invoice balance has reopened; QuickBooks and job closeout may still show it paid.`,
+        occurredAt: clean(payment.paid_at) || null, href, actionLabel: "Review invoice", paymentId,
+      });
+    } else if (clean(payment.payment_status) === "reversed") {
+      items.push({ id: `qbo-reversed-payment-${paymentId}`, category: "qbo_payment", severity: "critical",
+        title: `QuickBooks still shows a reversed payment · Invoice ${label}`,
+        detail: "This payment was refunded or lost to a dispute, but it was already synced to QuickBooks.",
+        truth: "EveryStep has reversed the money. QuickBooks still counts it as received, so its books overstate revenue until the payment is removed there.",
+        occurredAt: clean(payment.paid_at) || null, href, actionLabel: "Remove payment in QuickBooks", paymentId,
+      });
+    } else {
+      const refunded = `$${(Number(payment.stripe_refunded_amount_cents ?? 0) / 100).toFixed(2)}`;
+      items.push({ id: `stripe-partial-refund-${paymentId}`, category: "qbo_payment", severity: "critical",
+        title: `Partial refund needs allocation · Invoice ${label}`,
+        detail: `Stripe refunded ${refunded} of a ${amount} payment.`,
+        truth: "The money left, but EveryStep still counts the full payment as collected — reversal is all-or-nothing here, so the balance must be corrected by hand.",
+        occurredAt: clean(payment.paid_at) || null, href, actionLabel: "Correct the balance", paymentId,
+      });
+    }
   }
   // Charges that landed after the invoice was voided. These sit in the same
   // pending rows as abandoned sessions, but they are the opposite situation:

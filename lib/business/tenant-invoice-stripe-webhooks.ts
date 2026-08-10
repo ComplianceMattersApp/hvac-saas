@@ -97,6 +97,286 @@ async function flagStripeChargeAgainstVoidedInvoice(params: {
   }
 }
 
+export type TenantInvoiceMoneyOutResult = {
+  applied: boolean;
+  reason: string;
+  paymentId?: string;
+};
+
+/**
+ * Locates the recorded payment a Stripe charge produced.
+ *
+ * Matches on charge id first, then payment intent, because rows written by the
+ * checkout path and by the charge path populate different identity columns.
+ */
+async function findRecordedPaymentForCharge(params: {
+  admin: any;
+  accountOwnerUserId: string;
+  chargeId: string;
+  paymentIntentId: string;
+}): Promise<any | null> {
+  const { admin, accountOwnerUserId, chargeId, paymentIntentId } = params;
+  for (const [column, value] of [
+    ['processor_charge_id', chargeId],
+    ['stripe_payment_intent_id', paymentIntentId],
+    ['processor_payment_reference', chargeId],
+  ] as const) {
+    if (!value) continue;
+    const { data } = await admin
+      .from('internal_invoice_payments')
+      .select('id, invoice_id, job_id, amount_cents, payment_status, dispute_status, account_owner_user_id')
+      .eq('account_owner_user_id', accountOwnerUserId)
+      .eq(column, value)
+      .limit(1);
+    const row = Array.isArray(data) ? data[0] : null;
+    if (row?.id) return row;
+  }
+  return null;
+}
+
+/**
+ * Reverses a payment because Stripe says the money is gone (full refund, or a
+ * lost dispute).
+ *
+ * Mirrors the manual reversal path exactly — guarded update on 'recorded' plus
+ * the allocation dual-write — because the invoice balance is derived from
+ * allocations, not from the payment row. Skipping the dual-write would reverse
+ * the payment while the invoice still looked paid.
+ *
+ * Note the manual path deliberately REFUSES to reverse Stripe-sourced payments
+ * ('internal_invoice_payment_reversal_online_blocked'): online money must be
+ * returned through Stripe. That makes this webhook the only legitimate way such
+ * a payment is ever reversed.
+ */
+async function reverseStripePayment(params: {
+  admin: any;
+  paymentRow: any;
+  reason: string;
+  extraPatch?: Record<string, unknown>;
+}): Promise<boolean> {
+  const { admin, paymentRow, reason } = params;
+  const nowIso = new Date().toISOString();
+
+  const { data: updated, error } = await admin
+    .from('internal_invoice_payments')
+    .update({
+      payment_status: 'reversed',
+      reversed_at: nowIso,
+      reversal_reason: reason,
+      updated_at: nowIso,
+      ...(params.extraPatch ?? {}),
+    })
+    .eq('id', paymentRow.id)
+    .eq('payment_status', 'recorded')
+    .select('id, amount_cents')
+    .maybeSingle();
+
+  if (error) {
+    console.error('Stripe-driven payment reversal failed', {
+      paymentId: paymentRow.id, message: error.message ?? 'unknown error',
+    });
+    return false;
+  }
+  if (!updated?.id) return false;
+
+  const allocation = await upsertInvoicePaymentAllocationForPaymentRow({
+    supabase: admin,
+    paymentRow: {
+      id: String(updated.id),
+      account_owner_user_id: toCleanString(paymentRow.account_owner_user_id),
+      invoice_id: toCleanString(paymentRow.invoice_id),
+      amount_cents: Number(updated.amount_cents ?? paymentRow.amount_cents ?? 0),
+      payment_status: 'reversed',
+    },
+  });
+  if (!allocation.ok) {
+    console.warn('Allocation dual-write failed after a Stripe-driven reversal', {
+      paymentId: updated.id, invoiceId: paymentRow.invoice_id,
+    });
+  }
+  return true;
+}
+
+/**
+ * charge.refunded — money returned to the customer.
+ *
+ * A FULL refund reverses the payment: Stripe is authoritative that the money
+ * left, and leaving the invoice marked paid is simply a false record.
+ * A PARTIAL refund does not, because 'reversed' is all-or-nothing and guessing
+ * at the allocation would corrupt the balance. It is recorded and raised for a
+ * human instead.
+ */
+export async function recordTenantInvoiceRefundFromStripeCharge(params: {
+  charge: Stripe.Charge;
+  eventId: string;
+  connectedAccountId?: string | null;
+  admin?: any;
+}): Promise<TenantInvoiceMoneyOutResult> {
+  const { charge, eventId } = params;
+  const admin = params.admin ?? createAdminClient();
+  const accountOwnerUserId = toCleanString(charge.metadata?.account_owner_user_id);
+  const invoiceId = toCleanString(charge.metadata?.invoice_id);
+  if (!accountOwnerUserId || !invoiceId) {
+    return { applied: false, reason: 'Missing metadata: account_owner_user_id or invoice_id' };
+  }
+
+  const eventConnectedAccountId = toCleanString(params.connectedAccountId);
+  const connectReadiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, admin);
+  const expectedConnectedAccountId = toCleanString(connectReadiness.connectedAccountId);
+  if (!expectedConnectedAccountId || expectedConnectedAccountId !== eventConnectedAccountId) {
+    console.warn('Tenant invoice refund skipped: connected account mismatch', {
+      eventId, accountOwnerUserId, invoiceId, expectedConnectedAccountId, eventConnectedAccountId,
+    });
+    return { applied: false, reason: 'Connected account mismatch' };
+  }
+
+  const paymentRow = await findRecordedPaymentForCharge({
+    admin,
+    accountOwnerUserId,
+    chargeId: toCleanString(charge.id),
+    paymentIntentId: toCleanString(charge.payment_intent as string | null),
+  });
+  if (!paymentRow) {
+    return { applied: false, reason: 'No matching payment for the refunded charge' };
+  }
+
+  const refundedCents = Number(charge.amount_refunded ?? 0);
+  const chargedCents = Number(charge.amount ?? 0);
+  const isFullRefund = refundedCents > 0 && refundedCents >= chargedCents;
+
+  // Idempotent: a replayed refund event must not re-reverse or double-report.
+  if (toCleanString(paymentRow.payment_status).toLowerCase() === 'reversed') {
+    return { applied: false, reason: 'Payment already reversed', paymentId: paymentRow.id };
+  }
+
+  if (!isFullRefund) {
+    await admin
+      .from('internal_invoice_payments')
+      .update({ stripe_refunded_amount_cents: refundedCents })
+      .eq('id', paymentRow.id);
+    return {
+      applied: true,
+      reason: 'Partial refund recorded — payment left intact for manual allocation',
+      paymentId: paymentRow.id,
+    };
+  }
+
+  const reversed = await reverseStripePayment({
+    admin,
+    paymentRow,
+    reason: `Stripe refund of $${(refundedCents / 100).toFixed(2)} on charge ${toCleanString(charge.id)}`,
+    extraPatch: { stripe_refunded_amount_cents: refundedCents },
+  });
+  if (!reversed) {
+    return { applied: false, reason: 'Payment was not in a reversible state', paymentId: paymentRow.id };
+  }
+
+  await insertPaymentRecordedJobEventIfMissing({
+    admin,
+    jobId: toCleanString(paymentRow.job_id),
+    paymentId: toCleanString(paymentRow.id),
+    meta: { refund_charge_id: toCleanString(charge.id), refunded_amount_cents: refundedCents, event_id: eventId },
+  }).catch(() => undefined);
+
+  return { applied: true, reason: 'Full refund reversed the payment', paymentId: paymentRow.id };
+}
+
+/**
+ * charge.dispute.created / charge.dispute.closed — a chargeback.
+ *
+ * Opening a dispute does NOT reverse the payment. Funds are held while the case
+ * runs and it may still resolve in our favour; collapsing that into 'reversed'
+ * would understate collected money for a dispute we go on to win. Only a LOST
+ * dispute reverses, because only then is the money actually gone.
+ */
+export async function recordTenantInvoiceDisputeFromStripe(params: {
+  dispute: Stripe.Dispute;
+  eventId: string;
+  closed: boolean;
+  connectedAccountId?: string | null;
+  admin?: any;
+}): Promise<TenantInvoiceMoneyOutResult> {
+  const { dispute, eventId, closed } = params;
+  const admin = params.admin ?? createAdminClient();
+  const accountOwnerUserId = toCleanString(dispute.metadata?.account_owner_user_id);
+  const chargeId = toCleanString(dispute.charge as string | null);
+  const paymentIntentId = toCleanString(dispute.payment_intent as string | null);
+
+  if (!chargeId && !paymentIntentId) {
+    return { applied: false, reason: 'Dispute carries no charge or payment intent' };
+  }
+
+  // Disputes do not always carry our metadata, so fall back to identifying the
+  // account from the payment row the charge already produced.
+  let ownerId = accountOwnerUserId;
+  if (!ownerId) {
+    const { data } = await admin
+      .from('internal_invoice_payments')
+      .select('account_owner_user_id')
+      .or([
+        chargeId ? `processor_charge_id.eq.${chargeId}` : null,
+        paymentIntentId ? `stripe_payment_intent_id.eq.${paymentIntentId}` : null,
+      ].filter(Boolean).join(','))
+      .limit(1);
+    ownerId = toCleanString(Array.isArray(data) ? data[0]?.account_owner_user_id : null);
+  }
+  if (!ownerId) {
+    return { applied: false, reason: 'Could not resolve the account for the disputed charge' };
+  }
+
+  const paymentRow = await findRecordedPaymentForCharge({
+    admin, accountOwnerUserId: ownerId, chargeId, paymentIntentId,
+  });
+  if (!paymentRow) {
+    return { applied: false, reason: 'No matching payment for the disputed charge' };
+  }
+
+  const nowIso = new Date().toISOString();
+  const disputeId = toCleanString(dispute.id);
+  const outcome = toCleanString(dispute.status).toLowerCase();
+
+  if (!closed) {
+    await admin
+      .from('internal_invoice_payments')
+      .update({
+        dispute_status: 'open',
+        disputed_at: nowIso,
+        stripe_dispute_id: disputeId,
+        dispute_reason: toCleanString(dispute.reason) || null,
+      })
+      .eq('id', paymentRow.id);
+    return { applied: true, reason: 'Dispute opened — payment held pending outcome', paymentId: paymentRow.id };
+  }
+
+  // Stripe reports several closed states; only an explicit win is a win.
+  const won = outcome === 'won' || outcome === 'warning_closed';
+  await admin
+    .from('internal_invoice_payments')
+    .update({
+      dispute_status: won ? 'won' : 'lost',
+      dispute_resolved_at: nowIso,
+      stripe_dispute_id: disputeId || null,
+    })
+    .eq('id', paymentRow.id);
+
+  if (won) {
+    return { applied: true, reason: 'Dispute won — payment stands', paymentId: paymentRow.id };
+  }
+
+  const reversed = await reverseStripePayment({
+    admin,
+    paymentRow,
+    reason: `Stripe dispute ${disputeId || '(unknown)'} lost (${outcome || 'closed'}) — funds withdrawn`,
+  });
+  return {
+    applied: true,
+    reason: reversed
+      ? 'Dispute lost — payment reversed'
+      : 'Dispute lost — payment was not in a reversible state',
+    paymentId: paymentRow.id,
+  };
+}
+
 /** Reads the invoice WITHOUT the void filter, so callers can tell void from missing. */
 async function resolveInvoiceStatusById(params: { admin: any; invoiceId: string }): Promise<string | null> {
   const invoiceId = toCleanString(params.invoiceId);

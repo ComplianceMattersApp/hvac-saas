@@ -12,6 +12,8 @@ import {
   recordTenantInvoicePaymentFromCheckoutSession,
   recordTenantInvoicePaymentFromStripeCharge,
   recordTenantInvoicePaymentFailureFromStripeCharge,
+  recordTenantInvoiceRefundFromStripeCharge,
+  recordTenantInvoiceDisputeFromStripe,
 } from "@/lib/business/tenant-invoice-stripe-webhooks";
 import { recordTenantSavedPaymentMethodSetupFromCheckoutSession } from "@/lib/business/tenant-saved-payment-method-setups";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -69,6 +71,12 @@ const HANDLED_EVENT_TYPES = new Set([
   "customer.subscription.deleted",
   "charge.succeeded",
   "charge.failed",
+  // Money leaving. Without these, a refund or chargeback issued from the Stripe
+  // dashboard never reaches EveryStep: the invoice stays marked paid, the job
+  // stays closed, and nothing detects it.
+  "charge.refunded",
+  "charge.dispute.created",
+  "charge.dispute.closed",
 ]);
 
 function getStripeSignature(request: Request) {
@@ -238,6 +246,33 @@ export async function POST(request: Request) {
           connectedAccountId,
         });
       }
+    }
+
+    if (event.type === "charge.refunded") {
+      const charge = event.data.object as Stripe.Charge;
+      const connectedAccountId = typeof event.account === "string" ? event.account.trim() : "";
+      const invoiceId = typeof charge.metadata?.invoice_id === "string"
+        ? charge.metadata.invoice_id.trim()
+        : "";
+
+      if (invoiceId) {
+        await recordTenantInvoiceRefundFromStripeCharge({
+          charge,
+          eventId: event.id,
+          connectedAccountId,
+        });
+      }
+    }
+
+    if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
+      // Disputes do not reliably carry our metadata, so the handler resolves the
+      // account from the payment row the original charge produced.
+      await recordTenantInvoiceDisputeFromStripe({
+        dispute: event.data.object as Stripe.Dispute,
+        eventId: event.id,
+        closed: event.type === "charge.dispute.closed",
+        connectedAccountId: typeof event.account === "string" ? event.account.trim() : "",
+      });
     }
 
     return NextResponse.json({ received: true });
