@@ -828,7 +828,7 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
           {formatMoney(snapshot.collectedPriorMonthToDateCents)}
         </span>
       </div>
-      {comparisonLabel ? (
+      {comparison != null && comparisonLabel ? (
         <div className={`mt-1 text-xs font-medium ${comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
       ) : null}
       <JobVolumeChart snapshot={snapshot} />
