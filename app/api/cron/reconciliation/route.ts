@@ -11,7 +11,14 @@ import {
  *
  * Report-only: it writes findings and nothing else. Runs per account so one
  * account's provider outage cannot abort the others.
+ *
+ * Scheduled from vercel.json at 09:00 UTC (early morning Pacific), so a run
+ * covers a full day of activity and finishes before anyone is working.
  */
+
+// Paginated QBO and Stripe reads across every account — well beyond the default
+// function timeout once more than a couple of accounts are connected.
+export const maxDuration = 300;
 export async function GET(request: Request) {
   const secret = String(process.env.CRON_SECRET ?? "").trim();
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
