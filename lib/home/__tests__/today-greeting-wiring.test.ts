@@ -65,7 +65,7 @@ describe("today greeting polish", () => {
     expect(todayReadModelSource).toContain("/reports/payments");
     expect(todayReadModelSource).toContain("/service-plans");
     expect(todayReadModelSource).toContain("failedPaymentAttentionPromise");
-    expect(todayReadModelSource).toContain("summarizeMaintenanceAgreementsForAccount");
+    expect(todayReadModelSource).toContain("listMaintenanceAgreementDrilldownForAccount");
   });
 
   it("does not alter auth mutation or role behavior", () => {

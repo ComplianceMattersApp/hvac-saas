@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(__dirname, "../../../app/today/page.tsx"), "utf8");
+const readModelSource = readFileSync(resolve(__dirname, "../today-read-model.ts"), "utf8");
 
 describe("Today page hierarchy", () => {
   it("uses an independent desktop main column and right rail", () => {
@@ -28,17 +29,22 @@ describe("Today page hierarchy", () => {
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
 
-  it("renders compact queue rows with the fixed six-queue workflow", () => {
+  it("renders every queue supplied by the expanded Operations snapshot", () => {
     for (const key of [
       "need_scheduling",
       "field_work",
+      "without_tech",
+      "contractor_intake",
       "waiting",
       "exceptions",
       "follow_ups",
       "closeout",
+      "permits",
+      "updates",
     ]) {
-      expect(source).toContain(`"${key}"`);
+      expect(readModelSource).toContain(`key: "${key}"`);
     }
+    expect(source).toContain("chips.map((chip)");
     expect(source).toContain("Operations snapshot");
     expect(source).toContain("min-h-11");
     expect(source).not.toContain("min-h-16");
