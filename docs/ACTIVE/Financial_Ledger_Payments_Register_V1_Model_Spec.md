@@ -107,7 +107,7 @@ Known limitations:
 - Manual payment date is not a first-class user-entered field.
 - Payment rows do not carry direct `customer_id`.
 - Failed attempts need cleaner visual/report separation from collected money.
-- There is no dedicated Payments Register report.
+- ~~There is no dedicated Payments Register report.~~ **No longer true (verified 2026-08-09):** `lib/reports/payments-register.ts` exists, surfaced at `/reports/payments`, alongside `/reports/failed-payments` and `/reports/payment-reconciliation`.
 - It is good enough for today's invoice-bound payment truth, but not sufficient as the long-term financial register.
 
 ## Source-Of-Truth Model
@@ -188,9 +188,20 @@ These must not be faked as ordinary collected payments.
 
 ### Refund / Reversal
 
-Refunds, disputes, chargebacks, and reversals are deferred.
+**Shipped 2026-08-09 — this section previously said refunds and disputes were deferred and that V1 should not expose refund/dispute tooling. That is no longer true.**
 
-The model reserves statuses and future concepts for them, but V1 implementation should not expose refund/dispute tooling until explicitly designed.
+Inbound Stripe handling is live and reaches the register as follows:
+
+- `charge.refunded` with a **full** refund reverses the payment: `payment_status = 'reversed'` plus the allocation dual-write, because invoice paid/balance derives from allocations and not from the payment row alone.
+- A **partial** refund does **not** reverse. `reversed` is all-or-nothing, so the refunded amount is recorded on `stripe_refunded_amount_cents` and raised for manual allocation rather than guessing a split.
+- `charge.dispute.created` does **not** reverse — funds are held but the case may still be won, and collapsing that into `reversed` would understate collected money for a dispute later won. Dispute state therefore lives in its own `dispute_status` column (`open` / `won` / `lost`), not in `payment_status`.
+- Only a **lost** dispute reverses the payment.
+
+Register truth boundaries are unchanged: webhook-confirmed rows remain collected-money truth, reversal is webhook-driven only, and the manual reversal path still refuses Stripe-sourced payments because online money must be returned through Stripe.
+
+Still deferred here: operator-initiated refunds from inside EveryStep, and pushing a reversal into QuickBooks rather than surfacing it for manual removal.
+
+Detail: [Payment_Controls_Hardening_Closeout_2026-08-09.md](./Payment_Controls_Hardening_Closeout_2026-08-09.md). Migration `20260809170000`.
 
 ### Recurring Billing Period
 
