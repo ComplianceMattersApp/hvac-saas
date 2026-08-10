@@ -66,7 +66,7 @@ Milestone position: service model buildout (milestone 1) is closed; reporting/an
 ### Immediate next moves (quick reference)
 
 1. **Ask CHEERS what EDDS access looks like for an ECC-Rater Company's software.** This is a conversation, not a sprint, and it gates the flagship ECC build below. CHEERS is approved to provide an external digital data source; no public API documentation was found, so their answer decides whether we build filing or a structured export.
-2. **Ship Routes API drive times** (`lib/routing/geometry.ts` is the single seam). Already scoped, and it closes the one routing claim ServiceTitan can currently beat us on.
+2. ~~Ship Routes API drive times.~~ **DONE 2026-08-09.** Live `computeRouteMatrix` drive times are fetched before planning and passed into the pure engine as data, with straight-line fallback. Cost-bounded to the focused job. *Verify in production:* the `GOOGLE_MAPS_GEOCODING_API_KEY` needs the **Routes API** enabled on it — Geocoding and Routes are separate APIs, and a key that geocodes fine can still return `REQUEST_DENIED`, which degrades silently to estimates. Open a job in the Call Worksheet and confirm drive times shift.
 3. **Owner smoke ECC/HERS Work-Sharing** in production — code is on `main`, loop unconfirmed.
 
 If you are starting a session and just need the shortest answer to "what now?":

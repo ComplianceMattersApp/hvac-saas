@@ -82,13 +82,27 @@ Rule 3 is why `bearingDegrees` and `angularDifferenceDegrees` exist in `geometry
 
 `DEFAULT_NEAR_THRESHOLD_KM = 25`.
 
-## Known limitation: straight-line estimates
+## Drive times: live, with an estimate fallback
 
-`estimateDriveMinutes` uses **haversine distance with conservative city-driving assumptions**. There are no live drive times and no traffic. Estimates are deliberately pessimistic rather than optimistic.
+**Updated 2026-08-09 — live Google Routes drive times shipped.** The seam held: `geometry.ts` was the only place that needed to change.
 
-This is a known, bounded limitation, not an oversight. `geometry.ts` is the single seam: the Google Routes API fast-follow can replace these estimates **without changing any call site**, because every consumer takes minutes from these helpers rather than computing distance itself.
+Live times arrive as **data, not a network call inside the engine**. `lib/routing/routes-api.ts` fetches a `computeRouteMatrix` result before planning; `lib/routing/drive-time-matrix.ts` holds it as a lookup keyed by quantized coordinates; `estimateDriveMinutes(a, b, matrix?)` prefers a live measurement and falls back to the straight-line estimate when the matrix is absent or does not cover that leg.
 
-Treat arrival windows as planning guidance, not commitments, until that lands.
+That indirection is what preserves the purity described above. A `fetch` inside `buildRoutePlan` would have made it async, non-deterministic and untestable without a network, all at once.
+
+Behaviours worth knowing:
+
+- **Lookups are directional.** Road networks are not symmetric, so an out-and-back is two lookups rather than one doubled.
+- **Coordinates are quantized to ~1.1m** for keys. Floats round-trip through the database and the provider response; exact equality would miss on the last decimal and silently fall back for every pair.
+- **A missing leg returns null, never zero.** Zero would claim two stops are adjacent.
+- **`TRAFFIC_UNAWARE` on purpose.** Traffic estimates are tied to a departure time, but the planner proposes *days*. A "now" number would be wrong for a job two weeks out and would make the plan differ between renders.
+- The arrival buffer is still added to live time — Routes returns road time, not park-walk-up-and-knock time.
+
+**Cost is bounded deliberately.** `computeRouteMatrix` bills per element, so the call fires only when a job is **focused** — the moment an operator is about to quote an arrival window on the phone — across home base plus that job plus its nearest anchors, capped at 12 points (144 elements). The overview commits nothing to a customer and plans on estimates. Oversized requests are refused before the request rather than discovered on an invoice.
+
+**Failure is silent by design, which cuts both ways.** Any provider failure returns null and planning continues on estimates. That is the right failure mode, but it means a misconfiguration looks like normal operation. `GOOGLE_MAPS_GEOCODING_API_KEY` must have the **Routes API** enabled on it — Geocoding and Routes are separate APIs, so a key that geocodes fine can still return `REQUEST_DENIED` for routing.
+
+Still absent: traffic-aware timing, and per-job duration (every unknown job is planned as 120 minutes).
 
 ## Maps and deep links
 

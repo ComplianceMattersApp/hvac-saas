@@ -507,7 +507,7 @@ This table exists so build planning and competitive comparison start from what i
 | ECC / HERS test system | `lib/ecc`, `app/services` | Core differentiator vs generic FSM |
 | ECC/HERS work-sharing (cross-account) | `app/ops/workshare`, `lib/workflows` | Send → accept/decline → receiver job; prod smoke outstanding |
 | Calendar + dispatch | `components/calendar`, `lib/calendar` | Per-tech columns, tech filter, streaming loaders |
-| **Route planning engine** | `lib/routing` | Area clustering, day-fit scoring, drive order, arrival windows. Proposals are ephemeral and never persisted. Straight-line estimates; no live drive times yet |
+| **Route planning engine** | `lib/routing` | Area clustering, day-fit scoring, drive order, arrival windows. Proposals are ephemeral and never persisted. **Live Google Routes drive times** (fetched before planning and passed in as data, so the engine stays pure), falling back to straight-line estimates when unavailable |
 | **Call Worksheet** (route surface) | `components/calendar/RoutePlanView.tsx`, `/calendar?view=plan` | Route-first scheduling companion for the phone call: nothing pre-committed, two-week day-fit strip per customer, booked windows re-score the rest, failure logged as a first-class outcome |
 | **Shared job lifecycle precedence** | `lib/jobs/job-lifecycle-state.ts` | One precedence order for "what state is this job in", used by every job-detail surface. Terminal > exception > calendar position. Fixed desktop reporting SCHEDULED over closed/failed/on-hold jobs while mobile reported the exception |
 | Staffing / assignments | `lib/staffing` | |
