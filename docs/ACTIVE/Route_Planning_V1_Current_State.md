@@ -18,6 +18,19 @@ Surfaced at `/calendar?view=plan`.
 
 This is the load-bearing decision in the lane. Because nothing is stored, a schedule change simply re-flows the plan; there is no stored proposal to invalidate, reconcile, or drift out of sync with reality. It also means there is no migration surface for the planner itself — the only persisted routing data is coordinates on `locations`.
 
+## The surface: Call Worksheet (`/calendar?view=plan`)
+
+The engine below is only half the lane, and the half this document originally described. The operator-facing surface is `components/calendar/RoutePlanView.tsx` — a **route-first scheduling companion built for the phone call**, not a map.
+
+Its design commitments:
+
+- **Nothing is pre-committed.** The unscheduled queue is presented as geographic groupings with a target day in mind, never as an auto-assigned schedule.
+- **Every customer carries a two-week day-fit strip**, so "how about Tuesday?" is answered at a glance mid-call rather than by re-planning.
+- **Each booked window becomes an anchor** that re-scores everything else on the next render — a direct consequence of proposals being ephemeral.
+- **Impact is stated in the operator's terms**: selecting a worse day says how much extra driving it costs against the best day, and shows projected arrival and offerable windows.
+- **Failure is a first-class outcome.** A call that does not book is logged and moved past, rather than leaving the job in an ambiguous state.
+- Day strips wrap on narrow screens rather than running off-canvas.
+
 ## Modules
 
 | File | Role |
