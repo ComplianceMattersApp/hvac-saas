@@ -229,6 +229,10 @@ export type FinancialSnapshot = {
   collectedMonthToDateCents: number;
   collectedPriorMonthToDateCents: number;
   comparisonPercent: number | null;
+  completedJobsMonthToDate: number;
+  completedJobsPriorMonthToDate: number;
+  billedMonthToDateCents: number;
+  billedPriorMonthToDateCents: number;
 };
 
 export type TeamCoverageAssignment = {
@@ -1350,7 +1354,7 @@ async function safeLoadFinancialSnapshot(params: {
 }): Promise<FinancialSnapshot | null> {
   try {
     const boundaries = financialMonthBoundariesLA(params.now);
-    const loadRange = async (startIso: string, endIso: string) => {
+    const loadCollectionsRange = async (startIso: string, endIso: string) => {
       const { data, error } = await params.supabase
         .from("internal_invoice_payments")
         .select("amount_cents")
@@ -1366,9 +1370,43 @@ async function safeLoadFinancialSnapshot(params: {
       );
     };
 
-    const [current, prior] = await Promise.all([
-      loadRange(boundaries.currentStartIso, boundaries.currentEndIso),
-      loadRange(boundaries.priorStartIso, boundaries.priorEndIso),
+    const loadCompletedJobsRange = async (startIso: string, endIso: string) => {
+      // Jobs do not carry account_owner_user_id; tenant isolation is enforced by RLS.
+      const { count, error } = await params.supabase
+        .from("jobs")
+        .select("id", { count: "exact", head: true })
+        .eq("field_complete", true)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .gte("field_complete_at", startIso)
+        .lt("field_complete_at", endIso);
+      if (error) throw error;
+      return Math.max(0, Number(count ?? 0) || 0);
+    };
+
+    const loadBilledRange = async (startIso: string, endIso: string) => {
+      const { data, error } = await params.supabase
+        .from("internal_invoices")
+        .select("total_cents")
+        .eq("account_owner_user_id", params.accountOwnerUserId)
+        .eq("status", "issued")
+        .gte("issued_at", startIso)
+        .lt("issued_at", endIso)
+        .limit(5000);
+      if (error) throw error;
+      return ((data ?? []) as Array<{ total_cents?: unknown }>).reduce(
+        (total, row) => total + Math.max(0, Number(row.total_cents ?? 0) || 0),
+        0,
+      );
+    };
+
+    const [current, prior, currentJobs, priorJobs, currentBilled, priorBilled] = await Promise.all([
+      loadCollectionsRange(boundaries.currentStartIso, boundaries.currentEndIso),
+      loadCollectionsRange(boundaries.priorStartIso, boundaries.priorEndIso),
+      loadCompletedJobsRange(boundaries.currentStartIso, boundaries.currentEndIso),
+      loadCompletedJobsRange(boundaries.priorStartIso, boundaries.priorEndIso),
+      loadBilledRange(boundaries.currentStartIso, boundaries.currentEndIso),
+      loadBilledRange(boundaries.priorStartIso, boundaries.priorEndIso),
     ]);
 
     return {
@@ -1377,6 +1415,10 @@ async function safeLoadFinancialSnapshot(params: {
       collectedMonthToDateCents: current,
       collectedPriorMonthToDateCents: prior,
       comparisonPercent: prior > 0 ? Math.round(((current - prior) / prior) * 100) : null,
+      completedJobsMonthToDate: currentJobs,
+      completedJobsPriorMonthToDate: priorJobs,
+      billedMonthToDateCents: currentBilled,
+      billedPriorMonthToDateCents: priorBilled,
     };
   } catch {
     return null;

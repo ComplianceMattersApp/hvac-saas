@@ -78,6 +78,18 @@ describe("today business attention wiring", () => {
     });
   });
 
+  it("compares completed job volume and issued invoice totals for the same month-to-date windows", () => {
+    expect(todayReadModelSource).toContain("loadCompletedJobsRange");
+    expect(todayReadModelSource).toContain('.eq("field_complete", true)');
+    expect(todayReadModelSource).toContain('.gte("field_complete_at", startIso)');
+    expect(todayReadModelSource).toContain("loadBilledRange");
+    expect(todayReadModelSource).toContain('.eq("status", "issued")');
+    expect(todayReadModelSource).toContain('.gte("issued_at", startIso)');
+    expect(todayPageSource).toContain("Jobs &amp; billed total");
+    expect(todayPageSource).toContain("snapshot.completedJobsMonthToDate");
+    expect(todayPageSource).toContain("snapshot.billedPriorMonthToDateCents");
+  });
+
   it("caps the prior comparison at month end across a January year boundary", () => {
     const boundaries = financialMonthBoundariesLA(new Date("2026-01-31T20:00:00.000Z"));
     expect(boundaries).toMatchObject({

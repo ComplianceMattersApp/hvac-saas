@@ -786,9 +786,76 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
         </span>
       </div>
       <div className={`mt-1 text-xs font-medium ${comparison != null && comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
+      <JobVolumeChart snapshot={snapshot} />
       <Link href="/reports/monthly" className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
         View monthly overview →
       </Link>
+    </div>
+  );
+}
+
+function JobVolumeChart({ snapshot }: { snapshot: FinancialSnapshot }) {
+  return (
+    <div className="mt-4 border-t border-slate-200 pt-3" aria-label="Completed jobs and billed totals comparison">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        Jobs &amp; billed total
+      </div>
+      <p className="mt-1 text-[11px] leading-4 text-slate-500">Completed and issued through the same day of each month.</p>
+      <div className="mt-3 space-y-3">
+        <CompactComparisonBars
+          label="Completed jobs"
+          currentLabel={snapshot.monthLabel}
+          priorLabel={snapshot.priorPeriodLabel.replace("Same days in ", "")}
+          currentValue={snapshot.completedJobsMonthToDate}
+          priorValue={snapshot.completedJobsPriorMonthToDate}
+          formatValue={(value) => String(value)}
+        />
+        <CompactComparisonBars
+          label="Issued invoices"
+          currentLabel={snapshot.monthLabel}
+          priorLabel={snapshot.priorPeriodLabel.replace("Same days in ", "")}
+          currentValue={snapshot.billedMonthToDateCents}
+          priorValue={snapshot.billedPriorMonthToDateCents}
+          formatValue={formatMoney}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CompactComparisonBars({
+  label, currentLabel, priorLabel, currentValue, priorValue, formatValue,
+}: {
+  label: string;
+  currentLabel: string;
+  priorLabel: string;
+  currentValue: number;
+  priorValue: number;
+  formatValue: (value: number) => string;
+}) {
+  const maxValue = Math.max(currentValue, priorValue, 1);
+  const rows = [
+    { label: currentLabel, value: currentValue, color: "bg-blue-600" },
+    { label: priorLabel, value: priorValue, color: "bg-slate-300" },
+  ];
+
+  return (
+    <div>
+      <div className="mb-1 text-[11px] font-semibold text-slate-700">{label}</div>
+      <div className="space-y-1.5">
+        {rows.map((row) => (
+          <div key={row.label} className="grid grid-cols-[3.5rem_1fr_auto] items-center gap-2 text-[11px]">
+            <span className="truncate text-slate-500">{row.label}</span>
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full rounded-full ${row.color}`}
+                style={{ width: `${row.value > 0 ? Math.max(4, (row.value / maxValue) * 100) : 0}%` }}
+              />
+            </div>
+            <span className="min-w-[3rem] text-right font-semibold tabular-nums text-slate-800">{formatValue(row.value)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
