@@ -9,10 +9,12 @@ import {
   discardInternalJobAttachmentUpload,
   finalizeInternalJobAttachmentUpload,
   shareJobAttachmentToContractor,
+  shareJobAttachmentsToContractor,
   updateInternalJobAttachmentCaption,
 } from "@/lib/actions/attachment-actions";
 import type { AttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
 import { stripRefrigerantChargeEvidenceTag } from "@/lib/jobs/refrigerant-charge-evidence";
+import { downloadAttachmentZip } from "@/lib/attachments/download-attachment-zip";
 
 type Item = {
   id: string;
@@ -106,6 +108,8 @@ export default function JobAttachmentsInternal({
   const [ok, setOk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [sharingId, setSharingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkAction, setBulkAction] = useState<"share" | "download" | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingCaption, setEditingCaption] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -270,6 +274,52 @@ export default function JobAttachmentsInternal({
       setError(e instanceof Error ? e.message : "Share failed");
     } finally {
       setSharingId(null);
+    }
+  }
+
+  function toggleSelected(attachmentId: string) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(attachmentId)) next.delete(attachmentId);
+      else next.add(attachmentId);
+      return next;
+    });
+  }
+
+  async function shareSelectedToContractor() {
+    const attachmentIds = Array.from(selectedIds).filter((id) => !sharedAttachmentIds.has(id));
+    if (!attachmentIds.length) return;
+    setError(null);
+    setOk(null);
+    setBulkAction("share");
+    try {
+      await shareJobAttachmentsToContractor({ jobId, attachmentIds });
+      setSharedAttachmentIds((previous) => new Set([...previous, ...attachmentIds]));
+      setSelectedIds(new Set());
+      setOk(`Shared ${attachmentIds.length} selected attachment${attachmentIds.length === 1 ? "" : "s"} with the contractor.`);
+      router.refresh();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Bulk share failed");
+    } finally {
+      setBulkAction(null);
+    }
+  }
+
+  async function downloadSelected() {
+    const selected = initialItems.filter((item) => selectedIds.has(item.id) && item.signedUrl);
+    if (!selected.length) return;
+    setError(null);
+    setBulkAction("download");
+    try {
+      await downloadAttachmentZip(
+        selected.map((item) => ({ fileName: item.file_name, signedUrl: item.signedUrl! })),
+        `job-${jobId}-attachments.zip`,
+      );
+      setOk(`Downloaded ${selected.length} attachment${selected.length === 1 ? "" : "s"}.`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Bulk download failed");
+    } finally {
+      setBulkAction(null);
     }
   }
 
@@ -447,7 +497,38 @@ export default function JobAttachmentsInternal({
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === initialItems.length}
+                    onChange={() => setSelectedIds(selectedIds.size === initialItems.length ? new Set() : new Set(initialItems.map((item) => item.id)))}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Select all
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500">{selectedIds.size} selected</span>
+                  <button
+                    type="button"
+                    onClick={shareSelectedToContractor}
+                    disabled={!Array.from(selectedIds).some((id) => !sharedAttachmentIds.has(id)) || bulkAction != null}
+                    className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    {bulkAction === "share" ? "Sharing…" : "Share selected"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadSelected}
+                    disabled={!initialItems.some((item) => selectedIds.has(item.id) && item.signedUrl) || bulkAction != null}
+                    className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black disabled:opacity-50"
+                  >
+                    {bulkAction === "download" ? "Preparing ZIP…" : "Download selected"}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {initialItems.map((a) => {
                 const isImage =
                   !!a.content_type &&
@@ -468,8 +549,16 @@ export default function JobAttachmentsInternal({
                 return (
                   <div
                     key={a.id}
-                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_10px_20px_-24px_rgba(15,23,42,0.22)] transition-shadow hover:shadow-[0_16px_28px_-24px_rgba(15,23,42,0.24)]"
+                    className={`relative overflow-hidden rounded-xl border bg-white shadow-[0_10px_20px_-24px_rgba(15,23,42,0.22)] transition-shadow hover:shadow-[0_16px_28px_-24px_rgba(15,23,42,0.24)] ${selectedIds.has(a.id) ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200"}`}
                   >
+                    <label className="absolute left-2 top-2 z-10 inline-flex cursor-pointer rounded-md border border-slate-200 bg-white/95 p-2 shadow-sm" aria-label={`Select ${a.file_name}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(a.id)}
+                        onChange={() => toggleSelected(a.id)}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </label>
                     {hasThumb ? (
                       <a
                         href={a.signedUrl!}
@@ -629,7 +718,8 @@ export default function JobAttachmentsInternal({
                   </div>
                 );
               })}
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>

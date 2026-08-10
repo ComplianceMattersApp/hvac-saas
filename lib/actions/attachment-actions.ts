@@ -811,3 +811,53 @@ export async function shareJobAttachmentToContractor(input: {
   revalidatePath(`/portal/jobs/${jobId}`);
   revalidatePath("/portal");
 }
+
+export async function shareJobAttachmentsToContractor(input: {
+  jobId: string;
+  attachmentIds: string[];
+  note?: string;
+}) {
+  const jobId = String(input.jobId ?? "").trim();
+  const attachmentIds = Array.from(new Set(
+    (input.attachmentIds ?? []).map((value) => String(value ?? "").trim()).filter(Boolean),
+  ));
+  const note = String(input.note ?? "").trim();
+  if (!jobId) throw new Error("Missing jobId");
+  if (!attachmentIds.length) throw new Error("Select at least one attachment");
+
+  const supabase = await createClient();
+  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!user) throw new Error("Not authenticated");
+  const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
+  const scoped = await loadScopedInternalJobAttachmentsForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    attachmentIds,
+    attachmentSelect: "file_name",
+  });
+  if (!scoped?.job || scoped.attachments.length !== attachmentIds.length) {
+    throw new Error("Not authorized to share one or more selected attachments");
+  }
+  await requireOperationalAttachmentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  const fileNames = scoped.attachments.map((attachment: { file_name?: unknown }) => String(attachment?.file_name ?? ""));
+  const { error: evErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "public_note",
+    user_id: user.id,
+    meta: {
+      note: note || `Shared ${attachmentIds.length} attachments`,
+      attachment_ids: attachmentIds,
+      file_names: fileNames,
+      source: "internal_share",
+    },
+  });
+  if (evErr) throw evErr;
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  revalidatePath("/portal");
+  return { count: attachmentIds.length };
+}

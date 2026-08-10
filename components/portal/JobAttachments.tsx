@@ -9,6 +9,7 @@ import {
   revalidatePortalJob,
 } from "@/lib/actions/attachment-actions";
 import ActionFeedback from "@/components/ui/ActionFeedback";
+import { downloadAttachmentZip } from "@/lib/attachments/download-attachment-zip";
 
 const portalPrimaryButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_16px_28px_-20px_rgba(37,99,235,0.46)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:opacity-50";
@@ -66,9 +67,38 @@ export default function JobAttachments({
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [isPreparingDownload, setIsPreparingDownload] = useState(false);
 
   const hasFiles = files.length > 0;
   const canAct = !isPending && (hasFiles || note.trim().length > 0);
+
+  function toggleSelected(attachmentId: string) {
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(attachmentId)) next.delete(attachmentId);
+      else next.add(attachmentId);
+      return next;
+    });
+  }
+
+  async function downloadSelected() {
+    const selected = initialItems.filter((item) => selectedIds.has(item.id) && item.signedUrl);
+    if (!selected.length) return;
+    setError(null);
+    setIsPreparingDownload(true);
+    try {
+      await downloadAttachmentZip(
+        selected.map((item) => ({ fileName: item.file_name, signedUrl: item.signedUrl! })),
+        `job-${jobId}-attachments.zip`,
+      );
+      setOk(`Downloaded ${selected.length} attachment${selected.length === 1 ? "" : "s"}.`);
+    } catch (downloadError: unknown) {
+      setError(downloadError instanceof Error ? downloadError.message : "Bulk download failed.");
+    } finally {
+      setIsPreparingDownload(false);
+    }
+  }
 
   function openPicker() {
     setError(null);
@@ -321,7 +351,30 @@ export default function JobAttachments({
               No files uploaded yet.
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size === initialItems.length}
+                    onChange={() => setSelectedIds(selectedIds.size === initialItems.length ? new Set() : new Set(initialItems.map((item) => item.id)))}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Select all
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 dark:text-slate-300">{selectedIds.size} selected</span>
+                  <button
+                    type="button"
+                    onClick={downloadSelected}
+                    disabled={!initialItems.some((item) => selectedIds.has(item.id) && item.signedUrl) || isPreparingDownload}
+                    className={portalPrimaryButtonClass}
+                  >
+                    {isPreparingDownload ? "Preparing ZIP…" : "Download selected"}
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {initialItems.map((a) => {
                 const isImage =
                   !!a.content_type &&
@@ -331,8 +384,16 @@ export default function JobAttachments({
                 return (
                   <div
                     key={a.id}
-                    className="overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/80 shadow-[0_12px_24px_-26px_rgba(15,23,42,0.18)] dark:border-slate-800 dark:bg-slate-900/55"
+                    className={`relative overflow-hidden rounded-xl border bg-slate-50/80 shadow-[0_12px_24px_-26px_rgba(15,23,42,0.18)] dark:bg-slate-900/55 ${selectedIds.has(a.id) ? "border-blue-500 ring-2 ring-blue-100 dark:ring-blue-900" : "border-slate-200/80 dark:border-slate-800"}`}
                   >
+                    <label className="absolute left-2 top-2 z-10 inline-flex cursor-pointer rounded-md border border-slate-200 bg-white/95 p-2 shadow-sm" aria-label={`Select ${a.file_name}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(a.id)}
+                        onChange={() => toggleSelected(a.id)}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                    </label>
                     {hasThumb ? (
                       <a href={a.signedUrl!} target="_blank" rel="noreferrer">
                         <img
@@ -376,7 +437,8 @@ export default function JobAttachments({
                   </div>
                 );
               })}
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>

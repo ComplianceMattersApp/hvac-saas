@@ -27,6 +27,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.101.1",
     "date-fns": "^4.1.0",
+    "fflate": "^0.8.2",
     "intuit-oauth": "^4.2.3",
     "lucide-react": "^0.562.0",
     "luxon": "^3.7.2",
