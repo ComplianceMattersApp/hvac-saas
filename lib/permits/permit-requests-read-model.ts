@@ -34,6 +34,7 @@ type RawPermitRequestQueueRow = {
   permit_number: string | null;
   jurisdiction: string | null;
   permit_date: string | null;
+  total_value_cents: number | null;
   contractor_note: string | null;
   request_label: string | null;
   customer_first_name_snapshot: string | null;
@@ -86,6 +87,7 @@ export type PermitRequestQueueRow = {
   permitNumber: string | null;
   jurisdiction: string | null;
   permitDate: string | null;
+  totalValueCents: number | null;
   contractorNote: string | null;
   requestLabel: string | null;
   customerFirstNameSnapshot: string | null;
@@ -142,6 +144,7 @@ export async function listActivePermitRequestQueueRows(params: {
         "permit_number",
         "jurisdiction",
         "permit_date",
+        "total_value_cents",
         "contractor_note",
         "request_label",
         "customer_first_name_snapshot",
@@ -271,6 +274,7 @@ function toPermitRequestQueueRow(
     permitNumber: row.permit_number,
     jurisdiction: row.jurisdiction,
     permitDate: row.permit_date,
+    totalValueCents: typeof row.total_value_cents === "number" ? row.total_value_cents : null,
     contractorNote: getTrimmedValue(row.contractor_note),
     requestLabel: getTrimmedValue(row.request_label),
     customerFirstNameSnapshot: getTrimmedValue(row.customer_first_name_snapshot),

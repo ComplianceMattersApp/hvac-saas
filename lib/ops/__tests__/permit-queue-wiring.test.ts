@@ -160,6 +160,9 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain('name="customer_email_snapshot"');
     expect(branch).toContain('name="customer_phone_snapshot"');
     expect(branch).toContain('name="service_address_text_snapshot"');
+    expect(branch).toContain('name="total_value"');
+    expect(branch).toContain("permitRequest.addressLine2Snapshot");
+    expect(branch).toContain('label: "Internal intake note"');
     expect(branch).toContain('name="permit_number"');
     expect(branch).toContain('name="post_permit_route"');
     expect(branch).toContain('value="ready_for_testing"');

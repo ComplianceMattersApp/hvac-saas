@@ -59,6 +59,7 @@ export type InternalPermitRequestIntakeInput = {
   contractorNote?: string | null;
   permitNumber?: string | null;
   permitDate?: string | null;
+  totalValueCents?: number | null;
 };
 
 export type InternalMarkPermitCreatedInput = {
@@ -224,6 +225,7 @@ function readPermitRequestIntakeInput(input: FormData | InternalPermitRequestInt
       contractorNote: getTrimmedValue(input.get("contractor_note"), 4000),
       permitNumber: getTrimmedValue(input.get("permit_number"), 160),
       permitDate: getNormalizedPermitDate(input.get("permit_date")),
+      totalValueCents: getNullableMoneyCents(input.get("total_value")),
     };
   }
 
@@ -244,7 +246,21 @@ function readPermitRequestIntakeInput(input: FormData | InternalPermitRequestInt
     contractorNote: getTrimmedValue(input.contractorNote, 4000),
     permitNumber: getTrimmedValue(input.permitNumber, 160),
     permitDate: getNormalizedPermitDate(input.permitDate),
+    totalValueCents: getNullableMoneyCents(input.totalValueCents, true),
   };
+}
+
+function getNullableMoneyCents(value: unknown, alreadyCents = false) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error("Total value must be a valid non-negative amount.");
+  }
+  const cents = alreadyCents ? amount : amount * 100;
+  if (!Number.isSafeInteger(Math.round(cents))) {
+    throw new Error("Total value is too large.");
+  }
+  return Math.round(cents);
 }
 
 function readMarkPermitCreatedInput(input: FormData | InternalMarkPermitCreatedInput) {
@@ -415,6 +431,7 @@ type ActivePermitRequestForMutation = {
   contractor_note: string | null;
   permit_number: string | null;
   permit_date: string | null;
+  total_value_cents: number | null;
   job_id: string | null;
   service_case_id: string | null;
 };
@@ -448,6 +465,7 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
       "contractor_note",
       "permit_number",
       "permit_date",
+      "total_value_cents",
       "job_id",
       "service_case_id",
     ].join(", "))
@@ -479,6 +497,7 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     contractor_note?: unknown;
     permit_number?: unknown;
     permit_date?: unknown;
+    total_value_cents?: unknown;
     job_id?: unknown;
     service_case_id?: unknown;
   } | null;
@@ -517,6 +536,7 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     contractor_note?: unknown;
     permit_number?: unknown;
     permit_date?: unknown;
+    total_value_cents?: unknown;
     job_id?: unknown;
     service_case_id?: unknown;
   };
@@ -544,6 +564,7 @@ async function loadAccountScopedActivePermitRequest(admin: any, input: {
     contractor_note: getTrimmedValue(activeRow.contractor_note, 4000),
     permit_number: getTrimmedValue(activeRow.permit_number, 160),
     permit_date: getTrimmedValue(activeRow.permit_date, 40),
+    total_value_cents: typeof activeRow.total_value_cents === "number" ? activeRow.total_value_cents : null,
     job_id: getTrimmedValue(activeRow.job_id, 120),
     service_case_id: getTrimmedValue(activeRow.service_case_id, 120),
   } satisfies ActivePermitRequestForMutation;
@@ -1274,6 +1295,7 @@ function buildChangedPermitIntakeFields(
     ["contractor_note", current.contractor_note, next.contractorNote],
     ["permit_number", current.permit_number, next.permitNumber],
     ["permit_date", current.permit_date, next.permitDate],
+    ["total_value_cents", current.total_value_cents === null ? null : String(current.total_value_cents), next.totalValueCents === null ? null : String(next.totalValueCents)],
   ];
 
   return checks
@@ -1599,6 +1621,7 @@ export async function updateInternalPermitRequestIntake(
     contractor_note: parsed.contractorNote,
     permit_number: parsed.permitNumber,
     permit_date: parsed.permitDate,
+    total_value_cents: parsed.totalValueCents,
   };
   const changedFields = buildChangedPermitIntakeFields(context.permitRequest, parsed);
 

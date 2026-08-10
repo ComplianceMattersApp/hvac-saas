@@ -849,6 +849,7 @@ describe("internal manual permit request actions", () => {
         contractorNote: "Contractor uploaded contract photo.",
         permitNumber: "P-123",
         permitDate: "2026-06-16",
+        totalValueCents: 125050,
       }),
     ).resolves.toMatchObject({
       permitRequestId: "permit-1",
@@ -874,6 +875,7 @@ describe("internal manual permit request actions", () => {
         contractor_note: "Contractor uploaded contract photo.",
         permit_number: "P-123",
         permit_date: "2026-06-16",
+        total_value_cents: 125050,
       },
     ]);
     expect(fixture.calls.permitRequestUpdatePayloads[0]).not.toHaveProperty("status");

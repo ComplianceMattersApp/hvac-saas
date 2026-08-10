@@ -1969,7 +1969,12 @@ export default async function OpsPage({
     async function updatePermitRequestIntakeFromOps(formData: FormData) {
       "use server";
 
-      await updateInternalPermitRequestIntake(formData);
+      try {
+        await updateInternalPermitRequestIntake(formData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Permit intake details could not be saved.";
+        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
+      }
       redirect("/ops?bucket=permits#ops-workspace");
     }
 
@@ -2299,16 +2304,20 @@ export default async function OpsPage({
                         ...(permitRequest.customerPhoneSnapshot
                           ? [{ label: "Phone", value: permitRequest.customerPhoneSnapshot }]
                           : []),
-                        ...(permitRequest.addressLine1Snapshot
-                          ? [{ label: "Address", value: [permitRequest.addressLine1Snapshot, permitRequest.citySnapshot, permitRequest.stateSnapshot, permitRequest.zipSnapshot].filter(Boolean).join(", ") }]
+                        ...(permitRequest.addressLine1Snapshot || permitRequest.addressLine2Snapshot
+                          ? [{ label: "Address", value: [permitRequest.addressLine1Snapshot, permitRequest.addressLine2Snapshot, permitRequest.citySnapshot, permitRequest.stateSnapshot, permitRequest.zipSnapshot].filter(Boolean).join(", ") }]
+                          : []),
+                        ...(permitRequest.totalValueCents !== null
+                          ? [{ label: "Total value", value: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(permitRequest.totalValueCents / 100) }]
                           : []),
                         ...(permitRequest.jurisdiction
                           ? [{ label: "Jurisdiction", value: permitRequest.jurisdiction }]
                           : []),
                         ...(permitRequest.contractorNote
-                          ? [{ label: "Note", value: permitRequest.contractorNote, fullWidth: true }]
-                          : permitRequest.internalIntakeNote
-                          ? [{ label: "Note", value: permitRequest.internalIntakeNote, fullWidth: true }]
+                          ? [{ label: "Contractor note", value: permitRequest.contractorNote, fullWidth: true }]
+                          : []),
+                        ...(permitRequest.internalIntakeNote
+                          ? [{ label: "Internal intake note", value: permitRequest.internalIntakeNote, fullWidth: true }]
                           : []),
                       ]}
                     >
@@ -2460,6 +2469,18 @@ export default async function OpsPage({
                               type="date"
                               name="permit_date"
                               defaultValue={permitRequest.permitDate ?? ""}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Total value
+                            <input
+                              type="number"
+                              name="total_value"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              defaultValue={permitRequest.totalValueCents === null ? "" : (permitRequest.totalValueCents / 100).toFixed(2)}
                               className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
                             />
                           </label>
