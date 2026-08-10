@@ -89,10 +89,10 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     const invoiceId = clean(payment.invoice_id); const jobId = clean(payment.job_id);
     items.push({
       id: `qbo-payment-${payment.id}`, category: "qbo_payment", severity: "critical",
-      title: `QuickBooks payment needs attention · Invoice ${labels.get(invoiceId) ?? invoiceId}`,
-      detail: clean(payment.qbo_sync_error) || "Collected payment has not posted to QuickBooks.",
-      truth: `Money is collected in EveryStep. QuickBooks still shows the invoice open.`, occurredAt: clean(payment.paid_at) || null,
-      href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`, actionLabel: "Retry payment sync",
+      title: `QuickBooks payment link needs attention · Invoice ${labels.get(invoiceId) ?? invoiceId}`,
+      detail: clean(payment.qbo_sync_error) || "Collected payment has not been linked to a QuickBooks payment.",
+      truth: `Money is collected in EveryStep. QuickBooks may already contain the payment; retry adopts one exact existing match before creating anything.`, occurredAt: clean(payment.paid_at) || null,
+      href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`, actionLabel: "Open invoice",
       paymentId: clean(payment.id),
     });
   }

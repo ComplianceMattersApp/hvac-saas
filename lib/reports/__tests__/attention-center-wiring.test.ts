@@ -24,6 +24,7 @@ describe("Needs Attention center", () => {
 
   it("keeps collected truth distinct from failed or unconfirmed money", () => {
     expect(model).toContain("Money is collected in EveryStep");
+    expect(model).toContain("retry adopts one exact existing match");
     expect(model).toContain("not counted as collected money");
     expect(page).toContain("Money was not collected");
     expect(page).toContain("not yet counted as collected");
@@ -31,7 +32,7 @@ describe("Needs Attention center", () => {
 
   it("provides direct recovery destinations", () => {
     expect(page).toContain("Reconnect QuickBooks");
-    expect(model).toContain("Retry payment sync");
+    expect(model).toContain('actionLabel: "Open invoice"');
     expect(model).toContain("Inspect Stripe session");
     expect(page).toContain("syncAttentionPaymentToQboFromForm");
     expect(page).toContain("Retry from hub");
