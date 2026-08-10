@@ -28,6 +28,13 @@ describe("Today upcoming service visibility", () => {
   it("shows booked work for the next seven days in both responsive layouts", () => {
     expect(todayPageSource.match(/<ComingUpSection comingUp=\{model\.comingUp\} \/>/g)).toHaveLength(2);
     expect(todayReadModelSource).toContain("safeLoadComingUp");
+    expect(todayReadModelSource).toContain("customerName: customerName");
+    expect(todayReadModelSource).toContain("locationLabel: locationLabel");
+    expect(todayPageSource).toContain("formatComingUpDay(group.date)");
+    expect(todayPageSource).toContain("job.customerName");
+    expect(todayPageSource).toContain("job.locationLabel");
+    expect(todayPageSource).toContain("job.statusLabel");
+    expect(todayPageSource).toContain("View all {comingUp.totalCount} booked visits");
     expect(todayReadModelSource).toContain('.gt("scheduled_date", params.today)');
     expect(todayReadModelSource).toContain('assignmentLabel: assignments.length');
   });

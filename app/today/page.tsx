@@ -196,6 +196,13 @@ export default async function TodayPage() {
 }
 
 function ComingUpSection({ comingUp }: { comingUp: ComingUp }) {
+  const dayGroups = comingUp.jobs.reduce<Array<{ date: string; jobs: ComingUp["jobs"] }>>((groups, job) => {
+    const existing = groups.find((group) => group.date === job.scheduledDate);
+    if (existing) existing.jobs.push(job);
+    else groups.push({ date: job.scheduledDate, jobs: [job] });
+    return groups;
+  }, []);
+
   return (
     <section className={CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
@@ -209,25 +216,61 @@ function ComingUpSection({ comingUp }: { comingUp: ComingUp }) {
         </div>
         <Link href={comingUp.href} className="text-xs font-semibold text-blue-700 hover:underline">Open Calendar</Link>
       </div>
-      <ul className="mt-3 space-y-2">
-        {comingUp.jobs.map((job) => (
-          <li key={job.id} className={ROW_SHELL}>
-            <Link href={job.href} className="flex items-center justify-between gap-3">
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold text-[#0f1f35]">{job.title}</span>
-                <span className="mt-0.5 block text-xs text-slate-600">
-                  {formatBusinessDateUS(job.scheduledDate)}{job.windowLabel ? ` · ${job.windowLabel}` : " · Window pending"}
-                </span>
-              </span>
-              <span className={`shrink-0 text-xs font-semibold ${job.needsAssignment ? "text-amber-700" : "text-slate-600"}`}>
-                {job.assignmentLabel}
-              </span>
-            </Link>
-          </li>
+      <div className="mt-3 space-y-4">
+        {dayGroups.map((group) => (
+          <div key={group.date}>
+            <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <span>{formatComingUpDay(group.date)}</span>
+              <span className="h-px flex-1 bg-slate-200" />
+              <span className="tabular-nums">{group.jobs.length}</span>
+            </div>
+            <ul className="space-y-2">
+              {group.jobs.map((job) => (
+                <li key={job.id} className={`${ROW_SHELL} p-0`}>
+                  <Link href={job.href} className="group block rounded-xl p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-[#0f1f35] group-hover:text-blue-700">{job.title}</div>
+                        <div className="mt-0.5 truncate text-xs font-medium text-slate-700">{job.customerName}</div>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-800">
+                        {job.windowLabel ?? "Time pending"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px]">
+                      <span className="min-w-0 truncate text-slate-500">{job.locationLabel}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="text-slate-500">{job.statusLabel}</span>
+                        <span className={`font-semibold ${job.needsAssignment ? "text-amber-700" : "text-slate-600"}`}>
+                          {job.needsAssignment ? "⚠ " : ""}{job.assignmentLabel}
+                        </span>
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
+      {comingUp.totalCount > comingUp.jobs.length ? (
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <Link href={comingUp.href} className="text-xs font-semibold text-blue-700 hover:underline">
+            View all {comingUp.totalCount} booked visits →
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function formatComingUpDay(date: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(`${date}T12:00:00Z`));
 }
 
 // -----------------------------------------------------------------------------
@@ -768,7 +811,7 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
   const comparison = snapshot.comparisonPercent;
   const comparisonLabel =
     comparison == null
-      ? `No recorded collections for ${snapshot.priorPeriodLabel.toLowerCase()}`
+      ? null
       : `${comparison > 0 ? "↑ " : comparison < 0 ? "↓ " : ""}${Math.abs(comparison)}% compared with the same point last month`;
 
   return (
@@ -785,7 +828,9 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
           {formatMoney(snapshot.collectedPriorMonthToDateCents)}
         </span>
       </div>
-      <div className={`mt-1 text-xs font-medium ${comparison != null && comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
+      {comparisonLabel ? (
+        <div className={`mt-1 text-xs font-medium ${comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
+      ) : null}
       <JobVolumeChart snapshot={snapshot} />
       <Link href="/reports/monthly" className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
         View monthly overview →
@@ -800,22 +845,26 @@ function JobVolumeChart({ snapshot }: { snapshot: FinancialSnapshot }) {
       <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
         Jobs &amp; billed total
       </div>
-      <p className="mt-1 text-[11px] leading-4 text-slate-500">Completed and issued through the same day of each month.</p>
+      <p className="mt-1 text-[11px] leading-4 text-slate-500">Current pace, the same days last month, and last month&apos;s final total.</p>
       <div className="mt-3 space-y-3">
         <CompactComparisonBars
           label="Completed jobs"
-          currentLabel={snapshot.monthLabel}
-          priorLabel={snapshot.priorPeriodLabel.replace("Same days in ", "")}
+          currentLabel={`${snapshot.monthLabel} MTD`}
+          priorLabel={`${snapshot.priorMonthLabel} total`}
           currentValue={snapshot.completedJobsMonthToDate}
-          priorValue={snapshot.completedJobsPriorMonthToDate}
+          samePeriodLabel={`${snapshot.priorMonthLabel} same days`}
+          samePeriodValue={snapshot.completedJobsPriorSamePeriod}
+          priorValue={snapshot.completedJobsPriorMonth}
           formatValue={(value) => String(value)}
         />
         <CompactComparisonBars
           label="Issued invoices"
-          currentLabel={snapshot.monthLabel}
-          priorLabel={snapshot.priorPeriodLabel.replace("Same days in ", "")}
+          currentLabel={`${snapshot.monthLabel} MTD`}
+          priorLabel={`${snapshot.priorMonthLabel} total`}
           currentValue={snapshot.billedMonthToDateCents}
-          priorValue={snapshot.billedPriorMonthToDateCents}
+          samePeriodLabel={`${snapshot.priorMonthLabel} same days`}
+          samePeriodValue={snapshot.billedPriorSamePeriodCents}
+          priorValue={snapshot.billedPriorMonthCents}
           formatValue={formatMoney}
         />
       </div>
@@ -824,18 +873,21 @@ function JobVolumeChart({ snapshot }: { snapshot: FinancialSnapshot }) {
 }
 
 function CompactComparisonBars({
-  label, currentLabel, priorLabel, currentValue, priorValue, formatValue,
+  label, currentLabel, samePeriodLabel, priorLabel, currentValue, samePeriodValue, priorValue, formatValue,
 }: {
   label: string;
   currentLabel: string;
+  samePeriodLabel: string;
   priorLabel: string;
   currentValue: number;
+  samePeriodValue: number;
   priorValue: number;
   formatValue: (value: number) => string;
 }) {
-  const maxValue = Math.max(currentValue, priorValue, 1);
+  const maxValue = Math.max(currentValue, samePeriodValue, priorValue, 1);
   const rows = [
     { label: currentLabel, value: currentValue, color: "bg-blue-600" },
+    { label: samePeriodLabel, value: samePeriodValue, color: "bg-blue-200" },
     { label: priorLabel, value: priorValue, color: "bg-slate-300" },
   ];
 
@@ -844,7 +896,7 @@ function CompactComparisonBars({
       <div className="mb-1 text-[11px] font-semibold text-slate-700">{label}</div>
       <div className="space-y-1.5">
         {rows.map((row) => (
-          <div key={row.label} className="grid grid-cols-[3.5rem_1fr_auto] items-center gap-2 text-[11px]">
+          <div key={row.label} className="grid grid-cols-[5.75rem_1fr_auto] items-center gap-2 text-[11px]">
             <span className="truncate text-slate-500">{row.label}</span>
             <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div

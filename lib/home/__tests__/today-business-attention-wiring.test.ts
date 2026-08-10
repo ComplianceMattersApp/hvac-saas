@@ -73,12 +73,13 @@ describe("today business attention wiring", () => {
       currentEndIso: "2026-07-20T07:00:00.000Z",
       priorStartIso: "2026-06-01T07:00:00.000Z",
       priorEndIso: "2026-06-20T07:00:00.000Z",
+      priorFullEndIso: "2026-07-01T07:00:00.000Z",
       monthLabel: "July",
       priorPeriodLabel: "Same days in June",
     });
   });
 
-  it("compares completed job volume and issued invoice totals for the same month-to-date windows", () => {
+  it("compares current month-to-date job volume and issued invoices with the prior full month", () => {
     expect(todayReadModelSource).toContain("loadCompletedJobsRange");
     expect(todayReadModelSource).toContain('.eq("field_complete", true)');
     expect(todayReadModelSource).toContain('.gte("field_complete_at", startIso)');
@@ -87,7 +88,13 @@ describe("today business attention wiring", () => {
     expect(todayReadModelSource).toContain('.gte("issued_at", startIso)');
     expect(todayPageSource).toContain("Jobs &amp; billed total");
     expect(todayPageSource).toContain("snapshot.completedJobsMonthToDate");
-    expect(todayPageSource).toContain("snapshot.billedPriorMonthToDateCents");
+    expect(todayPageSource).toContain("snapshot.billedPriorMonthCents");
+    expect(todayReadModelSource).toContain("boundaries.priorFullEndIso");
+    expect(todayPageSource).toContain('priorLabel={`${snapshot.priorMonthLabel} total`}');
+    expect(todayPageSource).toContain("same days last month");
+    expect(todayPageSource).toContain("snapshot.completedJobsPriorSamePeriod");
+    expect(todayPageSource).toContain("snapshot.billedPriorSamePeriodCents");
+    expect(todayPageSource).not.toContain("No recorded collections for");
   });
 
   it("caps the prior comparison at month end across a January year boundary", () => {
@@ -97,6 +104,7 @@ describe("today business attention wiring", () => {
       currentEndIso: "2026-02-01T08:00:00.000Z",
       priorStartIso: "2025-12-01T08:00:00.000Z",
       priorEndIso: "2026-01-01T08:00:00.000Z",
+      priorFullEndIso: "2026-01-01T08:00:00.000Z",
       priorPeriodLabel: "Same days in December",
     });
   });

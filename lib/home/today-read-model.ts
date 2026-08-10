@@ -225,14 +225,17 @@ export type RoleAwarePulse = {
 
 export type FinancialSnapshot = {
   monthLabel: string;
+  priorMonthLabel: string;
   priorPeriodLabel: string;
   collectedMonthToDateCents: number;
   collectedPriorMonthToDateCents: number;
   comparisonPercent: number | null;
   completedJobsMonthToDate: number;
-  completedJobsPriorMonthToDate: number;
+  completedJobsPriorSamePeriod: number;
+  completedJobsPriorMonth: number;
   billedMonthToDateCents: number;
-  billedPriorMonthToDateCents: number;
+  billedPriorSamePeriodCents: number;
+  billedPriorMonthCents: number;
 };
 
 export type TeamCoverageAssignment = {
@@ -261,6 +264,9 @@ export type ComingUpJob = {
   title: string;
   scheduledDate: string;
   windowLabel: string | null;
+  customerName: string;
+  locationLabel: string;
+  statusLabel: string;
   assignmentLabel: string;
   needsAssignment: boolean;
   href: string;
@@ -838,11 +844,22 @@ async function safeLoadComingUp(params: {
       : {};
     const jobs = normalized.slice(0, 5).map((job) => {
       const assignments = assignmentMap[job.id] ?? [];
+      const customerName = [job.customerFirstName, job.customerLastName]
+        .map((part) => String(part ?? "").trim())
+        .filter(Boolean)
+        .join(" ");
+      const locationLabel = [job.jobAddress, job.city]
+        .map((part) => String(part ?? "").trim())
+        .filter(Boolean)
+        .join(", ");
       return {
         id: job.id,
         title: job.title,
         scheduledDate: job.scheduledDate!,
         windowLabel: displayWindowLA(job.windowStart, job.windowEnd) || null,
+        customerName: customerName || "Customer pending",
+        locationLabel: locationLabel || "Location pending",
+        statusLabel: formatStatusLabel(job.status, job.opsStatus),
         assignmentLabel: assignments.length ? assignments.map((item) => item.display_name).join(", ") : "Needs assignment",
         needsAssignment: assignments.length === 0,
         href: `/jobs/${job.id}?tab=ops`,
@@ -1339,11 +1356,13 @@ export function financialMonthBoundariesLA(now = new Date()) {
     currentEndIso: laDateTimeToUtcIso(nextYmd(year, month, day), "00:00"),
     priorStartIso: laDateTimeToUtcIso(ymd(priorYear, priorMonth, 1), "00:00"),
     priorEndIso: laDateTimeToUtcIso(nextYmd(priorYear, priorMonth, priorDay), "00:00"),
+    priorFullEndIso: laDateTimeToUtcIso(nextYmd(priorYear, priorMonth, priorLastDay), "00:00"),
     monthLabel: new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Los_Angeles",
       month: "long",
     }).format(now),
     priorPeriodLabel: `Same days in ${priorMonthLabel}`,
+    priorMonthLabel,
   };
 }
 
@@ -1400,25 +1419,30 @@ async function safeLoadFinancialSnapshot(params: {
       );
     };
 
-    const [current, prior, currentJobs, priorJobs, currentBilled, priorBilled] = await Promise.all([
+    const [current, prior, currentJobs, priorSamePeriodJobs, priorJobs, currentBilled, priorSamePeriodBilled, priorBilled] = await Promise.all([
       loadCollectionsRange(boundaries.currentStartIso, boundaries.currentEndIso),
       loadCollectionsRange(boundaries.priorStartIso, boundaries.priorEndIso),
       loadCompletedJobsRange(boundaries.currentStartIso, boundaries.currentEndIso),
       loadCompletedJobsRange(boundaries.priorStartIso, boundaries.priorEndIso),
+      loadCompletedJobsRange(boundaries.priorStartIso, boundaries.priorFullEndIso),
       loadBilledRange(boundaries.currentStartIso, boundaries.currentEndIso),
       loadBilledRange(boundaries.priorStartIso, boundaries.priorEndIso),
+      loadBilledRange(boundaries.priorStartIso, boundaries.priorFullEndIso),
     ]);
 
     return {
       monthLabel: boundaries.monthLabel,
+      priorMonthLabel: boundaries.priorMonthLabel,
       priorPeriodLabel: boundaries.priorPeriodLabel,
       collectedMonthToDateCents: current,
       collectedPriorMonthToDateCents: prior,
       comparisonPercent: prior > 0 ? Math.round(((current - prior) / prior) * 100) : null,
       completedJobsMonthToDate: currentJobs,
-      completedJobsPriorMonthToDate: priorJobs,
+      completedJobsPriorSamePeriod: priorSamePeriodJobs,
+      completedJobsPriorMonth: priorJobs,
       billedMonthToDateCents: currentBilled,
-      billedPriorMonthToDateCents: priorBilled,
+      billedPriorSamePeriodCents: priorSamePeriodBilled,
+      billedPriorMonthCents: priorBilled,
     };
   } catch {
     return null;
