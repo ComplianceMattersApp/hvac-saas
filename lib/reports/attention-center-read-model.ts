@@ -20,7 +20,7 @@ function clean(value: unknown) { return String(value ?? "").trim(); }
 export async function buildAttentionCenterReadModel(params: { admin: any; accountOwnerUserId: string }) {
   const ownerId = clean(params.accountOwnerUserId);
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const [paymentResult, invoiceErrorResult, voidDriftResult, moneyOutResult, chargedAfterVoidResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
+  const [paymentResult, invoiceErrorResult, voidDriftResult, reconciliationResult, moneyOutResult, chargedAfterVoidResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
     params.admin.from("internal_invoice_payments")
       .select("id, invoice_id, job_id, amount_cents, paid_at, qbo_sync_status, qbo_sync_error, processor_name")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "recorded")
@@ -35,6 +35,13 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       .select("id, job_id, invoice_number, invoice_display_number, qbo_void_status, qbo_void_error, voided_at")
       .eq("account_owner_user_id", ownerId).eq("status", "void")
       .in("qbo_void_status", ["pending", "blocked", "error"]).order("voided_at", { ascending: false }).limit(100),
+    // Independent three-way reconciliation output. This is the only source here
+    // that can surface problems EveryStep did not cause and would otherwise never
+    // notice — a QBO invoice edited by hand, a Stripe charge we never recorded.
+    params.admin.from("reconciliation_findings")
+      .select("id, finding_type, severity, subject_kind, subject_id, external_system, external_id, title, detail, truth, everystep_value, external_value, amount_cents, job_id, first_seen_at")
+      .eq("account_owner_user_id", ownerId).is("resolved_at", null)
+      .order("first_seen_at", { ascending: false }).limit(100),
     // Money leaving that still needs a human: a live chargeback, a partial refund
     // the app cannot allocate on its own, or a reversal QuickBooks has not heard
     // about. Left un-thrown below so an undeployed migration degrades to zero
@@ -110,6 +117,27 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
         : "This invoice is void in EveryStep. QuickBooks may still count it as open revenue.",
       occurredAt: clean(invoice.voided_at) || null, href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`,
       actionLabel: blocked ? "Reconcile in QuickBooks" : "Retry QuickBooks void",
+    });
+  }
+  // Reconciliation findings arrive with their copy already written, because the
+  // reconciler is the only thing that saw both sides.
+  for (const finding of reconciliationResult.error ? [] : (reconciliationResult.data ?? [])) {
+    const jobId = clean(finding.job_id); const subjectId = clean(finding.subject_id);
+    const evidence = [clean(finding.everystep_value) && `EveryStep: ${clean(finding.everystep_value)}`,
+      clean(finding.external_value) && `${finding.external_system === "stripe" ? "Stripe" : "QuickBooks"}: ${clean(finding.external_value)}`]
+      .filter(Boolean).join(" · ");
+    items.push({
+      id: `reconciliation-${clean(finding.id)}`,
+      category: finding.subject_kind === "payment" ? "qbo_payment" : "qbo_invoice",
+      severity: clean(finding.severity) === "warning" ? "warning" : "critical",
+      title: clean(finding.title),
+      detail: [clean(finding.detail), evidence].filter(Boolean).join(" — "),
+      truth: clean(finding.truth),
+      occurredAt: clean(finding.first_seen_at) || null,
+      href: jobId && subjectId
+        ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(finding.subject_kind === "invoice" ? subjectId : "")}#invoice-workspace`
+        : "/reports/attention",
+      actionLabel: "Investigate",
     });
   }
   for (const payment of moneyOutResult.error ? [] : (moneyOutResult.data ?? [])) {

@@ -8,6 +8,7 @@ import {
   initiateQboOAuthFromForm,
 } from "@/lib/actions/qbo-connection-actions";
 import {
+  runReconciliationNowFromForm,
   syncAllPendingInvoicesToQboFromForm,
   type QboSyncActionResult,
 } from "@/lib/actions/qbo-sync-actions";
@@ -32,6 +33,10 @@ export function QboIntegrationControls({
   const [, connectAction] = useActionState<null, FormData>(initiateQboOAuthFromForm, null);
   const [syncResult, syncAction, syncing] = useActionState<QboSyncActionResult | null, FormData>(
     syncAllPendingInvoicesToQboFromForm,
+    null,
+  );
+  const [reconcileResult, reconcileAction, reconciling] = useActionState<QboSyncActionResult | null, FormData>(
+    runReconciliationNowFromForm,
     null,
   );
   const [disconnectResult, disconnectAction, disconnecting] = useActionState<
@@ -112,6 +117,18 @@ export function QboIntegrationControls({
         </div>
       ) : null}
 
+      {reconcileResult ? (
+        <div
+          className={`rounded-xl border px-3.5 py-2.5 text-sm ${
+            reconcileResult.errors > 0
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}
+        >
+          {reconcileResult.message}
+        </div>
+      ) : null}
+
       {disconnectResult && !disconnectResult.success ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-900">
           {disconnectResult.error ?? "Failed to disconnect QuickBooks Online."}
@@ -126,6 +143,18 @@ export function QboIntegrationControls({
             className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
           >
             {syncing ? "Syncing…" : "Sync pending invoices"}
+          </button>
+        </form>
+        {/* Independent check: compares EveryStep against QuickBooks and Stripe
+            rather than reporting on what the sync engine believes it did. Runs
+            nightly on its own; this is the on-demand version. Report-only. */}
+        <form action={reconcileAction}>
+          <button
+            type="submit"
+            disabled={reconciling}
+            className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 disabled:opacity-60"
+          >
+            {reconciling ? "Checking…" : "Check for discrepancies"}
           </button>
         </form>
         <form

@@ -10,6 +10,10 @@ import { getQboConnectionForAccount } from "@/lib/qbo/qbo-connection";
 import { syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
 import { syncPaymentToQbo } from "@/lib/qbo/qbo-payment-sync";
 import { voidAllPendingInvoiceVoidsInQbo, voidInvoiceInQbo } from "@/lib/qbo/qbo-void-sync";
+import {
+  persistReconciliationFindings,
+  runThreeWayReconciliation,
+} from "@/lib/reconciliation/three-way-reconciliation";
 
 const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
 
@@ -134,6 +138,52 @@ export async function syncAttentionPaymentToQboFromForm(formData: FormData): Pro
   revalidatePath("/reports/attention");
   revalidatePath("/reports/payments");
   redirect(`/reports/attention?sync=${result.status === "synced" ? "complete" : "failed"}`);
+}
+
+/**
+ * On-demand three-way reconciliation for the signed-in account.
+ *
+ * Same engine the nightly cron runs. Report-only — it writes findings and never
+ * touches invoices or payments — so it is safe to run at any time.
+ */
+export async function runReconciliationNowFromForm(
+  _prevState: unknown,
+  _formData: FormData,
+): Promise<QboSyncActionResult> {
+  try {
+    const supabase = await createClient();
+    const { internalUser } = await requireInternalRole("admin", { supabase });
+    const admin = createAdminClient();
+
+    const result = await runThreeWayReconciliation({
+      admin,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      windowDays: 90,
+    });
+    const persisted = await persistReconciliationFindings({ admin, result });
+    revalidatePath(COMPANY_PROFILE_PATH);
+    revalidatePath("/reports/attention");
+
+    const checked = `Checked ${result.checkedInvoices} invoice(s) and ${result.checkedPayments} payment(s) over 90 days.`;
+    const outcome = result.findings.length === 0
+      ? "EveryStep, QuickBooks and Stripe agree."
+      : `${result.findings.length} discrepancy(ies) found — ${persisted.opened} new. See Needs Attention.`;
+    const skipped = result.skipped.length > 0 ? ` Not compared: ${result.skipped.join("; ")}.` : "";
+
+    return {
+      synced: persisted.refreshed,
+      skipped: result.skipped.length,
+      errors: result.findings.length,
+      message: `${checked} ${outcome}${skipped}`,
+    };
+  } catch (error) {
+    return {
+      synced: 0,
+      skipped: 0,
+      errors: 0,
+      message: error instanceof Error ? error.message : "Reconciliation failed.",
+    };
+  }
 }
 
 export async function syncAllPendingInvoicesToQboFromForm(

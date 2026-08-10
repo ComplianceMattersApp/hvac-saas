@@ -443,6 +443,95 @@ export async function findQboInvoiceById(
  * zeroes the amounts — which matches EveryStep's own "voiding keeps the invoice
  * in history" semantics. `syncToken` must be the live one, not the stored one.
  */
+/**
+ * Paginated QBO query. QBO caps a response at 1000 rows and offers no cursor, so
+ * pages are walked with STARTPOSITION until a short page comes back.
+ *
+ * Reconciliation reads in bulk through this rather than looking up rows one at a
+ * time: QBO throttles hard, and a per-row loop over a few hundred invoices is
+ * both slow and far more likely to trip a rate limit mid-run.
+ */
+async function queryQboAll(
+  params: QboRequestBase & { entity: "Invoice" | "Payment"; where: string },
+): Promise<any[]> {
+  const { accessToken, realmId, baseUrl, entity, where } = params;
+  const PAGE_SIZE = 500;
+  const rows: any[] = [];
+
+  for (let start = 1; ; start += PAGE_SIZE) {
+    const page = await qboFetch({
+      accessToken,
+      realmId,
+      baseUrl,
+      path: "query",
+      method: "GET",
+      query: `select * from ${entity} where ${where} startposition ${start} maxresults ${PAGE_SIZE}`,
+    });
+    const batch: any[] = page?.QueryResponse?.[entity] ?? [];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) return rows;
+    // Hard stop: a runaway page walk would hammer a throttled API.
+    if (rows.length >= 10000) return rows;
+  }
+}
+
+/** Every QBO invoice with a transaction date on/after `fromDate` (YYYY-MM-DD). */
+export async function listQboInvoicesSince(
+  params: QboRequestBase & { fromDate: string },
+): Promise<QboInvoiceSnapshot[]> {
+  const rows = await queryQboAll({
+    ...params,
+    entity: "Invoice",
+    where: `TxnDate >= '${escapeQboQueryValue(params.fromDate)}'`,
+  });
+  return rows.map((invoice) => {
+    const balance = Number(invoice.Balance ?? 0);
+    const totalAmount = Number(invoice.TotalAmt ?? 0);
+    return {
+      id: String(invoice.Id),
+      syncToken: String(invoice.SyncToken ?? "0"),
+      docNumber: String(invoice.DocNumber ?? "").trim() || null,
+      balance,
+      totalAmount,
+      looksVoided: totalAmount === 0 && balance === 0,
+    };
+  });
+}
+
+export type QboPaymentSnapshot = {
+  id: string;
+  totalAmount: number;
+  txnDate: string | null;
+  /** Invoice ids this payment is applied to. */
+  linkedInvoiceIds: string[];
+};
+
+/** Every QBO payment with a transaction date on/after `fromDate` (YYYY-MM-DD). */
+export async function listQboPaymentsSince(
+  params: QboRequestBase & { fromDate: string },
+): Promise<QboPaymentSnapshot[]> {
+  const rows = await queryQboAll({
+    ...params,
+    entity: "Payment",
+    where: `TxnDate >= '${escapeQboQueryValue(params.fromDate)}'`,
+  });
+  return rows.map((payment) => ({
+    id: String(payment.Id),
+    totalAmount: Number(payment.TotalAmt ?? 0),
+    txnDate: String(payment.TxnDate ?? "").trim() || null,
+    linkedInvoiceIds: [
+      ...new Set(
+        (payment?.Line ?? []).flatMap((line: any) =>
+          (line?.LinkedTxn ?? [])
+            .filter((txn: any) => String(txn?.TxnType ?? "") === "Invoice")
+            .map((txn: any) => String(txn?.TxnId ?? "").trim())
+            .filter(Boolean),
+        ),
+      ),
+    ] as string[],
+  }));
+}
+
 export async function voidQboInvoice(
   params: QboRequestBase & { qboInvoiceId: string; syncToken: string },
 ): Promise<QboSyncedEntity> {
