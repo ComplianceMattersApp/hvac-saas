@@ -1,4 +1,5 @@
 import type { CoordinatePair } from "./coordinates";
+import type { DriveTimeMatrix } from "./drive-time-matrix";
 import {
   angularDifferenceDegrees,
   bearingDegrees,
@@ -60,6 +61,16 @@ export type RoutePlanOptions = {
   defaultDurationMinutes: number;
   maxStopsPerDay: number;
   clusterThresholdKm: number;
+  /**
+   * Pre-fetched live drive times. Optional: absent, or for any leg it does not
+   * cover, the planner falls back to straight-line estimates.
+   *
+   * It rides on options rather than input because options is what already flows
+   * to every internal helper, and like the other options it changes how minutes
+   * are computed rather than what work exists. The planner stays pure — this is
+   * finished data, fetched before planning, never a call from inside the engine.
+   */
+  driveTimes?: DriveTimeMatrix | null;
 };
 
 const DEFAULT_OPTIONS: RoutePlanOptions = {
@@ -338,7 +349,8 @@ function buildDayTimeline(
   route.forEach((stop, index) => {
     const point = stop.coordinates;
     const driveKm = cursorPoint && point ? haversineKm(cursorPoint, point) : 0;
-    const driveMinutes = cursorPoint && point ? estimateDriveMinutes(cursorPoint, point) : 0;
+    const driveMinutes =
+      cursorPoint && point ? estimateDriveMinutes(cursorPoint, point, options.driveTimes) : 0;
     totalDriveKm += driveKm;
     totalDriveMinutes += driveMinutes;
 

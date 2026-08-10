@@ -1,4 +1,5 @@
 import type { CoordinatePair } from "./coordinates";
+import type { DriveTimeMatrix } from "./drive-time-matrix";
 import { estimateDriveMinutes, haversineKm } from "./geometry";
 import type { PlanAnchor } from "./route-plan";
 
@@ -40,6 +41,8 @@ export function scoreDayFitsForJob(params: {
   homeBase: CoordinatePair | null;
   maxStopsPerDay?: number;
   nearThresholdKm?: number;
+  /** Pre-fetched live drive times; legs it does not cover use estimates. */
+  driveTimes?: DriveTimeMatrix | null;
 }): DayFit[] {
   const maxStopsPerDay = params.maxStopsPerDay ?? 8;
   const nearThresholdKm = params.nearThresholdKm ?? DEFAULT_NEAR_THRESHOLD_KM;
@@ -82,7 +85,7 @@ export function scoreDayFitsForJob(params: {
         nearestAnchorLabel:
           String(nearestAnchor.city ?? "").trim() || String(nearestAnchor.title ?? "").trim() || null,
         detourMinutes: nearestAnchor.coordinates
-          ? estimateDriveMinutes(nearestAnchor.coordinates, params.coordinates)
+          ? estimateDriveMinutes(nearestAnchor.coordinates, params.coordinates, params.driveTimes)
           : null,
         roundTripMinutes: null,
       };
@@ -97,7 +100,10 @@ export function scoreDayFitsForJob(params: {
       nearestAnchorLabel: null,
       detourMinutes: null,
       roundTripMinutes: params.homeBase
-        ? estimateDriveMinutes(params.homeBase, params.coordinates) * 2
+        // Each direction is looked up separately: real road networks are not
+        // symmetric, so an out-and-back is not always twice the outbound leg.
+        ? estimateDriveMinutes(params.homeBase, params.coordinates, params.driveTimes)
+          + estimateDriveMinutes(params.coordinates, params.homeBase, params.driveTimes)
         : null,
     };
   });

@@ -55,7 +55,7 @@ export const askCmBaselineIntents: AskCmBaselineIntent[] = [
     body: (context) => "Open the job, then open its invoice workspace. Review the customer, charges, and total. If it is still a draft, use Issue & Send Invoice. If it is already issued, use Send Invoice Email. Owner, admin, or billing access may be required." + financialAccessNote(context),
     links: [{ label: "Jobs", href: "/jobs" }, { label: "Closeout", href: "/ops?bucket=closeout#ops-workspace" }],
     sources: {
-      docs: ["docs/ACTIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Closeout.md"],
+      docs: ["docs/ARCHIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Closeout.md"],
       code: ["app/jobs/[id]/invoice/page.tsx", "lib/auth/field-billing-access.ts"],
     },
   },
@@ -66,7 +66,7 @@ export const askCmBaselineIntents: AskCmBaselineIntent[] = [
     body: (context) => "Open the job and make sure the completed work is listed under Work Items. Choose Create Invoice or Build Invoice. Eligible Work Items are brought into a draft when available. Review the Invoice Charges, prices, customer, and total before issuing or sending it." + financialAccessNote(context),
     links: [{ label: "Jobs", href: "/jobs" }, { label: "Closeout", href: "/ops?bucket=closeout#ops-workspace" }],
     sources: {
-      docs: ["docs/ACTIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Closeout.md", "docs/ACTIVE/Visit_Scope_First_Model_Brief.md"],
+      docs: ["docs/ARCHIVE/Workflow_Modernization_B8C_Work_Items_to_Invoice_Flow_Simplification_Closeout.md", "docs/ACTIVE/Visit_Scope_First_Model_Brief.md"],
       code: ["app/jobs/[id]/v2/page.tsx", "app/jobs/[id]/invoice/page.tsx", "lib/jobs/job-invoice-action.ts"],
     },
   },
@@ -77,7 +77,7 @@ export const askCmBaselineIntents: AskCmBaselineIntent[] = [
     body: (context) => "Open the job's issued invoice and go to the payment section. Owner, admin, or billing users can record a confirmed cash, check, or other manual payment. Card payments become paid only after the payment provider confirms them; do not mark a card payment paid by hand." + financialAccessNote(context),
     links: [{ label: "Jobs", href: "/jobs" }, { label: "Payments Report", href: "/reports/payments" }],
     sources: {
-      docs: ["docs/ACTIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md", "docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md"],
+      docs: ["docs/ARCHIVE/Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md", "docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md"],
       code: ["app/jobs/[id]/invoice/page.tsx", "lib/actions/internal-invoice-payment-actions.ts"],
     },
   },
@@ -88,7 +88,7 @@ export const askCmBaselineIntents: AskCmBaselineIntent[] = [
     body: "Open the job and finish the field outcome first. Choose the outcome that matches what happened, such as Work Completed, Materials Needed, Approval Needed, or Unable to Complete. Office or admin then reviews Closeout Operations for billing, follow-up, return work, or final closeout.",
     links: [{ label: "Jobs", href: "/jobs" }, { label: "Closeout", href: "/ops?bucket=closeout#ops-workspace" }],
     sources: {
-      docs: ["docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md", "docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md"],
+      docs: ["docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md", "docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md"],
       code: ["app/jobs/[id]/v2/_components/FinishOutcomeCards.tsx", "app/jobs/[id]/_components/FieldOutcomePanel.tsx"],
     },
   },
@@ -99,7 +99,7 @@ export const askCmBaselineIntents: AskCmBaselineIntent[] = [
     body: "Complete and save the ECC test results on the original job. A failed result moves the work into correction or retest follow-up. Review the failure details, create or open the linked retest job, schedule it, and enter the new test results there. The original test history stays attached to the service chain.",
     links: [{ label: "Operations", href: "/ops" }, { label: "Jobs", href: "/jobs" }],
     sources: {
-      docs: ["docs/ACTIVE/Guided_Workflow_Maturation_Closeout.md", "docs/ACTIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md"],
+      docs: ["docs/ARCHIVE/Guided_Workflow_Maturation_Closeout.md", "docs/ARCHIVE/Workflow_Modernization_B4_Field_Finish_Flow_Closeout.md"],
       code: ["app/jobs/[id]/tests/page.tsx", "app/jobs/[id]/v2/page.tsx"],
     },
   },

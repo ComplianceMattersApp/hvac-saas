@@ -1,10 +1,15 @@
 import type { CoordinatePair } from "./coordinates";
+import { lookupDriveMinutes, type DriveTimeMatrix } from "./drive-time-matrix";
 
 /**
- * Pure geometry/estimation helpers for route planning. Straight-line math
- * only — no external APIs. Estimates are deliberately conservative city-driving
- * numbers; the Routes API fast-follow can replace them with live drive times
- * without changing any call sites.
+ * Pure geometry/estimation helpers for route planning. Still pure: no module
+ * here performs I/O.
+ *
+ * Live drive times arrive as an optional pre-fetched `DriveTimeMatrix` rather
+ * than a network call, so the planner stays deterministic. Without a matrix — or
+ * for any leg the matrix does not cover — these fall back to conservative
+ * straight-line city-driving math, which is exactly the behavior the lane
+ * shipped with.
  */
 
 const EARTH_RADIUS_KM = 6371;
@@ -32,11 +37,29 @@ export function haversineKm(a: CoordinatePair, b: CoordinatePair): number {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
-/** Estimated door-to-door drive minutes between two points. */
-export function estimateDriveMinutes(a: CoordinatePair, b: CoordinatePair): number {
+/** Straight-line fallback estimate. Exported for tests and for honest labelling. */
+export function estimateStraightLineDriveMinutes(a: CoordinatePair, b: CoordinatePair): number {
   const km = haversineKm(a, b);
   if (km < 0.05) return 0;
   return Math.round((km * ROUTE_CIRCUITY_FACTOR * 60) / AVERAGE_SPEED_KMH) + ARRIVAL_BUFFER_MINUTES;
+}
+
+/**
+ * Door-to-door drive minutes between two points.
+ *
+ * Prefers a live measurement from the pre-fetched matrix; falls back to the
+ * straight-line estimate when the matrix is absent or does not cover this leg.
+ * The arrival buffer is added to live drive time too — the Routes API returns
+ * road time, not park-walk-up-and-knock time.
+ */
+export function estimateDriveMinutes(
+  a: CoordinatePair,
+  b: CoordinatePair,
+  matrix?: DriveTimeMatrix | null,
+): number {
+  const live = lookupDriveMinutes(matrix, a, b);
+  if (live !== null) return live > 0 ? live + ARRIVAL_BUFFER_MINUTES : 0;
+  return estimateStraightLineDriveMinutes(a, b);
 }
 
 export function kmToMiles(km: number): number {

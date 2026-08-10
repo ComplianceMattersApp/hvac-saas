@@ -12,7 +12,8 @@ import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-
 import { getCachedInternalBusinessProfile } from "@/lib/business/tenant-reference-cache";
 import { normalizeCoordinatePair, type CoordinatePair } from "@/lib/routing/coordinates";
 import { scoreDayFitsForJob, type DayFit } from "@/lib/routing/day-fit";
-import { kmToMiles } from "@/lib/routing/geometry";
+import { haversineKm, kmToMiles } from "@/lib/routing/geometry";
+import { fetchDriveTimeMatrixForPoints, MAX_MATRIX_POINTS } from "@/lib/routing/routes-api";
 import { buildRouteStaticMapUrl, type RouteMapStop } from "@/lib/routing/route-links";
 import {
   clusterJobsByArea,
@@ -174,8 +175,36 @@ export async function RoutePlanView({
     .map((horizonDate) => ({ date: horizonDate, anchors: anchorsByDate[horizonDate] ?? [] }))
     .filter((entry) => entry.anchors.length > 0);
 
+  // Live drive times are fetched for the FOCUSED job only, and only when one is
+  // open. That is the moment accuracy pays for itself — an operator is about to
+  // quote an arrival window to a customer on the phone. The overview lists
+  // nothing to a customer and commits nothing, so it plans on estimates.
+  //
+  // Bounded on purpose: computeRouteMatrix bills per element (origins ×
+  // destinations), so the point set is home base + the focused job + the nearest
+  // anchors, capped well inside the element ceiling. A miss or an outage returns
+  // null and every leg falls back to the straight-line estimate.
+  const driveTimes = focusedJob
+    ? await fetchDriveTimeMatrixForPoints({
+        points: [
+          ...(homeBase ? [homeBase] : []),
+          focusedJob.coordinates,
+          ...horizonDates
+            .flatMap((horizonDate) => anchorsByDate[horizonDate] ?? [])
+            .map((anchor) => anchor.coordinates)
+            .filter((point): point is CoordinatePair => point !== null)
+            .sort(
+              (a, b) =>
+                haversineKm(focusedJob.coordinates, a) - haversineKm(focusedJob.coordinates, b),
+            )
+            .slice(0, MAX_MATRIX_POINTS - (homeBase ? 2 : 1)),
+        ],
+      })
+    : null;
+
   const dayFitsFor = (job: LocatedPlanJob): DayFit[] =>
     scoreDayFitsForJob({
+      driveTimes,
       coordinates: job.coordinates,
       anchorsByDate,
       horizonDates,
