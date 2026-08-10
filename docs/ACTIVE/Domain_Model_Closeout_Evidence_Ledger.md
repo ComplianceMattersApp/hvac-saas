@@ -102,7 +102,7 @@ Durable truth to keep in the model specs:
 - Platform application fee is Stripe/platform revenue only.
 - It does not create customer-facing surcharge line items.
 - It must not distort invoice paid/balance projections.
-- Refunds/disputes and ACH remain deferred unless separately unlocked.
+- ACH remains deferred unless separately unlocked. Refunds/disputes were unlocked on 2026-08-09: inbound Stripe refund and dispute handling now reverses payments (full refunds and lost disputes only) and raises partial refunds for manual allocation.
 
 ## Service-Plan Billing Period Foundation Evidence
 

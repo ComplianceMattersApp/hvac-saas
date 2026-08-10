@@ -1,5 +1,17 @@
 # Calendar Reality Audit
 
+> **STALE — point-in-time audit, superseded by the code (checked 2026-08-09).**
+> The calendar has been refactored since this was written and several claims below are now false. Verify against `components/calendar/` and `lib/actions/calendar-actions.ts`; do not cite this document as current architecture.
+>
+> Known-wrong claims, each checked against the code on 2026-08-09:
+> - **"no technician filter"** (§ remaining gaps) — a technician filter exists: `components/calendar/calendar-filtering.ts` (`filterJobsForTechnician`) applied in `calendar-view.tsx`, with test coverage in `lib/actions/__tests__/calendar-filtering.test.ts`.
+> - **Dispatch grid layout** — `CalendarDispatchGrid.tsx` now renders per-technician columns (`gridTemplateColumns: '84px repeat(${columnCount}, minmax(170px, 1fr))'`, line ~588) with `assignLanes` overlap packing. Any description here of the older single-shared-column layout is outdated.
+> - **Data fetching** — the monolithic `getDispatchCalendarData` described here was removed; the current path is the Suspense/streaming split (`getDispatchCalendarBoardData` with separate queue/roster loads).
+>
+> Route planning (`/calendar?view=plan`) was added 2026-08-08 and is not covered here at all.
+>
+> Kept rather than deleted because the scope/inventory sections below are still a useful map of the surface area. The gap list is not.
+
 ---
 
 ## 1. Scope

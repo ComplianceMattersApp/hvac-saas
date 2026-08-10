@@ -22,7 +22,7 @@ Current roadmap status:
 - Platform fee is Stripe/platform revenue only and must not create a customer-facing invoice surcharge line item.
 - Invoice paid/balance truth remains gross-payment-derived with no paid/balance distortion.
 - Failed payment rows remain non-collected.
-- Refunds/disputes remain deferred.
+- Refunds/disputes: **inbound handling shipped 2026-08-09** and is no longer deferred. Stripe `charge.refunded` and `charge.dispute.created`/`closed` reach EveryStep; a full refund reverses the payment, a partial refund is raised for manual allocation, and a dispute reverses only when lost. Still deferred within this area: operator-initiated refunds from inside EveryStep, and pushing a reversal into QuickBooks rather than surfacing it for manual removal. See [Payment_Controls_Hardening_Closeout_2026-08-09.md](./Payment_Controls_Hardening_Closeout_2026-08-09.md).
 - ACH remains deferred.
 - Next roadmap UX lane remains invoice page UX cleanup, followed by customer page IA/UX cleanup.
 

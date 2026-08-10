@@ -5,6 +5,12 @@ Authority: Subordinate to docs/ACTIVE/Active Spine V4.0 Current.md and docs/ACTI
 Mode: Documentation/model only (no implementation)
 Date: 2026-05-15
 
+> **Overtaken by events — read this first (updated 2026-08-09).** This spec was written on 2026-05-15, when live SMS was gated on A2P/campaign approval. That gate has cleared: the Twilio campaign was **approved 2026-08-05** and a production smoke passed (delivery confirmed in ~2.2s, STOP verified). Sending, inbound/opt-out processing, and the live-activation lane are implemented — `lib/communications/sms-live-send.ts` and `twilio-inbound-processor.ts` with tests.
+>
+> What remains is an **owner action, not engineering**: lift the test-phone suppression and press Activate.
+>
+> Every "live SMS remains deferred pending legal/provider/A2P/STOP/HELP/activation approval" line below is a **historical phase record** that was accurate when written. Those are preserved deliberately and should not be read as current status.
+
 ---
 
 ## F3B Completion Cross-Reference (May 2026)
