@@ -148,6 +148,9 @@ export type MaintenanceAgreementDrilldownRow = {
   source_template_name_snapshot: string | null;
   next_due_date: string | null;
   due_state: MaintenanceAgreementDueState;
+  fulfillment_state: "due_for_booking" | "job_created_unscheduled" | "booked" | "visit_review_needed" | "healthy";
+  linked_job_id: string | null;
+  linked_job_scheduled_date: string | null;
   visit_count_review: MaintenanceAgreementVisitCountReviewSummary;
 };
 
@@ -629,6 +632,7 @@ type MaintenanceAgreementVisitProjectionJob = {
   field_complete?: boolean | null;
   service_visit_type?: string | null;
   service_visit_outcome?: string | null;
+  scheduled_date?: string | null;
 };
 
 async function runAgreementQuery(query: any) {
@@ -1165,7 +1169,7 @@ export async function listMaintenanceAgreementDrilldownForAccount(
     if (jobIds.length > 0) {
       const { data: jobRows, error: jobError } = await params.supabase
         .from("jobs")
-        .select("id, status, ops_status, job_type, field_complete, service_visit_type, service_visit_outcome")
+        .select("id, status, ops_status, job_type, field_complete, service_visit_type, service_visit_outcome, scheduled_date")
         .in("id", jobIds);
 
       if (jobError) throw jobError;
@@ -1198,6 +1202,25 @@ export async function listMaintenanceAgreementDrilldownForAccount(
         nextDueDate,
         today: asOfDate,
       });
+      const linkedPairs = (linksByAgreementId.get(id) ?? [])
+        .map((link) => ({ link, job: jobsById.get(toCleanString(link.job_id)) }))
+        .filter((pair): pair is { link: MaintenanceAgreementVisitLinkRow; job: MaintenanceAgreementVisitProjectionJob } => Boolean(pair.job));
+      const activeLinkedJob = linkedPairs.map((pair) => pair.job).find((job) => {
+        const status = toCleanString(job.status).toLowerCase();
+        const opsStatus = toCleanString(job.ops_status).toLowerCase();
+        return !job.field_complete && !DISQUALIFYING_JOB_STATUSES.has(status) && !DISQUALIFYING_OPS_STATUSES.has(opsStatus);
+      }) ?? null;
+      const reviewJob = linkedPairs.find(({ link, job }) =>
+        (Boolean(job.field_complete) || toCleanString(job.status).toLowerCase() === "completed") &&
+        projectMaintenanceAgreementVisitCountReview({ link, job }) === "eligible_for_count_review"
+      )?.job ?? null;
+      const fulfillmentState: MaintenanceAgreementDrilldownRow["fulfillment_state"] = activeLinkedJob
+        ? (toCleanString(activeLinkedJob.scheduled_date) ? "booked" : "job_created_unscheduled")
+        : reviewJob
+        ? "visit_review_needed"
+        : (dueState === "overdue" || dueState === "due_today" || dueState === "upcoming" || dueState === "not_scheduled")
+        ? "due_for_booking"
+        : "healthy";
 
       return {
         id,
@@ -1214,6 +1237,9 @@ export async function listMaintenanceAgreementDrilldownForAccount(
         source_template_name_snapshot: toCleanString(row.source_template_name_snapshot) || null,
         next_due_date: nextDueDate,
         due_state: dueState,
+        fulfillment_state: fulfillmentState,
+        linked_job_id: activeLinkedJob ? toCleanString(activeLinkedJob.id) || null : reviewJob ? toCleanString(reviewJob.id) || null : null,
+        linked_job_scheduled_date: activeLinkedJob ? toCleanString(activeLinkedJob.scheduled_date) || null : null,
         visit_count_review: summarizeMaintenanceAgreementVisitCountReviewRows(
           linksByAgreementId.get(id) ?? [],
           jobsById,

@@ -11,7 +11,7 @@ import { redirect } from "next/navigation";
 import {
   buildTodayReadModel,
   type FinancialSnapshot,
-  type FollowUpGroup,
+  type ComingUp,
   type NextBestAction,
   type PriorityChip,
   type RoleAwarePulse,
@@ -144,6 +144,8 @@ export default async function TodayPage() {
           showFieldActions={model.todayWork.showFieldActions}
         />
 
+        {model.comingUp.visible ? <ComingUpSection comingUp={model.comingUp} /> : null}
+
         <ResumeRecentSection
           items={model.resumeRecentWork.slice(0, 3)}
           hasMore={model.resumeRecentHasMore}
@@ -172,6 +174,7 @@ export default async function TodayPage() {
               desktop
               primary
             />
+            {model.comingUp.visible ? <ComingUpSection comingUp={model.comingUp} /> : null}
             <ResumeRecentSection
               items={model.resumeRecentWork}
               hasMore={model.resumeRecentHasMore}
@@ -189,6 +192,41 @@ export default async function TodayPage() {
       </div>
 
     </div>
+  );
+}
+
+function ComingUpSection({ comingUp }: { comingUp: ComingUp }) {
+  return (
+    <section className={CARD_SHELL}>
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <SectionEyebrow label="Next 7 Days" />
+          <h2 className={SECTION_HEADING_TEXT}>Coming Up</h2>
+          <p className="mt-1 text-xs text-slate-600">
+            {comingUp.totalCount} booked {comingUp.totalCount === 1 ? "visit" : "visits"}
+            {comingUp.unassignedCount ? ` · ${comingUp.unassignedCount} need assignment` : ""}
+          </p>
+        </div>
+        <Link href={comingUp.href} className="text-xs font-semibold text-blue-700 hover:underline">Open Calendar</Link>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {comingUp.jobs.map((job) => (
+          <li key={job.id} className={ROW_SHELL}>
+            <Link href={job.href} className="flex items-center justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-[#0f1f35]">{job.title}</span>
+                <span className="mt-0.5 block text-xs text-slate-600">
+                  {formatBusinessDateUS(job.scheduledDate)}{job.windowLabel ? ` · ${job.windowLabel}` : " · Window pending"}
+                </span>
+              </span>
+              <span className={`shrink-0 text-xs font-semibold ${job.needsAssignment ? "text-amber-700" : "text-slate-600"}`}>
+                {job.assignmentLabel}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -599,123 +637,6 @@ function chipAccentClass(chip: PriorityChip): string {
     return "border-l-blue-400 bg-blue-50/20";
   }
   return "border-l-slate-300";
-}
-
-function normalizeReasonToken(value: string | null | undefined): string {
-  return String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[-_]/g, " ")
-    .replace(/\s+/g, " ");
-}
-
-function shouldShowReasonForGroup(groupKey: FollowUpGroup["key"], reason: string | null | undefined): boolean {
-  const normalizedReason = normalizeReasonToken(reason);
-  if (!normalizedReason) return false;
-
-  if (groupKey === "scheduling" && normalizedReason === "needs scheduling") {
-    return false;
-  }
-
-  if (groupKey === "payments" && normalizedReason === "payment follow up") {
-    return false;
-  }
-
-  if (groupKey === "service_plans" && normalizedReason === "service plan follow up") {
-    return false;
-  }
-
-  return true;
-}
-
-// -----------------------------------------------------------------------------
-// Action Center
-// -----------------------------------------------------------------------------
-
-// Retained for a future record-level attention treatment; intentionally not
-// rendered while the Operations snapshot owns queue visibility.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function FollowUpSection({
-  groups,
-  desktop = false,
-  primary = false,
-}: {
-  groups: FollowUpGroup[];
-  desktop?: boolean;
-  primary?: boolean;
-}) {
-  return (
-    <section className={primary ? CARD_SHELL_PRIMARY : CARD_SHELL}>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <SectionEyebrow label="Action Center" />
-          <h2 className={primary ? SECTION_HEADING_TEXT_LG : SECTION_HEADING_TEXT}>Work that needs a next step</h2>
-        </div>
-        {desktop ? (
-          <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
-            Open Operations
-          </Link>
-        ) : null}
-      </div>
-
-      {groups.length === 0 ? (
-        <EmptyState message="No next-step work waiting right now." />
-      ) : (
-        <ul className="mt-3 space-y-2">
-          {groups.map((group) => (
-            <li key={group.key} className={ROW_SHELL}>
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-[#0f1f35]">{group.label}</div>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                  {group.count}
-                </span>
-              </div>
-
-              {group.summary ? (
-                <div className="mt-1 text-xs text-slate-600">{group.summary}</div>
-              ) : null}
-
-              {group.preview.length > 0 ? (
-                <ul className="mt-2 space-y-1.5">
-                  {group.preview.map((item) => (
-                    <li key={item.key}>
-                      <Link href={item.href} className="group block rounded-md px-1 py-0.5">
-                        <div className="truncate text-sm font-medium text-slate-900 group-hover:text-blue-700">
-                          {item.title}
-                        </div>
-                        {(() => {
-                          const breadcrumbParts = [
-                            shouldShowReasonForGroup(group.key, item.reason) ? item.reason : null,
-                            item.customerName,
-                            item.city,
-                            item.ageDisplay,
-                          ].filter(Boolean);
-
-                          if (breadcrumbParts.length === 0) return null;
-
-                          return (
-                            <div className="truncate text-xs text-slate-500">
-                              {breadcrumbParts.join(" · ")}
-                            </div>
-                          );
-                        })()}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              <div className="mt-2">
-                <Link href={group.href} className="text-xs font-semibold text-blue-700 hover:underline">
-                  View all {group.count}
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
 }
 
 // -----------------------------------------------------------------------------

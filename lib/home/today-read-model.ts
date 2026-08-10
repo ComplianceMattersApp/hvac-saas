@@ -34,7 +34,7 @@ import {
 } from "@/lib/time-clock/read-model";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
-import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agreements/read-model";
+import { listMaintenanceAgreementDrilldownForAccount } from "@/lib/maintenance-agreements/read-model";
 import {
   displayWindowLA,
   formatBusinessDateUS,
@@ -60,6 +60,11 @@ import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billi
 import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 import { isContractorIntakeQueueAvailableForProductMode } from "@/lib/ops/ops-workspace-queues";
 import { opsWorkspaceQueueHref } from "@/lib/ops/ops-nav-queue-links";
+import { listActivePermitRequestQueueRowsIfAvailable } from "@/lib/permits/permit-requests-read-model";
+import {
+  listInternalContractorUpdateAwareness,
+  listInternalNewWorkRequestAwareness,
+} from "@/lib/actions/notification-read-actions";
 
 const OPEN_INVOICES_REPORT_HREF = "/reports/invoices?view=open";
 // -----------------------------------------------------------------------------
@@ -247,6 +252,24 @@ export type TeamCoverage = {
   emptyStateMessage: string | null;
 };
 
+export type ComingUpJob = {
+  id: string;
+  title: string;
+  scheduledDate: string;
+  windowLabel: string | null;
+  assignmentLabel: string;
+  needsAssignment: boolean;
+  href: string;
+};
+
+export type ComingUp = {
+  visible: boolean;
+  jobs: ComingUpJob[];
+  totalCount: number;
+  unassignedCount: number;
+  href: string;
+};
+
 export type ResumeRecentItem = {
   key: string;
   itemType: "Job";
@@ -274,9 +297,8 @@ export type TodayReadModel = {
     showFieldActions: boolean;
   };
   priorityChips: PriorityChip[];
-  followUps: FollowUpItem[];
-  followUpGroups: FollowUpGroup[];
   teamCoverage: TeamCoverage;
+  comingUp: ComingUp;
   businessPulse: BusinessPulse;
   upcomingService: UpcomingService;
   roleAwarePulse: RoleAwarePulse;
@@ -767,6 +789,71 @@ async function safeCount(
     return typeof count === "number" ? count : null;
   } catch {
     return null;
+  }
+}
+
+function shiftBusinessYmd(ymd: string, days: number): string {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, "0")}-${String(shifted.getUTCDate()).padStart(2, "0")}`;
+}
+
+async function safeLoadComingUp(params: {
+  supabase: any;
+  role: InternalRole;
+  userId: string;
+  today: string;
+}): Promise<ComingUp> {
+  try {
+    const through = shiftBusinessYmd(params.today, 7);
+    const assignedIds = params.role === "tech"
+      ? await safeQueryAssignedJobIdsForUser(params.supabase, params.userId)
+      : null;
+    if (assignedIds && assignedIds.length === 0) {
+      return { visible: false, jobs: [], totalCount: 0, unassignedCount: 0, href: "/ops/field" };
+    }
+    let query = params.supabase
+      .from("jobs")
+      .select(TODAY_JOB_SELECT)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("field_complete", false)
+      .gt("scheduled_date", params.today)
+      .lte("scheduled_date", through)
+      .order("scheduled_date", { ascending: true })
+      .order("window_start", { ascending: true })
+      .limit(25);
+    if (assignedIds) query = query.in("id", assignedIds);
+    const { data, error } = await query;
+    if (error) throw error;
+    const normalized = ((data ?? []) as unknown[])
+      .map((row) => normalizeJob(row))
+      .filter((row: TodayJobSummary | null): row is TodayJobSummary => Boolean(row?.scheduledDate));
+    const assignmentMap = normalized.length
+      ? await getActiveJobAssignmentDisplayMap({ supabase: params.supabase, jobIds: normalized.map((job) => job.id) })
+      : {};
+    const jobs = normalized.slice(0, 5).map((job) => {
+      const assignments = assignmentMap[job.id] ?? [];
+      return {
+        id: job.id,
+        title: job.title,
+        scheduledDate: job.scheduledDate!,
+        windowLabel: displayWindowLA(job.windowStart, job.windowEnd) || null,
+        assignmentLabel: assignments.length ? assignments.map((item) => item.display_name).join(", ") : "Needs assignment",
+        needsAssignment: assignments.length === 0,
+        href: `/jobs/${job.id}?tab=ops`,
+      };
+    });
+    const unassignedCount = normalized.filter((job) => (assignmentMap[job.id] ?? []).length === 0).length;
+    return {
+      visible: normalized.length > 0,
+      jobs,
+      totalCount: normalized.length,
+      unassignedCount,
+      href: "/calendar?view=list",
+    };
+  } catch {
+    return { visible: false, jobs: [], totalCount: 0, unassignedCount: 0, href: "/calendar?view=list" };
   }
 }
 
@@ -1684,6 +1771,8 @@ export function buildPriorityChips(params: {
   servicePlansOverdue: number | null;
   openInvoiceCount: number | null;
   canViewBusinessPulse: boolean;
+  permitCount?: number | null;
+  updatesCount?: number | null;
   primaryFocusKey?: NextBestAction["focusKey"];
 }): PriorityChip[] {
   if (params.role === "tech") {
@@ -1764,6 +1853,27 @@ export function buildPriorityChips(params: {
       tone: "info",
       urgent: false,
   });
+
+  if (params.role !== "billing" && params.permitCount != null) {
+    pushQueue({
+      key: "permits",
+      label: "Permits",
+      count: params.permitCount,
+      href: opsWorkspaceQueueHref("permits"),
+      tone: "warn",
+      urgent: false,
+    });
+  }
+  if (params.role !== "billing" && params.updatesCount != null) {
+    pushQueue({
+      key: "updates",
+      label: "Updates",
+      count: params.updatesCount,
+      href: "/ops/notifications?state=unread",
+      tone: "info",
+      urgent: false,
+    });
+  }
 
   return chips;
 }
@@ -2140,6 +2250,37 @@ async function buildTodayReadModelForInternalActor(
     }),
   );
 
+  const comingUpPromise = localTimedPhase("comingUpRead", () =>
+    safeLoadComingUp({ supabase, role, userId, today }),
+  );
+
+  const permitCountPromise = localTimedPhase("permitQueueCountRead", async () => {
+    if (role === "tech" || role === "billing") return null;
+    try {
+      const result = await listActivePermitRequestQueueRowsIfAvailable({
+        supabase,
+        accountOwnerUserId,
+        limit: 250,
+      });
+      return result.schemaAvailable ? result.rows.length : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const updatesCountPromise = localTimedPhase("updatesQueueCountRead", async () => {
+    if (role === "tech" || role === "billing") return null;
+    try {
+      const [updates, requests] = await Promise.all([
+        listInternalContractorUpdateAwareness({ onlyUnread: true, limit: 100 }),
+        listInternalNewWorkRequestAwareness({ onlyUnread: true, limit: 100 }),
+      ]);
+      return updates.length + requests.length;
+    } catch {
+      return null;
+    }
+  });
+
   const recentPromise = localTimedPhase("recentResumeRead", () =>
     safeLoadRecentResume({
       supabase,
@@ -2151,9 +2292,12 @@ async function buildTodayReadModelForInternalActor(
   const servicePlansPromise = localTimedPhase("servicePlansSummaryRead", async () => {
     if (!isMaintenanceAgreementsEnabled()) return null;
     try {
-      return await summarizeMaintenanceAgreementsForAccount({
+      return await listMaintenanceAgreementDrilldownForAccount({
         supabase,
         accountOwnerUserId,
+        today,
+        filter: "all",
+        limit: 250,
       });
     } catch {
       return null;
@@ -2236,6 +2380,9 @@ async function buildTodayReadModelForInternalActor(
     priorityCounts,
     followUps,
     teamCoverage,
+    comingUp,
+    permitCount,
+    updatesCount,
     recent,
     servicePlans,
     openInvoice,
@@ -2254,6 +2401,9 @@ async function buildTodayReadModelForInternalActor(
       priorityCountsPromise,
       followUpsPromise,
       teamCoveragePromise,
+      comingUpPromise,
+      permitCountPromise,
+      updatesCountPromise,
       recentPromise,
       servicePlansPromise,
       openInvoicePromise,
@@ -2264,11 +2414,14 @@ async function buildTodayReadModelForInternalActor(
     ]),
   );
 
-  const servicePlansOverdue = servicePlans?.due_counts?.overdue ?? null;
-  const servicePlansDueIn7 = servicePlans?.due_counts?.due_in_next_7_days ?? null;
-  const servicePlansDueIn30 = servicePlans?.due_counts?.due_in_next_30_days ?? null;
-  const servicePlansNotScheduled = servicePlans?.due_counts?.not_scheduled_active ?? null;
-  const servicePlansActive = servicePlans?.status_counts?.active ?? null;
+  const servicePlanRows = servicePlans?.rows ?? [];
+  const servicePlansActive = servicePlans ? servicePlanRows.filter((row) => row.status === "active").length : null;
+  const needsBookingRows = servicePlanRows.filter((row) => row.fulfillment_state === "due_for_booking" || row.fulfillment_state === "job_created_unscheduled");
+  const servicePlansOverdue = servicePlans ? needsBookingRows.filter((row) => row.due_state === "overdue").length : null;
+  const servicePlansNotScheduled = servicePlans ? needsBookingRows.filter((row) => row.due_state === "not_scheduled" || row.fulfillment_state === "job_created_unscheduled").length : null;
+  const daysFromToday = (date: string | null) => date ? Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000) : null;
+  const servicePlansDueIn7 = servicePlans ? needsBookingRows.filter((row) => { const days = daysFromToday(row.next_due_date); return days != null && days >= 1 && days <= 7; }).length : null;
+  const servicePlansDueIn30 = servicePlans ? needsBookingRows.filter((row) => { const days = daysFromToday(row.next_due_date); return days != null && days >= 1 && days <= 30; }).length : null;
 
   const upcomingService = buildUpcomingService({
     role,
@@ -2278,16 +2431,6 @@ async function buildTodayReadModelForInternalActor(
     dueInNext7Days: servicePlansDueIn7,
     dueInNext30Days: servicePlansDueIn30,
     notScheduled: servicePlansNotScheduled,
-  });
-
-  const followUpGroups = buildFollowUpGroups({
-    role,
-    productMode,
-    followUps,
-    priorityCounts,
-    servicePlansOverdue,
-    openInvoiceCount: openInvoice.count,
-    canViewBusinessPulse,
   });
 
   const dailyBriefing = buildDailyBriefing({
@@ -2318,6 +2461,8 @@ async function buildTodayReadModelForInternalActor(
     servicePlansOverdue,
     openInvoiceCount: openInvoice.count,
     canViewBusinessPulse,
+    permitCount,
+    updatesCount,
     primaryFocusKey: nextBestAction.focusKey,
   });
 
@@ -2389,9 +2534,8 @@ async function buildTodayReadModelForInternalActor(
       showFieldActions,
     },
     priorityChips,
-    followUps: followUps.slice(0, role === "tech" ? 3 : 8),
-    followUpGroups,
     teamCoverage,
+    comingUp,
     businessPulse,
     upcomingService,
     roleAwarePulse,
