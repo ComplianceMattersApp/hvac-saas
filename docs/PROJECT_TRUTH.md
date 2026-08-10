@@ -488,11 +488,53 @@ Branch / release flow:
 
 ---
 
-## 16. What Is Complete (durable baseline)
+## 16. What Is Complete (capability inventory)
 
 Core platform (locked as complete/real, not prototype): lifecycle engine · ops command center · customer/location/job model · service-case additive container layer · ECC test system · contractor portal · event-driven operational narrative · staffing/assignments · calendar/scheduling engine · notification visibility v1 · source-of-truth stabilization · repo/tree reconciliation · migration stabilization process and guardrails.
 
 The core operational platform is complete enough to be considered a real working system, not a partial prototype.
+
+### 16.1 Capability inventory (what this product can actually do)
+
+This table exists so build planning and competitive comparison start from what is true rather than from what was true when some lane closed. **Every row names where the capability lives, so any claim here can be checked in one command.** If a row and the code disagree, the code wins and the row is a bug — fix it in the same change that made it wrong.
+
+| Capability | Where it lives | Notes / limits |
+|---|---|---|
+| Jobs, lifecycle, ops status projection | `lib/jobs`, `lib/actions/job-evaluator.ts`, `app/ops` | `jobs.ops_status` is a projection, never freeform UI state |
+| Job detail (V2 canonical) | `app/jobs/[id]/v2` | Classic `page.tsx` retired but still on disk |
+| Customers, locations, service addresses | `lib/customers`, `app/customers`, `app/locations` | Address autocomplete + geocode capture |
+| Service cases (continuity container) | `lib/actions/service-case-reconciliation.ts` | Additive container over jobs |
+| ECC / HERS test system | `lib/ecc`, `app/services` | Core differentiator vs generic FSM |
+| ECC/HERS work-sharing (cross-account) | `app/ops/workshare`, `lib/workflows` | Send → accept/decline → receiver job; prod smoke outstanding |
+| Calendar + dispatch | `components/calendar`, `lib/calendar` | Per-tech columns, tech filter, streaming loaders |
+| **Route planning** | `lib/routing`, `/calendar?view=plan` | Area clustering, day-fit, drive order, arrival windows. Straight-line estimates; no live drive times yet |
+| Staffing / assignments | `lib/staffing` | |
+| Time clock | `lib/time-clock`, `app/time-clock` | Clock events, admin review/correction, export. **No GPS/location capture** |
+| Estimates + multi-option proposals | `lib/estimates`, `app/estimates`, `app/proposals` | Customer approval surfaces, estimate→job/invoice conversion |
+| **Estimates AI** (coach + line rewrite) | `lib/ai`, `app/estimates/[id]/EstimateCoachPanel.tsx` | OpenAI; global $25/month cap; fails closed to a deterministic coach. See `ACTIVE/Estimates_AI_V1_Current_State.md` |
+| Invoicing (internal, consolidated, supplemental) | `lib/invoices`, `lib/business/internal-invoice*.ts`, `app/jobs/[id]/invoice` | Issue/send/void, add-on invoice family, PDF/print |
+| Payments — collection | `lib/payments`, `lib/business/tenant-invoice-*.ts`, `app/api/stripe` | Stripe Connect Checkout, saved cards, scheduled autopay, field collection reports |
+| **Payments — money out** | `lib/business/tenant-invoice-stripe-webhooks.ts` | Refunds (full reverses, partial flagged) and disputes (reverses only when lost). Shipped 2026-08-09 |
+| Payment truth + allocations | `lib/business/payment-allocations.ts` | Webhook-confirmed rows are collected-money truth; balance derives from allocations |
+| **QuickBooks Online sync** | `lib/qbo` | LIVE in production. Customers, invoices, payments, and invoice voids. One-way push; nothing read back to drive state |
+| **Three-way reconciliation** | `lib/reconciliation`, `/api/cron/reconciliation` | Nightly + on-demand. Compares EveryStep vs QBO vs Stripe independently. Report-only |
+| Exception surfacing | `lib/reports/attention-center-*.ts`, `/reports/attention` | Single place for stalled/failed financial workflows |
+| Financial reporting | `lib/reports`, `app/reports` | Payments register, deposits/payout explanation, invoice ledger, CSV export |
+| Maintenance agreements / service plans | `lib/maintenance-agreements`, `app/service-plans` | Billing periods, visit linkage, next-due |
+| Pricebook | `lib/business` pricebook actions | Field-facing pricing |
+| Permits | `lib/permits`, `app/ops` permit surfaces | Owner-scoped permit workflow |
+| Contractor portal | `app/portal`, `lib/portal` | Invoices, jobs, intake submissions, permit requests. Scoped by frozen billing identity, never job assignment |
+| Notifications | `lib/notifications` | In-app, email, account-scoped web push |
+| **SMS** | `lib/communications` | Twilio approved, prod smoke passed, live-send + inbound STOP implemented. **Pending owner activation** |
+| Support | `lib/support`, `lib/help-assistant` | Support case/call log, help-gap logging, trainer AI |
+| PWA / device | `lib/pwa` | Install, push subscription, device setup |
+| Android shell | `capacitor.config.ts`, `android/` | Capacitor 8 remote-URL shell, validated. No store submission |
+
+### 16.2 Known absences (for honest comparison)
+
+Not built, and deliberately so unless noted: customer portal / client hub · online booking and customer self-scheduling · two-way conversational SMS · review, referral and marketing automation · AI receptionist / call tracking · inventory, purchase orders, job costing, payroll, financing · ACH, deposits, instant payouts · GPS location capture · live drive times · offline mode beyond PWA basics.
+
+The competitive read on these lives in `ACTIVE/Current_App_Baseline_and_Competitive_Audit_2026-07-06.md`; that document is a dated snapshot, so trust this table for what exists and treat its competitor commentary as the older half.
 
 **Operational Entitlement Mutation Guard — locked server-side result** (rollout closeout narrative removed; the durable authorization rule is retained):
 - Active entitlement is allowed.
