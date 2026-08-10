@@ -38,5 +38,8 @@ describe("Needs Attention center", () => {
     expect(page).toContain("{item.actionLabel}");
     expect(model).toContain('finding.finding_type) === "stripe_charge_unrecorded"');
     expect(model).not.toContain(': "/reports/attention",');
+    expect(page).toContain("linkVerifiedStripePaymentIdentityFromForm");
+    expect(page).toContain("Link verified Stripe payment");
+    expect(model).toContain("repairFindingId");
   });
 });

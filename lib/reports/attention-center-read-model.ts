@@ -13,6 +13,7 @@ export type AttentionItem = {
   href: string;
   actionLabel: string;
   paymentId?: string | null;
+  repairFindingId?: string | null;
 };
 
 function clean(value: unknown) { return String(value ?? "").trim(); }
@@ -139,6 +140,9 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
         ? `/jobs/${jobId}/invoice${subjectId && (finding.subject_kind === "invoice" || isUnrecordedStripeCharge) ? `?invoice_id=${encodeURIComponent(subjectId)}` : ""}#invoice-workspace`
         : finding.external_system === "stripe" ? "/reports/stripe-reconciliation" : "/reports/invoices",
       actionLabel: "Investigate",
+      repairFindingId: ["stripe_charge_unrecorded", "stripe_payment_identity_mismatch"].includes(clean(finding.finding_type))
+        ? clean(finding.id)
+        : null,
     });
   }
   for (const payment of moneyOutResult.error ? [] : (moneyOutResult.data ?? [])) {
