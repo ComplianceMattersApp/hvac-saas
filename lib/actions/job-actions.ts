@@ -5150,7 +5150,13 @@ export async function addEccTestRunFromForm(formData: FormData) {
 
   if (!visitId) throw new Error("Unable to resolve Visit #1");
 
-  // 🔒 Duplicate prevention: job + system + test_type
+  // 🔒 Duplicate prevention: job + system + test_type.
+  //
+  // This also caps Custom Verification at one run per system. Lifting it was
+  // considered and rejected: the workspace resolves a single focused run per
+  // test type (`pickRunForSystem`), so extra custom runs would exist in the
+  // database with no way to open or complete them. Supporting several named
+  // verifications per system needs a list UI first.
   const { data: existing, error: existErr } = await supabase
     .from("ecc_test_runs")
     .select("id")
@@ -6726,6 +6732,82 @@ export async function saveAndCompleteFanWattDrawFromForm(formData: FormData) {
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
   redirectToTests({ jobId, testType: "fan_watt_draw", systemId, notice: "test_completed" });
+}
+
+/**
+ * Custom Verification save.
+ *
+ * The one ECC test with no computation behind it: the rater names what they
+ * verified, writes what they found, and states the outcome. Everything lives in
+ * the run's existing `data` jsonb, so this needs no migration.
+ *
+ * The result is written to `computed_pass` rather than `override_pass` because
+ * there is nothing to override — the rater's judgement IS the computation here.
+ * It must be explicit: `evaluateEccOpsStatus` reads a run with both pass columns
+ * null as "unknown", which would leave the job unresolved with no visible reason.
+ */
+export async function saveAndCompleteCustomVerificationFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const testRunId = String(formData.get("test_run_id") || "").trim();
+  const label = String(formData.get("custom_label") || "").trim();
+  const notes = String(formData.get("custom_notes") || "").trim();
+  const resultRaw = String(formData.get("custom_result") || "").trim().toLowerCase();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!testRunId) throw new Error("Missing test_run_id");
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const systemId = await resolveSystemIdForRun({
+    supabase,
+    jobId,
+    testRunId,
+    systemIdFromForm: String(formData.get("system_id") || "").trim() || null,
+  });
+
+  // A named, judged verification is the whole point of this test type. Refusing
+  // here beats silently saving a nameless run with an unknown outcome.
+  if (!label || !notes || (resultRaw !== "pass" && resultRaw !== "fail")) {
+    redirectToTests({
+      jobId,
+      testType: "custom",
+      systemId,
+      notice: "custom_verification_incomplete",
+    });
+  }
+
+  const { error } = await supabase
+    .from("ecc_test_runs")
+    .update({
+      data: {
+        custom_label: label,
+        custom_notes: notes,
+        custom_result: resultRaw,
+      },
+      computed: { source: "manual_custom_verification" },
+      computed_pass: resultRaw === "pass",
+      override_pass: null,
+      override_reason: null,
+      updated_at: new Date().toISOString(),
+      is_completed: true,
+    })
+    .eq("id", testRunId)
+    .eq("job_id", jobId)
+    .eq("test_type", "custom");
+
+  if (error) throw error;
+
+  await evaluateEccOpsStatus(jobId);
+  revalidateEccProjectionConsumers(jobId);
+  redirectToTests({ jobId, testType: "custom", systemId, notice: "test_completed" });
 }
 
 export async function saveAhriVerificationDataFromForm(formData: FormData) {

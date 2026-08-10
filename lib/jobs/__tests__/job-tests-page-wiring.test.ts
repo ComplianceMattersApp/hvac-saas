@@ -451,7 +451,10 @@ describe("job tests page wiring", () => {
     const addAnotherLinkEnd = jobTestsPageSource.indexOf("</Link>", addAnotherIndex);
     const addAnotherLink = jobTestsPageSource.slice(addAnotherLinkStart, addAnotherLinkEnd);
 
-    expect(addAnotherLink).toContain('href={focusedType === "custom" ? withS(undefined) : withS("custom")}');
+    // Sentinel renamed 2026-08-09: the Add Test drawer used "custom", which is
+    // also a real registry test code, so focusing a Custom Verification run
+    // opened this drawer instead of the test. "add" disambiguates them.
+    expect(addAnotherLink).toContain('href={focusedType === "add" ? withS(undefined) : withS("add")}');
     expect(addAnotherLink).not.toContain("sm:hidden");
   });
 
@@ -473,7 +476,7 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain("const isEccWorkspaceClosedOrCompleted =");
     expect(jobTestsPageSource).toContain('normalizedOpsStatus === "closed" || normalizedStatus === "completed"');
     expect(jobTestsPageSource).toContain("!isEccWorkspaceClosedOrCompleted &&\n    !isCompactTestWorkspace");
-    expect(jobTestsPageSource).toContain('focusedType === "custom" && !isEccWorkspaceClosedOrCompleted');
+    expect(jobTestsPageSource).toContain('focusedType === "add" && !isEccWorkspaceClosedOrCompleted');
     expect(jobTestsPageSource).toContain("Additional tests are unavailable after completion.");
   });
 

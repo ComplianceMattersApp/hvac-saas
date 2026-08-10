@@ -24,6 +24,7 @@ import JobSubpageContextHeader from "../_components/JobSubpageContextHeader";
 
 import {
   completeEccTestRunFromForm,
+  saveAndCompleteCustomVerificationFromForm,
   addEccTestRunFromForm,
   deleteEccTestRunFromForm,
   saveDuctLeakageDataFromForm,
@@ -103,8 +104,15 @@ function getPrimaryEquipment(systemEquipment: any[]) {
   );
 }
 
-function getTestDisplayLabel(testType: string, packageSystem: boolean) {
+function getTestDisplayLabel(testType: string, packageSystem: boolean, run?: { data?: any } | null) {
   const baseLabel = getTestDefinition(testType)?.shortLabel ?? testType;
+
+  // A custom verification is only meaningful by the name the rater gave it —
+  // a list of rows all reading "Custom" tells nobody what was checked.
+  if (testType === "custom") {
+    const customLabel = String(run?.data?.custom_label ?? "").trim();
+    return customLabel || baseLabel;
+  }
 
   if (packageSystem && testType === "refrigerant_charge") {
     return `${baseLabel} — Not Required (Package Unit)`;
@@ -1189,10 +1197,10 @@ export default async function JobTestsPage({
   const manualAddTests = getActiveManualAddTests();
   const allowedFocusedTypes = new Set<string>([
     ...manualAddTests.map((t) => String(t.code)),
-    "custom",
+    "add",
   ]);
   const focusedTypeRaw = allowedFocusedTypes.has(focused)
-    ? (focused as EccTestType | "custom")
+    ? (focused as EccTestType | "add")
     : "";
 
   const selectedSystemEquipment =
@@ -1392,7 +1400,7 @@ export default async function JobTestsPage({
 
   const focusedCustomTestType =
     focusedType &&
-    focusedType !== "custom" &&
+    focusedType !== "add" &&
     focusedType !== "duct_leakage" &&
     focusedType !== "airflow" &&
     focusedType !== "fan_watt_draw" &&
@@ -2791,6 +2799,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div className="grid grid-cols-1 gap-2">
                 {selectedSystemStatusRows.map((row) => {
   const { testType, status, carriedForward, isRequired } = row;
+  const rowRun = (status as any)?.run ?? null;
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
   const tone = getTestStatusTone(String(row.state));
   const isOpen = focusedType === testType;
@@ -2806,7 +2815,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
           <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-navy sm:text-base">
-                {getTestDisplayLabel(testType, packageSystem)}
+                {getTestDisplayLabel(testType, packageSystem, rowRun)}
               </div>
               <div className={`mt-1 hidden text-xs leading-5 sm:block ${carriedForward ? "text-emerald-700" : tone.text}`}>
                 {getTestStatusHelp(String(status.state), carriedForward)}
@@ -2879,21 +2888,21 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                 {showInlineAddAnotherTestCard ? (
                   <Link
-                    href={focusedType === "custom" ? withS(undefined) : withS("custom")}
+                    href={focusedType === "add" ? withS(undefined) : withS("add")}
                     className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border border-dashed px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 ${
-                      focusedType === "custom"
+                      focusedType === "add"
                         ? "border-blue-600 bg-blue-600 text-white"
                         : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
                     }`}
                   >
                     <div>
                       <div className="text-sm font-semibold">Add another test</div>
-                      <div className={`mt-1 text-xs ${focusedType === "custom" ? "text-slate-200" : "text-slate-600"}`}>
+                      <div className={`mt-1 text-xs ${focusedType === "add" ? "text-slate-200" : "text-slate-600"}`}>
                         Use when the field scope needs an extra run for this system.
                       </div>
                     </div>
-                    <div className={`text-xs font-medium ${focusedType === "custom" ? "text-slate-200" : "text-slate-500"}`}>
-                      {focusedType === "custom" ? "Hide" : "Open"}
+                    <div className={`text-xs font-medium ${focusedType === "add" ? "text-slate-200" : "text-slate-500"}`}>
+                      {focusedType === "add" ? "Hide" : "Open"}
                     </div>
                   </Link>
                 ) : null}
@@ -2905,7 +2914,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <div className="text-xs font-semibold uppercase tracking-wide text-red-800">Parent Failed Results (Read-only)</div>
                 {parentFailedComparisonRows.map((row) => (
                   <div key={`parent-failed-${row.testType}`} className="rounded-md border border-red-200 bg-white px-3 py-2 text-xs text-slate-700">
-                    <div className="font-medium text-slate-900">{getTestDisplayLabel(row.testType, packageSystem)}</div>
+                    <div className="font-medium text-slate-900">{getTestDisplayLabel(row.testType, packageSystem, row.run)}</div>
                     <div>Result on parent: {getEffectiveResultLabel(row.run)}</div>
                     <div>
                       Updated: {row.run?.updated_at ? formatTestResultTimestamp(row.run.updated_at) : "—"}
@@ -2938,7 +2947,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         ) : null}
 
         {/* Add Test panel */}
-        {selectedSystemId && focusedType === "custom" && !isEccWorkspaceClosedOrCompleted ? (
+        {selectedSystemId && focusedType === "add" && !isEccWorkspaceClosedOrCompleted ? (
           <div className={`${eccWorkspaceCardClass}`}>
             <div>
               <div className={eccUtilityLabelClass}>Add Test</div>
@@ -3015,7 +3024,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           </div>
         ) : null}
 
-        {selectedSystemId && focusedType === "custom" && isEccWorkspaceClosedOrCompleted ? (
+        {selectedSystemId && focusedType === "add" && isEccWorkspaceClosedOrCompleted ? (
           <div className={`${eccWorkspaceCardClass}`}>
             <div>
               <div className={eccUtilityLabelClass}>Add Test</div>
@@ -3031,20 +3040,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         {!isCompactTestWorkspace && !showInlineAddAnotherTestCard ? (
           selectedSystemId && !isEccWorkspaceClosedOrCompleted ? (
             <Link
-              href={focusedType === "custom" ? withS(undefined) : withS("custom")}
+              href={focusedType === "add" ? withS(undefined) : withS("add")}
               className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors ${
-                focusedType === "custom"
+                focusedType === "add"
                   ? "border-blue-600 bg-blue-600 text-white"
                   : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
               }`}
             >
               <div>
                 <div className="font-semibold">Add another test</div>
-                <div className={`mt-0.5 text-xs ${focusedType === "custom" ? "text-slate-200" : "text-slate-500"}`}>
+                <div className={`mt-0.5 text-xs ${focusedType === "add" ? "text-slate-200" : "text-slate-500"}`}>
                   Use when the field scope needs an extra run for this system.
                 </div>
               </div>
-              <span className="text-xs">{focusedType === "custom" ? "Hide" : "Open"}</span>
+              <span className="text-xs">{focusedType === "add" ? "Hide" : "Open"}</span>
             </Link>
           ) : selectedSystemId && isEccWorkspaceClosedOrCompleted ? (
             <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
@@ -3063,7 +3072,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div>
                 <div className={eccUtilityLabelClass}>Ad Hoc Test</div>
                 <div className="mt-1 text-base font-semibold text-slate-950">
-                  {getTestDisplayLabel(focusedCustomTestType, packageSystem)}
+                  {getTestDisplayLabel(focusedCustomTestType, packageSystem, focusedCustomRun)}
                 </div>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span>{" "}
@@ -3086,6 +3095,90 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   Create Run
                 </SubmitButton>
               </form>
+            ) : focusedCustomTestType === "custom" ? (
+              // Custom Verification is the one test with nothing to compute: the
+              // rater names what they verified, records what they found, and
+              // states the outcome. Everything else on this page is a diagnostic
+              // with a formula behind it.
+              <div className="grid gap-3">
+                <form
+                  action={saveAndCompleteCustomVerificationFromForm}
+                  className="grid gap-3"
+                >
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={focusedCustomRun.id} />
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+
+                  <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor="custom_label">
+                      What did you verify?
+                    </label>
+                    <input
+                      id="custom_label"
+                      name="custom_label"
+                      type="text"
+                      maxLength={120}
+                      required
+                      defaultValue={String(focusedCustomRun.data?.custom_label ?? "")}
+                      placeholder="e.g. Whole house fan verification"
+                      className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    />
+                    <div className="text-xs text-slate-500">
+                      This name is what appears on the test list and the completion report.
+                    </div>
+                  </div>
+
+                  <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor="custom_notes">
+                      Findings
+                    </label>
+                    <textarea
+                      id="custom_notes"
+                      name="custom_notes"
+                      rows={4}
+                      required
+                      defaultValue={String(focusedCustomRun.data?.custom_notes ?? "")}
+                      placeholder="What was checked, what was observed, and anything the next person needs to know."
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    />
+                  </div>
+
+                  <div className="grid gap-1">
+                    <label className="text-sm font-medium" htmlFor="custom_result">
+                      Result
+                    </label>
+                    <select
+                      id="custom_result"
+                      name="custom_result"
+                      required
+                      defaultValue={String(focusedCustomRun.data?.custom_result ?? "")}
+                      className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    >
+                      <option value="" disabled>
+                        Select result…
+                      </option>
+                      <option value="pass">Pass</option>
+                      <option value="fail">Fail</option>
+                    </select>
+                    <div className="text-xs text-slate-500">
+                      There is no calculation for a custom verification, so the result is your
+                      call. It counts toward ECC resolution exactly like any other test.
+                    </div>
+                  </div>
+
+                  <SubmitButton loadingText="Saving..." className={eccPrimaryButtonClass}>
+                    {focusedCustomRun.is_completed ? "Save Changes" : "Save & Complete"}
+                  </SubmitButton>
+                </form>
+
+                <form action={deleteEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={focusedCustomRun.id} />
+                  <button type="submit" className={eccSecondaryButtonClass}>
+                    Delete
+                  </button>
+                </form>
+              </div>
             ) : (
               <div className={eccActionRowClass}>
                 <form action={completeEccTestRunFromForm}>
