@@ -220,6 +220,7 @@ export type RoleAwarePulse = {
 
 export type FinancialSnapshot = {
   monthLabel: string;
+  priorPeriodLabel: string;
   collectedMonthToDateCents: number;
   collectedPriorMonthToDateCents: number;
   comparisonPercent: number | null;
@@ -1227,25 +1228,31 @@ export function financialMonthBoundariesLA(now = new Date()) {
   const year = value("year");
   const month = value("month");
   const day = value("day");
-  const hour = value("hour");
-  const minute = value("minute");
   const priorYear = month === 1 ? year - 1 : year;
   const priorMonth = month === 1 ? 12 : month - 1;
   const priorLastDay = new Date(Date.UTC(priorYear, priorMonth, 0)).getUTCDate();
   const priorDay = Math.min(day, priorLastDay);
   const ymd = (y: number, m: number, d: number) =>
     `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  const hm = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const nextYmd = (y: number, m: number, d: number) => {
+    const next = new Date(Date.UTC(y, m - 1, d + 1));
+    return ymd(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+  };
+  const priorMonthLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "long",
+  }).format(new Date(Date.UTC(priorYear, priorMonth - 1, 1, 12)));
 
   return {
     currentStartIso: laDateTimeToUtcIso(ymd(year, month, 1), "00:00"),
-    currentEndIso: now.toISOString(),
+    currentEndIso: laDateTimeToUtcIso(nextYmd(year, month, day), "00:00"),
     priorStartIso: laDateTimeToUtcIso(ymd(priorYear, priorMonth, 1), "00:00"),
-    priorEndIso: laDateTimeToUtcIso(ymd(priorYear, priorMonth, priorDay), hm),
+    priorEndIso: laDateTimeToUtcIso(nextYmd(priorYear, priorMonth, priorDay), "00:00"),
     monthLabel: new Intl.DateTimeFormat("en-US", {
       timeZone: "America/Los_Angeles",
       month: "long",
     }).format(now),
+    priorPeriodLabel: `Same days in ${priorMonthLabel}`,
   };
 }
 
@@ -1279,6 +1286,7 @@ async function safeLoadFinancialSnapshot(params: {
 
     return {
       monthLabel: boundaries.monthLabel,
+      priorPeriodLabel: boundaries.priorPeriodLabel,
       collectedMonthToDateCents: current,
       collectedPriorMonthToDateCents: prior,
       comparisonPercent: prior > 0 ? Math.round(((current - prior) / prior) * 100) : null,

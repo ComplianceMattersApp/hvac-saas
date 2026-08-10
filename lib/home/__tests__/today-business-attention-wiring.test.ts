@@ -62,16 +62,30 @@ describe("today business attention wiring", () => {
     expect(todayReadModelSource).toContain('.gte("paid_at", startIso)');
     expect(todayReadModelSource).toContain('.lt("paid_at", endIso)');
     expect(todayPageSource).toContain("Collected in {snapshot.monthLabel}");
-    expect(todayPageSource).toContain("same point last month");
+    expect(todayPageSource).toContain("snapshot.collectedPriorMonthToDateCents");
+    expect(todayPageSource).toContain("snapshot.priorPeriodLabel");
   });
 
   it("builds LA month-to-date comparison windows across DST", () => {
     const boundaries = financialMonthBoundariesLA(new Date("2026-07-19T12:34:00.000Z"));
     expect(boundaries).toMatchObject({
       currentStartIso: "2026-07-01T07:00:00.000Z",
+      currentEndIso: "2026-07-20T07:00:00.000Z",
       priorStartIso: "2026-06-01T07:00:00.000Z",
-      priorEndIso: "2026-06-19T12:34:00.000Z",
+      priorEndIso: "2026-06-20T07:00:00.000Z",
       monthLabel: "July",
+      priorPeriodLabel: "Same days in June",
+    });
+  });
+
+  it("caps the prior comparison at month end across a January year boundary", () => {
+    const boundaries = financialMonthBoundariesLA(new Date("2026-01-31T20:00:00.000Z"));
+    expect(boundaries).toMatchObject({
+      currentStartIso: "2026-01-01T08:00:00.000Z",
+      currentEndIso: "2026-02-01T08:00:00.000Z",
+      priorStartIso: "2025-12-01T08:00:00.000Z",
+      priorEndIso: "2026-01-01T08:00:00.000Z",
+      priorPeriodLabel: "Same days in December",
     });
   });
 

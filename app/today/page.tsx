@@ -144,8 +144,6 @@ export default async function TodayPage() {
           showFieldActions={model.todayWork.showFieldActions}
         />
 
-        <FollowUpSection groups={model.followUpGroups.slice(0, 3)} />
-
         <ResumeRecentSection
           items={model.resumeRecentWork.slice(0, 3)}
           hasMore={model.resumeRecentHasMore}
@@ -174,7 +172,6 @@ export default async function TodayPage() {
               desktop
               primary
             />
-            <FollowUpSection groups={model.followUpGroups} desktop primary />
             <ResumeRecentSection
               items={model.resumeRecentWork}
               hasMore={model.resumeRecentHasMore}
@@ -560,16 +557,7 @@ function PriorityChipsSection({
   chips: PriorityChip[];
   desktop?: boolean;
 }) {
-  const snapshotKeys = new Set([
-    "need_scheduling",
-    "field_work",
-    "waiting",
-    "exceptions",
-    "follow_ups",
-    "closeout",
-  ]);
-  const snapshotChips = chips.filter((chip) => snapshotKeys.has(chip.key));
-  if (snapshotChips.length === 0) return null;
+  if (chips.length === 0) return null;
   return (
     <section className={CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
@@ -585,7 +573,7 @@ function PriorityChipsSection({
         ) : null}
       </div>
       <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-white">
-        {snapshotChips.map((chip) => (
+        {chips.map((chip) => (
           <Link
             key={chip.key}
             href={chip.href}
@@ -604,7 +592,12 @@ function PriorityChipsSection({
 
 function chipAccentClass(chip: PriorityChip): string {
   if (chip.key === "exceptions") return "border-l-rose-400 bg-rose-50/30";
-  if (chip.key === "need_scheduling") return "border-l-amber-400";
+  if (chip.key === "need_scheduling" || chip.key === "without_tech") {
+    return "border-l-amber-400 bg-amber-50/20";
+  }
+  if (chip.key === "field_work" || chip.key === "contractor_intake") {
+    return "border-l-blue-400 bg-blue-50/20";
+  }
   return "border-l-slate-300";
 }
 
@@ -639,6 +632,9 @@ function shouldShowReasonForGroup(groupKey: FollowUpGroup["key"], reason: string
 // Action Center
 // -----------------------------------------------------------------------------
 
+// Retained for a future record-level attention treatment; intentionally not
+// rendered while the Operations snapshot owns queue visibility.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function FollowUpSection({
   groups,
   desktop = false,
@@ -851,7 +847,7 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
   const comparison = snapshot.comparisonPercent;
   const comparisonLabel =
     comparison == null
-      ? "No comparable collections last month"
+      ? `No recorded collections for ${snapshot.priorPeriodLabel.toLowerCase()}`
       : `${comparison > 0 ? "↑ " : comparison < 0 ? "↓ " : ""}${Math.abs(comparison)}% compared with the same point last month`;
 
   return (
@@ -861,6 +857,12 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
       </div>
       <div className="mt-1 text-2xl font-bold tracking-tight text-[#0f1f35] tabular-nums">
         {formatMoney(snapshot.collectedMonthToDateCents)}
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-2 text-xs">
+        <span className="font-medium text-slate-600">{snapshot.priorPeriodLabel}</span>
+        <span className="font-semibold tabular-nums text-slate-800">
+          {formatMoney(snapshot.collectedPriorMonthToDateCents)}
+        </span>
       </div>
       <div className={`mt-1 text-xs font-medium ${comparison != null && comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
       <Link href="/reports/monthly" className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">

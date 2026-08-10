@@ -12,6 +12,17 @@ describe("Today upcoming service visibility", () => {
     expect(todayPageSource).toContain("View all service plans");
   });
 
+  it("does not repeat Operations queues in the main Today stream", () => {
+    expect(todayPageSource).not.toContain("<FollowUpSection groups={model.followUpGroups");
+  });
+
+  it("renders every queue supplied by the Today read model without a stale UI allowlist", () => {
+    expect(todayPageSource).not.toContain("const snapshotKeys = new Set");
+    expect(todayPageSource).toContain("{chips.map((chip) => (");
+    expect(todayPageSource).toContain('chip.key === "without_tech"');
+    expect(todayPageSource).toContain('chip.key === "contractor_intake"');
+  });
+
   it("uses existing service-plan summary truth including the 30-day window", () => {
     expect(todayReadModelSource).toContain("due_in_next_7_days");
     expect(todayReadModelSource).toContain("due_in_next_30_days");
