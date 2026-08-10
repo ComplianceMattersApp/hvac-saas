@@ -70,6 +70,10 @@ vi.mock("@/lib/actions/notification-actions", () => ({
   markInternalNewWorkNotificationsResolved: vi.fn(),
 }));
 
+vi.mock("@/lib/notifications/contractor-shared-job-update", () => ({
+  notifyContractorOfSharedJobUpdate: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/lib/staffing/human-layer", () => ({
   assertAssignableInternalUser: (...args: unknown[]) => assertAssignableInternalUserMock(...args),
   resolveUserDisplayMap: (...args: unknown[]) => resolveUserDisplayMapMock(...args),

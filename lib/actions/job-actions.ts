@@ -67,6 +67,7 @@ import {
 import { buildInternalProposalAlertEmailHtml } from "@/lib/email/operational-proposal-alert-email";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { sendEmail } from "@/lib/email/sendEmail";
+import { notifyContractorOfSharedJobUpdate } from "@/lib/notifications/contractor-shared-job-update";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
 import { resolveInternalOpsRecipientEmails } from "@/lib/notifications/internal-email-recipients";
 import { buildNotePreview, normalizeTaggedUserIds } from "@/lib/notifications/internal-note-tagging";
@@ -11987,13 +11988,29 @@ export async function addPublicNoteFromForm(formData: FormData) {
     );
   }
 
-  await insertJobEvent({
+  const eventId = await insertJobEvent({
     supabase,
     jobId,
     event_type: "public_note",
     meta: { note },
     userId,
   });
+
+  try {
+    await notifyContractorOfSharedJobUpdate({
+      admin: createAdminClient(),
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      eventId,
+      note,
+    });
+  } catch (error) {
+    console.error("contractor_shared_note_email_failed", {
+      jobId,
+      eventId,
+      error: error instanceof Error ? error.message : "Unknown email error",
+    });
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/v2`, "page");

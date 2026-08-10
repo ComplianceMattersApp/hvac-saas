@@ -30,6 +30,10 @@ vi.mock("@/lib/actions/notification-actions", () => ({
     insertInternalNotificationForEventMock(...args),
 }));
 
+vi.mock("@/lib/notifications/contractor-shared-job-update", () => ({
+  notifyContractorOfSharedJobUpdate: vi.fn(async () => undefined),
+}));
+
 function makeAdminClientFixture(fixture: {
   job: Record<string, unknown> | null;
   customerInScope: boolean;
@@ -220,7 +224,12 @@ function makeSessionClientFixture(fixture: {
         return {
           insert(values: Record<string, unknown>) {
             insertedJobEvents.push(values);
-            return Promise.resolve({ error: null });
+            const result = Promise.resolve({ error: null });
+            return Object.assign(result, {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "event-1" }, error: null })),
+              })),
+            });
           },
         };
       }

@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/internal-attachment-scope";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
+import { notifyContractorOfSharedJobUpdate } from "@/lib/notifications/contractor-shared-job-update";
 import {
   buildAttachmentCaptionWithEvidenceContext,
   isEquipmentLabelPhotoCaption,
@@ -793,7 +794,7 @@ export async function shareJobAttachmentToContractor(input: {
 
   const fallbackNote = `Shared file: ${String(attachment.file_name ?? "Attachment")}`;
 
-  const { error: evErr } = await supabase.from("job_events").insert({
+  const { data: event, error: evErr } = await supabase.from("job_events").insert({
     job_id: jobId,
     event_type: "public_note",
     user_id: user.id,
@@ -803,9 +804,26 @@ export async function shareJobAttachmentToContractor(input: {
       file_names: [String(attachment.file_name ?? "")],
       source: "internal_share",
     },
-  });
+  }).select("id").single();
 
   if (evErr) throw evErr;
+
+  try {
+    await notifyContractorOfSharedJobUpdate({
+      admin: createAdminClient(),
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      eventId: String(event?.id ?? ""),
+      note: note || fallbackNote,
+      fileNames: [String(attachment.file_name ?? "")],
+    });
+  } catch (error) {
+    console.error("contractor_attachment_share_email_failed", {
+      jobId,
+      attachmentId,
+      error: error instanceof Error ? error.message : "Unknown email error",
+    });
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal/jobs/${jobId}`);
@@ -844,7 +862,7 @@ export async function shareJobAttachmentsToContractor(input: {
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
   const fileNames = scoped.attachments.map((attachment: { file_name?: unknown }) => String(attachment?.file_name ?? ""));
-  const { error: evErr } = await supabase.from("job_events").insert({
+  const { data: event, error: evErr } = await supabase.from("job_events").insert({
     job_id: jobId,
     event_type: "public_note",
     user_id: user.id,
@@ -854,8 +872,24 @@ export async function shareJobAttachmentsToContractor(input: {
       file_names: fileNames,
       source: "internal_share",
     },
-  });
+  }).select("id").single();
   if (evErr) throw evErr;
+  try {
+    await notifyContractorOfSharedJobUpdate({
+      admin: createAdminClient(),
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      eventId: String(event?.id ?? ""),
+      note: note || null,
+      fileNames,
+    });
+  } catch (error) {
+    console.error("contractor_bulk_attachment_share_email_failed", {
+      jobId,
+      attachmentCount: attachmentIds.length,
+      error: error instanceof Error ? error.message : "Unknown email error",
+    });
+  }
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/portal/jobs/${jobId}`);
   revalidatePath("/portal");
