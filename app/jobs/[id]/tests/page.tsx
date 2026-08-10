@@ -1224,7 +1224,13 @@ export default async function JobTestsPage({
   const isAirflowFocused = focusedType === "airflow";
   const isRefrigerantChargeFocused = focusedType === "refrigerant_charge";
   const isCompletionReportFocused = focused === "completion_report";
-  const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;
+  // Custom Verification joins the dedicated-screen tests. Without it, focusing a
+  // custom run left the status list on screen and rendered the test inline
+  // underneath, so it read as an appendix to the page rather than the test you
+  // opened — and there was no "Back to Tests" way out.
+  const isCustomVerificationFocused = focusedType === "custom";
+  const isCompactTestWorkspace =
+    isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused || isCustomVerificationFocused;
 
   let refrigerantEvidenceAttachments: Array<{
     id: string;
@@ -3070,7 +3076,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className={eccWorkspaceCardClass}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className={eccUtilityLabelClass}>Ad Hoc Test</div>
+                <div className={eccUtilityLabelClass}>Focused Test</div>
                 <div className="mt-1 text-base font-semibold text-slate-950">
                   {getTestDisplayLabel(focusedCustomTestType, packageSystem, focusedCustomRun)}
                 </div>

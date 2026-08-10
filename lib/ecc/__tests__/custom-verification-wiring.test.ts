@@ -26,7 +26,11 @@ describe("custom verification is reachable", () => {
     expect(ECC_TEST_REGISTRY.custom.code).toBe("custom");
     expect(ECC_TEST_REGISTRY.custom.allowManualAdd).toBe(true);
     expect(testsPage).toContain('focusedType === "add"');
-    expect(testsPage).not.toContain('focusedType === "custom"');
+    // The Add Test drawer must not claim the sentinel back. Narrow on purpose:
+    // focusedType === "custom" is now legitimately used to put the custom test
+    // into the dedicated-screen layout.
+    expect(testsPage).not.toContain('withS("custom")');
+    expect(testsPage).not.toContain('focusedType === "custom" && !isEccWorkspaceClosedOrCompleted');
   });
 
   it("custom is not excluded from the focusable test types", () => {
