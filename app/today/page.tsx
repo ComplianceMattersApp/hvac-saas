@@ -21,6 +21,7 @@ import {
   type TodayHeader,
   type TodayJobSummary,
   type TodayReadModel,
+  type UpcomingService,
 } from "@/lib/home/today-read-model";
 import TodayFieldConditionsClient from "@/components/home/TodayFieldConditionsClient";
 import TodayWelcomeModal from "@/components/home/TodayWelcomeModal";
@@ -129,6 +130,10 @@ export default async function TodayPage() {
           />
         ) : null}
 
+        {model.upcomingService.visible ? (
+          <UpcomingServiceSection service={model.upcomingService} />
+        ) : null}
+
         {model.roleAwarePulse.visible ? (
           <RoleAwarePulseSection pulse={model.roleAwarePulse} />
         ) : null}
@@ -158,6 +163,9 @@ export default async function TodayPage() {
               wide
             />
           ) : null}
+          {model.upcomingService.visible ? (
+            <UpcomingServiceSection service={model.upcomingService} />
+          ) : null}
           <div className="space-y-5">
             <TodayWorkSection
               label={model.todayWork.label}
@@ -185,6 +193,64 @@ export default async function TodayPage() {
 
     </div>
   );
+}
+
+// -----------------------------------------------------------------------------
+// Upcoming Service
+// -----------------------------------------------------------------------------
+
+function UpcomingServiceSection({ service }: { service: UpcomingService }) {
+  return (
+    <section className={CARD_SHELL_PRIMARY} aria-labelledby="upcoming-service-heading">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <SectionEyebrow label="Service Plans" />
+          <h2 id="upcoming-service-heading" className={SECTION_HEADING_TEXT_LG}>Upcoming Service</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-600">
+            Recurring customer visits to review before they slip past due.
+          </p>
+        </div>
+        {service.totalAttentionCount > 0 ? (
+          <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-amber-900">
+            {service.totalAttentionCount}
+          </span>
+        ) : null}
+      </div>
+
+      {service.items.length === 0 ? (
+        <EmptyState message="No service plans need scheduling attention in the next 30 days." />
+      ) : (
+        <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+          {service.items.map((item) => (
+            <Link
+              key={item.key}
+              href={item.href}
+              className={`group flex min-h-14 items-center justify-between gap-4 border-l-[3px] border-b border-b-slate-200/80 px-3 py-2.5 transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${upcomingServiceAccentClass(item.tone)}`}
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-[#0f1f35]">{item.label}</span>
+                <span className="mt-0.5 block text-xs leading-5 text-slate-600">{item.detail}</span>
+              </span>
+              <span className="inline-flex min-w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-700">
+                {item.count}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <Link href={service.href} className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
+        View all service plans →
+      </Link>
+    </section>
+  );
+}
+
+function upcomingServiceAccentClass(tone: UpcomingService["items"][number]["tone"]): string {
+  if (tone === "danger") return "border-l-rose-400 bg-rose-50/30";
+  if (tone === "warn") return "border-l-amber-400 bg-amber-50/20";
+  if (tone === "info") return "border-l-blue-400 bg-blue-50/20";
+  return "border-l-slate-300";
 }
 
 // -----------------------------------------------------------------------------

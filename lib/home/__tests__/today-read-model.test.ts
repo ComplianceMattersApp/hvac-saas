@@ -6,6 +6,7 @@ import {
   buildFollowUpGroups,
   buildPriorityChips,
   buildTeamCoverageSnapshot,
+  buildUpcomingService,
   canViewBusinessPulseForRole,
   derivePreferredGreetingName,
   followUpReason,
@@ -69,6 +70,60 @@ describe("canViewBusinessPulseForRole", () => {
   it("denies office and tech", () => {
     expect(canViewBusinessPulseForRole("office")).toBe(false);
     expect(canViewBusinessPulseForRole("tech")).toBe(false);
+  });
+});
+
+describe("buildUpcomingService", () => {
+  it("shows actionable service-plan windows to admin and office roles", () => {
+    for (const role of ["admin", "office"] as const) {
+      const result = buildUpcomingService({
+        role,
+        productMode: "hvac_service",
+        maintenanceAgreementsEnabled: true,
+        overdue: 2,
+        dueInNext7Days: 3,
+        dueInNext30Days: 8,
+        notScheduled: 1,
+      });
+
+      expect(result.visible).toBe(true);
+      expect(result.items.find((item) => item.key === "overdue")?.href).toBe("/service-plans?filter=overdue");
+      expect(result.items.find((item) => item.key === "due_1_7_days")?.count).toBe(3);
+      expect(result.items.find((item) => item.key === "due_8_30_days")?.count).toBe(5);
+      expect(result.items.find((item) => item.key === "not_scheduled")?.label).toBe("Missing next date");
+      expect(result.totalAttentionCount).toBe(11);
+    }
+  });
+
+  it("stays visible with a healthy empty state when there is no attention work", () => {
+    const result = buildUpcomingService({
+      role: "office",
+      productMode: "hybrid",
+      maintenanceAgreementsEnabled: true,
+      overdue: 0,
+      dueInNext7Days: 0,
+      dueInNext30Days: 0,
+      notScheduled: 0,
+    });
+
+    expect(result.visible).toBe(true);
+    expect(result.items).toEqual([]);
+    expect(result.totalAttentionCount).toBe(0);
+  });
+
+  it("does not expose the scheduling section to tech, billing, disabled, or ECC/HERS contexts", () => {
+    const base = {
+      maintenanceAgreementsEnabled: true,
+      overdue: 2,
+      dueInNext7Days: 3,
+      dueInNext30Days: 5,
+      notScheduled: 1,
+    };
+
+    expect(buildUpcomingService({ ...base, role: "tech", productMode: "hvac_service" }).visible).toBe(false);
+    expect(buildUpcomingService({ ...base, role: "billing", productMode: "hvac_service" }).visible).toBe(false);
+    expect(buildUpcomingService({ ...base, role: "admin", productMode: "ecc_hers" }).visible).toBe(false);
+    expect(buildUpcomingService({ ...base, role: "admin", productMode: "hybrid", maintenanceAgreementsEnabled: false }).visible).toBe(false);
   });
 });
 

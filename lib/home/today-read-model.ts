@@ -174,6 +174,22 @@ export type BusinessPulse = {
   unreadNotificationCount: number;
 };
 
+export type UpcomingServiceItem = {
+  key: "overdue" | "due_1_7_days" | "due_8_30_days" | "not_scheduled";
+  label: string;
+  count: number;
+  detail: string;
+  href: string;
+  tone: "danger" | "warn" | "info" | "neutral";
+};
+
+export type UpcomingService = {
+  visible: boolean;
+  totalAttentionCount: number;
+  items: UpcomingServiceItem[];
+  href: string;
+};
+
 export type RoleAwarePulseMode = "business" | "money" | "ops";
 
 export type RoleAwarePulseTile = {
@@ -261,6 +277,7 @@ export type TodayReadModel = {
   followUpGroups: FollowUpGroup[];
   teamCoverage: TeamCoverage;
   businessPulse: BusinessPulse;
+  upcomingService: UpcomingService;
   roleAwarePulse: RoleAwarePulse;
   resumeRecentWork: ResumeRecentItem[];
   resumeRecentHasMore: boolean;
@@ -282,6 +299,72 @@ export function canViewBusinessPulseForRole(role: InternalRole): boolean {
   // Owner/admin and billing roles see money/recurring confidence.
   // Office and tech do not see balances in Phase 1.
   return role === "admin" || role === "billing";
+}
+
+export function buildUpcomingService(params: {
+  role: InternalRole;
+  productMode: ProductMode;
+  maintenanceAgreementsEnabled: boolean;
+  overdue: number | null;
+  dueInNext7Days: number | null;
+  dueInNext30Days: number | null;
+  notScheduled: number | null;
+}): UpcomingService {
+  const canViewScheduling = params.role === "admin" || params.role === "office";
+  const visible =
+    params.maintenanceAgreementsEnabled &&
+    params.productMode !== "ecc_hers" &&
+    canViewScheduling;
+
+  if (!visible) {
+    return { visible: false, totalAttentionCount: 0, items: [], href: "/service-plans" };
+  }
+
+  const dueInNext7Days = Math.max(0, params.dueInNext7Days ?? 0);
+  const dueInNext30Days = Math.max(dueInNext7Days, params.dueInNext30Days ?? 0);
+  const dueIn8To30Days = dueInNext30Days - dueInNext7Days;
+  const candidateItems: UpcomingServiceItem[] = [
+    {
+      key: "overdue",
+      label: "Overdue",
+      count: Math.max(0, params.overdue ?? 0),
+      detail: "Past due and needs office follow-up.",
+      href: "/service-plans?filter=overdue",
+      tone: "danger",
+    },
+    {
+      key: "due_1_7_days",
+      label: "Due next 7 days",
+      count: dueInNext7Days,
+      detail: "Review now and get the visit onto the calendar.",
+      href: "/service-plans?filter=due_1_7_days",
+      tone: "warn",
+    },
+    {
+      key: "due_8_30_days",
+      label: "Due in 8–30 days",
+      count: dueIn8To30Days,
+      detail: "Upcoming customer outreach and scheduling work.",
+      href: "/service-plans?filter=due_8_30_days",
+      tone: "info",
+    },
+    {
+      key: "not_scheduled",
+      label: "Missing next date",
+      count: Math.max(0, params.notScheduled ?? 0),
+      detail: "Active plan has no next service date.",
+      href: "/service-plans?filter=not_scheduled",
+      tone: "neutral",
+    },
+  ];
+  const items = candidateItems.filter((item) => item.count > 0);
+
+  return {
+    visible: true,
+    totalAttentionCount: items.reduce((total, item) => total + item.count, 0),
+    items,
+    href: "/service-plans",
+  };
 }
 
 function roleLabelFor(role: InternalRole, productMode: ProductMode): string {
@@ -2176,8 +2259,19 @@ async function buildTodayReadModelForInternalActor(
 
   const servicePlansOverdue = servicePlans?.due_counts?.overdue ?? null;
   const servicePlansDueIn7 = servicePlans?.due_counts?.due_in_next_7_days ?? null;
+  const servicePlansDueIn30 = servicePlans?.due_counts?.due_in_next_30_days ?? null;
   const servicePlansNotScheduled = servicePlans?.due_counts?.not_scheduled_active ?? null;
   const servicePlansActive = servicePlans?.status_counts?.active ?? null;
+
+  const upcomingService = buildUpcomingService({
+    role,
+    productMode,
+    maintenanceAgreementsEnabled: isMaintenanceAgreementsEnabled(),
+    overdue: servicePlansOverdue,
+    dueInNext7Days: servicePlansDueIn7,
+    dueInNext30Days: servicePlansDueIn30,
+    notScheduled: servicePlansNotScheduled,
+  });
 
   const followUpGroups = buildFollowUpGroups({
     role,
@@ -2292,6 +2386,7 @@ async function buildTodayReadModelForInternalActor(
     followUpGroups,
     teamCoverage,
     businessPulse,
+    upcomingService,
     roleAwarePulse,
     resumeRecentWork: recent.items,
     resumeRecentHasMore: recent.hasMore,
