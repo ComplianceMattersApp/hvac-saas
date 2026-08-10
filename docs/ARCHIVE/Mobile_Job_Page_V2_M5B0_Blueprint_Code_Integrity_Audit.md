@@ -26,11 +26,11 @@ Recommended next slice: **continued Mobile V2 state-matrix screenshot monitoring
 Reviewed:
 
 - `docs/ACTIVE/Mobile_Job_Page_V2_Blueprint.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M1_Readiness_Audit.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M3A_State_Specific_Preview_Audit.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M3F_Preview_QA_Matrix.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M4A_Promotion_Readiness_Audit.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M4F_Screenshot_State_QA_Checklist.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M1_Readiness_Audit.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M3A_State_Specific_Preview_Audit.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M3F_Preview_QA_Matrix.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M4A_Promotion_Readiness_Audit.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M4F_Screenshot_State_QA_Checklist.md`
 - `app/jobs/[id]/page.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailCurrent.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx`

@@ -25,7 +25,7 @@ No cleanup should be implemented before a separate, tightly scoped slice is appr
 Files inspected:
 
 - `docs/ACTIVE/Mobile_Job_Page_V2_Blueprint.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M1_Readiness_Audit.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M1_Readiness_Audit.md`
 - `app/jobs/[id]/page.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailCurrent.tsx`
 

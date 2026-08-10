@@ -14,7 +14,7 @@ No product code was changed.
 
 Reviewed:
 
-- `docs/WORKING/Mobile_Job_Page_V2_M5I0_Parity_Checkpoint.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M5I0_Parity_Checkpoint.md`
 - `app/jobs/[id]/_components/MobileJobDetailCurrent.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx`
 - `app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx`

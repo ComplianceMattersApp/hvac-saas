@@ -226,8 +226,8 @@ Search/source commands run:
   - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
   - `docs/ACTIVE/Maintenance_Agreements_V1_Model_Spec.md`
   - `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`
-  - `docs/WORKING/Mobile_Job_Page_V2_M5B0_Blueprint_Code_Integrity_Audit.md`
-  - `docs/WORKING/Mobile_Job_Page_V2_Final_State_Matrix_Smoke_Checklist.md`
+  - `docs/ARCHIVE/Mobile_Job_Page_V2_M5B0_Blueprint_Code_Integrity_Audit.md`
+  - `docs/ARCHIVE/Mobile_Job_Page_V2_Final_State_Matrix_Smoke_Checklist.md`
 - `rg --files app | rg "(login|signup|invite|set-password|reset|password|ops|jobs/new|calendar|contractor|tests|invoice|estimate|proposal|reports|payments|time-clock|notifications|support|device|pwa|offline)"`
   Result: confirmed route inventory for auth, ops, jobs, calendar, contractor, tests, invoice, estimates/proposals, reports, payments, time clock, notifications, support/device surfaces.
 - `rg --files lib | rg "(__tests__|auth|invite|job|calendar|contractor|ecc|invoice|payment|maintenance|notification|support|rls|estimate|proposal|time-clock)"`

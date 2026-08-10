@@ -25,7 +25,7 @@ Default rule remains: **Mobile V2 should match current mobile behavior unless a 
 
 Reviewed:
 
-- `docs/WORKING/Mobile_Job_Page_V2_M5C2_Living_Parity_Ledger.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M5C2_Living_Parity_Ledger.md`
 - `app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailCurrent.tsx`
 - `app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx`
@@ -89,7 +89,7 @@ For monitoring evidence and broader fixture confidence, continue to run the fina
 - service-plan visit-count and next-due action states;
 - fallback behavior for `mobileLayout=current`, `mobileLayout=classic`, Standard View exits, and desktop separation.
 
-The checklist is tracked in `docs/WORKING/Mobile_Job_Page_V2_Final_State_Matrix_Smoke_Checklist.md`.
+The checklist is tracked in `docs/ARCHIVE/Mobile_Job_Page_V2_Final_State_Matrix_Smoke_Checklist.md`.
 
 ## Updated Known Field Findings
 

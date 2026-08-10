@@ -32,8 +32,8 @@ No product code, schema, actions, helpers, permissions, reads, anchors, form fie
 Reviewed:
 
 - `docs/ACTIVE/Mobile_Job_Page_V2_Blueprint.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M1_Readiness_Audit.md`
-- `docs/WORKING/Mobile_Job_Page_V2_M1D_Performance_Opportunity_Audit.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M1_Readiness_Audit.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M1D_Performance_Opportunity_Audit.md`
 - `app/jobs/[id]/page.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailCurrent.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx`

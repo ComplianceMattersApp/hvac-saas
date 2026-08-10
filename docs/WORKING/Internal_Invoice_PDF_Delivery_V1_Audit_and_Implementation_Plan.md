@@ -170,7 +170,7 @@ Existing test conventions to extend include `lib/actions/__tests__/internal-invo
 ## 9. Material deviations or conflicts with the request
 
 1. The requested Active Spine is retired; current authority is `PROJECT_TRUTH.md` plus `CURRENT_ROADMAP.md`.
-2. The repository currently calls the product EveryStep JobWorks, not EveryStep FieldWorks.
+2. ~~The repository currently calls the product EveryStep JobWorks, not EveryStep FieldWorks.~~ **Superseded 2026-08-09:** the discrepancy was real when written, but it was resolved the other way. **EveryStep FieldWorks is canonical** — it matches the app shell and the bulk of the repository, and the owner confirmed it. `PROJECT_TRUTH.md` §1 was corrected accordingly.
 3. The existing internal invoice model has no due-date field and no explicit tax field. The PDF cannot truthfully show those as separate facts in V1 without a separate approved model change.
 4. The workspace copy already says “send the invoice PDF,” but current sends do not attach a PDF. This is misleading current UI copy and should become true in Slice D.
 5. Provider support exists in Resend, but the local abstraction does not expose it.

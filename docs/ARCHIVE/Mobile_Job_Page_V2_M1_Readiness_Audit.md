@@ -218,7 +218,7 @@ Expected files:
 
 Expected non-code file after this audit:
 
-- This document only: `docs/WORKING/Mobile_Job_Page_V2_M1_Readiness_Audit.md`.
+- This document only: `docs/ARCHIVE/Mobile_Job_Page_V2_M1_Readiness_Audit.md`.
 
 ## 11. Validation and screenshot matrix
 

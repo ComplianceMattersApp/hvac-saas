@@ -27,6 +27,15 @@ Two groups moved:
 
 Every inbound link from a document that stayed was repointed in the same commit. Nothing was deleted, reworded, or rewritten — `git mv` only, so history follows the file.
 
+## Second pass — `docs/WORKING/` (same day)
+
+`WORKING` means "in progress", and it held 19 files of which 16 were finished. Sixteen more moved here:
+
+- **The Mobile Job Page V2 phase series (15 docs)** — M1 through M5-I7 audits, QA matrices, parity ledgers, and the final-state smoke checklist. That lane shipped: `app/jobs/[id]/v2` exists with 14 files, its blueprint in ACTIVE reads "IMPLEMENTED AND LIVE", and PROJECT_TRUTH records V2 as the canonical job-detail surface.
+- **`Stripe_Successful_Payment_Auto_Reconciliation_Audit`** — the audit that preceded the closeout already archived above.
+
+`WORKING` now holds three genuinely open items: the address-autocomplete plan (Slices F–G still gated), the invoice PDF delivery plan (implemented, controlled smoke pending), and the desktop workbench blueprint.
+
 ## What deliberately did NOT move
 
 Some documents look archivable by their status line but were kept because live docs depend on them:

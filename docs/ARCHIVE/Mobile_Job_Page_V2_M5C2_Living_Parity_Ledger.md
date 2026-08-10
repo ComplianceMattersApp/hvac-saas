@@ -14,7 +14,7 @@ Default rule: **match current mobile behavior unless a design or function change
 
 Reviewed:
 
-- `docs/WORKING/Mobile_Job_Page_V2_M5B0_Blueprint_Code_Integrity_Audit.md`
+- `docs/ARCHIVE/Mobile_Job_Page_V2_M5B0_Blueprint_Code_Integrity_Audit.md`
 - `app/jobs/[id]/_components/MobileJobDetailCurrent.tsx`
 - `app/jobs/[id]/_components/MobileJobDetailV2Preview.tsx`
 - `app/jobs/[id]/page.tsx`
