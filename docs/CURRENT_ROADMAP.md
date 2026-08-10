@@ -61,7 +61,7 @@ Milestone position: service model buildout (milestone 1) is closed; billing/invo
 
 If you are starting a session and just need the shortest answer to "what now?":
 
-1. **Owner smoke** the two Merged-awaiting-smoke tracks in live prod (ECC/HERS Work-Sharing; Company Profile Console) — nothing new should start on top of them until smoked.
+1. **Owner smoke ECC/HERS Work-Sharing** in live prod — its code is fully on `main` (incoming/decided/returned surfaces, receiver panel, migrations) and the feature branch is gone, but the end-to-end loop has not been confirmed against production. *(Company Profile Console was the other track here; it was smoked in production on 2026-08-09 and is now Closed.)*
 2. **Lane 4 (SMS to Toggle-Ready)** remains the next non-invoice build lane after the owner-designated invoice closeout pass.
 3. **PERF Slice 3** and the **Documentation consolidation Phase 2+** are safe, well-scoped parallel work that does not touch product runtime behavior.
 
@@ -106,8 +106,8 @@ Anything not in the Active lanes list is deferred or runbook-gated — do not st
 - **Parked cleanup (post-Close):** full decommission of the legacy handoff subsystem — its dormant backing (read models/actions, the handoff functions still entangled in the shared workflow-milestones `lib/workflows/actions.ts`, the retired-classic job panel, and the 4 `*_handoff_*` tables) — best done together with the classic v1 job-page retirement tracked in the PERF Slice 3 lane below.
 - **Guardrails:** both tables RLS-scoped by `current_internal_account_owner_id()`; a request can only be sent on an `active` connection; the transition trigger permits only `sent→cancelled|declined|accepted` plus accepted-row outcome/retest/acknowledge updates, and fires even under the service-role client; decline/accept/outcome/retest RPCs are `service_role`-only. Cross-account name lookups + notification writes use the service-role client (the request row proves the active connection). To smoke a populated queue, first send a request from a sender account holding an active connection.
 
-### Company Profile — Sectioned Settings Console (P0–P7) — MERGED, awaiting owner prod smoke
-- **Status:** Merged to `main`; awaiting owner smoke. `/ops/admin/company-profile` restructured from one long scroll into a sectioned settings console — Overview · Identity & Branding · Billing & Payments · ECC/HERS · Team & Roles. Per-section save model unchanged; ECC/HERS stays a link-out to the Partner Network; Team & Roles links out to People & Access.
+### Company Profile — Sectioned Settings Console (P0–P7) — CLOSED
+- **Status:** **Closed (corrected 2026-08-09).** Previously carried as "awaiting owner prod smoke"; the owner exercised the console repeatedly against live production on 2026-08-09, running QuickBooks sync and reconciliation from the Integrations section and acting on the results. That is production smoke. `/ops/admin/company-profile` restructured from one long scroll into a sectioned settings console — Overview · Identity & Branding · Billing & Payments · ECC/HERS · Team & Roles. Per-section save model unchanged; ECC/HERS stays a link-out to the Partner Network; Team & Roles links out to People & Access.
 - **Next safe slice:** sturdier SVG logo handling (restrictive CSP / `Content-Disposition` / rasterize on upload) is backlogged; the shared readiness/profile DB-boundary `any` types were left as-is.
 - **Guardrails:** logo uploads are restricted server-side by MIME and extension, SVGs script-scanned and rejected before storage; all reads/mutations remain admin-gated and account-scoped server-side. No billing/payment/connection behavior change.
 
