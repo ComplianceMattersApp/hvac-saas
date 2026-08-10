@@ -226,6 +226,24 @@ describe("Stripe reconciliation", () => {
     expect(result.findings.map((f) => f.findingType)).not.toContain("stripe_charge_unrecorded");
   });
 
+  it("reports a missing Stripe identity instead of a missing payment when an exact payment exists", async () => {
+    const stripe = stripeWithCharges([
+      { id: "py_legacy", status: "succeeded", refunded: false, amount: 85000, amount_refunded: 0, metadata: { invoice_id: "inv-1", job_id: "job-1" } },
+    ]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        { id: "pay-existing", invoice_id: "inv-1", job_id: "job-1", amount_cents: 85000, payment_status: "recorded" },
+      ]),
+      accountOwnerUserId: "owner-1", stripe,
+    });
+    expect(result.findings).toContainEqual(expect.objectContaining({
+      findingType: "stripe_payment_identity_mismatch",
+      subjectId: "pay-existing",
+      externalId: "py_legacy",
+    }));
+    expect(result.findings.map((finding) => finding.findingType)).not.toContain("stripe_charge_unrecorded");
+  });
+
   it("ignores platform charges that carry no invoice id", async () => {
     const stripe = stripeWithCharges([
       { id: "ch_sub", status: "succeeded", refunded: false, amount: 9900, amount_refunded: 0, metadata: {} },

@@ -324,6 +324,36 @@ function reconcileAgainstStripe(params: {
       ? `${everystepLabel} (QuickBooks ${qboLabel})`
       : everystepLabel;
 
+    // A webhook or legacy payment path can record the money and invoice balance
+    // but fail to persist the external Stripe identity. Do not call that "no
+    // payment row": an operator might replay the event and double-record money.
+    // Only classify it as an identity mismatch when one exact recorded payment
+    // unambiguously matches this invoice and amount.
+    const exactRecordedPayments = params.payments.filter((payment) =>
+      clean(payment.invoice_id) === invoiceId
+      && clean(payment.payment_status).toLowerCase() === "recorded"
+      && Number(payment.amount_cents ?? 0) === Number(charge.amount ?? 0),
+    );
+    if (exactRecordedPayments.length === 1) {
+      const payment = exactRecordedPayments[0];
+      findings.push({
+        findingType: "stripe_payment_identity_mismatch",
+        severity: "warning",
+        subjectKind: "payment",
+        subjectId: clean(payment.id),
+        externalSystem: "stripe",
+        externalId: chargeId,
+        title: `Stripe payment identity is not linked · invoice ${invoiceLabel}`,
+        detail: `EveryStep already has a recorded ${money(Number(payment.amount_cents ?? 0))} payment for this invoice, but it is not linked to Stripe payment ${chargeId}.`,
+        truth: "The invoice balance may already be correct in EveryStep and QuickBooks. Do not replay or record the payment again; repair the missing Stripe identity link after verification.",
+        everystepValue: `recorded payment ${clean(payment.id)}, ${money(Number(payment.amount_cents ?? 0))}`,
+        externalValue: `succeeded, ${money(Number(charge.amount ?? 0))}`,
+        amountCents: Number(charge.amount ?? 0),
+        jobId: clean(payment.job_id) || clean(charge.metadata?.job_id) || null,
+      });
+      continue;
+    }
+
     findings.push({
       findingType: "stripe_charge_unrecorded",
       severity: "critical",
