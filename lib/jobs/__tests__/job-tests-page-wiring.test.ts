@@ -144,9 +144,7 @@ describe("job tests page wiring", () => {
     expect(ductBlock).not.toContain('data-duct-live-total');
     expect(ductBlock).not.toContain('Needs input - measured');
     expect(ductBlock).not.toContain('<script');
-    // Custom Verification joined the dedicated-screen tests on 2026-08-09; before
-    // that it rendered inline beneath the status list with no way back.
-    expect(jobTestsPageSource).toContain("isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused || isCustomVerificationFocused");
+    expect(jobTestsPageSource).toContain("isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;");
     expect(jobTestsPageSource).toContain('className={isCompletionReportFocused ? "space-y-4 print:space-y-0" : isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}');
   });
 
@@ -181,9 +179,7 @@ describe("job tests page wiring", () => {
     expect(airflowBlock).not.toContain('EccLivePreview mode="airflow"');
     expect(airflowBlock).not.toContain('Airflow Override Pass');
     expect(airflowBlock).not.toContain('Needs input - measured');
-    // Custom Verification joined the dedicated-screen tests on 2026-08-09; before
-    // that it rendered inline beneath the status list with no way back.
-    expect(jobTestsPageSource).toContain("isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused || isCustomVerificationFocused");
+    expect(jobTestsPageSource).toContain("isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;");
     expect(jobTestsPageSource).toContain('className={`${isCompactTestWorkspace || isCompletionReportFocused ? "hidden" : "space-y-3"} sm:hidden print:hidden`}');
   });
 

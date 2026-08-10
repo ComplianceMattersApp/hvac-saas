@@ -1224,13 +1224,15 @@ export default async function JobTestsPage({
   const isAirflowFocused = focusedType === "airflow";
   const isRefrigerantChargeFocused = focusedType === "refrigerant_charge";
   const isCompletionReportFocused = focused === "completion_report";
-  // Custom Verification joins the dedicated-screen tests. Without it, focusing a
-  // custom run left the status list on screen and rendered the test inline
-  // underneath, so it read as an appendix to the page rather than the test you
-  // opened — and there was no "Back to Tests" way out.
-  const isCustomVerificationFocused = focusedType === "custom";
+  // NOTE: Custom Verification is deliberately NOT in this list, despite reading
+  // like it belongs. Compact mode hides the "Current Tests" card (the gate at
+  // the status list), and the three tests below render their panels outside that
+  // card. The custom panel renders *inside* the same section, so switching it to
+  // compact hid the list AND left the custom test with nowhere to appear — it
+  // vanished entirely. Making custom a true dedicated screen requires moving its
+  // panel out of the status section first.
   const isCompactTestWorkspace =
-    isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused || isCustomVerificationFocused;
+    isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;
 
   let refrigerantEvidenceAttachments: Array<{
     id: string;
