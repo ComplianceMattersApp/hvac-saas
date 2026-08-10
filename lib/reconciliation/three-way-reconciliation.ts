@@ -108,6 +108,20 @@ function reconcileInvoices(params: {
       continue;
     }
 
+    const qboDocNumber = clean(qboInvoice.docNumber);
+    if (qboDocNumber && qboDocNumber !== label) {
+      findings.push({
+        ...base,
+        findingType: "invoice_number_mismatch",
+        severity: "warning",
+        title: `Invoice number mismatch · EveryStep ${label}, QuickBooks ${qboDocNumber}`,
+        detail: `EveryStep invoice ${label} is linked by QuickBooks ID to document number ${qboDocNumber}.`,
+        truth: "These are the same linked invoice under two visible numbers. The QuickBooks document may have been renumbered or the wrong QuickBooks invoice may be linked.",
+        everystepValue: label,
+        externalValue: qboDocNumber,
+      });
+    }
+
     if (status === "void" && !qboInvoice.looksVoided) {
       findings.push({
         ...base,
@@ -160,7 +174,8 @@ function reconcilePaymentsAgainstQbo(params: {
   invoiceLabels: Map<string, string>;
 }): ReconciliationFinding[] {
   const findings: ReconciliationFinding[] = [];
-  const qboPaymentIds = new Set(params.qboPayments.map((payment) => payment.id));
+  const qboPaymentsById = new Map(params.qboPayments.map((payment) => [payment.id, payment]));
+  const qboPaymentIds = new Set(qboPaymentsById.keys());
 
   for (const payment of params.payments) {
     const qboPaymentId = clean(payment.qbo_payment_id);
@@ -201,6 +216,25 @@ function reconcilePaymentsAgainstQbo(params: {
         everystepValue: `recorded, ${money(Number(payment.amount_cents ?? 0))}`,
         externalValue: "not found",
       });
+      continue;
+    }
+
+    if (status === "recorded") {
+      const qboPayment = qboPaymentsById.get(qboPaymentId);
+      if (!qboPayment) continue;
+      const everystepCents = Number(payment.amount_cents ?? 0);
+      const qboCents = toCents(qboPayment.totalAmount);
+      if (everystepCents !== qboCents || !qboPayment.linkedInvoiceIds.includes(clean(payment.qbo_invoice_id))) {
+        findings.push({
+          ...base,
+          findingType: "payment_allocation_mismatch",
+          title: `QuickBooks payment allocation disagrees · invoice ${label}`,
+          detail: `EveryStep recorded ${money(everystepCents)} against this invoice; QuickBooks payment ${qboPaymentId} totals ${money(qboCents)} and is linked to ${qboPayment.linkedInvoiceIds.includes(clean(payment.qbo_invoice_id)) ? "the expected invoice" : "a different invoice"}.`,
+          truth: "A payment exists in both systems, but its amount or invoice allocation does not agree.",
+          everystepValue: `${money(everystepCents)}, invoice ${label}`,
+          externalValue: `${money(qboCents)}, ${qboPayment.linkedInvoiceIds.join(", ") || "no linked invoice"}`,
+        });
+      }
     }
   }
 
@@ -218,13 +252,14 @@ function reconcileAgainstStripe(params: {
   payments: any[];
   charges: Stripe.Charge[];
   invoiceLabels: Map<string, string>;
+  qboInvoiceLabels?: Map<string, string>;
 }): ReconciliationFinding[] {
   const findings: ReconciliationFinding[] = [];
   const chargeById = new Map(params.charges.map((charge) => [clean(charge.id), charge]));
 
   const knownChargeIds = new Set<string>();
   for (const payment of params.payments) {
-    for (const column of ["processor_charge_id", "processor_payment_reference"]) {
+    for (const column of ["processor_charge_id", "processor_payment_reference", "stripe_payment_intent_id"]) {
       const value = clean(payment[column]);
       if (value) knownChargeIds.add(value);
     }
@@ -281,16 +316,24 @@ function reconcileAgainstStripe(params: {
     const invoiceId = clean(charge.metadata?.invoice_id);
     if (!invoiceId) continue; // Platform/subscription charges are not invoice money.
     const chargeId = clean(charge.id);
-    if (knownChargeIds.has(chargeId)) continue;
+    const paymentIntentId = typeof charge.payment_intent === "string" ? clean(charge.payment_intent) : clean(charge.payment_intent?.id);
+    if (knownChargeIds.has(chargeId) || (paymentIntentId && knownChargeIds.has(paymentIntentId))) continue;
+    const everystepLabel = params.invoiceLabels.get(invoiceId) ?? invoiceId;
+    const qboLabel = params.qboInvoiceLabels?.get(invoiceId);
+    const invoiceLabel = qboLabel && qboLabel !== everystepLabel
+      ? `${everystepLabel} (QuickBooks ${qboLabel})`
+      : everystepLabel;
 
     findings.push({
       findingType: "stripe_charge_unrecorded",
       severity: "critical",
       subjectKind: "payment",
-      subjectId: null,
+      // There is no EveryStep payment row to point at. Keep the related invoice
+      // id so the attention center can open the correct invoice workspace.
+      subjectId: invoiceId,
       externalSystem: "stripe",
       externalId: chargeId,
-      title: `Stripe collected money EveryStep has no record of · invoice ${params.invoiceLabels.get(invoiceId) ?? invoiceId}`,
+      title: `Stripe collected money EveryStep has no record of · invoice ${invoiceLabel}`,
       detail: `Charge ${chargeId} for ${money(Number(charge.amount ?? 0))} succeeded in Stripe with no matching payment in EveryStep.`,
       truth: "A customer was charged and this app never recorded it. The invoice still looks unpaid and the money is unreconciled.",
       everystepValue: "no payment row",
@@ -316,22 +359,32 @@ export async function runThreeWayReconciliation(params: {
   const sinceDate = since.slice(0, 10);
   const skipped: string[] = [];
   const findings: ReconciliationFinding[] = [];
+  const qboInvoiceLabels = new Map<string, string>();
 
-  const { data: invoiceRows } = await admin
+  const { data: invoiceRows, error: invoiceError } = await admin
     .from("internal_invoices")
     .select("id, job_id, invoice_number, invoice_display_number, status, total_cents, qbo_invoice_id, invoice_date")
     .eq("account_owner_user_id", accountOwnerUserId)
     .gte("invoice_date", sinceDate)
     .limit(5000);
+  if (invoiceError) throw new Error(`Failed to load invoices for reconciliation: ${invoiceError.message ?? "unknown error"}`);
   const invoices: any[] = invoiceRows ?? [];
 
-  const { data: paymentRows } = await admin
+  const { data: paymentRows, error: paymentError } = await admin
     .from("internal_invoice_payments")
-    .select("id, invoice_id, job_id, amount_cents, payment_status, paid_at, processor_charge_id, processor_payment_reference, qbo_payment_id, dispute_status")
+    .select("id, invoice_id, job_id, amount_cents, payment_status, paid_at, processor_charge_id, processor_payment_reference, stripe_payment_intent_id, qbo_payment_id, dispute_status")
     .eq("account_owner_user_id", accountOwnerUserId)
     .gte("paid_at", since)
     .limit(5000);
+  if (paymentError) throw new Error(`Failed to load payments for reconciliation: ${paymentError.message ?? "unknown error"}`);
   const payments: any[] = paymentRows ?? [];
+
+  const qboInvoiceIdByInvoiceId = new Map<string, string>(
+    invoices.map((invoice) => [clean(invoice.id), clean(invoice.qbo_invoice_id)]),
+  );
+  for (const payment of payments) {
+    payment.qbo_invoice_id = qboInvoiceIdByInvoiceId.get(clean(payment.invoice_id)) ?? "";
+  }
 
   const invoiceLabels = new Map<string, string>(
     invoices.map((invoice) => [
@@ -354,6 +407,12 @@ export async function runThreeWayReconciliation(params: {
           listQboInvoicesSince({ accessToken: token.accessToken, realmId: token.realmId, baseUrl, fromDate: sinceDate }),
           listQboPaymentsSince({ accessToken: token.accessToken, realmId: token.realmId, baseUrl, fromDate: sinceDate }),
         ]);
+        const qboInvoicesById = new Map(qboInvoices.map((invoice) => [clean(invoice.id), invoice]));
+        for (const invoice of invoices) {
+          const qboInvoice = qboInvoicesById.get(clean(invoice.qbo_invoice_id));
+          const docNumber = clean(qboInvoice?.docNumber);
+          if (docNumber) qboInvoiceLabels.set(clean(invoice.id), docNumber);
+        }
         findings.push(...reconcileInvoices({ invoices, qboInvoices }));
         findings.push(...reconcilePaymentsAgainstQbo({ payments, qboPayments, invoiceLabels }));
       }
@@ -379,7 +438,7 @@ export async function runThreeWayReconciliation(params: {
         charges.push(charge);
         if (charges.length >= 5000) break;
       }
-      findings.push(...reconcileAgainstStripe({ payments, charges, invoiceLabels }));
+      findings.push(...reconcileAgainstStripe({ payments, charges, invoiceLabels, qboInvoiceLabels }));
     }
   } catch (error) {
     skipped.push(`Stripe comparison failed: ${error instanceof Error ? error.message : "unknown error"}`);
@@ -434,10 +493,21 @@ export async function persistReconciliationFindings(params: {
     const existing = openByKey.get(key);
 
     if (existing?.id) {
-      await admin
+      const { error } = await admin
         .from("reconciliation_findings")
-        .update({ last_seen_at: nowIso, detail: finding.detail, external_value: finding.externalValue })
+        .update({
+          last_seen_at: nowIso,
+          severity: finding.severity,
+          title: finding.title,
+          detail: finding.detail,
+          truth: finding.truth,
+          everystep_value: finding.everystepValue,
+          external_value: finding.externalValue,
+          amount_cents: finding.amountCents,
+          job_id: finding.jobId,
+        })
         .eq("id", existing.id);
+      if (error) throw new Error(`Failed to refresh reconciliation finding: ${error.message ?? "unknown error"}`);
       refreshed += 1;
       continue;
     }
@@ -460,7 +530,8 @@ export async function persistReconciliationFindings(params: {
       first_seen_at: nowIso,
       last_seen_at: nowIso,
     });
-    if (!error) opened += 1;
+    if (error) throw new Error(`Failed to persist reconciliation finding: ${error.message ?? "unknown error"}`);
+    opened += 1;
   }
 
   // Auto-resolve what this run no longer sees — but only for comparisons that
@@ -476,10 +547,11 @@ export async function persistReconciliationFindings(params: {
     if (system === "quickbooks" && !ranQbo) continue;
     if (system === "stripe" && !ranStripe) continue;
 
-    await admin
+    const { error } = await admin
       .from("reconciliation_findings")
       .update({ resolved_at: nowIso, resolved_reason: "No longer observed by reconciliation" })
       .eq("id", row.id);
+    if (error) throw new Error(`Failed to resolve reconciliation finding: ${error.message ?? "unknown error"}`);
     resolved += 1;
   }
 

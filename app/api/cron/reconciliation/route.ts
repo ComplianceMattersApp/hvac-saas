@@ -28,13 +28,16 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const windowDays = Number(new URL(request.url).searchParams.get("windowDays") ?? 90);
 
-  // Only accounts with a QBO connection or Stripe activity are worth checking.
-  const { data: connections } = await admin
-    .from("qbo_connections")
-    .select("account_owner_user_id")
-    .eq("status", "active");
+  // Check both populations independently. A Stripe-only account can still have
+  // an unrecorded charge and must not disappear merely because QBO is absent.
+  const [{ data: connections, error: connectionError }, { data: stripeProfiles, error: stripeProfileError }] = await Promise.all([
+    admin.from("qbo_connections").select("account_owner_user_id").eq("status", "active"),
+    admin.from("internal_business_profiles").select("account_owner_user_id").not("stripe_connected_account_id", "is", null),
+  ]);
+  if (connectionError) return NextResponse.json({ error: `Failed to enumerate QuickBooks accounts: ${connectionError.message}` }, { status: 500 });
+  if (stripeProfileError) return NextResponse.json({ error: `Failed to enumerate Stripe accounts: ${stripeProfileError.message}` }, { status: 500 });
   const accountIds = [
-    ...new Set((connections ?? []).map((row: any) => String(row.account_owner_user_id ?? "").trim()).filter(Boolean)),
+    ...new Set([...(connections ?? []), ...(stripeProfiles ?? [])].map((row: any) => String(row.account_owner_user_id ?? "").trim()).filter(Boolean)),
   ];
 
   const summaries: Array<Record<string, unknown>> = [];

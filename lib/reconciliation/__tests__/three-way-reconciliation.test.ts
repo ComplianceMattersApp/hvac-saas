@@ -89,6 +89,20 @@ describe("invoice reconciliation against QuickBooks", () => {
     expect(finding).toMatchObject({ everystepValue: "$840.00", externalValue: "$900.00" });
   });
 
+  it("flags a linked invoice whose visible number differs in QuickBooks", async () => {
+    mockListInvoices.mockResolvedValue([
+      { id: "4534", syncToken: "1", docNumber: "1708", balance: 840, totalAmount: 840, looksVoided: false },
+    ]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], []), accountOwnerUserId: "owner-1",
+    });
+    expect(result.findings).toContainEqual(expect.objectContaining({
+      findingType: "invoice_number_mismatch",
+      everystepValue: "2109",
+      externalValue: "1708",
+    }));
+  });
+
   it("flags an invoice voided in QuickBooks only", async () => {
     mockListInvoices.mockResolvedValue([
       { id: "4534", syncToken: "1", docNumber: "2109", balance: 0, totalAmount: 0, looksVoided: true },
@@ -138,6 +152,17 @@ describe("payment reconciliation", () => {
     });
     expect(result.findings.map((f) => f.findingType)).toContain("payment_missing_in_qbo");
   });
+
+  it("flags a QuickBooks payment with the wrong amount or invoice allocation", async () => {
+    mockListPayments.mockResolvedValue([{ id: "qp-1", totalAmount: 700, txnDate: "2026-08-01", linkedInvoiceIds: ["different-invoice"] }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 84000, payment_status: "recorded", qbo_payment_id: "qp-1" },
+      ]),
+      accountOwnerUserId: "owner-1",
+    });
+    expect(result.findings.map((f) => f.findingType)).toContain("payment_allocation_mismatch");
+  });
 });
 
 describe("Stripe reconciliation", () => {
@@ -158,6 +183,21 @@ describe("Stripe reconciliation", () => {
     const finding = result.findings.find((f) => f.findingType === "stripe_charge_unrecorded");
     expect(finding).toBeDefined();
     expect(finding?.amountCents).toBe(48500);
+    expect(finding?.subjectId).toBe("inv-1");
+  });
+
+  it("shows both invoice numbers on an orphan charge when QuickBooks was renumbered", async () => {
+    mockListInvoices.mockResolvedValue([
+      { id: "4534", syncToken: "1", docNumber: "1708", balance: 840, totalAmount: 840, looksVoided: false },
+    ]);
+    const stripe = stripeWithCharges([
+      { id: "ch_orphan", status: "succeeded", refunded: false, amount: 48500, amount_refunded: 0, metadata: { invoice_id: "inv-1", job_id: "job-1" } },
+    ]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], []), accountOwnerUserId: "owner-1", stripe,
+    });
+    expect(result.findings.find((finding) => finding.findingType === "stripe_charge_unrecorded")?.title)
+      .toContain("invoice 2109 (QuickBooks 1708)");
   });
 
   it("flags a Stripe refund EveryStep still counts as collected", async () => {
@@ -171,6 +211,19 @@ describe("Stripe reconciliation", () => {
       accountOwnerUserId: "owner-1", stripe,
     });
     expect(result.findings.map((f) => f.findingType)).toContain("stripe_refund_not_reflected");
+  });
+
+  it("does not call a charge missing when its PaymentIntent is already recorded", async () => {
+    const stripe = stripeWithCharges([
+      { id: "ch_1", payment_intent: "pi_1", status: "succeeded", refunded: false, amount: 48500, amount_refunded: 0, metadata: { invoice_id: "inv-1" } },
+    ]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 48500, payment_status: "recorded", stripe_payment_intent_id: "pi_1" },
+      ]),
+      accountOwnerUserId: "owner-1", stripe,
+    });
+    expect(result.findings.map((f) => f.findingType)).not.toContain("stripe_charge_unrecorded");
   });
 
   it("ignores platform charges that carry no invoice id", async () => {

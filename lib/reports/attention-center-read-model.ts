@@ -123,6 +123,7 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
   // reconciler is the only thing that saw both sides.
   for (const finding of reconciliationResult.error ? [] : (reconciliationResult.data ?? [])) {
     const jobId = clean(finding.job_id); const subjectId = clean(finding.subject_id);
+    const isUnrecordedStripeCharge = clean(finding.finding_type) === "stripe_charge_unrecorded";
     const evidence = [clean(finding.everystep_value) && `EveryStep: ${clean(finding.everystep_value)}`,
       clean(finding.external_value) && `${finding.external_system === "stripe" ? "Stripe" : "QuickBooks"}: ${clean(finding.external_value)}`]
       .filter(Boolean).join(" · ");
@@ -134,9 +135,9 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       detail: [clean(finding.detail), evidence].filter(Boolean).join(" — "),
       truth: clean(finding.truth),
       occurredAt: clean(finding.first_seen_at) || null,
-      href: jobId && subjectId
-        ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(finding.subject_kind === "invoice" ? subjectId : "")}#invoice-workspace`
-        : "/reports/attention",
+      href: jobId
+        ? `/jobs/${jobId}/invoice${subjectId && (finding.subject_kind === "invoice" || isUnrecordedStripeCharge) ? `?invoice_id=${encodeURIComponent(subjectId)}` : ""}#invoice-workspace`
+        : finding.external_system === "stripe" ? "/reports/stripe-reconciliation" : "/reports/invoices",
       actionLabel: "Investigate",
     });
   }

@@ -35,5 +35,8 @@ describe("Needs Attention center", () => {
     expect(model).toContain("Inspect Stripe session");
     expect(page).toContain("syncAttentionPaymentToQboFromForm");
     expect(page).toContain("Retry from hub");
+    expect(page).toContain("{item.actionLabel}");
+    expect(model).toContain('finding.finding_type) === "stripe_charge_unrecorded"');
+    expect(model).not.toContain(': "/reports/attention",');
   });
 });
