@@ -41,6 +41,13 @@ describe("custom verification is reachable", () => {
     expect(block).toContain('focusedType !== "add"');
     expect(block).not.toContain('focusedType !== "custom"');
   });
+
+  it("opens an exact custom run and uses the dedicated workspace layout", () => {
+    expect(testsPage).toContain('const focusedRunId = String(sp.r ?? "").trim()');
+    expect(testsPage).toContain('focusedRunId === String(row.runId)');
+    expect(testsPage).toContain("isCustomVerificationFocused");
+    expect(testsPage).toContain("isRefrigerantChargeFocused || isCustomVerificationFocused");
+  });
 });
 
 describe("custom verification captures a name, findings and a result", () => {
@@ -88,5 +95,18 @@ describe("the custom name is what gets displayed", () => {
     expect(block).toContain("custom_label");
     // Every call site must pass the run, or the name cannot be resolved.
     expect(testsPage).not.toMatch(/getTestDisplayLabel\([^)]*packageSystem\)/);
+  });
+
+  it("lists every custom run under its system and includes each in the completion report", () => {
+    expect(testsPage).toContain("selectedCustomRuns.map");
+    expect(testsPage).toContain("sys.customRuns.filter");
+    expect(testsPage).toContain("customRun.data?.custom_notes");
+    expect(testsPage).toContain("getEffectiveResultLabel(customRun)");
+  });
+
+  it("allows custom duplicates while preserving uniqueness for standard tests", () => {
+    const body = actionBody(jobActions, "addEccTestRunFromForm");
+    expect(body).toContain('if (testType !== "custom")');
+    expect(body).toContain("testRunId: insertedRunId");
   });
 });

@@ -2385,16 +2385,19 @@ function redirectToTests(opts: {
   jobId: string;
   testType?: string | null;
   systemId?: string | null;
+  testRunId?: string | null;
   notice?: string | null;
 }) {
   const { jobId } = opts;
   const testType = String(opts.testType ?? "").trim();
   const systemId = String(opts.systemId ?? "").trim();
+  const testRunId = String(opts.testRunId ?? "").trim();
   const notice = String(opts.notice ?? "").trim();
 
   const q = new URLSearchParams();
   if (testType) q.set("t", testType);
   if (systemId) q.set("s", systemId);
+  if (testRunId) q.set("r", testRunId);
   if (notice) q.set("notice", notice);
 
   const qs = q.toString();
@@ -5150,26 +5153,23 @@ export async function addEccTestRunFromForm(formData: FormData) {
 
   if (!visitId) throw new Error("Unable to resolve Visit #1");
 
-  // 🔒 Duplicate prevention: job + system + test_type.
-  //
-  // This also caps Custom Verification at one run per system. Lifting it was
-  // considered and rejected: the workspace resolves a single focused run per
-  // test type (`pickRunForSystem`), so extra custom runs would exist in the
-  // database with no way to open or complete them. Supporting several named
-  // verifications per system needs a list UI first.
-  const { data: existing, error: existErr } = await supabase
-    .from("ecc_test_runs")
-    .select("id")
-    .eq("job_id", jobId)
-    .eq("system_id", systemId)
-    .eq("test_type", testType)
-    .limit(1);
+  // Standard test types remain unique per system. Custom verifications are
+  // named, independently addressable runs, so a system may have several.
+  if (testType !== "custom") {
+    const { data: existing, error: existErr } = await supabase
+      .from("ecc_test_runs")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("system_id", systemId)
+      .eq("test_type", testType)
+      .limit(1);
 
-  if (existErr) throw existErr;
+    if (existErr) throw existErr;
 
-  if ((existing ?? []).length) {
-    revalidatePath(`/jobs/${jobId}/tests`);
-    redirectToTests({ jobId, testType, systemId });
+    if ((existing ?? []).length) {
+      revalidatePath(`/jobs/${jobId}/tests`);
+      redirectToTests({ jobId, testType, systemId });
+    }
   }
 
   const payload: any = {
@@ -5193,12 +5193,31 @@ export async function addEccTestRunFromForm(formData: FormData) {
 
   if (equipmentId) payload.equipment_id = equipmentId;
 
-  const { error: insErr } = await supabase.from("ecc_test_runs").insert(payload);
+  let insertedRunId: string | null = null;
+  let insErr: any = null;
+
+  if (testType === "custom") {
+    const { data: insertedRun, error } = await supabase
+      .from("ecc_test_runs")
+      .insert(payload)
+      .select("id")
+      .single();
+    insertedRunId = String(insertedRun?.id ?? "").trim() || null;
+    insErr = error;
+  } else {
+    const result = await supabase.from("ecc_test_runs").insert(payload);
+    insErr = result.error;
+  }
 
   if (insErr) throw insErr;
 
   revalidatePath(`/jobs/${jobId}/tests`);
-  redirectToTests({ jobId, testType, systemId });
+  redirectToTests({
+    jobId,
+    testType,
+    systemId,
+    testRunId: insertedRunId,
+  });
 }
 
 export async function deleteEccTestRunFromForm(formData: FormData) {
@@ -6807,7 +6826,13 @@ export async function saveAndCompleteCustomVerificationFromForm(formData: FormDa
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "custom", systemId, notice: "test_completed" });
+  redirectToTests({
+    jobId,
+    testType: "custom",
+    systemId,
+    testRunId,
+    notice: "test_completed",
+  });
 }
 
 export async function saveAhriVerificationDataFromForm(formData: FormData) {

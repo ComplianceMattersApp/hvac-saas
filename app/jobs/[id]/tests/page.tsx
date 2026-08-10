@@ -192,8 +192,8 @@ function formatJobTypeLabel(value?: string | null) {
   return normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function getRequiredTestStatusForSystem(job: any, systemId: string, testType: EccTestType) {
-  const run = pickRunForSystem(job, testType, systemId);
+function getRequiredTestStatusForSystem(job: any, systemId: string, testType: EccTestType, explicitRun?: any) {
+  const run = explicitRun ?? pickRunForSystem(job, testType, systemId);
   const runDataKeys = run?.data && typeof run.data === "object" ? Object.keys(run.data).length : 0;
 
   if (!run) {
@@ -761,13 +761,14 @@ export default async function JobTestsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ t?: string; s?: string; notice?: string }>;
+  searchParams?: Promise<{ t?: string; s?: string; r?: string; notice?: string }>;
 }) {
   const { id } = await params;
   const sp = (await searchParams) ?? {};
 
   const focused = String(sp.t ?? "").trim();
   const selectedSystemIdFromQuery = String(sp.s ?? "").trim();
+  const focusedRunId = String(sp.r ?? "").trim();
   const notice = String(sp.notice ?? "").trim();
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const timingStartMs = Date.now();
@@ -1223,16 +1224,12 @@ export default async function JobTestsPage({
   const isDuctLeakageFocused = focusedType === "duct_leakage";
   const isAirflowFocused = focusedType === "airflow";
   const isRefrigerantChargeFocused = focusedType === "refrigerant_charge";
+  const isCustomVerificationFocused = focusedType === "custom";
   const isCompletionReportFocused = focused === "completion_report";
-  // NOTE: Custom Verification is deliberately NOT in this list, despite reading
-  // like it belongs. Compact mode hides the "Current Tests" card (the gate at
-  // the status list), and the three tests below render their panels outside that
-  // card. The custom panel renders *inside* the same section, so switching it to
-  // compact hid the list AND left the custom test with nowhere to appear — it
-  // vanished entirely. Making custom a true dedicated screen requires moving its
-  // panel out of the status section first.
+  // Dedicated test workspaces hide the overview while keeping the focused panel
+  // and the shared Back to Tests navigation visible.
   const isCompactTestWorkspace =
-    isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;
+    isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused || isCustomVerificationFocused;
 
   let refrigerantEvidenceAttachments: Array<{
     id: string;
@@ -1336,9 +1333,25 @@ export default async function JobTestsPage({
 
   const visibleFieldTestTypes = visibleTestTypes.filter((testType) => testType !== "ahri_verification");
 
+  const selectedCustomRuns = selectedSystemId
+    ? (job.ecc_test_runs ?? [])
+        .filter(
+          (run: any) =>
+            run.test_type === "custom" && String(run.system_id ?? "") === String(selectedSystemId)
+        )
+        .sort((a: any, b: any) => {
+          const at = new Date(a.updated_at ?? a.created_at ?? 0).getTime();
+          const bt = new Date(b.updated_at ?? b.created_at ?? 0).getTime();
+          return bt - at;
+        })
+    : [];
+
   const selectedSystemStatusRows = selectedSystemId
-    ? visibleFieldTestTypes.map((testType: EccTestType) => {
-        const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
+    ? [
+        ...visibleFieldTestTypes.filter((testType) => testType !== "custom").map((testType: EccTestType) => ({ testType, run: null, isCustom: false })),
+        ...selectedCustomRuns.map((run: any) => ({ testType: "custom" as EccTestType, run, isCustom: true })),
+      ].map(({ testType, run, isCustom }) => {
+        const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType, run);
         const parentRun = pickParentRunForSelectedSystem(testType);
         const parentOutcome = getEffectiveResultState(parentRun);
         const carriedForward = isRetestChild && !status.run && parentOutcome === "pass";
@@ -1354,6 +1367,8 @@ export default async function JobTestsPage({
 
         return {
           testType,
+          runId: isCustom ? status.run?.id ?? null : null,
+          isCustom,
           status,
           parentRun,
           parentOutcome,
@@ -1422,7 +1437,9 @@ export default async function JobTestsPage({
 
   const focusedCustomRun =
     selectedSystemId && focusedCustomTestType
-      ? pickRunForSystem(job, focusedCustomTestType, selectedSystemId)
+      ? focusedCustomTestType === "custom" && focusedRunId
+        ? selectedCustomRuns.find((run: any) => String(run.id) === focusedRunId) ?? null
+        : pickRunForSystem(job, focusedCustomTestType, selectedSystemId)
       : null;
 
   const packageSystem = isPackageSystem(selectedSystemEquipment);
@@ -1703,12 +1720,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   }
 
   const baseHref = `/jobs/${job.id}/tests`;
-  const withS = (t?: string, s?: string) => {
+  const withS = (t?: string, s?: string, runId?: string | null) => {
     const q = new URLSearchParams();
 
     const sys = String((s ?? selectedSystemId) ?? "").trim();
 
     if (t) q.set("t", t);
+    if (runId) q.set("r", runId);
     if (sys) q.set("s", sys); // ✅ only set if non-empty
 
     const qs = q.toString();
@@ -1767,6 +1785,16 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     const runFilter = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "air_filter_device", systemId);
     const runDuct = systemIsDuctlessMiniSplit ? null : pickLatestRunForSystem(job, "duct_leakage", systemId);
     const runRefrigerant = systemIsHeatOnly ? null : pickLatestRunForSystem(job, "refrigerant_charge", systemId);
+    const customRuns = (job.ecc_test_runs ?? [])
+      .filter(
+        (run: any) =>
+          run.test_type === "custom" && String(run.system_id ?? "") === String(systemId)
+      )
+      .sort((a: any, b: any) => {
+        const at = new Date(a.updated_at ?? a.created_at ?? 0).getTime();
+        const bt = new Date(b.updated_at ?? b.created_at ?? 0).getTime();
+        return at - bt;
+      });
 
     const packageSystem = isPackageSystem(systemEquipment);
     const packageEquipment = systemEquipment.filter((eq: any) => isPackageEquipment(eq));
@@ -1796,6 +1824,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       runFilter,
       runDuct,
       runRefrigerant,
+      customRuns,
       showAirflowReport: isEccTestInReportScope(reportScopedTestTypes, "airflow"),
       showFanReport: isEccTestInReportScope(reportScopedTestTypes, "fan_watt_draw"),
       showAhriReport: isEccTestInReportScope(reportScopedTestTypes, "ahri_verification"),
@@ -2549,6 +2578,24 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       </div>
                     </div>
                     ) : null}
+
+                    {sys.customRuns.filter((customRun: any) => customRun.is_completed === true).map((customRun: any) => (
+                      <div key={`custom-report-${customRun.id}`} className={reportDetailSectionClass}>
+                        <div className={reportDetailHeadingClass}>
+                          {String(customRun.data?.custom_label ?? "").trim() || "Custom Verification"}
+                        </div>
+                        <div className={reportDetailBodyClass}>
+                          <div>System: {sys.systemName}</div>
+                          <div>Findings: {fallbackText(customRun.data?.custom_notes)}</div>
+                          <div>Result: {getEffectiveResultLabel(customRun)}</div>
+                          <div>
+                            Completed: {customRun.updated_at
+                              ? formatTestResultTimestamp(customRun.updated_at)
+                              : "Completed"}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   {sys.showRefrigerantReport ? (
@@ -2808,14 +2855,16 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 {selectedSystemStatusRows.map((row) => {
   const { testType, status, carriedForward, isRequired } = row;
   const rowRun = (status as any)?.run ?? null;
-  const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
+  const testHref = withS(testType, selectedSystemId, row.runId);
   const tone = getTestStatusTone(String(row.state));
-  const isOpen = focusedType === testType;
+  const isOpen =
+    focusedType === testType &&
+    (!row.isCustom || !row.runId || focusedRunId === String(row.runId));
   const isUpNextTest = testType === mobileNextTestType;
 
   return (
       <div
-      key={testType}
+      key={row.runId ? `${testType}-${row.runId}` : testType}
       className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:gap-3 sm:rounded-lg sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
     >
         <div className="flex min-w-0 items-start justify-between gap-2 sm:justify-start sm:gap-3">
