@@ -1253,6 +1253,7 @@ export default async function InternalInvoiceWorkspacePage({
                   <input type="hidden" name="invoice_id" value={invoice.id} />
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
+                  <input type="hidden" name="payment_operation_id" value={crypto.randomUUID()} />
                   <div>
                     <label className={labelClass}>Send To</label>
                     <input type="email" name="recipient_email" defaultValue={invoice.billing_email ?? ""} placeholder="billing@example.com" className={inputClass} required />

@@ -4,6 +4,8 @@ const mockRecordTenantInvoicePaymentFromStripeCharge = vi.fn();
 const mockRecordTenantInvoicePaymentFailureFromStripeCharge = vi.fn();
 const mockRecordTenantInvoicePaymentFromCheckoutSession = vi.fn();
 const mockCloseTenantInvoicePendingPaymentFromExpiredCheckoutSession = vi.fn();
+const mockRecordTenantInvoiceRefundFromStripeCharge = vi.fn();
+const mockRecordTenantInvoiceDisputeFromStripe = vi.fn();
 const mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession = vi.fn();
 const mockCreateAdminClient = vi.fn(() => ({ from: vi.fn() }));
 const mockDeliverInternalPaymentReceivedEmail = vi.fn(async () => ({ sent: true }));
@@ -13,6 +15,11 @@ const mockAutoSyncRecordedPaymentSettlement = vi.fn(async () => ({
   code: 'synced',
   reason: 'Settlement synchronized.',
   settlementId: 'settlement-1',
+}));
+const mockReleaseInvoiceCollectionReservation = vi.fn(async () => true);
+
+vi.mock('@/lib/business/invoice-collection-reservations', () => ({
+  releaseInvoiceCollectionReservation: mockReleaseInvoiceCollectionReservation,
 }));
 
 vi.mock('@/lib/business/stripe-settlement-auto-sync', () => ({
@@ -34,6 +41,8 @@ vi.mock('@/lib/business/tenant-invoice-stripe-webhooks', () => ({
     mockRecordTenantInvoicePaymentFailureFromStripeCharge,
   closeTenantInvoicePendingPaymentFromExpiredCheckoutSession:
     mockCloseTenantInvoicePendingPaymentFromExpiredCheckoutSession,
+  recordTenantInvoiceRefundFromStripeCharge: mockRecordTenantInvoiceRefundFromStripeCharge,
+  recordTenantInvoiceDisputeFromStripe: mockRecordTenantInvoiceDisputeFromStripe,
 }));
 
 vi.mock('@/lib/business/tenant-saved-payment-method-setups', () => ({
@@ -107,6 +116,7 @@ describe('Stripe webhook route — charge events', () => {
             account_owner_user_id: 'owner-1',
             invoice_id: 'inv-1',
             job_id: 'job-1',
+            collection_reservation_key: 'invoice-checkout:inv-1:10000:0',
           },
         },
       },
@@ -129,6 +139,11 @@ describe('Stripe webhook route — charge events', () => {
     expect(mockDeliverInternalPaymentReceivedEmail).toHaveBeenCalledWith({
       paymentId: 'payment-checkout-1',
     });
+    expect(mockReleaseInvoiceCollectionReservation).toHaveBeenCalledWith(expect.objectContaining({
+      accountOwnerUserId: 'owner-1',
+      invoiceId: 'inv-1',
+      reservationKey: 'invoice-checkout:inv-1:10000:0',
+    }));
   });
 
   it('acknowledges payment-mode checkout.session.completed with missing metadata without throwing', async () => {
@@ -217,6 +232,7 @@ describe('Stripe webhook route — charge events', () => {
             account_owner_user_id: 'owner-1',
             invoice_id: 'inv-1',
             job_id: 'job-1',
+            collection_reservation_key: 'invoice-checkout:inv-1:10000:0',
           },
         },
       },
@@ -261,6 +277,7 @@ describe('Stripe webhook route — charge events', () => {
             account_owner_user_id: 'owner-1',
             invoice_id: 'inv-1',
             job_id: 'job-1',
+            collection_reservation_key: 'invoice-checkout:inv-1:10000:0',
           },
         },
       },
@@ -272,6 +289,9 @@ describe('Stripe webhook route — charge events', () => {
       expect.objectContaining({ session: expect.objectContaining({ id: 'cs_test_expired_1' }) }),
     );
     expect(mockRecordTenantInvoicePaymentFromCheckoutSession).not.toHaveBeenCalled();
+    expect(mockReleaseInvoiceCollectionReservation).toHaveBeenCalledWith(expect.objectContaining({
+      reservationKey: 'invoice-checkout:inv-1:10000:0',
+    }));
   });
 
   it('ignores setup-mode checkout.session.expired', async () => {
@@ -328,7 +348,34 @@ describe('Stripe webhook route — charge events', () => {
     expect(mockAutoSyncRecordedPaymentSettlement).toHaveBeenCalledWith({ paymentId: 'payment-1' });
   });
 
-  it('acknowledges charge.succeeded when payment identity is already recorded', async () => {
+  it('returns 500 so Stripe retries when tenant account readiness is temporarily unavailable', async () => {
+    mockRecordTenantInvoicePaymentFromStripeCharge.mockResolvedValue({
+      recorded: false,
+      reason: 'Tenant connected account is not ready',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_retry_connect_readiness',
+      account: 'acct_connected_1',
+      type: 'charge.succeeded',
+      data: {
+        object: {
+          id: 'ch_retry_connect_readiness',
+          amount: 10000,
+          created: 1747756800,
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+          },
+        },
+      },
+    });
+
+    expect(response.status).toBe(500);
+    expect(mockAutoSyncRecordedPaymentToQbo).not.toHaveBeenCalled();
+  });
+
+  it('resumes idempotent downstream sync when payment identity is already recorded', async () => {
     mockRecordTenantInvoicePaymentFromStripeCharge.mockResolvedValue({
       recorded: false,
       reason: 'Payment already recorded for Stripe payment identity',
@@ -355,8 +402,8 @@ describe('Stripe webhook route — charge events', () => {
 
     expect(response.status).toBe(200);
     expect(mockRecordTenantInvoicePaymentFromStripeCharge).toHaveBeenCalledTimes(1);
-    expect(mockAutoSyncRecordedPaymentToQbo).not.toHaveBeenCalled();
-    expect(mockAutoSyncRecordedPaymentSettlement).not.toHaveBeenCalled();
+    expect(mockAutoSyncRecordedPaymentToQbo).toHaveBeenCalledWith({ paymentId: 'payment-existing' });
+    expect(mockAutoSyncRecordedPaymentSettlement).toHaveBeenCalledWith({ paymentId: 'payment-existing' });
   });
 
   it('keeps Stripe webhook acknowledgement independent from QBO sync failure', async () => {
@@ -476,5 +523,31 @@ describe('Stripe webhook route — charge events', () => {
         connectedAccountId: 'acct_connected_2',
       }),
     );
+  });
+
+  it('returns 500 for a tenant refund that arrived before its payment row', async () => {
+    mockRecordTenantInvoiceRefundFromStripeCharge.mockResolvedValue({
+      applied: false,
+      reason: 'No matching payment for the refunded charge',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_refund_before_payment',
+      account: 'acct_connected_2',
+      type: 'charge.refunded',
+      data: {
+        object: {
+          id: 'ch_refund_before_payment',
+          amount: 5000,
+          amount_refunded: 5000,
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+          },
+        },
+      },
+    });
+
+    expect(response.status).toBe(500);
   });
 });

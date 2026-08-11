@@ -18,6 +18,13 @@ const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const resolveFieldBillingCapabilitiesMock = vi.fn();
 const loadFieldBillingExplicitCapabilitiesForUserMock = vi.fn();
 const deliverInternalPaymentReceivedEmailMock = vi.fn(async (_args: unknown) => ({ sent: true }));
+const claimInvoiceCollectionReservationMock = vi.fn(async (_args: unknown) => true);
+const releaseInvoiceCollectionReservationMock = vi.fn(async (_args: unknown) => true);
+
+vi.mock('@/lib/business/invoice-collection-reservations', () => ({
+  claimInvoiceCollectionReservation: (args: unknown) => claimInvoiceCollectionReservationMock(args),
+  releaseInvoiceCollectionReservation: (args: unknown) => releaseInvoiceCollectionReservationMock(args),
+}));
 
 vi.mock('@/lib/payments/payment-received-email', () => ({
   deliverInternalPaymentReceivedEmail: (args: unknown) => deliverInternalPaymentReceivedEmailMock(args),

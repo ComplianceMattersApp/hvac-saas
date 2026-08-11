@@ -48,6 +48,8 @@ const RECORDED_PAYMENT = {
   amount_cents: 48500,
   payment_status: "recorded",
   dispute_status: null,
+  stripe_dispute_id: null,
+  stripe_refunded_amount_cents: null,
   account_owner_user_id: "owner-1",
 };
 
@@ -124,6 +126,19 @@ describe("recordTenantInvoiceRefundFromStripeCharge", () => {
     expect(updates).toHaveLength(0);
   });
 
+  it("ignores a refund event with no refunded money", async () => {
+    const { recordTenantInvoiceRefundFromStripeCharge } = await import("@/lib/business/tenant-invoice-stripe-webhooks");
+    const { admin, updates } = makeAdmin(RECORDED_PAYMENT);
+
+    const result = await recordTenantInvoiceRefundFromStripeCharge({
+      charge: refundCharge({ amount_refunded: 0 }), eventId: "evt_zero", connectedAccountId: "acct_1", admin,
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.reason).toContain("no positive refunded amount");
+    expect(updates).toHaveLength(0);
+  });
+
   it("refuses a refund arriving on a mismatched connected account", async () => {
     const { recordTenantInvoiceRefundFromStripeCharge } = await import("@/lib/business/tenant-invoice-stripe-webhooks");
     const { admin, updates } = makeAdmin(RECORDED_PAYMENT);
@@ -191,5 +206,22 @@ describe("recordTenantInvoiceDisputeFromStripe", () => {
 
     expect(result.applied).toBe(true);
     expect(updates.at(-1)).toMatchObject({ dispute_status: "open" });
+  });
+
+  it("does not reopen a resolved dispute when created arrives out of order", async () => {
+    const { recordTenantInvoiceDisputeFromStripe } = await import("@/lib/business/tenant-invoice-stripe-webhooks");
+    const { admin, updates } = makeAdmin({
+      ...RECORDED_PAYMENT,
+      dispute_status: "won",
+      stripe_dispute_id: "dp_1",
+    });
+
+    const result = await recordTenantInvoiceDisputeFromStripe({
+      dispute: dispute(), eventId: "evt_delayed_created", closed: false, connectedAccountId: "acct_1", admin,
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.reason).toBe("Dispute already resolved");
+    expect(updates).toHaveLength(0);
   });
 });

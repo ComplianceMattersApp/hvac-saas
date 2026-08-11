@@ -24,8 +24,10 @@ function makeAttemptRow(overrides?: Record<string, unknown>) {
     amount_cents_snapshot: 5000,
     attempt_kind: "scheduled_autopay",
     attempt_status: "pending",
+    failure_code: null,
     stripe_idempotency_key: "scheduled_autopay:owner-1:inv-1:2026-05-28:1",
     stripe_payment_intent_id: null,
+    created_at: new Date().toISOString(),
     ...overrides,
   };
 }
@@ -240,7 +242,10 @@ function makeAdmin(rows?: Array<Record<string, unknown>>) {
   };
 
   return {
-    admin: { from },
+    admin: {
+      from,
+      rpc: vi.fn(async () => ({ data: true, error: null })),
+    },
     attempts,
     touchedTables,
   };
@@ -315,6 +320,29 @@ describe("scheduled autopay attempt submission", () => {
 
     expect(result.terminalNoopCount).toBe(1);
     expect(result.results[0]?.outcome).toBe("terminal_noop");
+  });
+
+  it("does not resubmit an unknown outcome beyond Stripe's safe idempotency window", async () => {
+    const ctx = makeAdmin([makeAttemptRow({
+      failure_code: "stripe_submit_outcome_unknown",
+      created_at: "2026-01-01T00:00:00.000Z",
+    })]);
+    const submitMock = vi.fn();
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: vi.fn(async () => makeEligibleRevalidation()),
+      submitAttemptThroughStripe: submitMock,
+      stripe: { paymentIntents: { create: vi.fn() } } as any,
+    });
+
+    expect(result.results[0]).toEqual(expect.objectContaining({
+      outcome: "blocked_precondition",
+      failureCode: "stripe_submit_outcome_unresolved",
+    }));
+    expect(submitMock).not.toHaveBeenCalled();
   });
 
   it("blocks duplicate/in-flight scheduled attempt for same invoice", async () => {

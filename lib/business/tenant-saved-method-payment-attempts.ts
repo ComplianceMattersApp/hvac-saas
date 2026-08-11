@@ -7,6 +7,10 @@ import {
   calculatePlatformApplicationFeeAmountCents,
   derivePlatformApplicationFeeConfig,
 } from "@/lib/business/platform-application-fees";
+import {
+  claimInvoiceCollectionReservation,
+  releaseInvoiceCollectionReservation,
+} from "@/lib/business/invoice-collection-reservations";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -21,6 +25,23 @@ function isUniqueConflict(error: unknown) {
   if (code === "23505") return true;
   const message = clean((error as { message?: unknown } | null)?.message).toLowerCase();
   return message.includes("duplicate key") || message.includes("unique constraint");
+}
+
+function stripePaymentIntentFromError(error: unknown): Stripe.PaymentIntent | null {
+  const candidate = (error as any)?.payment_intent ?? (error as any)?.raw?.payment_intent ?? null;
+  return candidate && typeof candidate === "object" && clean(candidate.id) && clean(candidate.status)
+    ? candidate as Stripe.PaymentIntent
+    : null;
+}
+
+function isDefinitiveStripeSubmitFailure(error: unknown) {
+  const type = clean((error as any)?.type);
+  return new Set([
+    "StripeCardError",
+    "StripeInvalidRequestError",
+    "StripeAuthenticationError",
+    "StripePermissionError",
+  ]).has(type);
 }
 
 function mapAttemptFailureStatus(params: {
@@ -77,6 +98,7 @@ type SavedMethodAttemptSubmitParams = {
   stripeCustomerId: string;
   stripePaymentMethodId: string;
   stripeIdempotencyKey: string;
+  collectionReservationKey?: string;
   billingPeriodId?: string | null;
   maintenanceAgreementId?: string | null;
 };
@@ -96,6 +118,7 @@ export async function submitSavedMethodAttemptThroughStripe(
   const stripeCustomerId = clean(params.stripeCustomerId);
   const stripePaymentMethodId = clean(params.stripePaymentMethodId);
   const stripeIdempotencyKey = clean(params.stripeIdempotencyKey);
+  const collectionReservationKey = clean(params.collectionReservationKey) || stripeIdempotencyKey;
   const billingPeriodId = clean(params.billingPeriodId) || "";
   const maintenanceAgreementId = clean(params.maintenanceAgreementId) || "";
   const platformFeeConfig = derivePlatformApplicationFeeConfig({
@@ -107,6 +130,42 @@ export async function submitSavedMethodAttemptThroughStripe(
     feeBasisPoints: platformFeeConfig.feeBasisPoints,
     enabled: platformFeeConfig.enabled,
   });
+  const reservationClaimed = await claimInvoiceCollectionReservation({
+    supabase: admin,
+    accountOwnerUserId,
+    invoiceId,
+    sourceKind: attemptKind,
+    reservationKey: collectionReservationKey,
+    amountCents,
+    ttlSeconds: 3600,
+  });
+  if (!reservationClaimed) {
+    const failureMessage = "Another payment collection is already in progress for this invoice.";
+    const { error: blockUpdateErr } = await admin
+      .from("tenant_saved_method_payment_attempts")
+      .update({
+        attempt_status: "blocked_precondition",
+        failure_code: "invoice_collection_in_progress",
+        failure_message: failureMessage,
+        resolved_at: nowIso(),
+        updated_at: nowIso(),
+      })
+      .eq("id", attemptId);
+    if (blockUpdateErr) {
+      throw new Error(
+        `Failed to record collection-reservation block on saved-method attempt: ${blockUpdateErr.message ?? "unknown error"}`,
+      );
+    }
+    return {
+      ok: true,
+      attemptId,
+      attemptStatus: "blocked_precondition",
+      stripePaymentIntentId: null,
+      failureCode: "invoice_collection_in_progress",
+      failureMessage,
+    };
+  }
+
   // Double-collection guard: this is the last gate before charging a stored
   // card (manual and scheduled autopay both submit through here). If
   // QuickBooks shows the invoice already settled outside EveryStep, block the
@@ -133,6 +192,12 @@ export async function submitSavedMethodAttemptThroughStripe(
         `Failed to record QBO-settled block on saved-method attempt: ${blockUpdateErr.message ?? "unknown error"}`,
       );
     }
+    await releaseInvoiceCollectionReservation({
+      supabase: admin,
+      accountOwnerUserId,
+      invoiceId,
+      reservationKey: collectionReservationKey,
+    });
     return {
       ok: true,
       attemptId,
@@ -158,105 +223,172 @@ export async function submitSavedMethodAttemptThroughStripe(
       attempt_kind: attemptKind,
       billing_period_id: billingPeriodId,
       maintenance_agreement_id: maintenanceAgreementId,
+      collection_reservation_key: collectionReservationKey,
     },
     ...(platformFee.applicationFeeAmountCents > 0
       ? { application_fee_amount: platformFee.applicationFeeAmountCents }
       : {}),
   };
 
+  let paymentIntent: Stripe.PaymentIntent | null = null;
+  let submitError: unknown = null;
   try {
-    const paymentIntent = await stripe.paymentIntents.create(
+    paymentIntent = await stripe.paymentIntents.create(
       paymentIntentPayload,
       {
         stripeAccount: connectedAccountId,
         idempotencyKey: stripeIdempotencyKey,
       },
     );
-
-    const paymentIntentId = clean(paymentIntent.id);
-    const intentStatus = clean(paymentIntent.status).toLowerCase();
-    const paymentError = paymentIntent.last_payment_error ?? null;
-    const failedStatus = mapAttemptFailureStatus({
-      paymentIntentStatus: intentStatus,
-      failureCode: clean(paymentError?.code),
-      failureMessage: clean(paymentError?.message),
-    });
-
-    let attemptStatus: "submitted" | "failed_declined" | "failed_requires_action" = "submitted";
-    const submittedAt: string | null = nowIso();
-    let resolvedAt: string | null = null;
-    let failureCode: string | null = null;
-    let failureMessage: string | null = null;
-
-    if (intentStatus === "succeeded") {
-      // Keep success provisional until webhook persists payment truth and links the attempt.
-      attemptStatus = "submitted";
-      resolvedAt = null;
-    } else if (intentStatus === "requires_action" || intentStatus === "requires_payment_method") {
-      attemptStatus = failedStatus;
-      resolvedAt = nowIso();
-      failureCode = clean(paymentError?.code) || intentStatus;
-      failureMessage =
-        clean(paymentError?.message)
-        || "Stripe requires customer action before this saved-card charge can complete.";
-    } else if (intentStatus === "canceled") {
-      attemptStatus = failedStatus;
-      resolvedAt = nowIso();
-      failureCode = clean(paymentError?.code) || "payment_intent_canceled";
-      failureMessage =
-        clean(paymentError?.message) || "Stripe canceled the saved-card charge attempt.";
+  } catch (firstError) {
+    const errorIntent = stripePaymentIntentFromError(firstError);
+    if (errorIntent) {
+      paymentIntent = errorIntent;
+    } else if (!isDefinitiveStripeSubmitFailure(firstError)) {
+      // A timeout/5xx can happen after Stripe accepted the request. Repeating
+      // the exact payload with the exact idempotency key either returns that
+      // operation or safely creates it if the first request never arrived.
+      try {
+        paymentIntent = await stripe.paymentIntents.create(
+          paymentIntentPayload,
+          {
+            stripeAccount: connectedAccountId,
+            idempotencyKey: stripeIdempotencyKey,
+          },
+        );
+      } catch (retryError) {
+        paymentIntent = stripePaymentIntentFromError(retryError);
+        if (!paymentIntent) submitError = retryError;
+      }
+    } else {
+      submitError = firstError;
     }
+  }
 
-    const { error: attemptUpdateErr } = await admin
+  if (!paymentIntent) {
+    const message = submitError instanceof Error ? submitError.message : "Stripe submit outcome is unknown.";
+    const definitiveFailure = isDefinitiveStripeSubmitFailure(submitError);
+    const nextStatus = definitiveFailure ? "failed_declined" : "pending";
+    const failureCode = definitiveFailure
+      ? clean((submitError as any)?.code) || "stripe_payment_intent_submit_failed"
+      : "stripe_submit_outcome_unknown";
+    const { error: outcomeUpdateError } = await admin
       .from("tenant_saved_method_payment_attempts")
       .update({
-        attempt_status: attemptStatus,
-        stripe_payment_intent_id: paymentIntentId || null,
-        submitted_at: submittedAt,
-        resolved_at: resolvedAt,
+        attempt_status: nextStatus,
         failure_code: failureCode,
-        failure_message: failureMessage,
+        failure_message: message,
+        resolved_at: definitiveFailure ? nowIso() : null,
         updated_at: nowIso(),
       })
       .eq("id", attemptId);
+    if (outcomeUpdateError) {
+      throw new Error(`Failed to persist Stripe submit outcome: ${outcomeUpdateError.message ?? "unknown error"}`);
+    }
 
-    if (attemptUpdateErr) {
-      throw new Error(
-        `Failed to update saved-method payment attempt row after Stripe submit: ${attemptUpdateErr.message ?? "unknown error"}`,
-      );
+    if (definitiveFailure) {
+      await releaseInvoiceCollectionReservation({
+        supabase: admin,
+        accountOwnerUserId,
+        invoiceId,
+        reservationKey: collectionReservationKey,
+      });
+    } else {
+      // Keep every other collection channel locked while a human or webhook
+      // resolves whether Stripe accepted the charge. This is deliberately much
+      // longer than the normal submit lock: an unknown result is not a decline.
+      await claimInvoiceCollectionReservation({
+        supabase: admin,
+        accountOwnerUserId,
+        invoiceId,
+        sourceKind: attemptKind,
+        reservationKey: collectionReservationKey,
+        amountCents,
+        ttlSeconds: 2_592_000,
+      });
     }
 
     return {
       ok: true,
       attemptId,
-      attemptStatus,
-      stripePaymentIntentId: paymentIntentId || null,
-      failureCode,
-      failureMessage,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "unknown error";
-
-    await admin
-      .from("tenant_saved_method_payment_attempts")
-      .update({
-        attempt_status: "failed_declined",
-        failure_code: "stripe_payment_intent_submit_failed",
-        failure_message: message,
-        resolved_at: nowIso(),
-        updated_at: nowIso(),
-      })
-      .eq("id", attemptId);
-
-    return {
-      ok: true,
-      attemptId,
-      attemptStatus: "failed_declined",
+      attemptStatus: nextStatus,
       stripePaymentIntentId: null,
-      failureCode: "stripe_payment_intent_submit_failed",
+      failureCode,
       failureMessage: message,
     };
   }
+
+  const paymentIntentId = clean(paymentIntent.id);
+  const intentStatus = clean(paymentIntent.status).toLowerCase();
+  const paymentError = paymentIntent.last_payment_error ?? null;
+  const failedStatus = mapAttemptFailureStatus({
+    paymentIntentStatus: intentStatus,
+    failureCode: clean(paymentError?.code),
+    failureMessage: clean(paymentError?.message),
+  });
+
+  let attemptStatus: "submitted" | "failed_declined" | "failed_requires_action" = "submitted";
+  const submittedAt: string | null = nowIso();
+  let resolvedAt: string | null = null;
+  let failureCode: string | null = null;
+  let failureMessage: string | null = null;
+
+  if (intentStatus === "succeeded") {
+    // Keep success provisional until webhook persists payment truth and links the attempt.
+    attemptStatus = "submitted";
+  } else if (intentStatus === "requires_action" || intentStatus === "requires_payment_method") {
+    attemptStatus = failedStatus;
+    resolvedAt = nowIso();
+    failureCode = clean(paymentError?.code) || intentStatus;
+    failureMessage =
+      clean(paymentError?.message)
+      || "Stripe requires customer action before this saved-card charge can complete.";
+  } else if (intentStatus === "canceled") {
+    attemptStatus = failedStatus;
+    resolvedAt = nowIso();
+    failureCode = clean(paymentError?.code) || "payment_intent_canceled";
+    failureMessage = clean(paymentError?.message) || "Stripe canceled the saved-card charge attempt.";
+  }
+
+  const { error: attemptUpdateErr } = await admin
+    .from("tenant_saved_method_payment_attempts")
+    .update({
+      attempt_status: attemptStatus,
+      stripe_payment_intent_id: paymentIntentId || null,
+      submitted_at: submittedAt,
+      resolved_at: resolvedAt,
+      failure_code: failureCode,
+      failure_message: failureMessage,
+      updated_at: nowIso(),
+    })
+    .eq("id", attemptId);
+
+  if (attemptUpdateErr) {
+    // Stripe may already have accepted the charge. Keep the reservation and
+    // the pending attempt so the same idempotency key can be investigated or
+    // retried without creating a second collection operation.
+    throw new Error(
+      `Failed to update saved-method payment attempt row after Stripe submit: ${attemptUpdateErr.message ?? "unknown error"}`,
+    );
+  }
+
+  if (attemptStatus !== "submitted") {
+    await releaseInvoiceCollectionReservation({
+      supabase: admin,
+      accountOwnerUserId,
+      invoiceId,
+      reservationKey: collectionReservationKey,
+    });
+  }
+
+  return {
+    ok: true,
+    attemptId,
+    attemptStatus,
+    stripePaymentIntentId: paymentIntentId || null,
+    failureCode,
+    failureMessage,
+  };
 }
 
 type StartManualSavedMethodAttemptParams = {
@@ -424,7 +556,20 @@ export async function startManualSavedMethodPaymentAttempt(
 
   const { data: inflightRows, error: inflightErr } = await admin
     .from("tenant_saved_method_payment_attempts")
-    .select("id")
+    .select([
+      "id",
+      "customer_id",
+      "attempt_status",
+      "failure_code",
+      "amount_cents_snapshot",
+      "stripe_connected_account_id",
+      "stripe_customer_id_snapshot",
+      "stripe_payment_method_id_snapshot",
+      "stripe_idempotency_key",
+      "billing_period_id",
+      "maintenance_agreement_id",
+      "created_at",
+    ].join(", "))
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("invoice_id", invoiceId)
     .eq("attempt_kind", "manual_saved_method")
@@ -437,7 +582,41 @@ export async function startManualSavedMethodPaymentAttempt(
     );
   }
 
-  if (Array.isArray(inflightRows) && inflightRows[0]?.id) {
+  const inflightAttempt = Array.isArray(inflightRows) ? inflightRows[0] : null;
+  if (inflightAttempt?.id) {
+    const createdAtMs = Date.parse(clean(inflightAttempt.created_at));
+    const withinStripeIdempotencyWindow = Number.isFinite(createdAtMs)
+      && createdAtMs >= Date.now() - 23 * 60 * 60 * 1000;
+    const canSafelyResumeUnknownSubmit =
+      clean(inflightAttempt.attempt_status) === "pending"
+      && clean(inflightAttempt.failure_code) === "stripe_submit_outcome_unknown"
+      && withinStripeIdempotencyWindow
+      && clean(inflightAttempt.customer_id) === customerId
+      && Number(inflightAttempt.amount_cents_snapshot ?? 0) === summary.balanceDueCents
+      && clean(inflightAttempt.stripe_connected_account_id) === connectedAccountId
+      && clean(inflightAttempt.stripe_customer_id_snapshot) === stripeCustomerId
+      && clean(inflightAttempt.stripe_payment_method_id_snapshot) === stripePaymentMethodId
+      && Boolean(clean(inflightAttempt.stripe_idempotency_key));
+
+    if (canSafelyResumeUnknownSubmit) {
+      return submitSavedMethodAttemptThroughStripe({
+        admin,
+        stripe,
+        accountOwnerUserId,
+        customerId,
+        invoiceId,
+        attemptId: clean(inflightAttempt.id),
+        attemptKind: "manual_saved_method",
+        amountCents: summary.balanceDueCents,
+        connectedAccountId,
+        stripeCustomerId,
+        stripePaymentMethodId,
+        stripeIdempotencyKey: clean(inflightAttempt.stripe_idempotency_key),
+        billingPeriodId: clean(inflightAttempt.billing_period_id) || null,
+        maintenanceAgreementId: clean(inflightAttempt.maintenance_agreement_id) || null,
+      });
+    }
+
     return { ok: false, blockedReason: "duplicate_inflight_attempt" };
   }
 

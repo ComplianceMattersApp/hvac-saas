@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import { getStripeServerClient } from "@/lib/business/platform-billing-stripe";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import { releaseInvoiceCollectionReservation } from "@/lib/business/invoice-collection-reservations";
 
 function clean(value: unknown) { return String(value ?? "").trim(); }
 
@@ -15,7 +16,7 @@ export async function closeVerifiedAbandonedStripeSession(params: {
   if (!ownerId || !paymentId) return { closed: false, reason: "invalid_request" } as const;
 
   const { data: pending, error } = await params.admin.from("internal_invoice_payments")
-    .select("id, invoice_id, job_id, amount_cents, created_at, payment_status, processor_name, payment_method, stripe_checkout_session_id")
+    .select("id, invoice_id, job_id, amount_cents, created_at, payment_status, processor_name, payment_method, stripe_checkout_session_id, collection_reservation_key")
     .eq("id", paymentId).eq("account_owner_user_id", ownerId).maybeSingle();
   if (error) throw new Error(`Failed to load pending payment: ${error.message ?? "unknown error"}`);
   if (!pending?.id || pending.payment_status !== "pending" || pending.processor_name !== "stripe" || pending.payment_method !== "card_stripe_online") {
@@ -56,5 +57,25 @@ export async function closeVerifiedAbandonedStripeSession(params: {
     .eq("id", paymentId).eq("account_owner_user_id", ownerId).eq("payment_status", "pending").select("id").maybeSingle();
   if (updateError) throw new Error(`Failed to close abandoned pending payment: ${updateError.message ?? "unknown error"}`);
   if (!updated?.id) return { closed: false, reason: "pending_row_changed" } as const;
+  const reservationKey = clean(pending.collection_reservation_key)
+    || clean(session.metadata?.collection_reservation_key);
+  if (reservationKey) {
+    try {
+      await releaseInvoiceCollectionReservation({
+        supabase: params.admin,
+        accountOwnerUserId: ownerId,
+        invoiceId: clean(pending.invoice_id),
+        reservationKey,
+      });
+    } catch (releaseError) {
+      // The financial state is already safely closed. A reservation is bounded
+      // by its TTL, so cleanup failure must not misreport the close operation.
+      console.warn("Failed to release abandoned checkout reservation", {
+        paymentId,
+        reservationKey,
+        message: releaseError instanceof Error ? releaseError.message : "unknown_error",
+      });
+    }
+  }
   return { closed: true, paymentId } as const;
 }

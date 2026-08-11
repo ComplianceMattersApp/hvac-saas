@@ -24,7 +24,7 @@ export type InvoicePaymentAllocationRow = {
 
 type MinimalInvoicePaymentSourceRow = Pick<
   InternalInvoicePaymentRow,
-  "id" | "account_owner_user_id" | "invoice_id" | "amount_cents" | "payment_status"
+  "id" | "account_owner_user_id" | "invoice_id" | "amount_cents" | "stripe_refunded_amount_cents" | "payment_status"
 >;
 
 type PersistedInvoicePaymentAllocationRow = InvoicePaymentAllocationRow & {
@@ -59,6 +59,9 @@ function normalizeMinimalPaymentSourceRow(
     account_owner_user_id: String(row.account_owner_user_id ?? "").trim(),
     invoice_id: String(row.invoice_id ?? "").trim(),
     amount_cents: Number(row.amount_cents ?? 0) || 0,
+    stripe_refunded_amount_cents: row.stripe_refunded_amount_cents == null
+      ? null
+      : Math.max(0, Number(row.stripe_refunded_amount_cents) || 0),
     payment_status: String(row.payment_status ?? "").trim().toLowerCase() as InternalInvoicePaymentRow["payment_status"],
   };
 }
@@ -97,7 +100,7 @@ export async function upsertInvoicePaymentAllocationForPaymentRow(params: {
   if (!sourcePaymentRow && paymentId) {
     const { data, error } = await params.supabase
       .from("internal_invoice_payments")
-      .select("id, account_owner_user_id, invoice_id, amount_cents, payment_status")
+      .select("id, account_owner_user_id, invoice_id, amount_cents, stripe_refunded_amount_cents, payment_status")
       .eq("id", paymentId)
       .maybeSingle();
 
@@ -152,7 +155,8 @@ export async function upsertInvoicePaymentAllocationForPaymentRow(params: {
     account_owner_user_id: sourcePaymentRow.account_owner_user_id,
     source_internal_invoice_payment_id: sourcePaymentRow.id,
     target_invoice_id: sourcePaymentRow.invoice_id,
-    allocated_amount_cents: sourcePaymentRow.amount_cents,
+    allocated_amount_cents:
+      sourcePaymentRow.amount_cents - Number(sourcePaymentRow.stripe_refunded_amount_cents ?? 0),
     allocation_status: mappedStatus,
     allocation_source_kind: "invoice_payment_record" as const,
   };
@@ -228,7 +232,8 @@ export function deriveCompatibilityInvoiceAllocations(
     .map((row) => {
       const paymentId = String(row?.id ?? "").trim();
       const invoiceId = String(row?.invoice_id ?? "").trim();
-      const amountCents = Number(row?.amount_cents ?? 0) || 0;
+      const amountCents =
+        (Number(row?.amount_cents ?? 0) || 0) - (Number(row?.stripe_refunded_amount_cents ?? 0) || 0);
 
       if (!paymentId || !invoiceId) {
         return null;

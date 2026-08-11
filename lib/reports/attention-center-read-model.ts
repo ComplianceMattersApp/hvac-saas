@@ -21,7 +21,7 @@ function clean(value: unknown) { return String(value ?? "").trim(); }
 export async function buildAttentionCenterReadModel(params: { admin: any; accountOwnerUserId: string }) {
   const ownerId = clean(params.accountOwnerUserId);
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const [paymentResult, invoiceErrorResult, voidDriftResult, reconciliationResult, moneyOutResult, chargedAfterVoidResult, staleResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
+  const [paymentResult, invoiceErrorResult, voidDriftResult, reconciliationResult, moneyOutResult, chargedAfterVoidResult, staleResult, uncertainSavedMethodResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
     params.admin.from("internal_invoice_payments")
       .select("id, invoice_id, job_id, amount_cents, paid_at, qbo_sync_status, qbo_sync_error, processor_name")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "recorded")
@@ -63,12 +63,20 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       .select("id, invoice_id, job_id, amount_cents, created_at, stripe_checkout_session_id")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "pending").eq("processor_name", "stripe")
       .lte("created_at", staleBefore).order("created_at", { ascending: true }).limit(100),
+    // A Stripe API/network failure can leave the submit outcome unknowable.
+    // These attempts remain locked and must surface distinctly from a decline:
+    // the customer may already have been charged.
+    params.admin.from("tenant_saved_method_payment_attempts")
+      .select("id, invoice_id, amount_cents_snapshot, attempt_kind, failure_message, updated_at")
+      .eq("account_owner_user_id", ownerId).eq("attempt_status", "pending")
+      .eq("failure_code", "stripe_submit_outcome_unknown")
+      .lte("updated_at", staleBefore).order("updated_at", { ascending: true }).limit(100),
     params.admin.from("qbo_connections")
       .select("status, last_sync_error, updated_at").eq("account_owner_user_id", ownerId).maybeSingle(),
     loadFailedPaymentReconciliationItems({ admin: params.admin, accountOwnerUserId: ownerId, limit: 250 }),
     listFieldPaymentCollectionReportsForReconciliation({ admin: params.admin, accountOwnerUserId: ownerId, limit: 250 }),
   ]);
-  for (const result of [paymentResult, invoiceErrorResult, staleResult, connectionResult]) {
+  for (const result of [paymentResult, invoiceErrorResult, staleResult, uncertainSavedMethodResult, connectionResult]) {
     if (result.error) throw new Error(`Failed to load attention center: ${result.error.message ?? "unknown error"}`);
   }
 
@@ -76,12 +84,14 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     ...(paymentResult.data ?? []).map((row: any) => clean(row.invoice_id)),
     ...(chargedAfterVoidResult.error ? [] : (chargedAfterVoidResult.data ?? [])).map((row: any) => clean(row.invoice_id)),
     ...(moneyOutResult.error ? [] : (moneyOutResult.data ?? [])).map((row: any) => clean(row.invoice_id)),
+    ...(uncertainSavedMethodResult.data ?? []).map((row: any) => clean(row.invoice_id)),
   ].filter(Boolean))];
   const labelsResult = invoiceIds.length
-    ? await params.admin.from("internal_invoices").select("id, invoice_number, invoice_display_number").eq("account_owner_user_id", ownerId).in("id", invoiceIds)
+    ? await params.admin.from("internal_invoices").select("id, job_id, invoice_number, invoice_display_number").eq("account_owner_user_id", ownerId).in("id", invoiceIds)
     : { data: [], error: null };
   if (labelsResult.error) throw new Error(`Failed to load attention invoice labels: ${labelsResult.error.message}`);
   const labels = new Map((labelsResult.data ?? []).map((row: any) => [clean(row.id), clean(row.invoice_display_number) || clean(row.invoice_number) || clean(row.id)]));
+  const jobIds = new Map((labelsResult.data ?? []).map((row: any) => [clean(row.id), clean(row.job_id)]));
 
   const items: AttentionItem[] = [];
   for (const payment of paymentResult.data ?? []) {
@@ -176,10 +186,10 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     } else {
       const refunded = `$${(Number(payment.stripe_refunded_amount_cents ?? 0) / 100).toFixed(2)}`;
       items.push({ id: `stripe-partial-refund-${paymentId}`, category: "qbo_payment", severity: "critical",
-        title: `Partial refund needs allocation · Invoice ${label}`,
+        title: `Partial refund needs accounting follow-up · Invoice ${label}`,
         detail: `Stripe refunded ${refunded} of a ${amount} payment.`,
-        truth: "The money left, but EveryStep still counts the full payment as collected — reversal is all-or-nothing here, so the balance must be corrected by hand.",
-        occurredAt: clean(payment.paid_at) || null, href, actionLabel: "Correct the balance", paymentId,
+        truth: "EveryStep reopened the refunded portion of the invoice balance. Confirm the refund and remaining receivable are also reflected correctly in QuickBooks.",
+        occurredAt: clean(payment.paid_at) || null, href, actionLabel: "Review accounting", paymentId,
       });
     }
   }
@@ -207,6 +217,18 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       title: "Stale Stripe checkout session", detail: "A Stripe checkout session has remained pending longer than 15 minutes.",
       truth: "This is not counted as collected money until Stripe confirms payment.", occurredAt: clean(payment.created_at) || null,
       href: "/reports/stripe-reconciliation", actionLabel: "Inspect Stripe session",
+    });
+  }
+  for (const attempt of uncertainSavedMethodResult.data ?? []) {
+    const attemptId = clean(attempt.id); const invoiceId = clean(attempt.invoice_id); const jobId = jobIds.get(invoiceId) ?? "";
+    const amount = `$${(Number(attempt.amount_cents_snapshot ?? 0) / 100).toFixed(2)}`;
+    items.push({ id: `stripe-submit-unknown-${attemptId}`, category: "stripe_pending", severity: "critical",
+      title: `Stripe charge outcome is unknown Â· Invoice ${labels.get(invoiceId) ?? invoiceId}`,
+      detail: clean(attempt.failure_message) || `Stripe did not return a final result for this ${amount} saved-card attempt.`,
+      truth: "Do not collect again through another channel. Retry only through the original operation or verify the charge in Stripe first; the customer may already have been charged.",
+      occurredAt: clean(attempt.updated_at) || null,
+      href: jobId ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace` : "/reports/payments",
+      actionLabel: "Verify in Stripe",
     });
   }
 

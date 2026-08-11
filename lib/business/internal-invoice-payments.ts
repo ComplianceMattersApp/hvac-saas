@@ -15,6 +15,10 @@ import {
 } from "@/lib/business/platform-application-fees";
 import { normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { checkQboBalanceBeforeCollection } from "@/lib/qbo/qbo-collection-preflight";
+import {
+  claimInvoiceCollectionReservation,
+  releaseInvoiceCollectionReservation,
+} from "@/lib/business/invoice-collection-reservations";
 
 export const INTERNAL_INVOICE_PAYMENT_STATUSES = [
   "recorded",
@@ -58,9 +62,11 @@ export type InternalInvoicePaymentRow = {
   reversal_reason?: string | null;
   processor_name?: string | null;
   stripe_checkout_session_id?: string | null;
+  collection_reservation_key?: string | null;
   stripe_event_id?: string | null;
   stripe_payment_intent_id?: string | null;
   stripe_charged_at?: string | null;
+  stripe_refunded_amount_cents?: number | null;
   qbo_sync_status?: "not_synced" | "pending" | "synced" | "failed" | null;
   qbo_payment_id?: string | null;
   qbo_last_synced_at?: string | null;
@@ -122,6 +128,13 @@ function buildPublicTenantInvoiceCheckoutReturnPath(params: {
 
 function buildPublicTenantInvoicePaymentPath(token: string) {
   return `/payments/invoice/${encodeURIComponent(token)}`;
+}
+
+function isDatabaseUniqueConflict(error: unknown): boolean {
+  const code = String((error as { code?: unknown } | null)?.code ?? "").trim();
+  if (code === "23505") return true;
+  const message = String((error as { message?: unknown } | null)?.message ?? "").toLowerCase();
+  return message.includes("duplicate key") || message.includes("unique constraint");
 }
 
 function resolvePaymentLinkSigningSecret(explicitSecret?: string | null) {
@@ -250,9 +263,11 @@ const INTERNAL_INVOICE_PAYMENT_SELECT = [
   "reversal_reason",
   "processor_name",
   "stripe_checkout_session_id",
+  "collection_reservation_key",
   "stripe_event_id",
   "stripe_payment_intent_id",
   "stripe_charged_at",
+  "stripe_refunded_amount_cents",
   "qbo_sync_status",
   "qbo_payment_id",
   "qbo_last_synced_at",
@@ -298,9 +313,13 @@ function normalizePaymentRow(row: any): InternalInvoicePaymentRow {
     reversal_reason: String(row?.reversal_reason ?? "").trim() || null,
     processor_name: String(row?.processor_name ?? "").trim() || null,
     stripe_checkout_session_id: String(row?.stripe_checkout_session_id ?? "").trim() || null,
+    collection_reservation_key: String(row?.collection_reservation_key ?? "").trim() || null,
     stripe_event_id: String(row?.stripe_event_id ?? "").trim() || null,
     stripe_payment_intent_id: String(row?.stripe_payment_intent_id ?? "").trim() || null,
     stripe_charged_at: String(row?.stripe_charged_at ?? "").trim() || null,
+    stripe_refunded_amount_cents: row?.stripe_refunded_amount_cents == null
+      ? null
+      : Math.max(0, Number(row.stripe_refunded_amount_cents) || 0),
     qbo_sync_status: ["not_synced", "pending", "synced", "failed"].includes(String(row?.qbo_sync_status ?? ""))
       ? row.qbo_sync_status
       : null,
@@ -475,6 +494,7 @@ export async function isStripePaymentAlreadyRecorded(params: {
     .select("id")
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("invoice_id", invoiceId)
+    .neq("payment_status", "failed")
     .or(identityClauses.join(","))
     .limit(1);
 
@@ -524,7 +544,10 @@ export function buildStripePaymentReference(charge: any): {
   stripe_charged_at: string | null;
 } {
   const chargeId = String(charge?.id ?? "").trim() || null;
-  const intentId = String(charge?.payment_intent ?? "").trim() || null;
+  const intentId =
+    (typeof charge?.payment_intent === "string"
+      ? String(charge.payment_intent).trim()
+      : String(charge?.payment_intent?.id ?? "").trim()) || null;
   const chargedAtUnix = Number(charge?.created) || null;
 
   let stripe_charged_at: string | null = null;
@@ -615,11 +638,103 @@ export async function createTenantInvoiceCheckoutSession(params: {
   }
 
   const balanceDueCents = paymentSummary.balanceDueCents;
+  const currentPaymentRows = await listInvoicePaymentRows(accountOwnerUserId, invoiceId, params.supabase);
+  const storedCheckoutRows = currentPaymentRows.filter((row) =>
+    row.payment_status === "pending" &&
+    (row.payment_method === "card_stripe_online" || String(row.processor_name ?? "").toLowerCase() === "stripe"),
+  );
+
+  // Repeated clicks and simultaneous public/internal submissions must converge
+  // on one Stripe Session. A pending paid Session means webhook confirmation is
+  // lagging, so fail closed rather than expose a second way to charge the card.
+  for (const row of storedCheckoutRows) {
+    const storedSessionId = String(row.stripe_checkout_session_id ?? "").trim();
+    if (!storedSessionId) {
+      throw new Error("An existing Stripe checkout attempt is missing its Session identity. Review it before collecting again.");
+    }
+
+    let storedSession: Stripe.Checkout.Session;
+    try {
+      storedSession = await stripe.checkout.sessions.retrieve(
+        storedSessionId,
+        {},
+        { stripeAccount: readiness.connectedAccountId },
+      );
+    } catch (error) {
+      throw new Error(
+        `Could not verify existing Stripe checkout session ${storedSessionId}; refusing a second collection attempt. ${error instanceof Error ? error.message : "unknown error"}`,
+      );
+    }
+
+    const metadataMatches =
+      String(storedSession.metadata?.account_owner_user_id ?? "").trim() === accountOwnerUserId &&
+      String(storedSession.metadata?.invoice_id ?? "").trim() === invoiceId &&
+      String(storedSession.metadata?.job_id ?? "").trim() === jobId;
+    if (!metadataMatches) {
+      throw new Error("Existing Stripe checkout Session metadata does not match this invoice. Review it before collecting again.");
+    }
+
+    if (String(storedSession.payment_status ?? "").toLowerCase() === "paid") {
+      throw new Error("Stripe already shows a paid checkout for this invoice and EveryStep is awaiting confirmation.");
+    }
+
+    const storedStatus = String(storedSession.status ?? "").toLowerCase();
+    const storedAmountCents = Number(storedSession.amount_total ?? 0) || 0;
+    const storedUrl = String(storedSession.url ?? "").trim();
+    if (storedStatus === "open" && storedAmountCents === balanceDueCents && storedUrl) {
+      const storedReservationKey =
+        String(storedSession.metadata?.collection_reservation_key ?? "").trim() ||
+        `checkout-session:${storedSessionId}`;
+      const claimed = await claimInvoiceCollectionReservation({
+        supabase: params.supabase,
+        accountOwnerUserId,
+        invoiceId,
+        sourceKind: "stripe_checkout",
+        reservationKey: storedReservationKey,
+        amountCents: balanceDueCents,
+        ttlSeconds: 90000,
+      });
+      if (!claimed) {
+        throw new Error("Another payment collection is already in progress for this invoice.");
+      }
+      return {
+        checkoutSessionId: storedSessionId,
+        checkoutSessionUrl: storedUrl,
+        connectedAccountId: readiness.connectedAccountId,
+        balanceDueCents,
+      };
+    }
+
+    if (storedStatus === "open") {
+      try {
+        await stripe.checkout.sessions.expire(
+          storedSessionId,
+          {},
+          { stripeAccount: readiness.connectedAccountId },
+        );
+      } catch (error) {
+        throw new Error(
+          `Could not expire stale Stripe checkout session ${storedSessionId}; refusing a second collection attempt. ${error instanceof Error ? error.message : "unknown error"}`,
+        );
+      }
+      continue;
+    }
+
+    if (storedStatus !== "expired") {
+      throw new Error(`Stripe checkout session ${storedSessionId} is ${storedStatus || "unresolved"}; refusing a second collection attempt.`);
+    }
+  }
+
+  const checkoutGeneration = currentPaymentRows.filter((row) =>
+    String(row.stripe_checkout_session_id ?? "").trim().length > 0,
+  ).length;
+  const checkoutIdempotencyKey = `invoice-checkout:${invoiceId}:${balanceDueCents}:${checkoutGeneration}`;
   const checkoutMetadata = {
     account_owner_user_id: accountOwnerUserId,
     invoice_id: invoiceId,
     job_id: jobId,
     invoice_number: String(invoice.invoice_number ?? "").trim() || invoiceId,
+    collection_reservation_key: checkoutIdempotencyKey,
   };
   const platformFeeConfig = derivePlatformApplicationFeeConfig({
     stripeConnectReady: readiness.isReady,
@@ -636,9 +751,22 @@ export async function createTenantInvoiceCheckoutSession(params: {
       ? { application_fee_amount: platformFee.applicationFeeAmountCents }
       : {}),
   };
+  const claimed = await claimInvoiceCollectionReservation({
+    supabase: params.supabase,
+    accountOwnerUserId,
+    invoiceId,
+    sourceKind: "stripe_checkout",
+    reservationKey: checkoutIdempotencyKey,
+    amountCents: balanceDueCents,
+    ttlSeconds: 90000,
+  });
+  if (!claimed) {
+    throw new Error("Another payment collection is already in progress for this invoice.");
+  }
 
-  const session = await stripe.checkout.sessions.create(
-    {
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [
         {
@@ -669,16 +797,30 @@ export async function createTenantInvoiceCheckoutSession(params: {
       ...(String(invoice.billing_email ?? "").trim()
         ? { customer_email: String(invoice.billing_email).trim() }
         : {}),
-    },
-    {
+    }, {
       stripeAccount: readiness.connectedAccountId,
-    },
-  );
+      idempotencyKey: checkoutIdempotencyKey,
+    });
+  } catch (error) {
+    await releaseInvoiceCollectionReservation({
+      supabase: params.supabase,
+      accountOwnerUserId,
+      invoiceId,
+      reservationKey: checkoutIdempotencyKey,
+    });
+    throw error;
+  }
 
   const checkoutSessionId = String(session.id ?? "").trim();
   const checkoutSessionUrl = String(session.url ?? "").trim();
 
   if (!checkoutSessionId || !checkoutSessionUrl) {
+    await releaseInvoiceCollectionReservation({
+      supabase: params.supabase,
+      accountOwnerUserId,
+      invoiceId,
+      reservationKey: checkoutIdempotencyKey,
+    });
     throw new Error("Stripe checkout session response was missing id or url.");
   }
 
@@ -698,9 +840,20 @@ export async function createTenantInvoiceCheckoutSession(params: {
       processor_name: "stripe",
       processor_payment_reference: checkoutSessionId,
       stripe_checkout_session_id: checkoutSessionId,
+      collection_reservation_key: checkoutIdempotencyKey,
+      stripe_identity_dedupe_scope: "checkout_v1",
     });
 
   if (pendingInsertErr) {
+    if (isDatabaseUniqueConflict(pendingInsertErr)) {
+      return {
+        checkoutSessionId,
+        checkoutSessionUrl,
+        connectedAccountId: readiness.connectedAccountId,
+        balanceDueCents,
+      };
+    }
+
     try {
       await stripe.checkout.sessions.expire(
         checkoutSessionId,
@@ -715,6 +868,12 @@ export async function createTenantInvoiceCheckoutSession(params: {
         message: error instanceof Error ? error.message : "unknown_error",
       });
     }
+    await releaseInvoiceCollectionReservation({
+      supabase: params.supabase,
+      accountOwnerUserId,
+      invoiceId,
+      reservationKey: checkoutIdempotencyKey,
+    });
     throw new Error(`Failed to store pending Stripe checkout session: ${pendingInsertErr.message ?? "unknown error"}`);
   }
 
@@ -818,36 +977,50 @@ export async function expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice(pa
   }
 
   const paymentRows = await listInvoicePaymentRows(accountOwnerUserId, invoiceId, params.supabase);
-  const checkoutSessionIds = Array.from(
-    new Set(
-      paymentRows
-        .filter((row) => row.payment_status === "pending")
-        .filter((row) => row.payment_method === "card_stripe_online" || String(row.processor_name ?? "").toLowerCase() === "stripe")
-        .map((row) => String(row.stripe_checkout_session_id ?? "").trim())
-        .filter(Boolean),
-    ),
-  );
+  const checkoutSessions = Array.from(new Map(
+    paymentRows
+      .filter((row) => row.payment_status === "pending")
+      .filter((row) => row.payment_method === "card_stripe_online" || String(row.processor_name ?? "").toLowerCase() === "stripe")
+      .map((row) => ({
+        sessionId: String(row.stripe_checkout_session_id ?? "").trim(),
+        reservationKey: String(row.collection_reservation_key ?? "").trim(),
+      }))
+      .filter((row) => Boolean(row.sessionId))
+      .map((row) => [row.sessionId, row] as const),
+  ).values());
 
-  if (checkoutSessionIds.length === 0) {
+  if (checkoutSessions.length === 0) {
     return { attempted: 0, expired: 0, skipped: 0 };
   }
 
   const readiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, params.supabase);
   if (!readiness.isReady || !readiness.connectedAccountId) {
-    return { attempted: 0, expired: 0, skipped: checkoutSessionIds.length };
+    return { attempted: 0, expired: 0, skipped: checkoutSessions.length };
   }
 
   const stripe = params.stripe ?? getStripeServerClient();
   let expired = 0;
   let skipped = 0;
 
-  for (const checkoutSessionId of checkoutSessionIds) {
+  for (const checkoutRow of checkoutSessions) {
+    const checkoutSessionId = checkoutRow.sessionId;
     try {
-      await stripe.checkout.sessions.expire(
+      const expiredSession = await stripe.checkout.sessions.expire(
         checkoutSessionId,
         {},
         { stripeAccount: readiness.connectedAccountId },
       );
+      const reservationKey =
+        checkoutRow.reservationKey
+        || String(expiredSession?.metadata?.collection_reservation_key ?? "").trim();
+      if (reservationKey) {
+        await releaseInvoiceCollectionReservation({
+          supabase: params.supabase,
+          accountOwnerUserId,
+          invoiceId,
+          reservationKey,
+        });
+      }
       expired += 1;
     } catch (error) {
       skipped += 1;
@@ -861,7 +1034,7 @@ export async function expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice(pa
   }
 
   return {
-    attempted: checkoutSessionIds.length,
+    attempted: checkoutSessions.length,
     expired,
     skipped,
   };

@@ -109,6 +109,32 @@ describe('internal invoice payment resolver', () => {
     expect(summary.paymentStatus).toBe('unpaid');
   });
 
+  it('counts only the net collected amount after a partial Stripe refund', async () => {
+    const supabase = makeSupabaseMock({
+      invoiceTotalCents: 10000,
+      payments: [{
+        id: 'p-refund',
+        account_owner_user_id: 'owner-1',
+        invoice_id: 'inv-1',
+        job_id: 'job-1',
+        payment_status: 'recorded',
+        payment_method: 'card_stripe_online',
+        amount_cents: 10000,
+        stripe_refunded_amount_cents: 2500,
+        paid_at: '2026-08-10T00:00:00Z',
+        recorded_by_user_id: 'owner-1',
+        created_at: '2026-08-10T00:00:00Z',
+        updated_at: '2026-08-10T00:00:00Z',
+      }],
+    });
+
+    const summary = await resolveInvoiceCollectedPaymentSummary('owner-1', 'inv-1', supabase);
+
+    expect(summary.amountPaidCents).toBe(7500);
+    expect(summary.balanceDueCents).toBe(2500);
+    expect(summary.paymentStatus).toBe('partial');
+  });
+
   it('balance due clamps at zero when recorded exceeds invoice total', async () => {
     const supabase = makeSupabaseMock({
       invoiceTotalCents: 5000,
@@ -272,6 +298,7 @@ describe('internal invoice payment resolver', () => {
         from: vi.fn(() => {
           const query: any = {
             eq: vi.fn(() => query),
+            neq: vi.fn(() => query),
             or: vi.fn(() => query),
             limit: vi.fn(async () => ({
               data: [{ id: 'pay-1' }, { id: 'pay-2' }],
@@ -421,6 +448,18 @@ describe('internal invoice payment resolver', () => {
       expect(ref.processor_charge_id).toBe('ch_test_missing_intent');
       expect(ref.stripe_payment_intent_id).toBeNull();
       expect(ref.stripe_charged_at).toBe('2025-05-20T16:00:00.000Z');
+    });
+
+    it('extracts an expanded PaymentIntent object without stringifying it', () => {
+      const ref = buildStripePaymentReference({
+        id: 'ch_expanded_1',
+        payment_intent: { id: 'pi_expanded_1' },
+        created: 1747756800,
+      });
+
+      expect(ref.processor_payment_reference).toBe('ch_expanded_1');
+      expect(ref.stripe_payment_intent_id).toBe('pi_expanded_1');
+      expect(ref.stripe_payment_intent_id).not.toBe('[object Object]');
     });
 
     it('handles null/undefined charge gracefully', () => {

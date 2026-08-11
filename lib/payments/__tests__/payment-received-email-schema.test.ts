@@ -49,7 +49,7 @@ const revalidatePathMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const resolveFieldBillingCapabilitiesMock = vi.fn();
 const loadFieldBillingExplicitCapabilitiesForUserMock = vi.fn();
-const autoSyncRecordedPaymentToQboMock = vi.fn(async () => undefined);
+const autoSyncRecordedPaymentToQboMock = vi.fn(async (_args?: unknown) => undefined);
 
 vi.mock("@/lib/payments/payment-received-email", () => ({
   deliverInternalPaymentReceivedEmail: (args: unknown) => deliverInternalPaymentReceivedEmailMock(args),
@@ -134,6 +134,15 @@ function makeSupabaseFixture() {
   const writes: Array<{ table: string; op: string; payload?: unknown }> = [];
 
   const supabase = {
+    rpc: vi.fn(async (functionName: string) => {
+      if (functionName === "claim_internal_invoice_collection_reservation") {
+        return { data: true, error: null };
+      }
+      if (functionName === "release_internal_invoice_collection_reservation") {
+        return { data: true, error: null };
+      }
+      throw new Error(`Unexpected RPC ${functionName}`);
+    }),
     from: vi.fn((table: string) => {
       if (table === "internal_invoice_payments") {
         return {

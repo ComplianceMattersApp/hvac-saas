@@ -58,6 +58,10 @@ vi.mock('@/lib/business/tenant-saved-method-payment-attempts', () => ({
 function makeIdentityRow(overrides?: Partial<Record<string, unknown>>) {
   return {
     id: 'payment-existing',
+    account_owner_user_id: 'owner-1',
+    invoice_id: 'inv-1',
+    job_id: 'job-1',
+    amount_cents: 5000,
     stripe_checkout_session_id: null,
     stripe_payment_intent_id: null,
     processor_charge_id: null,
@@ -131,6 +135,7 @@ function makeAdminInsertSuccess(opts?: {
     if (table === 'internal_invoice_payments') {
       const selectQuery: any = {
         eq: vi.fn(() => selectQuery),
+        neq: vi.fn(() => selectQuery),
         or: vi.fn(() => selectQuery),
         order: vi.fn(() => selectQuery),
         limit: vi.fn(async (count: number) => ({
@@ -691,6 +696,101 @@ describe('tenant invoice Stripe webhook handlers', () => {
       );
     });
 
+    it('charge event recovers its Checkout Session and enriches a paid row even after the invoice is closed', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-checkout-recorded-first',
+            stripe_checkout_session_id: 'cs_recovered_1',
+            stripe_payment_intent_id: null,
+            processor_charge_id: null,
+          }),
+        ],
+      });
+      mockResolveJobBlocksOnlineInvoicePayment.mockResolvedValue(true);
+      mockBuildStripePaymentReference.mockReturnValue({
+        processor_name: 'stripe',
+        processor_payment_reference: 'ch_expanded_1',
+        processor_charge_id: 'ch_expanded_1',
+        stripe_payment_intent_id: 'pi_expanded_1',
+        stripe_charged_at: '2026-05-19T00:00:00.000Z',
+      });
+      const checkoutList = vi.fn(async () => ({
+        data: [
+          baseCheckoutSession({
+            id: 'cs_recovered_1',
+            payment_intent: { id: 'pi_expanded_1' } as Stripe.PaymentIntent,
+          }),
+        ],
+      }));
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge({
+          payment_intent: { id: 'pi_expanded_1' } as Stripe.PaymentIntent,
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            job_id: 'job-1',
+          },
+        }),
+        eventId: 'evt_charge_after_invoice_closed',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+        stripe: { checkout: { sessions: { list: checkoutList } } },
+      });
+
+      expect(checkoutList).toHaveBeenCalledWith(
+        { payment_intent: 'pi_expanded_1', limit: 3 },
+        { stripeAccount: 'acct_connected_1' },
+      );
+      expect(result).toEqual(expect.objectContaining({
+        recorded: false,
+        paymentId: 'payment-checkout-recorded-first',
+      }));
+      expect(insert).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith(expect.objectContaining({
+        stripe_payment_intent_id: 'pi_expanded_1',
+        processor_charge_id: 'ch_expanded_1',
+      }));
+      expect(mockResolveJobBlocksOnlineInvoicePayment).not.toHaveBeenCalled();
+    });
+
+    it('checkout event persists expanded PaymentIntent and latest Charge ids', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+      const retrieve = vi.fn(async () => ({
+        id: 'pi_expanded_checkout_1',
+        created: 1747756800,
+        latest_charge: { id: 'ch_expanded_checkout_1' },
+      }));
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession({
+          payment_intent: { id: 'pi_expanded_checkout_1' } as Stripe.PaymentIntent,
+        }),
+        eventId: 'evt_checkout_expanded_identity',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+        stripe: { paymentIntents: { retrieve } } as any,
+      });
+
+      expect(result.recorded).toBe(true);
+      expect(retrieve).toHaveBeenCalledWith(
+        'pi_expanded_checkout_1',
+        {},
+        { stripeAccount: 'acct_connected_1' },
+      );
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+        stripe_payment_intent_id: 'pi_expanded_checkout_1',
+        processor_charge_id: 'ch_expanded_checkout_1',
+      }));
+    });
+
     it('checkout.session.completed first then charge.succeeded uses one canonical payment row', async () => {
       const { recordTenantInvoicePaymentFromStripeCharge } = await import(
         '@/lib/business/tenant-invoice-stripe-webhooks'
@@ -814,6 +914,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
         identityRowsByCall: [
           [],
           [],
+          [],
           [
             makeIdentityRow({
               id: 'payment-canonical',
@@ -854,6 +955,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
           message: 'duplicate key value violates unique constraint',
         },
         identityRowsByCall: [
+          [],
           [],
           [
             makeIdentityRow({

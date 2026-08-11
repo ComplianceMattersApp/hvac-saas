@@ -27,6 +27,11 @@ import { autoSyncRecordedPaymentToQbo } from '@/lib/qbo/qbo-payment-auto-sync';
 import { deliverInternalPaymentReceivedEmail } from '@/lib/payments/payment-received-email';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import {
+  claimInvoiceCollectionReservation,
+  releaseInvoiceCollectionReservation,
+  type InvoiceCollectionSourceKind,
+} from '@/lib/business/invoice-collection-reservations';
+import {
   type TenantInvoiceCheckoutSessionActionState,
   INITIAL_TENANT_INVOICE_CHECKOUT_SESSION_ACTION_STATE,
 } from '@/lib/actions/internal-invoice-payment-actions-state';
@@ -199,29 +204,104 @@ async function createFinalManualInvoicePaymentTruthRecord(params: {
   receivedReference?: string | null;
   notes?: string | null;
   recordedByUserId: string;
+  sourceKind: Extract<InvoiceCollectionSourceKind, 'manual_off_platform' | 'field_payment_verification'>;
+  operationKey: string;
 }) {
-  const { data: insertedPayment, error: insertErr } = await params.supabase
-    .from('internal_invoice_payments')
-    .insert({
-      account_owner_user_id: params.accountOwnerUserId,
-      invoice_id: params.invoiceId,
-      job_id: params.jobId,
-      payment_status: 'recorded',
-      payment_method: params.method,
-      amount_cents: params.amountCents,
-      paid_at: new Date().toISOString(),
-      received_reference: params.receivedReference ?? null,
-      notes: params.notes ?? null,
-      recorded_by_user_id: params.recordedByUserId,
-    })
-    .select('id')
-    .single();
+  const reservationKey = `${params.sourceKind}:${params.operationKey}`;
+  const claimed = await claimInvoiceCollectionReservation({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+    invoiceId: params.invoiceId,
+    sourceKind: params.sourceKind,
+    reservationKey,
+    amountCents: params.amountCents,
+    ttlSeconds: 300,
+  });
+  if (!claimed) {
+    throw new Error('Another payment collection is already in progress for this invoice. Resolve it before recording payment.');
+  }
 
-  if (insertErr) throw insertErr;
+  let insertedPayment: { id?: string | null } | null = null;
+  try {
+    const result = await params.supabase
+      .from('internal_invoice_payments')
+      .insert({
+        account_owner_user_id: params.accountOwnerUserId,
+        invoice_id: params.invoiceId,
+        job_id: params.jobId,
+        payment_status: 'recorded',
+        payment_method: params.method,
+        amount_cents: params.amountCents,
+        paid_at: new Date().toISOString(),
+        received_reference: params.receivedReference ?? null,
+        notes: params.notes ?? null,
+        recorded_by_user_id: params.recordedByUserId,
+        collection_reservation_key: reservationKey,
+      })
+      .select('id')
+      .single();
+    if (result.error) throw result.error;
+    insertedPayment = result.data;
+  } catch (error) {
+    try {
+      await releaseInvoiceCollectionReservation({
+        supabase: params.supabase,
+        accountOwnerUserId: params.accountOwnerUserId,
+        invoiceId: params.invoiceId,
+        reservationKey,
+      });
+    } catch (releaseError) {
+      console.warn('Failed to release invoice collection reservation after manual payment insert failure', {
+        invoiceId: params.invoiceId,
+        reservationKey,
+        message: releaseError instanceof Error ? releaseError.message : 'unknown_error',
+      });
+    }
+    const databaseCode = String((error as { code?: unknown } | null)?.code ?? '').trim();
+    if (databaseCode === '23505') {
+      const { data: existingPayment, error: existingPaymentError } = await params.supabase
+        .from('internal_invoice_payments')
+        .select('id, account_owner_user_id, invoice_id, job_id, amount_cents, payment_method, payment_status')
+        .eq('account_owner_user_id', params.accountOwnerUserId)
+        .eq('collection_reservation_key', reservationKey)
+        .maybeSingle();
+      if (existingPaymentError) throw existingPaymentError;
+      if (
+        existingPayment?.id
+        && existingPayment.invoice_id === params.invoiceId
+        && existingPayment.job_id === params.jobId
+        && Number(existingPayment.amount_cents ?? 0) === params.amountCents
+        && existingPayment.payment_method === params.method
+        && existingPayment.payment_status === 'recorded'
+      ) {
+        return { paymentId: String(existingPayment.id) };
+      }
+    }
+    throw error;
+  }
 
   const paymentId = String(insertedPayment?.id ?? '').trim();
   if (!paymentId) {
     throw new Error('Failed to create final payment truth row.');
+  }
+
+  try {
+    await releaseInvoiceCollectionReservation({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+      invoiceId: params.invoiceId,
+      reservationKey,
+    });
+  } catch (error) {
+    // Payment truth already exists and the database balance guard now blocks a
+    // duplicate. Do not report the collection as failed merely because this
+    // short-lived lock could not be cleaned up; it will expire automatically.
+    console.warn('Failed to release invoice collection reservation after manual payment truth was recorded', {
+      paymentId,
+      invoiceId: params.invoiceId,
+      reservationKey,
+      message: error instanceof Error ? error.message : 'unknown_error',
+    });
   }
 
   const allocationUpsertResult = await upsertInvoicePaymentAllocationForPaymentRow({
@@ -301,6 +381,10 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   const invoiceIdInput = getTrimmedString(formData.get('invoice_id'));
   const tab = getTrimmedString(formData.get('tab')) || 'info';
   const returnTo = getTrimmedString(formData.get('return_to'));
+  const requestedPaymentOperationId = getTrimmedString(formData.get('payment_operation_id'));
+  const paymentOperationId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestedPaymentOperationId)
+    ? requestedPaymentOperationId
+    : globalThis.crypto.randomUUID();
 
   if (!jobId) {
     throw new Error('Job ID is required.');
@@ -384,6 +468,15 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_overpay_denied', returnTo));
   }
 
+  const checkoutExpiration = await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
+  });
+  if (checkoutExpiration.skipped > 0) {
+    throw new Error('An open Stripe checkout could not be safely expired. Resolve it before recording another payment.');
+  }
+
   const paymentTruth = await createFinalManualInvoicePaymentTruthRecord({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -394,12 +487,8 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     receivedReference: getOptionalText(formData.get('received_reference')),
     notes: getOptionalText(formData.get('notes')),
     recordedByUserId: userId,
-  });
-
-  await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    invoiceId: invoice.id,
+    sourceKind: 'manual_off_platform',
+    operationKey: paymentOperationId,
   });
 
   await insertJobEvent({
@@ -1209,6 +1298,15 @@ export async function verifyFieldPaymentCollectionReportFromForm(formData: FormD
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_overpay_denied', returnTo));
   }
 
+  const checkoutExpiration = await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
+  });
+  if (checkoutExpiration.skipped > 0) {
+    throw new Error('An open Stripe checkout could not be safely expired. Resolve it before verifying another payment.');
+  }
+
   const paymentTruth = await createFinalManualInvoicePaymentTruthRecord({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -1219,12 +1317,8 @@ export async function verifyFieldPaymentCollectionReportFromForm(formData: FormD
     receivedReference: getOptionalText(reportRow.reference),
     notes: getOptionalText(reportRow.note),
     recordedByUserId: userId,
-  });
-
-  await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    invoiceId: invoice.id,
+    sourceKind: 'field_payment_verification',
+    operationKey: reportId,
   });
 
   const nowIso = new Date().toISOString();

@@ -24,7 +24,7 @@ type TestState = {
   invoiceStatus?: string;
   balanceDueCents?: number;
   setupAuthorized?: boolean;
-  inflightAttempt?: boolean;
+  inflightAttempt?: boolean | Record<string, unknown>;
   paymentIntentStatus?: string;
   paymentIntentFailureCode?: string | null;
   paymentIntentFailureMessage?: string | null;
@@ -95,7 +95,12 @@ function makeAdmin(state: TestState = {}) {
         if (table === "tenant_saved_method_payment_attempts") {
           const byInvoice = String(filters.invoice_id ?? "");
           if (inflightAttempt && byInvoice === "inv-1") {
-            return { data: [{ id: "attempt-inflight" }], error: null };
+            return {
+              data: [typeof inflightAttempt === "object"
+                ? inflightAttempt
+                : { id: "attempt-inflight" }],
+              error: null,
+            };
           }
 
           if (String(filters.id ?? "") === "attempt-webhook") {
@@ -137,6 +142,7 @@ function makeAdmin(state: TestState = {}) {
   return {
     writes,
     admin: {
+      rpc: vi.fn(async () => ({ data: true, error: null })),
       from: (table: string) => {
         const selectQuery = makeSelectQuery(table);
 
@@ -344,6 +350,7 @@ describe("tenant saved-method payment attempts", () => {
         customer_id: "cust-1",
         invoice_id: "inv-1",
         attempt_kind: "manual_saved_method",
+        collection_reservation_key: expect.stringContaining("manual_saved_method:owner-1:inv-1:"),
       }),
     );
     expect(requestOptions).toEqual(
@@ -355,6 +362,162 @@ describe("tenant saved-method payment attempts", () => {
     expect(ctx.writes.some((w) => w.table === "tenant_saved_method_payment_attempts" && w.op === "insert")).toBe(true);
     expect(ctx.writes.some((w) => w.table === "internal_invoice_payments")).toBe(false);
     expect(ctx.writes.some((w) => w.table === "internal_invoice_payment_allocations")).toBe(false);
+  });
+
+  it("retries an ambiguous Stripe transport failure with the same idempotency key", async () => {
+    const ctx = makeAdmin();
+    ctx.setupMocks();
+    const stripe = {
+      paymentIntents: {
+        create: vi.fn()
+          .mockRejectedValueOnce(Object.assign(new Error("connection reset"), { type: "StripeConnectionError" }))
+          .mockResolvedValueOnce({ id: "pi_recovered", status: "processing", last_payment_error: null }),
+      },
+    };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result).toEqual(expect.objectContaining({ attemptStatus: "submitted", stripePaymentIntentId: "pi_recovered" }));
+    expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(2);
+    expect(stripe.paymentIntents.create.mock.calls[1]?.[1]).toEqual(stripe.paymentIntents.create.mock.calls[0]?.[1]);
+  });
+
+  it("keeps the attempt pending when Stripe's outcome remains unknown", async () => {
+    const ctx = makeAdmin();
+    ctx.setupMocks();
+    const stripe = {
+      paymentIntents: {
+        create: vi.fn().mockRejectedValue(Object.assign(new Error("upstream timeout"), { type: "StripeAPIError" })),
+      },
+    };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      attemptStatus: "pending",
+      failureCode: "stripe_submit_outcome_unknown",
+    }));
+    expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(2);
+    expect(ctx.admin.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("releases the reservation after a definitive pre-charge Stripe failure", async () => {
+    const ctx = makeAdmin();
+    ctx.setupMocks();
+    const stripe = {
+      paymentIntents: {
+        create: vi.fn().mockRejectedValue(Object.assign(new Error("card declined"), {
+          type: "StripeCardError",
+          code: "card_declined",
+        })),
+      },
+    };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result).toEqual(expect.objectContaining({ attemptStatus: "failed_declined", failureCode: "card_declined" }));
+    expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(1);
+    expect(ctx.admin.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("blocks before Stripe when another channel has reserved the invoice", async () => {
+    const ctx = makeAdmin();
+    ctx.setupMocks();
+    ctx.admin.rpc.mockResolvedValueOnce({ data: false, error: null });
+    const stripe = { paymentIntents: { create: vi.fn() } };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      attemptStatus: "blocked_precondition",
+      failureCode: "invoice_collection_in_progress",
+    }));
+    expect(stripe.paymentIntents.create).not.toHaveBeenCalled();
+  });
+
+  it("safely resumes a recent unknown attempt with its original idempotency key", async () => {
+    const ctx = makeAdmin({
+      inflightAttempt: {
+        id: "attempt-inflight",
+        customer_id: "cust-1",
+        attempt_status: "pending",
+        failure_code: "stripe_submit_outcome_unknown",
+        amount_cents_snapshot: 2500,
+        stripe_connected_account_id: "acct_test_123",
+        stripe_customer_id_snapshot: "cus_test_123",
+        stripe_payment_method_id_snapshot: "pm_test_123",
+        stripe_idempotency_key: "manual_saved_method:original-operation",
+        billing_period_id: "bp-1",
+        maintenance_agreement_id: "ma-1",
+        created_at: new Date().toISOString(),
+      },
+    });
+    ctx.setupMocks();
+    const stripe = {
+      paymentIntents: {
+        create: vi.fn(async () => ({ id: "pi_original", status: "processing", last_payment_error: null })),
+      },
+    };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result).toEqual(expect.objectContaining({ attemptId: "attempt-inflight", attemptStatus: "submitted" }));
+    const resumeCall = stripe.paymentIntents.create.mock.calls[0] as unknown as Array<Record<string, unknown>>;
+    expect(resumeCall[1]).toEqual(expect.objectContaining({
+      idempotencyKey: "manual_saved_method:original-operation",
+    }));
+    expect(ctx.writes.some((write) => write.op === "insert")).toBe(false);
   });
 
   it("calculates 9-cent application fee for 17.50 manual saved-card charge", async () => {

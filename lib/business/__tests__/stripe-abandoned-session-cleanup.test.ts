@@ -11,9 +11,9 @@ function query(result: any, single = false) {
 }
 
 function admin() {
-  const pending = { id: "11111111-1111-4111-8111-111111111111", invoice_id: "inv-1", job_id: "job-1", amount_cents: 41000, created_at: "2026-07-15T00:00:00Z", payment_status: "pending", processor_name: "stripe", payment_method: "card_stripe_online", stripe_checkout_session_id: "cs_open" };
+  const pending = { id: "11111111-1111-4111-8111-111111111111", invoice_id: "inv-1", job_id: "job-1", amount_cents: 41000, created_at: "2026-07-15T00:00:00Z", payment_status: "pending", processor_name: "stripe", payment_method: "card_stripe_online", stripe_checkout_session_id: "cs_open", collection_reservation_key: "invoice-checkout:inv-1:41000:0" };
   const queries = [query({ data: pending, error: null }, true), query({ data: [{ id: "recorded-1" }], error: null }), query({ data: { id: pending.id }, error: null }, true)];
-  return { client: { from: vi.fn(() => queries.shift()) }, updateQuery: queries[2] };
+  return { client: { from: vi.fn(() => queries.shift()), rpc: vi.fn(async () => ({ data: true, error: null })) }, updateQuery: queries[2] };
 }
 
 const openSession = { id: "cs_open", status: "open", payment_status: "unpaid", amount_total: 41000, metadata: { account_owner_user_id: "owner-1", invoice_id: "inv-1", job_id: "job-1" } };
@@ -26,6 +26,11 @@ describe("closeVerifiedAbandonedStripeSession", () => {
     const result = await closeVerifiedAbandonedStripeSession({ admin: client, stripe, accountOwnerUserId: "owner-1", paymentId: "11111111-1111-4111-8111-111111111111" });
     expect(result).toEqual({ closed: true, paymentId: "11111111-1111-4111-8111-111111111111" });
     expect(stripe.checkout.sessions.expire).toHaveBeenCalledWith("cs_open", {}, { stripeAccount: "acct_1" });
+    expect(client.rpc).toHaveBeenCalledWith("release_internal_invoice_collection_reservation", {
+      p_account_owner_user_id: "owner-1",
+      p_invoice_id: "inv-1",
+      p_reservation_key: "invoice-checkout:inv-1:41000:0",
+    });
   });
 
   it("does not expire an open session when no other recorded payment exists", async () => {
@@ -41,7 +46,7 @@ describe("closeVerifiedAbandonedStripeSession", () => {
   it("closes a session Stripe already expired even when the invoice has no recorded payment", async () => {
     const pendingRow = { id: "11111111-1111-4111-8111-111111111111", invoice_id: "inv-1", job_id: "job-1", amount_cents: 41000, created_at: "2026-07-15T00:00:00Z", payment_status: "pending", processor_name: "stripe", payment_method: "card_stripe_online", stripe_checkout_session_id: "cs_open" };
     const queries = [query({ data: pendingRow, error: null }, true), query({ data: { id: pendingRow.id }, error: null }, true)];
-    const client = { from: vi.fn(() => queries.shift()) };
+    const client = { from: vi.fn(() => queries.shift()), rpc: vi.fn(async () => ({ data: true, error: null })) };
     const stripe: any = { checkout: { sessions: { retrieve: vi.fn(async () => ({ ...openSession, status: "expired" })), expire: vi.fn() } } };
     const result = await closeVerifiedAbandonedStripeSession({ admin: client, stripe, accountOwnerUserId: "owner-1", paymentId: "11111111-1111-4111-8111-111111111111" });
     expect(result).toEqual({ closed: true, paymentId: "11111111-1111-4111-8111-111111111111" });

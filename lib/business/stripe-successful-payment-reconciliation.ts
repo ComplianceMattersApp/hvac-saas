@@ -7,6 +7,7 @@ import { closeVerifiedAbandonedStripeSession } from "@/lib/business/stripe-aband
 import { upsertInvoicePaymentAllocationForPaymentRow } from "@/lib/business/payment-allocations";
 import { autoSyncRecordedPaymentToQbo } from "@/lib/qbo/qbo-payment-auto-sync";
 import { deliverInternalPaymentReceivedEmail } from "@/lib/payments/payment-received-email";
+import { releaseInvoiceCollectionReservation } from "@/lib/business/invoice-collection-reservations";
 
 const clean = (value: unknown) => String(value ?? "").trim();
 export type StripePaymentReconciliationOutcome = "exact_paid_match_reconciled" | "already_reconciled" | "allocation_repaired" | "still_processing" | "not_paid" | "expired_session_closed" | "ambiguous_multiple_successes" | "amount_mismatch" | "currency_mismatch" | "connected_account_mismatch" | "invoice_scope_mismatch" | "customer_scope_mismatch" | "invoice_ineligible" | "refunded_or_disputed" | "transient_provider_error" | "blocked_unsafe";
@@ -15,7 +16,7 @@ export type StripePaymentReconciliationResult = { outcome: StripePaymentReconcil
 export async function reconcileStripeSuccessfulPayment(params: { admin: any; accountOwnerUserId: string; paymentId: string; stripe?: Stripe; syncQbo?: typeof autoSyncRecordedPaymentToQbo; sendReceipt?: typeof deliverInternalPaymentReceivedEmail }): Promise<StripePaymentReconciliationResult> {
   const ownerId = clean(params.accountOwnerUserId), paymentId = clean(params.paymentId);
   if (!ownerId || !paymentId) return { outcome: "blocked_unsafe", financialMutation: false };
-  const { data: selected, error } = await params.admin.from("internal_invoice_payments").select("id, account_owner_user_id, invoice_id, job_id, amount_cents, payment_status, processor_name, payment_method, stripe_checkout_session_id").eq("id", paymentId).eq("account_owner_user_id", ownerId).maybeSingle();
+  const { data: selected, error } = await params.admin.from("internal_invoice_payments").select("id, account_owner_user_id, invoice_id, job_id, amount_cents, payment_status, processor_name, payment_method, stripe_checkout_session_id, collection_reservation_key").eq("id", paymentId).eq("account_owner_user_id", ownerId).maybeSingle();
   if (error) throw new Error(`Failed to load pending payment: ${error.message ?? "unknown error"}`);
   if (!selected?.id) return { outcome: "blocked_unsafe", financialMutation: false };
   if (selected.payment_status === "recorded") {
@@ -66,6 +67,24 @@ export async function reconcileStripeSuccessfulPayment(params: { admin: any; acc
     const recorded = await recordTenantInvoicePaymentFromCheckoutSession({ session, eventId: event.id, connectedAccountId: readiness.connectedAccountId, admin: params.admin, stripe });
     const durablePaymentId = clean(recorded.paymentId) || paymentId;
     if (!recorded.recorded && !recorded.paymentId) return { outcome: "blocked_unsafe", financialMutation: false };
+    const reservationKey = clean(selected.collection_reservation_key)
+      || clean(session.metadata?.collection_reservation_key);
+    if (reservationKey) {
+      try {
+        await releaseInvoiceCollectionReservation({
+          supabase: params.admin,
+          accountOwnerUserId: ownerId,
+          invoiceId: clean(selected.invoice_id),
+          reservationKey,
+        });
+      } catch (releaseError) {
+        console.warn("Failed to release reconciled checkout reservation", {
+          paymentId: durablePaymentId,
+          reservationKey,
+          message: releaseError instanceof Error ? releaseError.message : "unknown_error",
+        });
+      }
+    }
     let qboStatus: "synced" | "pending" = "pending";
     try { const qbo = await (params.syncQbo ?? autoSyncRecordedPaymentToQbo)({ paymentId: durablePaymentId }); qboStatus = qbo?.status === "synced" ? "synced" : "pending"; } catch {}
     try { await (params.sendReceipt ?? deliverInternalPaymentReceivedEmail)({ paymentId: durablePaymentId }); } catch {}

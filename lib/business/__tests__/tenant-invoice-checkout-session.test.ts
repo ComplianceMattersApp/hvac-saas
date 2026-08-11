@@ -52,6 +52,7 @@ function buildSupabaseFixture(options: SupabaseFixtureOptions = {}) {
   };
 
   const supabase = {
+    rpc: vi.fn(async () => ({ data: true, error: null })),
     from: vi.fn((table: string) => {
       if (table === "internal_invoices") {
         const query: any = {
@@ -178,13 +179,77 @@ describe("createTenantInvoiceCheckoutSession", () => {
     const firstCall = createMock.mock.calls[0] as unknown as Array<Record<string, unknown>>;
     const requestOptions = firstCall[1];
     expect(requestOptions).toEqual(expect.objectContaining({ stripeAccount: "acct_connected_1" }));
+    expect(String(requestOptions.idempotencyKey)).toBe("invoice-checkout:inv-1:10000:0");
     const payload = firstCall[0] as Record<string, any>;
+    expect(payload.metadata.collection_reservation_key).toBe(requestOptions.idempotencyKey);
+    expect(payload.payment_intent_data.metadata.collection_reservation_key).toBe(requestOptions.idempotencyKey);
     expect(payload.success_url).toBe(
       "http://localhost:3000/payments/checkout-complete?status=success&job_id=job-1&invoice_id=inv-1",
     );
     expect(payload.cancel_url).toBe(
       "http://localhost:3000/payments/checkout-complete?status=cancelled&job_id=job-1&invoice_id=inv-1",
     );
+  });
+
+  it("reuses the exact open Checkout Session instead of creating a second charge path", async () => {
+    const fixture = buildSupabaseFixture({
+      paymentRows: [{
+        id: "pending-1",
+        payment_status: "pending",
+        payment_method: "card_stripe_online",
+        processor_name: "stripe",
+        amount_cents: 10000,
+        stripe_checkout_session_id: "cs_open_1",
+      }],
+    });
+    const createMock = vi.fn();
+    const retrieveMock = vi.fn(async () => ({
+      id: "cs_open_1",
+      mode: "payment",
+      status: "open",
+      payment_status: "unpaid",
+      amount_total: 10000,
+      url: "https://checkout.stripe.com/c/pay/cs_open_1",
+      metadata: {
+        account_owner_user_id: "owner-1",
+        invoice_id: "inv-1",
+        job_id: "job-1",
+        collection_reservation_key: "invoice-checkout:inv-1:10000:0",
+      },
+    }));
+
+    const result = await createTenantInvoiceCheckoutSession({
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      invoiceId: "inv-1",
+      supabase: fixture.supabase,
+      stripe: { checkout: { sessions: { create: createMock, retrieve: retrieveMock } } } as any,
+      appUrl: "http://localhost:3000",
+    });
+
+    expect(result.checkoutSessionId).toBe("cs_open_1");
+    expect(createMock).not.toHaveBeenCalled();
+    expect(fixture.supabase.rpc).toHaveBeenCalledWith(
+      "claim_internal_invoice_collection_reservation",
+      expect.objectContaining({ p_reservation_key: "invoice-checkout:inv-1:10000:0" }),
+    );
+  });
+
+  it("fails closed when another collection channel owns the invoice reservation", async () => {
+    const fixture = buildSupabaseFixture();
+    fixture.supabase.rpc.mockResolvedValueOnce({ data: false, error: null });
+    const createMock = vi.fn();
+
+    await expect(createTenantInvoiceCheckoutSession({
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      invoiceId: "inv-1",
+      supabase: fixture.supabase,
+      stripe: { checkout: { sessions: { create: createMock } } } as any,
+      appUrl: "http://localhost:3000",
+    })).rejects.toThrow("Another payment collection is already in progress");
+
+    expect(createMock).not.toHaveBeenCalled();
   });
 
   it("missing or unready connected account blocks creation", async () => {

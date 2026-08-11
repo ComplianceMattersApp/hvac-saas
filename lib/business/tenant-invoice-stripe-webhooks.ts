@@ -5,7 +5,6 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { getStripeServerClient } from '@/lib/business/platform-billing-stripe';
 import {
   isStripeEventAlreadyRecorded,
-  isStripePaymentAlreadyRecorded,
   validateInvoiceEligibleForOnlinePayment,
   buildStripePaymentReference,
   resolveInvoiceCollectedPaymentSummary,
@@ -23,6 +22,14 @@ import { insertJobEvent } from '@/lib/actions/job-actions';
 
 function toCleanString(value: unknown): string {
   return String(value ?? '').trim();
+}
+
+function resolveStripeObjectId(value: unknown): string {
+  if (typeof value === 'string') return toCleanString(value);
+  if (value && typeof value === 'object' && 'id' in value) {
+    return toCleanString((value as { id?: unknown }).id);
+  }
+  return '';
 }
 
 async function resolveInternalInvoiceById(params: {
@@ -122,12 +129,15 @@ async function findRecordedPaymentForCharge(params: {
     ['processor_payment_reference', chargeId],
   ] as const) {
     if (!value) continue;
-    const { data } = await admin
+    const { data, error } = await admin
       .from('internal_invoice_payments')
-      .select('id, invoice_id, job_id, amount_cents, payment_status, dispute_status, account_owner_user_id')
+      .select('id, invoice_id, job_id, amount_cents, payment_status, dispute_status, stripe_dispute_id, stripe_refunded_amount_cents, account_owner_user_id')
       .eq('account_owner_user_id', accountOwnerUserId)
       .eq(column, value)
       .limit(1);
+    if (error) {
+      throw new Error(`Failed to resolve Stripe payment for money-out event: ${error.message ?? 'unknown error'}`);
+    }
     const row = Array.isArray(data) ? data[0] : null;
     if (row?.id) return row;
   }
@@ -172,10 +182,7 @@ async function reverseStripePayment(params: {
     .maybeSingle();
 
   if (error) {
-    console.error('Stripe-driven payment reversal failed', {
-      paymentId: paymentRow.id, message: error.message ?? 'unknown error',
-    });
-    return false;
+    throw new Error(`Stripe-driven payment reversal failed: ${error.message ?? 'unknown error'}`);
   }
   if (!updated?.id) return false;
 
@@ -202,9 +209,10 @@ async function reverseStripePayment(params: {
  *
  * A FULL refund reverses the payment: Stripe is authoritative that the money
  * left, and leaving the invoice marked paid is simply a false record.
- * A PARTIAL refund does not, because 'reversed' is all-or-nothing and guessing
- * at the allocation would corrupt the balance. It is recorded and raised for a
- * human instead.
+ * A PARTIAL refund keeps the gross payment record but reduces its active
+ * allocation by Stripe's cumulative refunded amount through the database
+ * projection trigger. That reopens only the refunded portion of the invoice;
+ * attention remains open for QuickBooks/accounting follow-through.
  */
 export async function recordTenantInvoiceRefundFromStripeCharge(params: {
   charge: Stripe.Charge;
@@ -214,34 +222,63 @@ export async function recordTenantInvoiceRefundFromStripeCharge(params: {
 }): Promise<TenantInvoiceMoneyOutResult> {
   const { charge, eventId } = params;
   const admin = params.admin ?? createAdminClient();
-  const accountOwnerUserId = toCleanString(charge.metadata?.account_owner_user_id);
-  const invoiceId = toCleanString(charge.metadata?.invoice_id);
-  if (!accountOwnerUserId || !invoiceId) {
-    return { applied: false, reason: 'Missing metadata: account_owner_user_id or invoice_id' };
+  let accountOwnerUserId = toCleanString(charge.metadata?.account_owner_user_id);
+  const metadataInvoiceId = toCleanString(charge.metadata?.invoice_id);
+  const chargeId = toCleanString(charge.id);
+  const paymentIntentId = resolveStripeObjectId(charge.payment_intent);
+  if (!accountOwnerUserId) {
+    const identityClauses = [
+      chargeId ? `processor_charge_id.eq.${chargeId}` : null,
+      paymentIntentId ? `stripe_payment_intent_id.eq.${paymentIntentId}` : null,
+    ].filter(Boolean).join(',');
+    if (identityClauses) {
+      const { data, error } = await admin
+        .from('internal_invoice_payments')
+        .select('account_owner_user_id')
+        .or(identityClauses)
+        .limit(2);
+      if (error) throw new Error(`Failed to resolve refund account scope: ${error.message ?? 'unknown error'}`);
+      if (Array.isArray(data) && data.length === 1) {
+        accountOwnerUserId = toCleanString(data[0]?.account_owner_user_id);
+      }
+    }
+  }
+  if (!accountOwnerUserId) {
+    return { applied: false, reason: 'Could not resolve the account for the refunded charge' };
+  }
+
+  const paymentRow = await findRecordedPaymentForCharge({
+    admin,
+    accountOwnerUserId,
+    chargeId,
+    paymentIntentId,
+  });
+  if (!paymentRow) {
+    return { applied: false, reason: 'No matching payment for the refunded charge' };
+  }
+  const invoiceId = toCleanString(paymentRow.invoice_id);
+  if (metadataInvoiceId && metadataInvoiceId !== invoiceId) {
+    return { applied: false, reason: 'Refund invoice metadata does not match the recorded payment' };
   }
 
   const eventConnectedAccountId = toCleanString(params.connectedAccountId);
   const connectReadiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, admin);
   const expectedConnectedAccountId = toCleanString(connectReadiness.connectedAccountId);
-  if (!expectedConnectedAccountId || expectedConnectedAccountId !== eventConnectedAccountId) {
+  if (!connectReadiness.isReady || !expectedConnectedAccountId) {
+    return { applied: false, reason: 'Tenant connected account is not ready' };
+  }
+  if (expectedConnectedAccountId !== eventConnectedAccountId) {
     console.warn('Tenant invoice refund skipped: connected account mismatch', {
       eventId, accountOwnerUserId, invoiceId, expectedConnectedAccountId, eventConnectedAccountId,
     });
     return { applied: false, reason: 'Connected account mismatch' };
   }
 
-  const paymentRow = await findRecordedPaymentForCharge({
-    admin,
-    accountOwnerUserId,
-    chargeId: toCleanString(charge.id),
-    paymentIntentId: toCleanString(charge.payment_intent as string | null),
-  });
-  if (!paymentRow) {
-    return { applied: false, reason: 'No matching payment for the refunded charge' };
-  }
-
   const refundedCents = Number(charge.amount_refunded ?? 0);
   const chargedCents = Number(charge.amount ?? 0);
+  if (!Number.isFinite(refundedCents) || refundedCents <= 0 || !Number.isFinite(chargedCents) || chargedCents <= 0) {
+    return { applied: false, reason: 'Refund event has no positive refunded amount', paymentId: paymentRow.id };
+  }
   const isFullRefund = refundedCents > 0 && refundedCents >= chargedCents;
 
   // Idempotent: a replayed refund event must not re-reverse or double-report.
@@ -250,13 +287,16 @@ export async function recordTenantInvoiceRefundFromStripeCharge(params: {
   }
 
   if (!isFullRefund) {
-    await admin
+    // This cumulative amount is an allocation input. The payment-integrity
+    // trigger atomically reopens only the refunded portion of the invoice.
+    const { error } = await admin
       .from('internal_invoice_payments')
       .update({ stripe_refunded_amount_cents: refundedCents })
       .eq('id', paymentRow.id);
+    if (error) throw new Error(`Failed to record partial Stripe refund: ${error.message ?? 'unknown error'}`);
     return {
       applied: true,
-      reason: 'Partial refund recorded — payment left intact for manual allocation',
+      reason: 'Partial refund recorded and refunded balance reopened',
       paymentId: paymentRow.id,
     };
   }
@@ -299,8 +339,8 @@ export async function recordTenantInvoiceDisputeFromStripe(params: {
   const { dispute, eventId, closed } = params;
   const admin = params.admin ?? createAdminClient();
   const accountOwnerUserId = toCleanString(dispute.metadata?.account_owner_user_id);
-  const chargeId = toCleanString(dispute.charge as string | null);
-  const paymentIntentId = toCleanString(dispute.payment_intent as string | null);
+  const chargeId = resolveStripeObjectId(dispute.charge);
+  const paymentIntentId = resolveStripeObjectId(dispute.payment_intent);
 
   if (!chargeId && !paymentIntentId) {
     return { applied: false, reason: 'Dispute carries no charge or payment intent' };
@@ -310,7 +350,7 @@ export async function recordTenantInvoiceDisputeFromStripe(params: {
   // account from the payment row the charge already produced.
   let ownerId = accountOwnerUserId;
   if (!ownerId) {
-    const { data } = await admin
+    const { data, error } = await admin
       .from('internal_invoice_payments')
       .select('account_owner_user_id')
       .or([
@@ -318,6 +358,7 @@ export async function recordTenantInvoiceDisputeFromStripe(params: {
         paymentIntentId ? `stripe_payment_intent_id.eq.${paymentIntentId}` : null,
       ].filter(Boolean).join(','))
       .limit(1);
+    if (error) throw new Error(`Failed to resolve dispute account scope: ${error.message ?? 'unknown error'}`);
     ownerId = toCleanString(Array.isArray(data) ? data[0]?.account_owner_user_id : null);
   }
   if (!ownerId) {
@@ -331,12 +372,33 @@ export async function recordTenantInvoiceDisputeFromStripe(params: {
     return { applied: false, reason: 'No matching payment for the disputed charge' };
   }
 
+  const eventConnectedAccountId = toCleanString(params.connectedAccountId);
+  const connectReadiness = await resolveTenantStripeConnectReadiness(ownerId, admin);
+  const expectedConnectedAccountId = toCleanString(connectReadiness.connectedAccountId);
+  if (!connectReadiness.isReady || !expectedConnectedAccountId) {
+    return { applied: false, reason: 'Tenant connected account is not ready' };
+  }
+  if (expectedConnectedAccountId !== eventConnectedAccountId) {
+    return { applied: false, reason: 'Connected account mismatch' };
+  }
+
   const nowIso = new Date().toISOString();
   const disputeId = toCleanString(dispute.id);
   const outcome = toCleanString(dispute.status).toLowerCase();
+  const currentDisputeStatus = toCleanString(paymentRow.dispute_status).toLowerCase();
+  const currentDisputeId = toCleanString(paymentRow.stripe_dispute_id);
 
   if (!closed) {
-    await admin
+    // Stripe does not guarantee event delivery order. Never let a delayed
+    // dispute.created replay reopen a dispute already resolved by a later
+    // dispute.closed event.
+    if (
+      ['won', 'lost'].includes(currentDisputeStatus)
+      && (!currentDisputeId || !disputeId || currentDisputeId === disputeId)
+    ) {
+      return { applied: false, reason: 'Dispute already resolved', paymentId: paymentRow.id };
+    }
+    const { error } = await admin
       .from('internal_invoice_payments')
       .update({
         dispute_status: 'open',
@@ -345,12 +407,13 @@ export async function recordTenantInvoiceDisputeFromStripe(params: {
         dispute_reason: toCleanString(dispute.reason) || null,
       })
       .eq('id', paymentRow.id);
+    if (error) throw new Error(`Failed to record Stripe dispute: ${error.message ?? 'unknown error'}`);
     return { applied: true, reason: 'Dispute opened — payment held pending outcome', paymentId: paymentRow.id };
   }
 
   // Stripe reports several closed states; only an explicit win is a win.
   const won = outcome === 'won' || outcome === 'warning_closed';
-  await admin
+  const { error: disputeUpdateError } = await admin
     .from('internal_invoice_payments')
     .update({
       dispute_status: won ? 'won' : 'lost',
@@ -358,6 +421,9 @@ export async function recordTenantInvoiceDisputeFromStripe(params: {
       stripe_dispute_id: disputeId || null,
     })
     .eq('id', paymentRow.id);
+  if (disputeUpdateError) {
+    throw new Error(`Failed to resolve Stripe dispute: ${disputeUpdateError.message ?? 'unknown error'}`);
+  }
 
   if (won) {
     return { applied: true, reason: 'Dispute won — payment stands', paymentId: paymentRow.id };
@@ -391,6 +457,10 @@ async function resolveInvoiceStatusById(params: { admin: any; invoiceId: string 
 
 type StripePaymentIdentityRow = {
   id: string;
+  account_owner_user_id: string;
+  invoice_id: string;
+  job_id: string;
+  amount_cents: number;
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   processor_charge_id: string | null;
@@ -482,6 +552,10 @@ async function resolveCanonicalStripePaymentByIdentity(params: {
     .select(
       [
         'id',
+        'account_owner_user_id',
+        'invoice_id',
+        'job_id',
+        'amount_cents',
         'stripe_checkout_session_id',
         'stripe_payment_intent_id',
         'processor_charge_id',
@@ -497,12 +571,13 @@ async function resolveCanonicalStripePaymentByIdentity(params: {
     )
     .eq('account_owner_user_id', accountOwnerUserId)
     .eq('invoice_id', invoiceId)
+    .neq('payment_status', 'failed')
     .or(identityClauses.join(','))
     .order('created_at', { ascending: true })
     .limit(1);
 
   if (error) {
-    return null;
+    throw new Error(`Failed to resolve canonical Stripe payment identity: ${error.message ?? 'unknown error'}`);
   }
 
   const row = Array.isArray(data) ? data[0] : null;
@@ -581,11 +656,9 @@ async function enrichCanonicalStripePaymentIdentity(params: {
     .maybeSingle();
 
   if (error) {
-    console.warn('Stripe webhook payment enrichment update failed', {
-      paymentId: toCleanString(row.id),
-      patchKeys,
-      error: error.message ?? 'unknown error',
-    });
+    throw new Error(
+      `Stripe webhook payment identity enrichment failed for ${toCleanString(row.id)}: ${error.message ?? 'unknown error'}`,
+    );
   }
 
   return {
@@ -737,6 +810,68 @@ async function attemptAllocationWebhookDualWrite(params: {
   }
 }
 
+/**
+ * Checkout copies our invoice metadata onto its PaymentIntent, but the resulting
+ * charge does not automatically include the Checkout Session id. Stripe can
+ * deliver charge.succeeded before checkout.session.completed, so resolve the
+ * Session from the PaymentIntent and use it to find the pending row we created
+ * before redirecting the customer. This closes the otherwise-unavoidable
+ * event-ordering gap without guessing by amount or customer.
+ */
+async function resolveCheckoutSessionIdForStripeCharge(params: {
+  stripe: Stripe;
+  charge: Stripe.Charge;
+  connectedAccountId: string;
+  accountOwnerUserId: string;
+  invoiceId: string;
+  paymentIntentId: string;
+}): Promise<string | null> {
+  const directSessionId = toCleanString(params.charge.metadata?.checkout_session_id);
+  if (directSessionId) return directSessionId;
+
+  // Saved-card and scheduled-autopay PaymentIntents are not Checkout Sessions.
+  if (toCleanString(params.charge.metadata?.attempt_id)) return null;
+  if (!params.paymentIntentId || !params.connectedAccountId) return null;
+
+  try {
+    const sessions = await params.stripe.checkout.sessions.list(
+      { payment_intent: params.paymentIntentId, limit: 3 },
+      { stripeAccount: params.connectedAccountId },
+    );
+    const exactMatches = (sessions.data ?? []).filter((session) =>
+      session.mode === 'payment' &&
+      toCleanString(session.metadata?.account_owner_user_id) === params.accountOwnerUserId &&
+      toCleanString(session.metadata?.invoice_id) === params.invoiceId &&
+      resolveStripeObjectId(session.payment_intent) === params.paymentIntentId &&
+      Number(session.amount_total ?? 0) === Number(params.charge.amount ?? 0),
+    );
+
+    if (exactMatches.length === 1) {
+      return toCleanString(exactMatches[0]?.id) || null;
+    }
+
+    if (exactMatches.length > 1) {
+      console.warn('Stripe charge matched multiple Checkout Sessions', {
+        chargeId: toCleanString(params.charge.id),
+        paymentIntentId: params.paymentIntentId,
+        accountOwnerUserId: params.accountOwnerUserId,
+        invoiceId: params.invoiceId,
+        checkoutSessionIds: exactMatches.map((session) => toCleanString(session.id)),
+      });
+    }
+  } catch (error) {
+    console.warn('Stripe charge Checkout Session lookup failed', {
+      chargeId: toCleanString(params.charge.id),
+      paymentIntentId: params.paymentIntentId,
+      accountOwnerUserId: params.accountOwnerUserId,
+      invoiceId: params.invoiceId,
+      error: error instanceof Error ? error.message : 'unknown error',
+    });
+  }
+
+  return null;
+}
+
 export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
   session: Stripe.Checkout.Session;
   eventId: string;
@@ -797,6 +932,7 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     return {
       recorded: false,
       reason: 'Event already recorded (idempotency check)',
+      paymentId: existingPaymentId || undefined,
     };
   }
 
@@ -804,8 +940,8 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
   const invoiceId = toCleanString(session.metadata?.invoice_id);
   const jobIdFromMetadata = toCleanString(session.metadata?.job_id);
   const checkoutSessionId = toCleanString(session.id);
-  const paymentIntentId =
-    typeof session.payment_intent === 'string' ? toCleanString(session.payment_intent) : '';
+  const paymentIntentId = resolveStripeObjectId(session.payment_intent);
+  const collectionReservationKey = toCleanString(session.metadata?.collection_reservation_key) || null;
 
   if (!accountOwnerUserId || !invoiceId) {
     return {
@@ -899,6 +1035,114 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     };
   }
 
+  const sessionAmountCents = Number(session.amount_total ?? 0) || 0;
+  if (sessionAmountCents <= 0) {
+    return {
+      recorded: false,
+      reason: 'Checkout session amount must be positive',
+    };
+  }
+
+  const stripe = params.stripe ?? getStripeServerClient();
+
+  let processorChargeId: string | null = null;
+  let chargedAtIso: string | null = null;
+
+  if (paymentIntentId) {
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      }, {
+        stripeAccount: eventConnectedAccountId,
+      });
+
+      processorChargeId = resolveStripeObjectId(paymentIntent.latest_charge) || null;
+      if (Number.isFinite(paymentIntent.created)) {
+        chargedAtIso = new Date(Number(paymentIntent.created) * 1000).toISOString();
+      }
+    } catch (error) {
+      console.warn('Tenant invoice checkout webhook payment intent lookup failed', {
+        eventId,
+        checkoutSessionId: checkoutSessionId || null,
+        paymentIntentId,
+        eventConnectedAccountId,
+        error: error instanceof Error ? error.message : 'unknown error',
+      });
+    }
+  }
+
+  const processorPaymentReference =
+    processorChargeId || paymentIntentId || checkoutSessionId || `checkout_event_${eventId}`;
+
+  // Identity reconciliation must happen before the paid/balance gates. A prior
+  // success event may already have paid the invoice but still need its missing
+  // charge or PaymentIntent identity enriched by this event.
+  const canonicalBeforeEligibility = await resolveCanonicalStripePaymentByIdentity({
+    admin,
+    accountOwnerUserId,
+    invoiceId,
+    stripeCheckoutSessionId: checkoutSessionId || null,
+    stripePaymentIntentId: paymentIntentId || null,
+    processorChargeId,
+  });
+  const canonicalBeforeEligibilityId = toCleanString(canonicalBeforeEligibility?.id) || null;
+
+  if (
+    canonicalBeforeEligibilityId &&
+    canonicalBeforeEligibility?.payment_status === 'pending' &&
+    Number(canonicalBeforeEligibility.amount_cents ?? 0) !== sessionAmountCents
+  ) {
+    return {
+      recorded: false,
+      reason: 'Stripe payment identity amount does not match the pending payment row',
+      paymentId: canonicalBeforeEligibilityId,
+    };
+  }
+
+  if (
+    canonicalBeforeEligibilityId &&
+    (canonicalBeforeEligibility?.payment_status === 'recorded' ||
+      canonicalBeforeEligibility?.payment_status === 'reversed')
+  ) {
+    if (Number(canonicalBeforeEligibility.amount_cents ?? 0) !== sessionAmountCents) {
+      return {
+        recorded: false,
+        reason: 'Stripe payment identity amount does not match the existing payment row',
+        paymentId: canonicalBeforeEligibilityId,
+      };
+    }
+
+    await enrichCanonicalStripePaymentIdentity({
+      admin,
+      row: canonicalBeforeEligibility,
+      stripeCheckoutSessionId: checkoutSessionId || null,
+      stripePaymentIntentId: paymentIntentId || null,
+      processorChargeId,
+      processorPaymentReference,
+      stripeChargedAt: chargedAtIso,
+      paidAtIso: new Date().toISOString(),
+      note: `Stripe checkout session ${checkoutSessionId || 'unknown session'}`,
+    });
+
+    if (canonicalBeforeEligibility.payment_status === 'recorded') {
+      await attemptAllocationWebhookDualWrite({
+        admin,
+        paymentId: canonicalBeforeEligibilityId,
+        logContext: {
+          webhookKind: 'checkout_session',
+          eventId,
+          invoiceId,
+          jobId: invoiceJobId || jobIdFromMetadata || '',
+        },
+      });
+    }
+
+    return {
+      recorded: false,
+      reason: 'Payment already recorded for Stripe payment identity',
+      paymentId: canonicalBeforeEligibilityId,
+    };
+  }
+
   if (
     await resolveJobBlocksOnlineInvoicePayment({
       accountOwnerUserId,
@@ -926,14 +1170,6 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     };
   }
 
-  const sessionAmountCents = Number(session.amount_total ?? 0) || 0;
-  if (sessionAmountCents <= 0) {
-    return {
-      recorded: false,
-      reason: 'Checkout session amount must be positive',
-    };
-  }
-
   if (sessionAmountCents > paymentSummary.balanceDueCents) {
     return {
       recorded: false,
@@ -941,47 +1177,7 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     };
   }
 
-  const stripe = params.stripe ?? getStripeServerClient();
-
-  let processorChargeId: string | null = null;
-  let chargedAtIso: string | null = null;
-
-  if (paymentIntentId) {
-    try {
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
-      }, {
-        stripeAccount: eventConnectedAccountId,
-      });
-
-      processorChargeId =
-        typeof paymentIntent.latest_charge === 'string'
-          ? toCleanString(paymentIntent.latest_charge) || null
-          : null;
-      if (Number.isFinite(paymentIntent.created)) {
-        chargedAtIso = new Date(Number(paymentIntent.created) * 1000).toISOString();
-      }
-    } catch (error) {
-      console.warn('Tenant invoice checkout webhook payment intent lookup failed', {
-        eventId,
-        checkoutSessionId: checkoutSessionId || null,
-        paymentIntentId,
-        eventConnectedAccountId,
-        error: error instanceof Error ? error.message : 'unknown error',
-      });
-    }
-  }
-
-  const processorPaymentReference =
-    processorChargeId || paymentIntentId || checkoutSessionId || `checkout_event_${eventId}`;
-
-  const paymentAlreadyRecorded = await isStripePaymentAlreadyRecorded({
-    accountOwnerUserId,
-    invoiceId,
-    stripeCheckoutSessionId: checkoutSessionId || null,
-    stripePaymentIntentId: paymentIntentId || null,
-    processorChargeId,
-    supabase: admin,
-  });
+  const paymentAlreadyRecorded = Boolean(canonicalBeforeEligibility);
 
   if (paymentAlreadyRecorded) {
     const canonicalExistingPayment = await resolveCanonicalStripePaymentByIdentity({
@@ -1086,6 +1282,7 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     return {
       recorded: false,
       reason: 'Payment already recorded for Stripe payment identity',
+      paymentId: existingPaymentId || undefined,
     };
   }
 
@@ -1220,6 +1417,7 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
       stripe_event_id: eventId,
       stripe_payment_intent_id: paymentIntentId || null,
       stripe_charged_at: chargedAtIso,
+      collection_reservation_key: collectionReservationKey,
       stripe_identity_dedupe_scope: 'recorded_v1',
     })
     .select('id')
@@ -1405,6 +1603,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
   const eventId = toCleanString(params.eventId);
   const eventConnectedAccountId = toCleanString(params.connectedAccountId);
   const attemptIdFromMetadata = toCleanString(charge.metadata?.attempt_id) || null;
+  const collectionReservationKey = toCleanString(charge.metadata?.collection_reservation_key) || null;
 
   if (!eventId) {
     return {
@@ -1437,7 +1636,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
         admin,
         accountOwnerUserId: toCleanString(charge.metadata?.account_owner_user_id),
         invoiceId: toCleanString(charge.metadata?.invoice_id),
-        stripePaymentIntentId: toCleanString(charge.payment_intent) || null,
+        stripePaymentIntentId: resolveStripeObjectId(charge.payment_intent) || null,
         stripeChargeId: toCleanString(charge.id) || null,
         stripeEventId: eventId,
         attemptIdFromMetadata: toCleanString(charge.metadata?.attempt_id) || null,
@@ -1449,6 +1648,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     return {
       recorded: false,
       reason: 'Event already recorded (idempotency check)',
+      paymentId: existingPaymentId || undefined,
     };
   }
 
@@ -1556,6 +1756,107 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     };
   }
 
+  const chargeAmountCents = Number(charge.amount) || 0;
+  if (chargeAmountCents <= 0) {
+    return {
+      recorded: false,
+      reason: 'Charge amount must be positive',
+    };
+  }
+
+  const stripeRef = buildStripePaymentReference(charge);
+  const stripe = (params.stripe ?? getStripeServerClient()) as Stripe;
+  const checkoutSessionId = await resolveCheckoutSessionIdForStripeCharge({
+    stripe,
+    charge,
+    connectedAccountId: eventConnectedAccountId,
+    accountOwnerUserId,
+    invoiceId,
+    paymentIntentId: toCleanString(stripeRef.stripe_payment_intent_id),
+  });
+
+  // A success delivered through the other Stripe event may already have paid
+  // the invoice. Reconcile exact external identity before asking whether the
+  // invoice still has a balance, otherwise the later event can never enrich it.
+  const canonicalBeforeEligibility = await resolveCanonicalStripePaymentByIdentity({
+    admin,
+    accountOwnerUserId,
+    invoiceId,
+    stripeCheckoutSessionId: checkoutSessionId,
+    stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+    processorChargeId: stripeRef.processor_charge_id,
+  });
+  const canonicalBeforeEligibilityId = toCleanString(canonicalBeforeEligibility?.id) || null;
+
+  if (
+    canonicalBeforeEligibilityId &&
+    canonicalBeforeEligibility?.payment_status === 'pending' &&
+    Number(canonicalBeforeEligibility.amount_cents ?? 0) !== chargeAmountCents
+  ) {
+    return {
+      recorded: false,
+      reason: 'Stripe payment identity amount does not match the pending payment row',
+      paymentId: canonicalBeforeEligibilityId,
+    };
+  }
+
+  if (
+    canonicalBeforeEligibilityId &&
+    (canonicalBeforeEligibility?.payment_status === 'recorded' ||
+      canonicalBeforeEligibility?.payment_status === 'reversed')
+  ) {
+    if (Number(canonicalBeforeEligibility.amount_cents ?? 0) !== chargeAmountCents) {
+      return {
+        recorded: false,
+        reason: 'Stripe payment identity amount does not match the existing payment row',
+        paymentId: canonicalBeforeEligibilityId,
+      };
+    }
+
+    await enrichCanonicalStripePaymentIdentity({
+      admin,
+      row: canonicalBeforeEligibility,
+      stripeCheckoutSessionId: checkoutSessionId,
+      stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+      processorChargeId: stripeRef.processor_charge_id,
+      processorPaymentReference: stripeRef.processor_payment_reference,
+      stripeChargedAt: stripeRef.stripe_charged_at,
+      paidAtIso: new Date(charge.created * 1000).toISOString(),
+      note: `Stripe charge ${stripeRef.processor_charge_id}`,
+    });
+
+    if (canonicalBeforeEligibility.payment_status === 'recorded') {
+      await attemptAllocationWebhookDualWrite({
+        admin,
+        paymentId: canonicalBeforeEligibilityId,
+        logContext: {
+          webhookKind: 'charge_succeeded',
+          eventId,
+          invoiceId,
+          jobId: effectiveJobId,
+        },
+      });
+    }
+
+    await resolveManualSavedMethodAttemptFromWebhook({
+      admin,
+      accountOwnerUserId,
+      invoiceId,
+      stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+      stripeChargeId: stripeRef.processor_charge_id,
+      stripeEventId: eventId,
+      attemptIdFromMetadata,
+      outcome: 'succeeded',
+      resolvedInternalInvoicePaymentId: canonicalBeforeEligibilityId,
+    });
+
+    return {
+      recorded: false,
+      reason: 'Payment already recorded for Stripe payment identity',
+      paymentId: canonicalBeforeEligibilityId,
+    };
+  }
+
   if (
     await resolveJobBlocksOnlineInvoicePayment({
       accountOwnerUserId,
@@ -1584,15 +1885,6 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     };
   }
 
-  // Validate charge amount
-  const chargeAmountCents = Number(charge.amount) || 0;
-  if (chargeAmountCents <= 0) {
-    return {
-      recorded: false,
-      reason: 'Charge amount must be positive',
-    };
-  }
-
   if (chargeAmountCents > paymentSummary.balanceDueCents) {
     return {
       recorded: false,
@@ -1600,24 +1892,14 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     };
   }
 
-  // Build Stripe payment reference
-  const stripeRef = buildStripePaymentReference(charge);
-
-  const paymentAlreadyRecorded = await isStripePaymentAlreadyRecorded({
-    accountOwnerUserId,
-    invoiceId,
-    stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
-    stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
-    processorChargeId: stripeRef.processor_charge_id,
-    supabase: admin,
-  });
+  const paymentAlreadyRecorded = Boolean(canonicalBeforeEligibility);
 
   if (paymentAlreadyRecorded) {
     const canonicalExistingPayment = await resolveCanonicalStripePaymentByIdentity({
       admin,
       accountOwnerUserId,
       invoiceId,
-      stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+      stripeCheckoutSessionId: checkoutSessionId,
       stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
       processorChargeId: stripeRef.processor_charge_id,
     });
@@ -1631,7 +1913,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
         amountCents: chargeAmountCents,
         processorPaymentReference: stripeRef.processor_payment_reference || stripeRef.processor_charge_id || eventId,
         processorChargeId: stripeRef.processor_charge_id,
-        stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+        stripeCheckoutSessionId: checkoutSessionId,
         stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
         stripeChargedAt: stripeRef.stripe_charged_at,
         stripeEventId: eventId,
@@ -1699,7 +1981,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
       await enrichCanonicalStripePaymentIdentity({
         admin,
         row: canonicalExistingPayment,
-        stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+        stripeCheckoutSessionId: checkoutSessionId,
         stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
         processorChargeId: stripeRef.processor_charge_id,
         processorPaymentReference: stripeRef.processor_payment_reference,
@@ -1737,6 +2019,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     return {
       recorded: false,
       reason: 'Payment already recorded for Stripe payment identity',
+      paymentId: existingPaymentId || undefined,
     };
   }
 
@@ -1744,7 +2027,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     admin,
     accountOwnerUserId,
     invoiceId,
-    stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+    stripeCheckoutSessionId: checkoutSessionId,
     stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
     processorChargeId: stripeRef.processor_charge_id,
   });
@@ -1755,7 +2038,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     await enrichCanonicalStripePaymentIdentity({
       admin,
       row: canonicalBeforeInsert,
-      stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+      stripeCheckoutSessionId: checkoutSessionId,
       stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
       processorChargeId: stripeRef.processor_charge_id,
       processorPaymentReference: stripeRef.processor_payment_reference,
@@ -1811,10 +2094,11 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
       processor_name: stripeRef.processor_name,
       processor_payment_reference: stripeRef.processor_payment_reference,
       processor_charge_id: stripeRef.processor_charge_id,
-      stripe_checkout_session_id: toCleanString(charge.metadata?.checkout_session_id) || null,
+      stripe_checkout_session_id: checkoutSessionId,
       stripe_event_id: eventId,
       stripe_payment_intent_id: stripeRef.stripe_payment_intent_id,
       stripe_charged_at: stripeRef.stripe_charged_at,
+      collection_reservation_key: collectionReservationKey,
       stripe_identity_dedupe_scope: 'recorded_v1',
     })
     .select('id')
@@ -1826,7 +2110,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
         admin,
         accountOwnerUserId,
         invoiceId,
-        stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+        stripeCheckoutSessionId: checkoutSessionId,
         stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
         processorChargeId: stripeRef.processor_charge_id,
       });
@@ -1837,7 +2121,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
         await enrichCanonicalStripePaymentIdentity({
           admin,
           row: canonicalAfterInsertError,
-          stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+          stripeCheckoutSessionId: checkoutSessionId,
           stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
           processorChargeId: stripeRef.processor_charge_id,
           processorPaymentReference: stripeRef.processor_payment_reference,
@@ -1955,6 +2239,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
   const eventId = toCleanString(params.eventId);
   const eventConnectedAccountId = toCleanString(params.connectedAccountId);
   const attemptIdFromMetadata = toCleanString(charge.metadata?.attempt_id) || null;
+  const collectionReservationKey = toCleanString(charge.metadata?.collection_reservation_key) || null;
 
   if (!eventId) {
     return {
@@ -1987,7 +2272,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
         admin,
         accountOwnerUserId: toCleanString(charge.metadata?.account_owner_user_id),
         invoiceId: toCleanString(charge.metadata?.invoice_id),
-        stripePaymentIntentId: toCleanString(charge.payment_intent) || null,
+        stripePaymentIntentId: resolveStripeObjectId(charge.payment_intent) || null,
         stripeChargeId: toCleanString(charge.id) || null,
         stripeEventId: eventId,
         attemptIdFromMetadata,
@@ -1999,6 +2284,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
     return {
       recorded: false,
       reason: 'Event already recorded (idempotency check)',
+      paymentId: existingPaymentId || undefined,
     };
   }
 
@@ -2112,6 +2398,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
       stripe_event_id: eventId,
       stripe_payment_intent_id: stripeRef.stripe_payment_intent_id,
       stripe_charged_at: stripeRef.stripe_charged_at,
+      collection_reservation_key: collectionReservationKey,
     })
     .select('id')
     .single();

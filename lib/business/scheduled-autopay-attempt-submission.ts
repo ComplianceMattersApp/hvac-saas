@@ -32,8 +32,10 @@ type ScheduledAttemptRow = {
   amount_cents_snapshot: number | null;
   attempt_kind: string | null;
   attempt_status: string | null;
+  failure_code: string | null;
   stripe_idempotency_key: string | null;
   stripe_payment_intent_id: string | null;
+  created_at: string | null;
 };
 
 type SubmitAttemptOutcome =
@@ -149,8 +151,10 @@ async function resolvePendingScheduledAttempt(params: {
         "amount_cents_snapshot",
         "attempt_kind",
         "attempt_status",
+        "failure_code",
         "stripe_idempotency_key",
         "stripe_payment_intent_id",
+        "created_at",
       ].join(", "),
     )
     .eq("account_owner_user_id", clean(params.accountOwnerUserId))
@@ -321,6 +325,25 @@ export async function submitScheduledAutopayAttempts(params: {
         blockedReasonCodes: ["attempt_status_not_pending"],
         failureCode: "attempt_status_not_pending",
         failureMessage: "Scheduled autopay attempt must be pending before submit.",
+      });
+      continue;
+    }
+
+    const attemptCreatedAtMs = Date.parse(clean(attempt.created_at));
+    if (
+      clean(attempt.failure_code) === "stripe_submit_outcome_unknown"
+      && (!Number.isFinite(attemptCreatedAtMs) || attemptCreatedAtMs < Date.now() - 23 * 60 * 60 * 1000)
+    ) {
+      result.blockedPreconditionCount += 1;
+      result.results.push({
+        attemptId,
+        invoiceId,
+        outcome: "blocked_precondition",
+        attemptStatus: "pending",
+        stripePaymentIntentId: currentIntentId,
+        blockedReasonCodes: ["stripe_submit_outcome_unresolved"],
+        failureCode: "stripe_submit_outcome_unresolved",
+        failureMessage: "Stripe submit outcome remains unknown beyond the safe idempotent retry window. Verify the original operation in Stripe before collecting again.",
       });
       continue;
     }

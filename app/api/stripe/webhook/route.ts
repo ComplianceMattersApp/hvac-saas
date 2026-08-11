@@ -20,9 +20,65 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { deliverInternalPaymentReceivedEmail } from "@/lib/payments/payment-received-email";
 import { autoSyncRecordedPaymentToQbo } from "@/lib/qbo/qbo-payment-auto-sync";
 import { autoSyncRecordedPaymentSettlement } from "@/lib/business/stripe-settlement-auto-sync";
+import { releaseInvoiceCollectionReservation } from "@/lib/business/invoice-collection-reservations";
+
+type TenantPaymentWebhookResult = {
+  recorded?: boolean;
+  closed?: boolean;
+  paymentId?: string;
+  reason?: string;
+};
+
+function throwIfTenantMoneyEventShouldRetry(result: TenantPaymentWebhookResult) {
+  if (result.paymentId) return;
+  const reason = String(result.reason ?? "").trim();
+  if (
+    reason === "Missing connected account context"
+    || reason === "Tenant connected account is not ready"
+    || reason === "Event already recorded (idempotency check)"
+  ) {
+    throw new Error(`Retryable tenant payment webhook result: ${reason}`);
+  }
+}
+
+function throwIfTenantMoneyOutEventShouldRetry(
+  result: { applied: boolean; reason?: string },
+  kind: 'refund' | 'dispute',
+) {
+  if (result.applied) return;
+  const reason = String(result.reason ?? '').trim();
+  if (
+    reason === 'Tenant connected account is not ready'
+    || (kind === 'refund' && reason.startsWith('No matching payment for the '))
+    || (kind === 'refund' && reason.startsWith('Could not resolve the account for the '))
+  ) {
+    throw new Error(`Retryable tenant money-out webhook result: ${reason}`);
+  }
+}
+
+async function releaseCollectionReservationForStripeObject(object: {
+  id?: string | null;
+  metadata?: Record<string, string> | null;
+}) {
+  const accountOwnerUserId = String(object.metadata?.account_owner_user_id ?? "").trim();
+  const invoiceId = String(object.metadata?.invoice_id ?? "").trim();
+  const reservationKey = String(object.metadata?.collection_reservation_key ?? "").trim();
+  if (!accountOwnerUserId || !invoiceId || !reservationKey) return;
+
+  await releaseInvoiceCollectionReservation({
+    supabase: createAdminClient(),
+    accountOwnerUserId,
+    invoiceId,
+    reservationKey,
+  });
+}
 
 async function notifyNewRecordedPayment(result: { recorded: boolean; paymentId?: string }) {
-  if (!result.recorded || !result.paymentId) return;
+  // A Stripe retry or the companion success event can resolve an already-
+  // recorded row. Re-run every idempotent downstream step whenever we know the
+  // canonical payment id so a crash after the truth write cannot strand QBO,
+  // settlement, or receipt delivery forever.
+  if (!result.paymentId) return;
   try {
     const settlementResult = await autoSyncRecordedPaymentSettlement({ paymentId: result.paymentId });
     if (settlementResult.status !== "synced") {
@@ -140,6 +196,10 @@ export async function POST(request: Request) {
           connectedAccountId,
           stripe,
         });
+        throwIfTenantMoneyEventShouldRetry(paymentResult);
+        if (paymentResult.paymentId) {
+          await releaseCollectionReservationForStripeObject(session);
+        }
         await notifyNewRecordedPayment(paymentResult);
 
         return NextResponse.json({ received: true });
@@ -189,7 +249,10 @@ export async function POST(request: Request) {
     if (event.type === "checkout.session.expired") {
       const session = event.data.object as Stripe.Checkout.Session;
       if (session.mode === "payment") {
-        await closeTenantInvoicePendingPaymentFromExpiredCheckoutSession({ session });
+        const closeResult = await closeTenantInvoicePendingPaymentFromExpiredCheckoutSession({ session });
+        if (closeResult.closed) {
+          await releaseCollectionReservationForStripeObject(session);
+        }
       }
       return NextResponse.json({ received: true });
     }
@@ -224,6 +287,10 @@ export async function POST(request: Request) {
           eventId: event.id,
           connectedAccountId,
         });
+        throwIfTenantMoneyEventShouldRetry(paymentResult);
+        if (paymentResult.paymentId) {
+          await releaseCollectionReservationForStripeObject(charge);
+        }
         await notifyNewRecordedPayment(paymentResult);
       }
     }
@@ -240,11 +307,15 @@ export async function POST(request: Request) {
         : "";
 
       if (invoiceId) {
-        await recordTenantInvoicePaymentFailureFromStripeCharge({
+        const failureResult = await recordTenantInvoicePaymentFailureFromStripeCharge({
           charge,
           eventId: event.id,
           connectedAccountId,
         });
+        throwIfTenantMoneyEventShouldRetry(failureResult);
+        if (failureResult.paymentId) {
+          await releaseCollectionReservationForStripeObject(charge);
+        }
       }
     }
 
@@ -256,23 +327,25 @@ export async function POST(request: Request) {
         : "";
 
       if (invoiceId) {
-        await recordTenantInvoiceRefundFromStripeCharge({
+        const refundResult = await recordTenantInvoiceRefundFromStripeCharge({
           charge,
           eventId: event.id,
           connectedAccountId,
         });
+        throwIfTenantMoneyOutEventShouldRetry(refundResult, 'refund');
       }
     }
 
     if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
       // Disputes do not reliably carry our metadata, so the handler resolves the
       // account from the payment row the original charge produced.
-      await recordTenantInvoiceDisputeFromStripe({
+      const disputeResult = await recordTenantInvoiceDisputeFromStripe({
         dispute: event.data.object as Stripe.Dispute,
         eventId: event.id,
         closed: event.type === "charge.dispute.closed",
         connectedAccountId: typeof event.account === "string" ? event.account.trim() : "",
       });
+      throwIfTenantMoneyOutEventShouldRetry(disputeResult, 'dispute');
     }
 
     return NextResponse.json({ received: true });
