@@ -15,12 +15,12 @@
     "test:smoke:visit-scope-inline-price-mobile": "node scripts/__tests__/visit-scope-inline-price-mobile.smoke.js"
   },
   "dependencies": {
-    "@capacitor/android": "^8.4.1",
+    "@capacitor/android": "^8.4.2",
     "@capacitor/browser": "^8.0.3",
-    "@capacitor/cli": "^8.4.1",
-    "@capacitor/core": "^8.4.1",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
     "@capacitor/geolocation": "^8.2.0",
-    "@capacitor/ios": "^8.4.1",
+    "@capacitor/ios": "^8.4.2",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@react-pdf/renderer": "^4.5.1",
