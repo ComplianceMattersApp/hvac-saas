@@ -57,6 +57,7 @@ export interface QboPaymentInput {
 export interface QboSyncedEntity {
   id: string;
   syncToken: string;
+  privateNote?: string | null;
 }
 
 export type QboInvoicePaymentContext = {
@@ -152,11 +153,16 @@ export async function findQboInvoiceByDocNumber(
     baseUrl,
     path: "query",
     method: "GET",
-    query: `select Id, SyncToken from Invoice where DocNumber = '${escapeQboQueryValue(normalizedDocNumber)}'`,
+    query: `select * from Invoice where DocNumber = '${escapeQboQueryValue(normalizedDocNumber)}'`,
   });
   const existing = found?.QueryResponse?.Invoice?.[0];
   if (!existing?.Id) return null;
-  return { id: String(existing.Id), syncToken: String(existing.SyncToken ?? "0") };
+  const privateNote = String(existing.PrivateNote ?? "").trim();
+  return {
+    id: String(existing.Id),
+    syncToken: String(existing.SyncToken ?? "0"),
+    ...(privateNote ? { privateNote } : {}),
+  };
 }
 
 interface QboRequestBase {
@@ -182,6 +188,8 @@ async function qboFetch(opts: {
   method: "GET" | "POST";
   body?: unknown;
   query?: string;
+  /** Intuit duplicate-request guard. Must be stable across retries and <= 50 chars. */
+  requestId?: string;
   /**
    * QBO operation selector, e.g. void on POST /invoice. The parameter NAME is
    * explicit because Intuit is inconsistent about it: `operation=` appears in
@@ -191,10 +199,11 @@ async function qboFetch(opts: {
    */
   operation?: { name: "operation" | "operate"; value: string };
 }): Promise<any> {
-  const { accessToken, realmId, baseUrl, path, method, body, query, operation } = opts;
+  const { accessToken, realmId, baseUrl, path, method, body, query, requestId, operation } = opts;
   const url = new URL(`${baseUrl}/v3/company/${realmId}/${path}`);
   url.searchParams.set("minorversion", QBO_MINOR_VERSION);
   if (query) url.searchParams.set("query", query);
+  if (requestId) url.searchParams.set("requestid", requestId.slice(0, 50));
   if (operation) url.searchParams.set(operation.name, operation.value);
 
   const response = await fetch(url.toString(), {
@@ -341,7 +350,7 @@ function buildInvoiceBody(invoice: QboInvoiceInput, servicesItemRef: string): Re
 }
 
 export async function createQboInvoice(
-  params: QboRequestBase & { invoice: QboInvoiceInput; servicesItemRef: string },
+  params: QboRequestBase & { invoice: QboInvoiceInput; servicesItemRef: string; requestId?: string | null },
 ): Promise<QboSyncedEntity> {
   const { accessToken, realmId, baseUrl, invoice, servicesItemRef } = params;
   const created = await qboFetch({
@@ -350,6 +359,7 @@ export async function createQboInvoice(
     baseUrl,
     path: "invoice",
     method: "POST",
+    requestId: String(params.requestId ?? "").trim() || undefined,
     body: buildInvoiceBody(invoice, servicesItemRef),
   });
   const inv = created?.Invoice;
@@ -363,6 +373,7 @@ export async function updateQboInvoice(
     syncToken: string;
     invoice: QboInvoiceInput;
     servicesItemRef: string;
+    requestId?: string | null;
   },
 ): Promise<QboSyncedEntity> {
   const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken, invoice, servicesItemRef } = params;
@@ -372,6 +383,7 @@ export async function updateQboInvoice(
     baseUrl,
     path: "invoice",
     method: "POST",
+    requestId: String(params.requestId ?? "").trim() || undefined,
     body: {
       ...buildInvoiceBody(invoice, servicesItemRef),
       Id: qboInvoiceId,
@@ -504,6 +516,8 @@ export type QboPaymentSnapshot = {
   txnDate: string | null;
   /** Invoice ids this payment is applied to. */
   linkedInvoiceIds: string[];
+  /** Dollars applied to each linked invoice, keyed by QuickBooks invoice id. */
+  appliedAmountByInvoiceId: Record<string, number>;
 };
 
 /** Every QBO payment with a transaction date on/after `fromDate` (YYYY-MM-DD). */
@@ -515,11 +529,22 @@ export async function listQboPaymentsSince(
     entity: "Payment",
     where: `TxnDate >= '${escapeQboQueryValue(params.fromDate)}'`,
   });
-  return rows.map((payment) => ({
-    id: String(payment.Id),
-    totalAmount: Number(payment.TotalAmt ?? 0),
-    txnDate: String(payment.TxnDate ?? "").trim() || null,
-    linkedInvoiceIds: [
+  return rows.map((payment) => {
+    const appliedAmountByInvoiceId: Record<string, number> = {};
+    for (const line of payment?.Line ?? []) {
+      const amount = Number(line?.Amount ?? 0);
+      for (const transaction of line?.LinkedTxn ?? []) {
+        if (String(transaction?.TxnType ?? "") !== "Invoice") continue;
+        const invoiceId = String(transaction?.TxnId ?? "").trim();
+        if (!invoiceId) continue;
+        appliedAmountByInvoiceId[invoiceId] = round2((appliedAmountByInvoiceId[invoiceId] ?? 0) + amount);
+      }
+    }
+    return {
+      id: String(payment.Id),
+      totalAmount: Number(payment.TotalAmt ?? 0),
+      txnDate: String(payment.TxnDate ?? "").trim() || null,
+      linkedInvoiceIds: [
       ...new Set(
         (payment?.Line ?? []).flatMap((line: any) =>
           (line?.LinkedTxn ?? [])
@@ -528,12 +553,14 @@ export async function listQboPaymentsSince(
             .filter(Boolean),
         ),
       ),
-    ] as string[],
-  }));
+      ] as string[],
+      appliedAmountByInvoiceId,
+    };
+  });
 }
 
 export async function voidQboInvoice(
-  params: QboRequestBase & { qboInvoiceId: string; syncToken: string },
+  params: QboRequestBase & { qboInvoiceId: string; syncToken: string; requestId?: string | null },
 ): Promise<QboSyncedEntity> {
   const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken } = params;
 
@@ -547,6 +574,7 @@ export async function voidQboInvoice(
   const post = (name: "operation" | "operate") =>
     qboFetch({
       accessToken, realmId, baseUrl, path: "invoice", method: "POST",
+      requestId: String(params.requestId ?? "").trim() || undefined,
       operation: { name, value: "void" }, body,
     });
 
@@ -580,7 +608,7 @@ function isMissingRequiredLineFault(error: unknown): boolean {
 }
 
 export async function createQboPayment(
-  params: QboRequestBase & { payment: QboPaymentInput },
+  params: QboRequestBase & { payment: QboPaymentInput; requestId?: string | null },
 ): Promise<QboSyncedEntity> {
   const { accessToken, realmId, baseUrl, payment } = params;
   const created = await qboFetch({
@@ -589,6 +617,7 @@ export async function createQboPayment(
     baseUrl,
     path: "payment",
     method: "POST",
+    requestId: String(params.requestId ?? "").trim() || undefined,
     body: {
       CustomerRef: { value: payment.customerRef },
       TotalAmt: round2(payment.amount),

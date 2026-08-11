@@ -196,6 +196,7 @@ export async function syncPaymentToQbo(params: {
       accessToken: token.accessToken,
       realmId: token.realmId,
       baseUrl: getQboBaseUrl(),
+      requestId: `espay-${paymentId}`,
       payment: {
         customerRef: qboInvoice.customerRef,
         invoiceRef: String(invoice.qbo_invoice_id),

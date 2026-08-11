@@ -120,6 +120,10 @@ describe("syncInvoiceToQbo", () => {
       expect.objectContaining({ customer: expect.objectContaining({ displayName: "Snap Cust" }) }),
     );
     expect(createQboInvoice).toHaveBeenCalled();
+    expect(createQboInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "esinv-inv2",
+      invoice: expect.objectContaining({ privateNote: expect.stringContaining("EveryStep invoice ID: inv2") }),
+    }));
     const synced = (updates.internal_invoices ?? []).find((p) => p.qbo_sync_status === "synced");
     expect(synced).toBeTruthy();
     expect(synced.qbo_invoice_id).toBe("Q1");
@@ -150,8 +154,32 @@ describe("syncInvoiceToQbo", () => {
     expect(createQboInvoice).not.toHaveBeenCalled();
     expect(findQboInvoiceByDocNumber).not.toHaveBeenCalled();
     expect(updateQboInvoice).toHaveBeenCalledWith(
-      expect.objectContaining({ qboInvoiceId: "Q9", syncToken: "5" }),
+      expect.objectContaining({ qboInvoiceId: "Q9", syncToken: "5", requestId: "esinvupd-inv3-5" }),
     );
+  });
+
+  it("adopts an exact QBO invoice created by an earlier timed-out request", async () => {
+    findQboInvoiceByDocNumber.mockResolvedValueOnce({
+      id: "Q-recovered",
+      syncToken: "2",
+      privateNote: "EveryStep invoice ID: inv-recover",
+    });
+    const { builder, updates } = makeSupabase({
+      internal_invoices: { single: {
+        id: "inv-recover", status: "issued", account_owner_user_id: "acc", job_id: null,
+        customer_id: null, billing_name: "Cust", invoice_display_number: 2008,
+        invoice_date: "2026-07-10", qbo_invoice_id: null,
+      } },
+      internal_invoice_line_items: { list: [
+        { item_name_snapshot: "Svc", quantity: 1, unit_price: 50, line_subtotal: 50, sort_order: 1 },
+      ] },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-recover" });
+
+    expect(result).toMatchObject({ status: "synced", qboInvoiceId: "Q-recovered" });
+    expect(createQboInvoice).not.toHaveBeenCalled();
+    expect((updates.internal_invoices ?? []).some((payload) => payload.qbo_invoice_id === "Q-recovered")).toBe(true);
   });
 
   it("blocks creation when QBO already has the proposed invoice number", async () => {

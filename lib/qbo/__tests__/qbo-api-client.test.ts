@@ -7,6 +7,7 @@ import {
   findQboInvoiceByDocNumber,
   findOrCreateQboCustomer,
   getQboInvoicePaymentContext,
+  listQboPaymentsSince,
 } from "@/lib/qbo/qbo-api-client";
 
 function mockFetchSequence(responses: Array<{ status: number; body: unknown }>) {
@@ -36,6 +37,7 @@ describe("qbo-api-client", () => {
     ]);
     const result = await createQboPayment({
       ...base,
+      requestId: "espay-payment-55",
       payment: {
         customerRef: "C1",
         invoiceRef: "I1",
@@ -46,6 +48,8 @@ describe("qbo-api-client", () => {
       },
     });
     expect(result).toEqual({ id: "P55", syncToken: "0" });
+    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requestUrl.searchParams.get("requestid")).toBe("espay-payment-55");
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     const body = JSON.parse(String(request.body));
     expect(body).toMatchObject({
@@ -119,6 +123,7 @@ describe("qbo-api-client", () => {
     const result = await createQboInvoice({
       ...base,
       servicesItemRef: "7",
+      requestId: "esinv-invoice-1",
       invoice: {
         docNumber: "2001",
         txnDate: "2026-07-10",
@@ -133,6 +138,8 @@ describe("qbo-api-client", () => {
     expect(body.CustomerRef).toEqual({ value: "55" });
     expect(body.Line[0].SalesItemLineDetail.ItemRef).toEqual({ value: "7" });
     expect(body.Line[0].Amount).toBe(100);
+    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requestUrl.searchParams.get("requestid")).toBe("esinv-invoice-1");
   });
 
   it("findQboInvoiceByDocNumber returns an exact existing invoice", async () => {
@@ -144,7 +151,7 @@ describe("qbo-api-client", () => {
 
     expect(result).toEqual({ id: "1727", syncToken: "4" });
     const requestUrl = new URL(String(fetchMock.mock.calls[0][0]));
-    expect(requestUrl.searchParams.get("query")).toBe("select Id, SyncToken from Invoice where DocNumber = '2001'");
+    expect(requestUrl.searchParams.get("query")).toBe("select * from Invoice where DocNumber = '2001'");
   });
 
   it("findQboInvoiceByDocNumber returns null when the number is available", async () => {
@@ -155,6 +162,26 @@ describe("qbo-api-client", () => {
   it("loads the current QBO invoice customer and open balance before payment", async () => {
     mockFetchSequence([{ status: 200, body: { QueryResponse: { Invoice: [{ Id: "4520", CustomerRef: { value: "315" }, Balance: 410, TotalAmt: 410 }] } } }]);
     await expect(getQboInvoicePaymentContext({ ...base, invoiceId: "4520" })).resolves.toEqual({ id: "4520", customerRef: "315", balance: 410, totalAmount: 410 });
+  });
+
+  it("preserves per-invoice allocations for multi-invoice QBO payments", async () => {
+    mockFetchSequence([{ status: 200, body: { QueryResponse: { Payment: [{
+      Id: "P-MULTI",
+      TotalAmt: 1000,
+      TxnDate: "2026-08-01",
+      Line: [
+        { Amount: 840, LinkedTxn: [{ TxnId: "I1", TxnType: "Invoice" }] },
+        { Amount: 160, LinkedTxn: [{ TxnId: "I2", TxnType: "Invoice" }] },
+      ],
+    }] } } }]);
+
+    await expect(listQboPaymentsSince({ ...base, fromDate: "2026-07-01" })).resolves.toEqual([{
+      id: "P-MULTI",
+      totalAmount: 1000,
+      txnDate: "2026-08-01",
+      linkedInvoiceIds: ["I1", "I2"],
+      appliedAmountByInvoiceId: { I1: 840, I2: 160 },
+    }]);
   });
 
   it("throws QboApiError with the fault message on a non-2xx response", async () => {

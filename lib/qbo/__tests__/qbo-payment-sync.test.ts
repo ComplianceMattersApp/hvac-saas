@@ -62,6 +62,7 @@ describe("syncPaymentToQbo", () => {
     const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
     expect(result).toEqual({ paymentId: "pay-1", status: "synced", qboPaymentId: "QP1" });
     expect(createQboPayment).toHaveBeenCalledWith(expect.objectContaining({
+      requestId: "espay-pay-1",
       payment: expect.objectContaining({ customerRef: "QC1", invoiceRef: "QI1", amount: 720, paymentRefNum: "CHK-104", privateNote: expect.stringContaining("EveryStep payment reference: CHK-104") }),
     }));
     expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "pending" }));

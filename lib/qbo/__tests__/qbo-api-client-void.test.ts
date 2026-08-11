@@ -38,10 +38,11 @@ describe("voidQboInvoice", () => {
   it("posts exactly {Id, SyncToken} to the documented operation=void", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ Invoice: { Id: "4676", SyncToken: "2" } }));
 
-    const result = await voidQboInvoice({ ...BASE, qboInvoiceId: "4676", syncToken: "1" });
+    const result = await voidQboInvoice({ ...BASE, qboInvoiceId: "4676", syncToken: "1", requestId: "esvoid-invoice-1" });
 
     expect(result).toEqual({ id: "4676", syncToken: "2" });
     expect(urlOf(0)).toContain("operation=void");
+    expect(new URL(urlOf(0)).searchParams.get("requestid")).toBe("esvoid-invoice-1");
     expect(bodyOf(0)).toEqual({ Id: "4676", SyncToken: "1" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

@@ -223,16 +223,20 @@ function reconcilePaymentsAgainstQbo(params: {
       const qboPayment = qboPaymentsById.get(qboPaymentId);
       if (!qboPayment) continue;
       const everystepCents = Number(payment.amount_cents ?? 0);
-      const qboCents = toCents(qboPayment.totalAmount);
-      if (everystepCents !== qboCents || !qboPayment.linkedInvoiceIds.includes(clean(payment.qbo_invoice_id))) {
+      const expectedQboInvoiceId = clean(payment.qbo_invoice_id);
+      const linkedToExpectedInvoice = qboPayment.linkedInvoiceIds.includes(expectedQboInvoiceId);
+      const appliedDollars = qboPayment.appliedAmountByInvoiceId?.[expectedQboInvoiceId]
+        ?? (qboPayment.linkedInvoiceIds.length === 1 && linkedToExpectedInvoice ? qboPayment.totalAmount : 0);
+      const qboAppliedCents = toCents(appliedDollars);
+      if (everystepCents !== qboAppliedCents || !linkedToExpectedInvoice) {
         findings.push({
           ...base,
           findingType: "payment_allocation_mismatch",
           title: `QuickBooks payment allocation disagrees · invoice ${label}`,
-          detail: `EveryStep recorded ${money(everystepCents)} against this invoice; QuickBooks payment ${qboPaymentId} totals ${money(qboCents)} and is linked to ${qboPayment.linkedInvoiceIds.includes(clean(payment.qbo_invoice_id)) ? "the expected invoice" : "a different invoice"}.`,
+          detail: `EveryStep recorded ${money(everystepCents)} against this invoice; QuickBooks payment ${qboPaymentId} applies ${money(qboAppliedCents)} here (payment total ${money(toCents(qboPayment.totalAmount))}) and is linked to ${linkedToExpectedInvoice ? "the expected invoice" : "a different invoice"}.`,
           truth: "A payment exists in both systems, but its amount or invoice allocation does not agree.",
           everystepValue: `${money(everystepCents)}, invoice ${label}`,
-          externalValue: `${money(qboCents)}, ${qboPayment.linkedInvoiceIds.join(", ") || "no linked invoice"}`,
+          externalValue: `${money(qboAppliedCents)} applied, ${qboPayment.linkedInvoiceIds.join(", ") || "no linked invoice"}`,
         });
       }
     }
@@ -274,6 +278,7 @@ function reconcileAgainstStripe(params: {
 
     const label = params.invoiceLabels.get(clean(payment.invoice_id)) ?? clean(payment.invoice_id);
     const refundedCents = Number(charge.amount_refunded ?? 0);
+    const everyStepRefundedCents = Number(payment.stripe_refunded_amount_cents ?? 0);
     const base = {
       severity: "critical" as const,
       subjectKind: "payment" as const,
@@ -284,18 +289,23 @@ function reconcileAgainstStripe(params: {
       jobId: clean(payment.job_id) || null,
     };
 
-    if (refundedCents > 0) {
+    if (refundedCents !== everyStepRefundedCents) {
       findings.push({
         ...base,
         findingType: "stripe_refund_not_reflected",
         title: `Stripe refunded a payment EveryStep still counts · invoice ${label}`,
         detail: `Stripe shows ${money(refundedCents)} refunded on charge ${chargeId}; EveryStep still has the payment recorded.`,
-        truth: "The customer got money back but the invoice still reads paid. The refund webhook did not land.",
-        everystepValue: `recorded, ${money(Number(payment.amount_cents ?? 0))}`,
+        truth: "The refund projection does not match Stripe's cumulative money-out total, so the open invoice balance may be wrong.",
+        everystepValue: `recorded, refunded ${money(everyStepRefundedCents)}`,
         externalValue: `refunded ${money(refundedCents)}`,
       });
       continue;
     }
+
+    // A matching partial refund is reflected correctly in EveryStep. It still
+    // surfaces in Needs Attention for the separate QBO/accounting adjustment,
+    // but it is not a Stripe reconciliation discrepancy.
+    if (refundedCents > 0) continue;
 
     if (charge.disputed) {
       findings.push({
@@ -402,7 +412,7 @@ export async function runThreeWayReconciliation(params: {
 
   const { data: paymentRows, error: paymentError } = await admin
     .from("internal_invoice_payments")
-    .select("id, invoice_id, job_id, amount_cents, payment_status, paid_at, processor_charge_id, processor_payment_reference, stripe_payment_intent_id, qbo_payment_id, dispute_status")
+    .select("id, invoice_id, job_id, amount_cents, payment_status, paid_at, processor_charge_id, processor_payment_reference, stripe_payment_intent_id, qbo_payment_id, dispute_status, stripe_refunded_amount_cents")
     .eq("account_owner_user_id", accountOwnerUserId)
     .gte("paid_at", since)
     .limit(5000);

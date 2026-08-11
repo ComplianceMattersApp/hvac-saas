@@ -163,6 +163,23 @@ describe("payment reconciliation", () => {
     });
     expect(result.findings.map((f) => f.findingType)).toContain("payment_allocation_mismatch");
   });
+
+  it("compares the invoice allocation instead of a multi-invoice payment total", async () => {
+    mockListPayments.mockResolvedValue([{
+      id: "qp-1",
+      totalAmount: 1000,
+      txnDate: "2026-08-01",
+      linkedInvoiceIds: ["4534", "other-invoice"],
+      appliedAmountByInvoiceId: { "4534": 840, "other-invoice": 160 },
+    }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 84000, payment_status: "recorded", qbo_payment_id: "qp-1" },
+      ]),
+      accountOwnerUserId: "owner-1",
+    });
+    expect(result.findings.map((f) => f.findingType)).not.toContain("payment_allocation_mismatch");
+  });
 });
 
 describe("Stripe reconciliation", () => {
@@ -211,6 +228,19 @@ describe("Stripe reconciliation", () => {
       accountOwnerUserId: "owner-1", stripe,
     });
     expect(result.findings.map((f) => f.findingType)).toContain("stripe_refund_not_reflected");
+  });
+
+  it("does not report a matching partial refund as missing from EveryStep", async () => {
+    const stripe = stripeWithCharges([
+      { id: "ch_1", status: "succeeded", refunded: false, amount: 48500, amount_refunded: 10000, metadata: { invoice_id: "inv-1" } },
+    ]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 48500, payment_status: "recorded", processor_charge_id: "ch_1", stripe_refunded_amount_cents: 10000 },
+      ]),
+      accountOwnerUserId: "owner-1", stripe,
+    });
+    expect(result.findings.map((f) => f.findingType)).not.toContain("stripe_refund_not_reflected");
   });
 
   it("does not call a charge missing when its PaymentIntent is already recorded", async () => {

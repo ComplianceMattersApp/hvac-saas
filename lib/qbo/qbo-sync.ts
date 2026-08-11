@@ -56,6 +56,10 @@ function nonEmpty(value: unknown): string | null {
   return s.length > 0 ? s : null;
 }
 
+function qboInvoiceOriginMarker(invoiceId: unknown) {
+  return `EveryStep invoice ID: ${String(invoiceId ?? "").trim()}`;
+}
+
 function resolveJobContext(customerRow: any | null, jobRow: any | null): string | null {
   const customerName =
     nonEmpty(customerRow?.full_name) ??
@@ -135,7 +139,7 @@ function buildInvoiceInput(
         unitPrice,
       };
     }),
-    privateNote: nonEmpty(invoiceRow.notes),
+    privateNote: [nonEmpty(invoiceRow.notes), qboInvoiceOriginMarker(invoiceRow.id)].filter(Boolean).join(" Â· "),
   };
 }
 
@@ -259,17 +263,26 @@ async function syncSingleInvoiceWithContext(
         docNumber: invoiceInput.docNumber,
       });
       if (existingQboInvoice) {
-        throw new Error(
-          `QuickBooks already has invoice number ${invoiceInput.docNumber}. This app invoice was not created or linked; resolve the number conflict before retrying.`,
-        );
+        if (nonEmpty(existingQboInvoice.privateNote)?.includes(qboInvoiceOriginMarker(invoiceRow.id))) {
+          // The original create reached QBO but its response/local identity
+          // write did not. The private marker proves this exact EveryStep
+          // invoice created the document, so adopting it is safe.
+          synced = existingQboInvoice;
+        } else {
+          throw new Error(
+            `QuickBooks already has invoice number ${invoiceInput.docNumber}. This app invoice was not created or linked; resolve the number conflict before retrying.`,
+          );
+        }
+      } else {
+        synced = await createQboInvoice({
+          accessToken,
+          realmId,
+          baseUrl,
+          invoice: invoiceInput,
+          servicesItemRef,
+          requestId: `esinv-${invoiceId}`,
+        });
       }
-      synced = await createQboInvoice({
-        accessToken,
-        realmId,
-        baseUrl,
-        invoice: invoiceInput,
-        servicesItemRef,
-      });
     } else {
       synced = await updateQboInvoice({
         accessToken,
@@ -279,6 +292,7 @@ async function syncSingleInvoiceWithContext(
         syncToken: invoiceRow.qbo_sync_token ?? "0",
         invoice: invoiceInput,
         servicesItemRef,
+        requestId: `esinvupd-${invoiceId}-${invoiceRow.qbo_sync_token ?? "0"}`,
       });
     }
 

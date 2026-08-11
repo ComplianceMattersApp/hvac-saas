@@ -191,6 +191,7 @@ export async function voidInvoiceInQbo(params: {
       baseUrl,
       qboInvoiceId,
       syncToken: snapshot.syncToken,
+      requestId: `esvoid-${invoiceId}-${snapshot.syncToken}`,
     });
 
     // Confirm against QBO instead of trusting the response. Production has

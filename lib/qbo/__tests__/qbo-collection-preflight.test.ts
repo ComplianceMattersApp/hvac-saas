@@ -58,15 +58,16 @@ describe("checkQboBalanceBeforeCollection", () => {
     expect(getValidQboAccessToken).not.toHaveBeenCalled();
   });
 
-  it("fails open when QBO is not connected", async () => {
+  it("fails closed when a QBO-linked invoice cannot be checked because QBO is disconnected", async () => {
     getValidQboAccessToken.mockResolvedValueOnce(null);
     const supabase = supabaseWithInvoice({ id: "inv-1", invoice_display_number: 2116, invoice_number: "INV-1", qbo_invoice_id: "4548" });
     const result = await checkQboBalanceBeforeCollection({ ...baseParams, supabase });
-    expect(result).toEqual({ blocked: false, checked: false });
+    expect(result).toMatchObject({ blocked: true, qboBalanceCents: null });
+    expect((result as any).message).toContain("reconnected");
     expect(getQboInvoicePaymentContext).not.toHaveBeenCalled();
   });
 
-  it("fails open when QBO is not configured for the environment", async () => {
+  it("skips the QBO gate when QBO is not configured for the deployment", async () => {
     getQboAvailability.mockReturnValueOnce({ available: false });
     const supabase = supabaseWithInvoice({ id: "inv-1", qbo_invoice_id: "4548" });
     const result = await checkQboBalanceBeforeCollection({ ...baseParams, supabase });
@@ -74,10 +75,11 @@ describe("checkQboBalanceBeforeCollection", () => {
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("fails open when the QBO lookup errors, so an accounting outage never blocks collection", async () => {
+  it("fails closed when the QBO balance lookup errors", async () => {
     getQboInvoicePaymentContext.mockRejectedValueOnce(new Error("QBO 500"));
     const supabase = supabaseWithInvoice({ id: "inv-1", invoice_display_number: 2116, invoice_number: "INV-1", qbo_invoice_id: "4548" });
     const result = await checkQboBalanceBeforeCollection({ ...baseParams, supabase });
-    expect(result).toEqual({ blocked: false, checked: false });
+    expect(result).toMatchObject({ blocked: true, qboBalanceCents: null });
+    expect((result as any).message).toContain("paused");
   });
 });
