@@ -192,6 +192,18 @@ where a.id is null
 - `git diff --check`: clean other than repository line-ending warnings.
 - TypeScript: all touched files are clean. The repository-wide typecheck still has pre-existing test-only errors in unrelated cron/API mocks and Drawer tests.
 
+## Deferred live verification: refunds
+
+Status: **Pending operator verification after 2026-08-10.** Do not treat the refund workflow as production-proven until this checklist is completed.
+
+- [ ] Create a new low-value internal test invoice and pay it through the live Stripe flow. Do not reuse invoice 2007 / QuickBooks 1708 or a customer transaction.
+- [ ] Record the EveryStep payment ID, Stripe Checkout Session, PaymentIntent, Charge ID, invoice balance, allocation, and QuickBooks balance before refunding.
+- [ ] Issue a partial refund in Stripe. Confirm the webhook succeeds, `stripe_refunded_amount_cents` reflects the cumulative refund, the EveryStep allocation decreases by that amount, and the invoice reopens for exactly the refunded balance.
+- [ ] Confirm Needs Attention creates the expected critical QuickBooks refund/credit follow-up. QuickBooks is expected to remain unchanged until the accounting adjustment is handled manually.
+- [ ] Refund the remainder. Confirm the EveryStep payment becomes reversed, the full invoice balance reopens, and no duplicate payment, allocation, or alert is created if the Stripe event is delivered again.
+- [ ] Complete the QuickBooks refund/credit procedure, rerun reconciliation twice, and confirm the second run creates no new discrepancy.
+- [ ] Save screenshots or IDs with the deployment record and mark this checklist complete.
+
 ## Go/no-go decision
 
 Go for migration-first staging and a controlled tenant canary.
