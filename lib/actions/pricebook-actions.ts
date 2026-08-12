@@ -15,6 +15,10 @@ import {
   parsePricebookCategory,
   parsePricebookUnitLabel,
 } from "@/lib/business/pricebook-options";
+import {
+  isMissingQboItemMappingColumnError,
+  parseQboItemSelection,
+} from "@/lib/qbo/qbo-item-mapping";
 import { createClient } from "@/lib/supabase/server";
 
 const ITEM_TYPES = new Set(["service", "material", "diagnostic", "adjustment"]);
@@ -31,7 +35,8 @@ type PricebookNotice =
   | "invalid_unit_price"
   | "negative_only_for_adjustment"
   | "not_found"
-  | "save_failed";
+  | "save_failed"
+  | "qbo_item_save_failed";
 
 export type PricebookImportActionState = {
   status: "idle" | "preview" | "imported" | "error";
@@ -387,8 +392,42 @@ export async function updatePricebookItemFromForm(formData: FormData) {
     redirect(withNotice("save_failed"));
   }
 
+  await saveQboItemMapping({ supabase, accountOwnerUserId, itemId, formData });
+
   revalidatePath("/ops/admin/pricebook");
   redirect(withNotice("updated"));
+}
+
+/**
+ * Persist the optional QuickBooks item mapping as its own statement.
+ *
+ * Separate from the main update on purpose: these columns are newer than the
+ * rest of the row, so a lagging migration must not be able to fail a plain
+ * pricebook edit. The presence marker distinguishes "the operator chose None"
+ * (clear the mapping) from "the selector wasn't rendered or was disabled"
+ * (leave whatever is stored alone).
+ */
+async function saveQboItemMapping(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  accountOwnerUserId: string;
+  itemId: string;
+  formData: FormData;
+}) {
+  if (normalizeText(params.formData.get("qbo_item_mapping_present")) !== "1") return;
+
+  const selection = parseQboItemSelection(params.formData.get("qbo_item"));
+  const { error } = await params.supabase
+    .from("pricebook_items")
+    .update({
+      qbo_item_id: selection?.qboItemId ?? null,
+      qbo_item_name: selection?.qboItemName ?? null,
+    })
+    .eq("id", params.itemId)
+    .eq("account_owner_user_id", params.accountOwnerUserId);
+
+  if (error && !isMissingQboItemMappingColumnError(error)) {
+    redirect(withNotice("qbo_item_save_failed"));
+  }
 }
 
 export async function setPricebookItemActiveFromForm(formData: FormData) {

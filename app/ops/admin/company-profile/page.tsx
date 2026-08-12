@@ -30,6 +30,8 @@ import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-strip
 import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { getQboConnectionForAccountIncludingInactive } from "@/lib/qbo/qbo-connection";
+import { loadQboItemCatalog, type QboItemCatalog } from "@/lib/qbo/qbo-item-catalog";
+import { readAccountDefaultQboItem } from "@/lib/qbo/qbo-item-mapping";
 import { QboIntegrationSection } from "./_components/QboIntegrationSection";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 import { SettingsSection } from "./_components/SettingsSection";
@@ -85,6 +87,12 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   qbo_disconnected: { tone: "success", message: "QuickBooks Online disconnected." },
   qbo_sync_complete: { tone: "success", message: "QuickBooks sync complete." },
   qbo_not_configured: { tone: "warn", message: "QuickBooks Online is not configured for this environment." },
+  qbo_default_item_saved: { tone: "success", message: "Default QuickBooks item saved." },
+  qbo_default_item_failed: { tone: "error", message: "We couldn't save the default QuickBooks item. Please try again." },
+  qbo_default_item_unavailable: {
+    tone: "warn",
+    message: "QuickBooks item mapping isn't available on this database yet. Apply the pending migration, then try again.",
+  },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -222,6 +230,16 @@ export default async function AdminCompanyProfilePage({
   } catch {
     qboConnection = null;
   }
+  // Item picker data — only fetched for a live connection, and never allowed to
+  // fail the page (loadQboItemCatalog reports unavailability instead of throwing).
+  const qboItemCatalog: QboItemCatalog =
+    qboAvailable && qboConnection?.status === "active"
+      ? await loadQboItemCatalog({ supabase, accountOwnerUserId: ownerId })
+      : { connected: false, items: [], error: null };
+  const defaultQboItem =
+    qboConnection?.status === "active"
+      ? await readAccountDefaultQboItem({ supabase, accountOwnerUserId: ownerId })
+      : null;
 
   // Rail state at a glance (design turn 14a): green dot = complete,
   // amber + count = needs attention. Derived from readiness so the source of
@@ -686,7 +704,12 @@ export default async function AdminCompanyProfilePage({
             id: "integrations",
             label: "Integrations",
             content: (
-              <QboIntegrationSection qboConnection={qboConnection} qboAvailable={qboAvailable} />
+              <QboIntegrationSection
+                qboConnection={qboConnection}
+                qboAvailable={qboAvailable}
+                itemCatalog={qboItemCatalog}
+                defaultQboItem={defaultQboItem}
+              />
             ),
           },
           {
