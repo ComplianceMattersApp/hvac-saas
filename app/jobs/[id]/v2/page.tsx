@@ -122,7 +122,7 @@ const S = {
   mono: "var(--font-geist-mono), monospace",
   sectionLabel: {
     fontFamily: "var(--font-geist-mono), monospace",
-    fontSize: "11px",
+    fontSize: "12px",
     letterSpacing: "0.11em",
     textTransform: "uppercase" as const,
     color: "oklch(0.42 0.025 262)",
@@ -130,7 +130,7 @@ const S = {
   },
   fieldLabel: {
     fontFamily: "var(--font-geist-mono), monospace",
-    fontSize: "10px",
+    fontSize: "12px",
     letterSpacing: "0.08em",
     textTransform: "uppercase" as const,
     color: "oklch(0.48 0.02 262)",
@@ -155,7 +155,7 @@ const S = {
     border: "none",
     background: "oklch(0.55 0.17 255)",
     color: "#fff",
-    fontSize: "13.5px",
+    fontSize: "14px",
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: "inherit",
@@ -170,7 +170,7 @@ const S = {
     border: `1px solid ${active ? "oklch(0.85 0.04 255)" : "oklch(0.9 0.006 250)"}`,
     background: active ? "oklch(0.97 0.02 255)" : "#fff",
     color: active ? "oklch(0.45 0.14 255)" : "oklch(0.32 0.02 262)",
-    fontSize: "13px",
+    fontSize: "14px",
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: "inherit",
@@ -181,7 +181,7 @@ const S = {
     borderRadius: "9px",
     border: "1px solid oklch(0.9 0.006 250)",
     background: "oklch(0.98 0.003 250)",
-    fontSize: "12.5px",
+    fontSize: "14px",
     fontWeight: 600,
     cursor: "pointer",
     fontFamily: "inherit",
@@ -1082,11 +1082,11 @@ export default async function JobDetailV2Page({
     <div style={{ background: "oklch(0.975 0.004 250)", minHeight: "100vh" }}>
     <div
       style={{
-        maxWidth: "1300px",
+        maxWidth: "1440px",
         margin: "0 auto",
         padding: "0 28px",
         display: "grid",
-        gridTemplateColumns: "minmax(0,1fr) 290px",
+        gridTemplateColumns: "minmax(0,1fr) 340px",
         gap: "32px",
         alignItems: "start",
         minHeight: 0,
@@ -1123,7 +1123,7 @@ export default async function JobDetailV2Page({
                 style={{
                   fontFamily: S.mono,
                   letterSpacing: "0.06em",
-                  fontSize: "11px",
+                  fontSize: "12px",
                   fontWeight: 600,
                   color: "oklch(0.55 0.015 262)",
                   marginBottom: "9px",
@@ -1150,7 +1150,7 @@ export default async function JobDetailV2Page({
                   <span
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "10.5px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.06em",
                       padding: "4px 8px",
@@ -1165,7 +1165,7 @@ export default async function JobDetailV2Page({
                 <span
                   style={{
                     fontFamily: S.mono,
-                    fontSize: "10.5px",
+                    fontSize: "12px",
                     fontWeight: 700,
                     letterSpacing: "0.06em",
                     padding: "4px 9px",
@@ -1199,7 +1199,7 @@ export default async function JobDetailV2Page({
                       background: "oklch(0.96 0.025 255)",
                       color: "oklch(0.43 0.13 255)",
                       fontFamily: S.mono,
-                      fontSize: "10px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.06em",
                       textTransform: "uppercase",
@@ -1227,7 +1227,7 @@ export default async function JobDetailV2Page({
                   style={{
                     display: "block",
                     fontFamily: S.mono,
-                    fontSize: "9.5px",
+                    fontSize: "12px",
                     fontWeight: 800,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
@@ -1241,7 +1241,7 @@ export default async function JobDetailV2Page({
                   <span
                     style={{
                       display: "block",
-                      fontSize: "13.5px",
+                      fontSize: "14px",
                       lineHeight: 1.25,
                       fontWeight: 750,
                       color: "oklch(0.28 0.018 262)",
@@ -1256,7 +1256,7 @@ export default async function JobDetailV2Page({
                     style={{
                       display: "block",
                       marginTop: scheduledAppointmentDateText ? "3px" : 0,
-                      fontSize: "13px",
+                      fontSize: "14px",
                       lineHeight: 1.25,
                       fontWeight: 700,
                       color: "oklch(0.34 0.02 262)",
@@ -1312,7 +1312,7 @@ export default async function JobDetailV2Page({
                   <span
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "9px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.06em",
                       padding: "2px 6px",
@@ -1327,7 +1327,7 @@ export default async function JobDetailV2Page({
                   <span
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "9px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.06em",
                       padding: "2px 6px",
@@ -1376,7 +1376,7 @@ export default async function JobDetailV2Page({
                   border: "1px solid oklch(0.86 0.018 250)",
                   background: "#fff",
                   color: "oklch(0.27 0.02 262)",
-                  fontSize: "13.5px",
+                  fontSize: "14px",
                   lineHeight: 1.55,
                   fontFamily: "inherit",
                   outline: "none",
@@ -1392,7 +1392,7 @@ export default async function JobDetailV2Page({
                     border: "1px solid oklch(0.85 0.04 255)",
                     background: "oklch(0.97 0.02 255)",
                     color: "oklch(0.45 0.14 255)",
-                    fontSize: "12.5px",
+                    fontSize: "14px",
                     fontWeight: 600,
                     cursor: "pointer",
                     fontFamily: "inherit",
@@ -1413,7 +1413,7 @@ export default async function JobDetailV2Page({
           style={S.section}
         >
           <div style={{ ...S.sectionLabel, marginBottom: "20px" }}>People &amp; Place</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "40px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: "40px" }}>
 
             {/* left: customer + team */}
             <div>
@@ -1421,7 +1421,7 @@ export default async function JobDetailV2Page({
               <div
                 style={{
                   fontFamily: S.mono,
-                  fontSize: "12.5px",
+                  fontSize: "14px",
                   color: "oklch(0.33 0.02 262)",
                   marginTop: "4px",
                 }}
@@ -1475,7 +1475,7 @@ export default async function JobDetailV2Page({
                 <span
                   style={{
                     fontFamily: S.mono,
-                    fontSize: "10px",
+                    fontSize: "12px",
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     color: "oklch(0.48 0.02 262)",
@@ -1483,7 +1483,7 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   Contact Logging
-                  <span style={{ fontWeight: 400, letterSpacing: "0", textTransform: "none", fontSize: "11px", color: "oklch(0.58 0.015 262)", marginLeft: "6px" }}>
+                  <span style={{ fontWeight: 400, letterSpacing: "0", textTransform: "none", fontSize: "12px", color: "oklch(0.58 0.015 262)", marginLeft: "6px" }}>
                     {contactAttemptLabel}
                   </span>
                 </span>
@@ -1515,7 +1515,7 @@ export default async function JobDetailV2Page({
                             borderRadius: "8px",
                             border: "1px solid oklch(0.9 0.006 250)",
                             background: "#fff",
-                            fontSize: "12px",
+                            fontSize: "14px",
                             fontWeight: 600,
                             cursor: "pointer",
                             fontFamily: "inherit",
@@ -1563,7 +1563,7 @@ export default async function JobDetailV2Page({
                           borderRadius: "50%",
                           background: "oklch(0.95 0.02 255)",
                           color: "oklch(0.45 0.12 255)",
-                          fontSize: "11px",
+                          fontSize: "12px",
                           fontWeight: 700,
                           display: "flex",
                           alignItems: "center",
@@ -1573,14 +1573,14 @@ export default async function JobDetailV2Page({
                       >
                         {getInitials(member.display_name)}
                       </span>
-                      <span style={{ fontSize: "13px", fontWeight: 600 }}>
+                      <span style={{ fontSize: "14px", fontWeight: 600 }}>
                         {formatPersonNamePart(member.display_name)}
                       </span>
                       {member.is_primary ? (
                         <span
                           style={{
                             fontFamily: S.mono,
-                            fontSize: "9px",
+                            fontSize: "12px",
                             fontWeight: 600,
                             color: "oklch(0.55 0.14 150)",
                             letterSpacing: "0.04em",
@@ -1644,7 +1644,7 @@ export default async function JobDetailV2Page({
                       top: "10px",
                       left: "10px",
                       fontFamily: S.mono,
-                      fontSize: "9.5px",
+                      fontSize: "12px",
                       letterSpacing: "0.08em",
                       textTransform: "uppercase",
                       fontWeight: 700,
@@ -1691,7 +1691,7 @@ export default async function JobDetailV2Page({
             <a
               href="#records"
               style={{
-                fontSize: "12.5px",
+                fontSize: "14px",
                 fontWeight: 600,
                 color: "oklch(0.5 0.13 255)",
                 textDecoration: "none",
@@ -1717,7 +1717,7 @@ export default async function JobDetailV2Page({
               <div
                 style={{
                   padding: "20px 0",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   color: "oklch(0.62 0.015 262)",
                 }}
               >
@@ -1748,7 +1748,7 @@ export default async function JobDetailV2Page({
             <span
               style={{
                 fontFamily: S.mono,
-                fontSize: "9.5px",
+                fontSize: "12px",
                 letterSpacing: "0.06em",
                 fontWeight: 600,
                 color: "oklch(0.5 0.13 255)",
@@ -1760,7 +1760,7 @@ export default async function JobDetailV2Page({
               EVERYSTEP
             </span>
           </div>
-          <div style={{ fontSize: "13px", color: "oklch(0.33 0.02 262)", marginBottom: "18px" }}>
+          <div style={{ fontSize: "14px", color: "oklch(0.33 0.02 262)", marginBottom: "18px" }}>
             {isTerminal
               ? "All field steps complete — visit outcome was submitted."
               : visitStarted
@@ -1818,7 +1818,7 @@ export default async function JobDetailV2Page({
                   <div
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "10px",
+                      fontSize: "12px",
                       fontWeight: 600,
                       letterSpacing: "0.08em",
                       color: tagColor,
@@ -1838,7 +1838,7 @@ export default async function JobDetailV2Page({
                   </div>
                   <div
                     style={{
-                      fontSize: "12px",
+                      fontSize: "14px",
                       marginTop: "3px",
                       color: isNow ? "oklch(0.5 0.015 262)" : "oklch(0.6 0.015 262)",
                     }}
@@ -1876,7 +1876,7 @@ export default async function JobDetailV2Page({
                 <span
                   style={{
                     fontFamily: S.mono,
-                    fontSize: "9.5px",
+                    fontSize: "12px",
                     fontWeight: 600,
                     letterSpacing: "0.08em",
                     color: "oklch(0.55 0.015 262)",
@@ -1887,7 +1887,7 @@ export default async function JobDetailV2Page({
                 >
                   LOCKED
                 </span>
-                <span style={{ fontSize: "12.5px", color: "oklch(0.5 0.015 262)" }}>
+                <span style={{ fontSize: "14px", color: "oklch(0.5 0.015 262)" }}>
                   Finish outcomes unlock at Step 3, once the visit is in progress.
                 </span>
               </div>
@@ -1929,7 +1929,7 @@ export default async function JobDetailV2Page({
                     />
                     <span
                       style={{
-                        fontSize: "13.5px",
+                        fontSize: "14px",
                         fontWeight: 700,
                         color: "oklch(0.27 0.02 262)",
                         marginTop: "8px",
@@ -1939,7 +1939,7 @@ export default async function JobDetailV2Page({
                     </span>
                     <span
                       style={{
-                        fontSize: "11.5px",
+                        fontSize: "12px",
                         lineHeight: 1.4,
                         color: "oklch(0.5 0.015 262)",
                         marginTop: "4px",
@@ -1958,7 +1958,7 @@ export default async function JobDetailV2Page({
                 borderRadius: "11px",
                 background: "oklch(0.95 0.04 150)",
                 border: "1px solid oklch(0.88 0.05 150)",
-                fontSize: "13.5px",
+                fontSize: "14px",
                 fontWeight: 600,
                 color: "oklch(0.45 0.13 150)",
               }}
@@ -1986,7 +1986,7 @@ export default async function JobDetailV2Page({
             <Link
               href={`/jobs/${jobId}/info?f=equipment`}
               style={{
-                fontSize: "12.5px",
+                fontSize: "14px",
                 fontWeight: 600,
                 color: "oklch(0.5 0.13 255)",
                 textDecoration: "none",
@@ -2020,11 +2020,11 @@ export default async function JobDetailV2Page({
                     }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{makeModel}</div>
+                      <div style={{ fontSize: "14px", fontWeight: 600 }}>{makeModel}</div>
                       {eq.system_location ? (
                         <div
                           style={{
-                            fontSize: "12px",
+                            fontSize: "14px",
                             color: "oklch(0.55 0.015 262)",
                             marginTop: "1px",
                           }}
@@ -2046,7 +2046,7 @@ export default async function JobDetailV2Page({
                         <span
                           style={{
                             fontFamily: S.mono,
-                            fontSize: "10px",
+                            fontSize: "12px",
                             fontWeight: 700,
                             padding: "3px 8px",
                             borderRadius: "999px",
@@ -2062,7 +2062,7 @@ export default async function JobDetailV2Page({
                       <span
                         style={{
                           fontFamily: S.mono,
-                          fontSize: "10px",
+                          fontSize: "12px",
                           fontWeight: 600,
                           padding: "3px 8px",
                           borderRadius: "5px",
@@ -2088,7 +2088,7 @@ export default async function JobDetailV2Page({
                 border: "1px dashed oklch(0.88 0.006 250)",
                 borderRadius: "11px",
                 color: "oklch(0.55 0.015 262)",
-                fontSize: "13px",
+                fontSize: "14px",
               }}
             >
               No equipment records — add equipment to track system inventory.
@@ -2136,12 +2136,12 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{item.title}</div>
+                    <div style={{ fontSize: "14px", fontWeight: 600 }}>{item.title}</div>
                     {priceDisplay.mathText ? (
                       <div
                         style={{
                           fontFamily: S.mono,
-                          fontSize: "11px",
+                          fontSize: "12px",
                           fontWeight: 600,
                           color:
                             priceDisplay.state === "billed"
@@ -2157,7 +2157,7 @@ export default async function JobDetailV2Page({
                       <div
                         style={{
                           fontFamily: S.mono,
-                          fontSize: "11px",
+                          fontSize: "12px",
                           color: "oklch(0.6 0.015 262)",
                           marginTop: "2px",
                         }}
@@ -2170,7 +2170,7 @@ export default async function JobDetailV2Page({
                     <span
                       style={{
                         fontFamily: S.mono,
-                        fontSize: "11px",
+                        fontSize: "12px",
                         fontWeight: 600,
                         padding: "4px 9px",
                         borderRadius: "6px",
@@ -2185,7 +2185,7 @@ export default async function JobDetailV2Page({
                     <span
                       style={{
                         fontFamily: S.mono,
-                        fontSize: "11px",
+                        fontSize: "12px",
                         fontWeight: 600,
                         padding: "4px 9px",
                         borderRadius: "6px",
@@ -2228,11 +2228,11 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{charge.title}</div>
+                    <div style={{ fontSize: "14px", fontWeight: 600 }}>{charge.title}</div>
                     <div
                       style={{
                         fontFamily: S.mono,
-                        fontSize: "11px",
+                        fontSize: "12px",
                         color: "oklch(0.6 0.015 262)",
                         marginTop: "2px",
                       }}
@@ -2243,7 +2243,7 @@ export default async function JobDetailV2Page({
                   <span
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "11px",
+                      fontSize: "12px",
                       fontWeight: 600,
                       padding: "4px 9px",
                       borderRadius: "6px",
@@ -2275,7 +2275,7 @@ export default async function JobDetailV2Page({
                 border: "1px dashed oklch(0.88 0.006 250)",
                 borderRadius: "11px",
                 color: "oklch(0.55 0.015 262)",
-                fontSize: "13px",
+                fontSize: "14px",
                 marginBottom: "20px",
               }}
             >
@@ -2385,15 +2385,15 @@ export default async function JobDetailV2Page({
                   }}
                 />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: "13.5px", fontWeight: 600 }}>{row.label}</div>
-                  <div style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)", marginTop: "1px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 600 }}>{row.label}</div>
+                  <div style={{ fontSize: "14px", color: "oklch(0.55 0.015 262)", marginTop: "1px" }}>
                     {row.detail}
                   </div>
                 </div>
                 <span
                   style={{
                     fontFamily: S.mono,
-                    fontSize: "11px",
+                    fontSize: "12px",
                     fontWeight: 600,
                     padding: "4px 9px",
                     borderRadius: "6px",
@@ -2430,7 +2430,7 @@ export default async function JobDetailV2Page({
                   flexShrink: 0,
                 }}
               />
-              <span style={{ fontSize: "13.5px", fontWeight: 600, color: "oklch(0.45 0.13 150)" }}>
+              <span style={{ fontSize: "14px", fontWeight: 600, color: "oklch(0.45 0.13 150)" }}>
                 {billingDisposition === "no_charge"
                   ? "Marked no-charge — no billing action needed."
                   : "Marked externally billed — billing recorded outside EveryStep."}
@@ -2453,7 +2453,7 @@ export default async function JobDetailV2Page({
                   borderRadius: "10px",
                   border: "1px solid oklch(0.88 0.05 150)",
                   background: "oklch(0.97 0.025 150)",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   fontFamily: "inherit",
                   color: "oklch(0.45 0.13 150)",
@@ -2483,7 +2483,7 @@ export default async function JobDetailV2Page({
                   border: "none",
                   background: "oklch(0.27 0.02 262)",
                   color: "#fff",
-                  fontSize: "13.5px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   fontFamily: "inherit",
                   textDecoration: "none",
@@ -2519,7 +2519,7 @@ export default async function JobDetailV2Page({
                         border: "none",
                         background: "oklch(0.27 0.02 262)",
                         color: "#fff",
-                        fontSize: "13.5px",
+                        fontSize: "14px",
                         fontWeight: 600,
                         fontFamily: "inherit",
                         display: "inline-flex",
@@ -2543,7 +2543,7 @@ export default async function JobDetailV2Page({
                         border: "none",
                         background: "oklch(0.27 0.02 262)",
                         color: "#fff",
-                        fontSize: "13.5px",
+                        fontSize: "14px",
                         fontWeight: 600,
                         fontFamily: "inherit",
                         display: "inline-flex",
@@ -2572,7 +2572,7 @@ export default async function JobDetailV2Page({
             <span
               style={{
                 fontFamily: S.mono,
-                fontSize: "9.5px",
+                fontSize: "12px",
                 letterSpacing: "0.06em",
                 fontWeight: 600,
                 color: "oklch(0.5 0.13 255)",
@@ -2635,7 +2635,7 @@ export default async function JobDetailV2Page({
                     borderRadius: "9px",
                     border: "1px solid oklch(0.92 0.006 250)",
                     background: "oklch(0.98 0.003 250)",
-                    fontSize: "12.5px",
+                    fontSize: "14px",
                     lineHeight: 1.45,
                     color: "oklch(0.55 0.015 262)",
                   }}
@@ -2645,7 +2645,7 @@ export default async function JobDetailV2Page({
               )}
               <div
                 style={{
-                  fontSize: "12px",
+                  fontSize: "14px",
                   lineHeight: 1.5,
                   color: "oklch(0.55 0.015 262)",
                   marginTop: "12px",
@@ -2678,7 +2678,7 @@ export default async function JobDetailV2Page({
                   <div
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "10px",
+                      fontSize: "12px",
                       letterSpacing: "0.08em",
                       textTransform: "uppercase",
                       fontWeight: 700,
@@ -2689,7 +2689,7 @@ export default async function JobDetailV2Page({
                     Active hold — {waitingState.blockerLabel}
                   </div>
                   <div
-                    style={{ fontSize: "13px", fontWeight: 600, color: "oklch(0.4 0.02 262)" }}
+                    style={{ fontSize: "14px", fontWeight: 600, color: "oklch(0.4 0.02 262)" }}
                   >
                     {waitingState.blockerReason}
                   </div>
@@ -2698,14 +2698,14 @@ export default async function JobDetailV2Page({
                       <form action={markServicePartOrderedFromForm}>
                         <input type="hidden" name="job_id" value={jobId} />
                         <input type="hidden" name="return_to" value={returnTo} />
-                        <ImmediateSubmitButton pendingText="Saving…" className="text-xs font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2 bg-transparent border-0 cursor-pointer p-0">
+                        <ImmediateSubmitButton pendingText="Saving…" className="inline-flex min-h-6 items-center text-sm font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2 bg-transparent border-0 cursor-pointer p-0">
                           Mark Part Ordered
                         </ImmediateSubmitButton>
                       </form>
                       <form action={markServicePartArrivedFromForm}>
                         <input type="hidden" name="job_id" value={jobId} />
                         <input type="hidden" name="return_to" value={returnTo} />
-                        <ImmediateSubmitButton pendingText="Saving…" className="text-xs font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2 bg-transparent border-0 cursor-pointer p-0">
+                        <ImmediateSubmitButton pendingText="Saving…" className="inline-flex min-h-6 items-center text-sm font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2 bg-transparent border-0 cursor-pointer p-0">
                           Mark Part Arrived
                         </ImmediateSubmitButton>
                       </form>
@@ -2714,7 +2714,7 @@ export default async function JobDetailV2Page({
                     <form action={markServiceApprovalReceivedFromForm} style={{ marginTop: "12px" }}>
                       <input type="hidden" name="job_id" value={jobId} />
                       <input type="hidden" name="return_to" value={returnTo} />
-                      <ImmediateSubmitButton pendingText="Saving…" className="text-xs font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2 bg-transparent border-0 cursor-pointer p-0">
+                      <ImmediateSubmitButton pendingText="Saving…" className="inline-flex min-h-6 items-center text-sm font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2 bg-transparent border-0 cursor-pointer p-0">
                         Mark Approval Received
                       </ImmediateSubmitButton>
                     </form>
@@ -2730,7 +2730,7 @@ export default async function JobDetailV2Page({
                       justifyContent: "space-between",
                     }}
                   >
-                    <span style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)" }}>
+                    <span style={{ fontSize: "14px", color: "oklch(0.55 0.015 262)" }}>
                       Resume job when hold is resolved.
                     </span>
                     <form action={releaseAndReevaluateFromForm}>
@@ -2746,7 +2746,7 @@ export default async function JobDetailV2Page({
                           border: "1px solid oklch(0.72 0.15 70)",
                           background: "#fff",
                           color: "oklch(0.5 0.12 65)",
-                          fontSize: "12px",
+                          fontSize: "14px",
                           fontWeight: 600,
                           cursor: "pointer",
                           fontFamily: "inherit",
@@ -2770,7 +2770,7 @@ export default async function JobDetailV2Page({
                   <div
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "10px",
+                      fontSize: "12px",
                       letterSpacing: "0.1em",
                       textTransform: "uppercase",
                       fontWeight: 600,
@@ -2780,7 +2780,7 @@ export default async function JobDetailV2Page({
                   >
                     On Hold
                   </div>
-                  <div style={{ fontSize: "13px", fontWeight: 600, color: "oklch(0.4 0.02 262)" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "oklch(0.4 0.02 262)" }}>
                     {String(job.on_hold_reason ?? "").trim()}
                   </div>
                   <div
@@ -2793,7 +2793,7 @@ export default async function JobDetailV2Page({
                       justifyContent: "space-between",
                     }}
                   >
-                    <span style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)" }}>
+                    <span style={{ fontSize: "14px", color: "oklch(0.55 0.015 262)" }}>
                       Resume job when hold is resolved.
                     </span>
                     <form action={releaseAndReevaluateFromForm}>
@@ -2809,7 +2809,7 @@ export default async function JobDetailV2Page({
                           border: "1px solid oklch(0.72 0.15 70)",
                           background: "#fff",
                           color: "oklch(0.5 0.12 65)",
-                          fontSize: "12px",
+                          fontSize: "14px",
                           fontWeight: 600,
                           cursor: "pointer",
                           fontFamily: "inherit",
@@ -2825,7 +2825,7 @@ export default async function JobDetailV2Page({
                   <div
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "9.5px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.08em",
                       textTransform: "uppercase",
@@ -2875,14 +2875,14 @@ export default async function JobDetailV2Page({
             >
               <div
                 style={{
-                  fontSize: "13px",
+                  fontSize: "14px",
                   fontWeight: 700,
                   color: hasFollowUpReminder ? "oklch(0.42 0.12 255)" : "oklch(0.55 0.015 262)",
                 }}
               >
                 {followUpReminderStatus}
               </div>
-              <div style={{ marginTop: "4px", fontSize: "12px", lineHeight: 1.5, color: "oklch(0.48 0.02 262)" }}>
+              <div style={{ marginTop: "4px", fontSize: "14px", lineHeight: 1.5, color: "oklch(0.48 0.02 262)" }}>
                 {hasFollowUpReminder
                   ? "This is an internal reminder. It stays visible in Operations Follow Ups and highlights as the date approaches."
                   : "Add a date and reminder note when someone should come back to this job later."}
@@ -2903,7 +2903,7 @@ export default async function JobDetailV2Page({
                       borderRadius: "8px",
                       border: "1px solid oklch(0.88 0.006 250)",
                       padding: "0 10px",
-                      fontSize: "12.5px",
+                      fontSize: "14px",
                       fontFamily: "inherit",
                       color: "oklch(0.33 0.02 262)",
                       background: "#fff",
@@ -2928,7 +2928,7 @@ export default async function JobDetailV2Page({
                       borderRadius: "8px",
                       border: "1px solid oklch(0.88 0.006 250)",
                       padding: "0 10px",
-                      fontSize: "12.5px",
+                      fontSize: "14px",
                       fontFamily: "inherit",
                       color: "oklch(0.33 0.02 262)",
                       background: "#fff",
@@ -2949,7 +2949,7 @@ export default async function JobDetailV2Page({
                     borderRadius: "8px",
                     border: "1px solid oklch(0.88 0.006 250)",
                     padding: "8px 10px",
-                    fontSize: "12.5px",
+                    fontSize: "14px",
                     fontFamily: "inherit",
                     color: "oklch(0.33 0.02 262)",
                     background: "#fff",
@@ -2967,7 +2967,7 @@ export default async function JobDetailV2Page({
                   border: "1px solid oklch(0.85 0.04 255)",
                   background: "oklch(0.97 0.02 255)",
                   color: "oklch(0.45 0.14 255)",
-                  fontSize: "12.5px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -2986,7 +2986,7 @@ export default async function JobDetailV2Page({
               <span
                 style={{
                   fontFamily: S.mono,
-                  fontSize: "10px",
+                  fontSize: "12px",
                   fontWeight: 700,
                   letterSpacing: "0.05em",
                   padding: "5px 12px",
@@ -2998,7 +2998,7 @@ export default async function JobDetailV2Page({
                 THIS JOB · {jobDisplayRef}
               </span>
               {serviceCaseId ? (
-                <span style={{ fontSize: "13px", color: "oklch(0.65 0.015 262)" }}>↓</span>
+                <span style={{ fontSize: "14px", color: "oklch(0.65 0.015 262)" }}>↓</span>
               ) : null}
             </div>
             <Suspense
@@ -3006,7 +3006,7 @@ export default async function JobDetailV2Page({
                 <div
                   style={{
                     padding: "13px 0",
-                    fontSize: "13px",
+                    fontSize: "14px",
                     color: "oklch(0.62 0.015 262)",
                     ...S.rowRule,
                   }}
@@ -3023,7 +3023,7 @@ export default async function JobDetailV2Page({
                   emptyStateClassName="text-sm text-slate-500 py-3"
                 />
               ) : (
-                <div style={{ fontSize: "13px", color: "oklch(0.62 0.015 262)", padding: "3px 0" }}>
+                <div style={{ fontSize: "14px", color: "oklch(0.62 0.015 262)", padding: "3px 0" }}>
                   No service chain linked
                 </div>
               )}
@@ -3118,14 +3118,14 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   <span
-                    style={{ fontSize: "13.5px", fontWeight: 500, color: "oklch(0.38 0.02 262)" }}
+                    style={{ fontSize: "14px", fontWeight: 500, color: "oklch(0.38 0.02 262)" }}
                   >
                     {row.label}
                   </span>
                   <span
                     style={{
                       fontFamily: S.mono,
-                      fontSize: "11px",
+                      fontSize: "12px",
                       fontWeight: 600,
                       padding: "4px 9px",
                       borderRadius: "6px",
@@ -3148,7 +3148,7 @@ export default async function JobDetailV2Page({
                   border: "none",
                   background: "oklch(0.55 0.17 255)",
                   color: "#fff",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -3177,10 +3177,10 @@ export default async function JobDetailV2Page({
                   background: "oklch(0.98 0.02 75)",
                 }}
               >
-                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.42 0.12 55)" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "oklch(0.42 0.12 55)" }}>
                   Confirm Retest Ready
                 </div>
-                <p style={{ marginTop: "5px", fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.06 60)" }}>
+                <p style={{ marginTop: "5px", fontSize: "14px", lineHeight: 1.5, color: "oklch(0.5 0.06 60)" }}>
                   Confirm the corrections are done so this job is ready for another ECC test visit. This moves
                   it into retest scheduling.
                 </p>
@@ -3207,10 +3207,10 @@ export default async function JobDetailV2Page({
                   background: "oklch(0.98 0.02 75)",
                 }}
               >
-                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.42 0.12 55)" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "oklch(0.42 0.12 55)" }}>
                   Schedule Retest
                 </div>
-                <p style={{ marginTop: "5px", fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.06 60)" }}>
+                <p style={{ marginTop: "5px", fontSize: "14px", lineHeight: 1.5, color: "oklch(0.5 0.06 60)" }}>
                   Schedule a linked retest visit now, or move it to the scheduling queue.
                 </p>
                 <form
@@ -3226,7 +3226,7 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   <input type="hidden" name="parent_job_id" value={jobId} />
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "oklch(0.34 0.02 262)" }}>
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "oklch(0.34 0.02 262)" }}>
                     <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
                     <span>Copy equipment from original</span>
                   </label>
@@ -3242,7 +3242,7 @@ export default async function JobDetailV2Page({
                           borderRadius: "9px",
                           border: "1px solid oklch(0.9 0.006 250)",
                           padding: "0 10px",
-                          fontSize: "13px",
+                          fontSize: "14px",
                           fontFamily: "inherit",
                           fontWeight: 400,
                           color: "oklch(0.3 0.02 262)",
@@ -3259,7 +3259,7 @@ export default async function JobDetailV2Page({
                           borderRadius: "9px",
                           border: "1px solid oklch(0.9 0.006 250)",
                           padding: "0 10px",
-                          fontSize: "13px",
+                          fontSize: "14px",
                           fontFamily: "inherit",
                           fontWeight: 400,
                           color: "oklch(0.3 0.02 262)",
@@ -3276,7 +3276,7 @@ export default async function JobDetailV2Page({
                           borderRadius: "9px",
                           border: "1px solid oklch(0.9 0.006 250)",
                           padding: "0 10px",
-                          fontSize: "13px",
+                          fontSize: "14px",
                           fontFamily: "inherit",
                           fontWeight: 400,
                           color: "oklch(0.3 0.02 262)",
@@ -3319,10 +3319,10 @@ export default async function JobDetailV2Page({
                   background: "oklch(0.985 0.004 250)",
                 }}
               >
-                <div style={{ fontSize: "13.5px", fontWeight: 700, color: "oklch(0.32 0.02 262)" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "oklch(0.32 0.02 262)" }}>
                   Resolve by Documentation Review
                 </div>
-                <p style={{ marginTop: "5px", fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.48 0.025 262)" }}>
+                <p style={{ marginTop: "5px", fontSize: "14px", lineHeight: 1.5, color: "oklch(0.48 0.025 262)" }}>
                   Use this only when submitted correction notes and photos are sufficient to resolve the failure without a physical retest visit.
                 </p>
                 <form action={resolveFailureByCorrectionReviewFromForm} style={{ marginTop: "12px", display: "grid", gap: "10px" }}>
@@ -3360,7 +3360,7 @@ export default async function JobDetailV2Page({
                   content: (
                     <Suspense
                       fallback={
-                        <div style={{ padding: "16px 0", fontSize: "13px", color: "oklch(0.62 0.015 262)" }}>
+                        <div style={{ padding: "16px 0", fontSize: "14px", color: "oklch(0.62 0.015 262)" }}>
                           Loading timeline…
                         </div>
                       }
@@ -3390,7 +3390,7 @@ export default async function JobDetailV2Page({
                   content: (
                     <Suspense
                       fallback={
-                        <div style={{ padding: "16px 0", fontSize: "13px", color: "oklch(0.62 0.015 262)" }}>
+                        <div style={{ padding: "16px 0", fontSize: "14px", color: "oklch(0.62 0.015 262)" }}>
                           Loading attachments…
                         </div>
                       }
@@ -3418,7 +3418,7 @@ export default async function JobDetailV2Page({
                                 flexWrap: "wrap",
                                 alignItems: "center",
                                 gap: "6px",
-                                fontSize: "13px",
+                                fontSize: "14px",
                                 color: "oklch(0.38 0.02 262)",
                               }}
                             >
@@ -3430,7 +3430,7 @@ export default async function JobDetailV2Page({
                                 <span
                                   style={{
                                     fontFamily: S.mono,
-                                    fontSize: "10px",
+                                    fontSize: "12px",
                                     fontWeight: 700,
                                     padding: "2px 7px",
                                     borderRadius: "999px",
@@ -3446,7 +3446,7 @@ export default async function JobDetailV2Page({
                           ))}
                         </div>
                       ) : (
-                        <div style={{ fontSize: "13px", color: "oklch(0.62 0.015 262)" }}>
+                        <div style={{ fontSize: "14px", color: "oklch(0.62 0.015 262)" }}>
                           No equipment records.
                         </div>
                       )}
@@ -3454,7 +3454,7 @@ export default async function JobDetailV2Page({
                         <Link
                           href={`/jobs/${jobId}/info?f=equipment`}
                           style={{
-                            fontSize: "13px",
+                            fontSize: "14px",
                             fontWeight: 600,
                             color: "oklch(0.5 0.13 255)",
                             textDecoration: "none",
@@ -3507,7 +3507,7 @@ export default async function JobDetailV2Page({
                               >
                                 <span
                                   style={{
-                                    fontSize: "13px",
+                                    fontSize: "14px",
                                     fontWeight: 500,
                                     color: "oklch(0.45 0.02 262)",
                                   }}
@@ -3517,7 +3517,7 @@ export default async function JobDetailV2Page({
                                 <span
                                   style={{
                                     fontFamily: S.mono,
-                                    fontSize: "12px",
+                                    fontSize: "14px",
                                     fontWeight: 600,
                                     color: row.value ? "oklch(0.33 0.02 262)" : "oklch(0.65 0.015 262)",
                                   }}
@@ -3530,7 +3530,7 @@ export default async function JobDetailV2Page({
                         ) : (
                           <div
                             style={{
-                              fontSize: "13px",
+                              fontSize: "14px",
                               color: "oklch(0.62 0.015 262)",
                               padding: "3px 0",
                             }}
@@ -3568,7 +3568,7 @@ export default async function JobDetailV2Page({
                             <Link
                               href={`/jobs/${jobId}/tests`}
                               style={{
-                                fontSize: "13px",
+                                fontSize: "14px",
                                 fontWeight: 600,
                                 color: "oklch(0.5 0.13 255)",
                                 textDecoration: "none",
@@ -3588,7 +3588,7 @@ export default async function JobDetailV2Page({
                   content: (
                     <Suspense
                       fallback={
-                        <div style={{ padding: "16px 0", fontSize: "13px", color: "oklch(0.62 0.015 262)" }}>
+                        <div style={{ padding: "16px 0", fontSize: "14px", color: "oklch(0.62 0.015 262)" }}>
                           Loading chain…
                         </div>
                       }
@@ -3601,7 +3601,7 @@ export default async function JobDetailV2Page({
                           emptyStateClassName="text-sm text-slate-500 py-3"
                         />
                       ) : (
-                        <div style={{ fontSize: "13px", color: "oklch(0.62 0.015 262)", padding: "3px 0" }}>
+                        <div style={{ fontSize: "14px", color: "oklch(0.62 0.015 262)", padding: "3px 0" }}>
                           No service chain linked
                         </div>
                       )}
@@ -3658,7 +3658,7 @@ export default async function JobDetailV2Page({
                   style={{
                     display: "block",
                     fontFamily: S.mono,
-                    fontSize: "9.5px",
+                    fontSize: "12px",
                     fontWeight: 700,
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
@@ -3671,7 +3671,7 @@ export default async function JobDetailV2Page({
                   style={{
                     display: "block",
                     marginTop: "5px",
-                    fontSize: "13px",
+                    fontSize: "14px",
                     lineHeight: 1.45,
                     fontWeight: 700,
                     color: "oklch(0.31 0.08 20)",
@@ -3687,7 +3687,7 @@ export default async function JobDetailV2Page({
                   border: "1px solid oklch(0.84 0.075 20)",
                   background: "rgba(255,255,255,0.76)",
                   padding: "4px 8px",
-                  fontSize: "11px",
+                  fontSize: "12px",
                   fontWeight: 700,
                   color: "oklch(0.42 0.12 20)",
                 }}
@@ -3713,7 +3713,7 @@ export default async function JobDetailV2Page({
                   borderRadius: "8px",
                   border: "1px solid oklch(0.84 0.075 20)",
                   padding: "8px 10px",
-                  fontSize: "12.5px",
+                  fontSize: "14px",
                   fontFamily: "inherit",
                   color: "oklch(0.33 0.02 262)",
                   background: "#fff",
@@ -3724,7 +3724,7 @@ export default async function JobDetailV2Page({
               <div
                 style={{
                   marginTop: "6px",
-                  fontSize: "11.5px",
+                  fontSize: "12px",
                   lineHeight: 1.45,
                   color: "oklch(0.42 0.08 20)",
                 }}
@@ -3742,7 +3742,7 @@ export default async function JobDetailV2Page({
                   border: "1px solid oklch(0.84 0.075 20)",
                   background: "#fff",
                   color: "oklch(0.38 0.1 20)",
-                  fontSize: "12px",
+                  fontSize: "14px",
                   fontWeight: 700,
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -3783,7 +3783,7 @@ export default async function JobDetailV2Page({
             <span
               style={{
                 fontFamily: S.mono,
-                fontSize: "9.5px",
+                fontSize: "12px",
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
@@ -3796,7 +3796,7 @@ export default async function JobDetailV2Page({
           {/* plain-language sentence */}
           <div
             style={{
-              fontSize: "13.5px",
+              fontSize: "14px",
               lineHeight: 1.5,
               color: "oklch(0.32 0.02 262)",
               fontWeight: 500,
@@ -3859,7 +3859,7 @@ export default async function JobDetailV2Page({
                   background: isFailedUnresolved || hasCloseoutNeeds || hasOutstandingInvoiceBalance
                     ? "oklch(0.97 0.025 75)"
                     : "oklch(0.97 0.03 150)",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   color: isFailedUnresolved || hasCloseoutNeeds || hasOutstandingInvoiceBalance
                     ? "oklch(0.42 0.09 75)"
@@ -3921,7 +3921,7 @@ export default async function JobDetailV2Page({
             <div
               style={{
                 fontFamily: S.mono,
-                fontSize: "9.5px",
+                fontSize: "12px",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 fontWeight: 700,
@@ -3939,7 +3939,7 @@ export default async function JobDetailV2Page({
                     display: "flex",
                     alignItems: "center",
                     gap: "9px",
-                    fontSize: "12.5px",
+                    fontSize: "14px",
                     fontWeight: 600,
                     color: "oklch(0.36 0.025 262)",
                   }}
@@ -3971,7 +3971,7 @@ export default async function JobDetailV2Page({
           <div
             style={{
               fontFamily: S.mono,
-              fontSize: "9.5px",
+              fontSize: "12px",
               fontWeight: 700,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
@@ -4001,7 +4001,7 @@ export default async function JobDetailV2Page({
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: "6px 0",
-                    fontSize: "13px",
+                    fontSize: "14px",
                     fontWeight: 600,
                     color: "oklch(0.34 0.025 262)",
                     textDecoration: "none",
@@ -4009,7 +4009,7 @@ export default async function JobDetailV2Page({
                   }}
                 >
                   {label}
-                  <span style={{ fontSize: "11px", color: "oklch(0.65 0.015 262)", flexShrink: 0 }}>↗</span>
+                  <span style={{ fontSize: "12px", color: "oklch(0.65 0.015 262)", flexShrink: 0 }}>↗</span>
                 </Link>
               ))}
             {canShowReviewAsk && reviewAskMailtoHref ? (
@@ -4020,7 +4020,7 @@ export default async function JobDetailV2Page({
                   alignItems: "center",
                   justifyContent: "space-between",
                   padding: "6px 0",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   color: "oklch(0.55 0.13 70)",
                   textDecoration: "none",
@@ -4028,7 +4028,7 @@ export default async function JobDetailV2Page({
                 }}
               >
                 Email Review Request
-                <span style={{ fontSize: "11px", color: "oklch(0.7 0.1 70)", flexShrink: 0 }}>✉</span>
+                <span style={{ fontSize: "12px", color: "oklch(0.7 0.1 70)", flexShrink: 0 }}>✉</span>
               </a>
             ) : null}
             {canShowReviewAsk && reviewAskSmsHref ? (
@@ -4039,7 +4039,7 @@ export default async function JobDetailV2Page({
                   alignItems: "center",
                   justifyContent: "space-between",
                   padding: "6px 0",
-                  fontSize: "13px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   color: "oklch(0.55 0.13 70)",
                   textDecoration: "none",
@@ -4047,7 +4047,7 @@ export default async function JobDetailV2Page({
                 }}
               >
                 Text Review Request
-                <span style={{ fontSize: "11px", color: "oklch(0.7 0.1 70)", flexShrink: 0 }}>↗</span>
+                <span style={{ fontSize: "12px", color: "oklch(0.7 0.1 70)", flexShrink: 0 }}>↗</span>
               </a>
             ) : null}
           </div>
@@ -4066,7 +4066,7 @@ export default async function JobDetailV2Page({
                 cursor: "pointer",
                 listStyle: "none",
                 fontFamily: S.mono,
-                fontSize: "9.5px",
+                fontSize: "12px",
                 fontWeight: 700,
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
@@ -4086,7 +4086,7 @@ export default async function JobDetailV2Page({
                 padding: "12px",
               }}
             >
-              <div style={{ fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.42 0.05 25)" }}>
+              <div style={{ fontSize: "14px", lineHeight: 1.5, color: "oklch(0.42 0.05 25)" }}>
                 Archive hides this job across Ops, portal, and searches. Cancel keeps the job visible as cancelled.
               </div>
               <form action={archiveJobFromForm}>
@@ -4100,7 +4100,7 @@ export default async function JobDetailV2Page({
                     border: "1px solid oklch(0.72 0.16 25)",
                     background: "oklch(0.58 0.18 25)",
                     color: "#fff",
-                    fontSize: "13px",
+                    fontSize: "14px",
                     fontWeight: 700,
                     cursor: "pointer",
                     fontFamily: "inherit",

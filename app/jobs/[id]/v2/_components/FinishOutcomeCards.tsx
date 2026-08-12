@@ -155,7 +155,7 @@ export default function FinishOutcomeCards({
               />
               <span
                 style={{
-                  fontSize: "13.5px",
+                  fontSize: "14px",
                   fontWeight: 700,
                   color: "oklch(0.27 0.02 262)",
                   marginTop: "8px",
@@ -165,7 +165,7 @@ export default function FinishOutcomeCards({
               </span>
               <span
                 style={{
-                  fontSize: "11.5px",
+                  fontSize: "12px",
                   lineHeight: 1.4,
                   color: "oklch(0.5 0.015 262)",
                   marginTop: "4px",
@@ -209,7 +209,7 @@ export default function FinishOutcomeCards({
               <div
                 style={{
                   fontFamily: "var(--font-geist-mono), monospace",
-                  fontSize: "10px",
+                  fontSize: "12px",
                   letterSpacing: "0.1em",
                   textTransform: "uppercase",
                   fontWeight: 600,
@@ -220,7 +220,7 @@ export default function FinishOutcomeCards({
               </div>
               <div
                 style={{
-                  fontSize: "13px",
+                  fontSize: "14px",
                   color: "oklch(0.35 0.02 262)",
                   marginTop: "4px",
                 }}
@@ -239,7 +239,7 @@ export default function FinishOutcomeCards({
                 border: "none",
                 background: sel.tone,
                 color: "#fff",
-                fontSize: "13px",
+                fontSize: "14px",
                 fontWeight: 600,
                 cursor: "pointer",
                 fontFamily: "inherit",
@@ -264,7 +264,7 @@ export default function FinishOutcomeCards({
                 borderRadius: "7px",
                 border: `1px solid ${colorMixWithWhite(sel.tone, 50)}`,
                 padding: "0 10px",
-                fontSize: "12.5px",
+                fontSize: "14px",
                 fontFamily: "inherit",
                 color: "oklch(0.33 0.02 262)",
                 background: "#fff",

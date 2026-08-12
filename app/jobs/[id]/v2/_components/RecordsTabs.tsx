@@ -43,7 +43,7 @@ export default function RecordsTabs({ tabs }: { tabs: RecordTab[] }) {
                 background: "none",
                 cursor: "pointer",
                 fontFamily: "inherit",
-                fontSize: "13px",
+                fontSize: "14px",
                 fontWeight: 600,
                 whiteSpace: "nowrap",
                 color: isActive ? "oklch(0.27 0.02 262)" : "oklch(0.55 0.015 262)",
@@ -54,7 +54,7 @@ export default function RecordsTabs({ tabs }: { tabs: RecordTab[] }) {
               <span
                 style={{
                   fontFamily: "var(--font-geist-mono), monospace",
-                  fontSize: "10px",
+                  fontSize: "12px",
                   fontWeight: 600,
                   padding: "2px 6px",
                   borderRadius: "5px",

@@ -20,7 +20,7 @@ const sectionStyle: CSSProperties = {
 };
 const sectionLabelStyle: CSSProperties = {
   fontFamily: mono,
-  fontSize: "11px",
+  fontSize: "12px",
   letterSpacing: "0.11em",
   textTransform: "uppercase",
   color: "oklch(0.42 0.025 262)",
@@ -28,7 +28,7 @@ const sectionLabelStyle: CSSProperties = {
 };
 const fieldLabelStyle: CSSProperties = {
   fontFamily: mono,
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "oklch(0.48 0.02 262)",
@@ -42,7 +42,7 @@ const inputStyle: CSSProperties = {
   borderRadius: "9px",
   border: "1px solid oklch(0.9 0.006 250)",
   background: "#fff",
-  fontSize: "13.5px",
+  fontSize: "14px",
   fontFamily: "inherit",
   color: "oklch(0.3 0.02 262)",
 };
@@ -52,7 +52,7 @@ const textareaStyle: CSSProperties = {
   borderRadius: "9px",
   border: "1px solid oklch(0.9 0.006 250)",
   background: "#fff",
-  fontSize: "13.5px",
+  fontSize: "14px",
   fontFamily: "inherit",
   lineHeight: 1.5,
   color: "oklch(0.3 0.02 262)",
@@ -65,7 +65,7 @@ const primaryBtnStyle: CSSProperties = {
   border: "none",
   background: "oklch(0.55 0.17 255)",
   color: "#fff",
-  fontSize: "13.5px",
+  fontSize: "14px",
   fontWeight: 600,
   cursor: "pointer",
   fontFamily: "inherit",
@@ -78,7 +78,7 @@ const cancelBtnStyle: CSSProperties = {
   border: "1px solid oklch(0.88 0.03 25)",
   background: "oklch(0.98 0.01 25)",
   color: "oklch(0.5 0.13 25)",
-  fontSize: "12.5px",
+  fontSize: "14px",
   fontWeight: 600,
   cursor: "pointer",
   fontFamily: "inherit",
@@ -105,7 +105,7 @@ function Banner({ tone, children }: { tone: "success" | "error"; children: React
         marginBottom: "16px",
         padding: "10px 13px",
         borderRadius: "9px",
-        fontSize: "13px",
+        fontSize: "14px",
         fontWeight: 600,
         border: `1px solid ${success ? "oklch(0.85 0.06 155)" : "oklch(0.85 0.06 25)"}`,
         background: success ? "oklch(0.97 0.03 155)" : "oklch(0.97 0.03 25)",
@@ -144,7 +144,7 @@ export default function EccHersRequestSection({
           <span
             style={{
               fontFamily: mono,
-              fontSize: "9.5px",
+              fontSize: "12px",
               letterSpacing: "0.06em",
               fontWeight: 600,
               color: "oklch(0.5 0.13 255)",
@@ -157,7 +157,7 @@ export default function EccHersRequestSection({
           </span>
         ) : null}
       </div>
-      <p style={{ fontSize: "13px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)", marginBottom: "18px", maxWidth: "640px" }}>
+      <p style={{ fontSize: "14px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)", marginBottom: "18px", maxWidth: "640px" }}>
         Send this job&apos;s ECC/HERS request to a connected rater account. This shares a safe request snapshot only — the
         rater reviews and accepts or declines it.
       </p>
@@ -177,7 +177,7 @@ export default function EccHersRequestSection({
             border: "1px solid oklch(0.85 0.05 255)",
             background: "oklch(0.97 0.02 255)",
             color: "oklch(0.45 0.14 255)",
-            fontSize: "12.5px",
+            fontSize: "14px",
             fontWeight: 600,
           }}
         >
@@ -252,7 +252,7 @@ export default function EccHersRequestSection({
             paddingTop: "14px",
           }}
         >
-          <div style={{ fontSize: "12px", lineHeight: 1.5, color: "oklch(0.55 0.015 262)", maxWidth: "420px" }}>
+          <div style={{ fontSize: "14px", lineHeight: 1.5, color: "oklch(0.55 0.015 262)", maxWidth: "420px" }}>
             Snapshot includes customer, location, permit, source job reference, and requested scope fields only.
           </div>
           <ImmediateSubmitButton pendingText="Sending…" className="" style={primaryBtnStyle}>
@@ -298,10 +298,10 @@ export default function EccHersRequestSection({
                 }}
               >
                 <div>
-                  <div style={{ fontSize: "13.5px", fontWeight: 600, color: "oklch(0.3 0.02 262)" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "oklch(0.3 0.02 262)" }}>
                     Request {statusLabel}
                   </div>
-                  <div style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)", marginTop: "2px" }}>
+                  <div style={{ fontSize: "14px", color: "oklch(0.55 0.015 262)", marginTop: "2px" }}>
                     {formatWorkshareDateTime(request.sent_at)}
                     {(() => {
                       const raterName = raterNameById?.[String(request.receiver_account_id ?? "").trim()];
@@ -324,7 +324,7 @@ export default function EccHersRequestSection({
                     style={{
                       padding: "5px 12px",
                       borderRadius: "999px",
-                      fontSize: "11px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.04em",
                       textTransform: "uppercase",
@@ -340,7 +340,7 @@ export default function EccHersRequestSection({
                     style={{
                       padding: "5px 12px",
                       borderRadius: "999px",
-                      fontSize: "11px",
+                      fontSize: "12px",
                       fontWeight: 700,
                       letterSpacing: "0.04em",
                       textTransform: "uppercase",
@@ -357,7 +357,7 @@ export default function EccHersRequestSection({
               {request.outcome_note ? (
                 <div
                   style={{
-                    fontSize: "12.5px",
+                    fontSize: "14px",
                     lineHeight: 1.5,
                     color: "oklch(0.4 0.02 262)",
                     background: "oklch(0.98 0.003 250)",
@@ -371,7 +371,7 @@ export default function EccHersRequestSection({
               ) : null}
 
               {retestPending && request.retest_note ? (
-                <div style={{ fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)" }}>
+                <div style={{ fontSize: "14px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)" }}>
                   Waiting on the tester. You reported: {request.retest_note}
                 </div>
               ) : null}
@@ -383,7 +383,7 @@ export default function EccHersRequestSection({
                     paddingTop: "10px",
                   }}
                 >
-                  <div style={{ fontSize: "12.5px", fontWeight: 600, color: "oklch(0.5 0.15 25)", marginBottom: "6px" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: "oklch(0.5 0.15 25)", marginBottom: "6px" }}>
                     Test failed. Make your corrections, then request a retest.
                   </div>
                   <details>
@@ -399,7 +399,7 @@ export default function EccHersRequestSection({
                         border: "1px solid oklch(0.85 0.05 255)",
                         background: "oklch(0.97 0.02 255)",
                         color: "oklch(0.45 0.14 255)",
-                        fontSize: "12.5px",
+                        fontSize: "14px",
                         fontWeight: 600,
                       }}
                     >

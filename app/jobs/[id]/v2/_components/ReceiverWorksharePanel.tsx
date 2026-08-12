@@ -16,7 +16,7 @@ const sectionStyle: CSSProperties = {
 };
 const sectionLabelStyle: CSSProperties = {
   fontFamily: mono,
-  fontSize: "11px",
+  fontSize: "12px",
   letterSpacing: "0.11em",
   textTransform: "uppercase",
   color: "oklch(0.42 0.025 262)",
@@ -24,7 +24,7 @@ const sectionLabelStyle: CSSProperties = {
 };
 const fieldLabelStyle: CSSProperties = {
   fontFamily: mono,
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.08em",
   textTransform: "uppercase",
   color: "oklch(0.48 0.02 262)",
@@ -37,7 +37,7 @@ const textareaStyle: CSSProperties = {
   borderRadius: "9px",
   border: "1px solid oklch(0.9 0.006 250)",
   background: "#fff",
-  fontSize: "13.5px",
+  fontSize: "14px",
   fontFamily: "inherit",
   lineHeight: 1.5,
   color: "oklch(0.3 0.02 262)",
@@ -50,7 +50,7 @@ const primaryBtnStyle: CSSProperties = {
   border: "none",
   background: "oklch(0.55 0.17 255)",
   color: "#fff",
-  fontSize: "12.5px",
+  fontSize: "14px",
   fontWeight: 600,
   cursor: "pointer",
   fontFamily: "inherit",
@@ -84,7 +84,7 @@ export default function ReceiverWorksharePanel({
   return (
     <section id="workshare-partner" data-jobsection="workshare-partner" style={sectionStyle}>
       <div style={{ ...sectionLabelStyle, marginBottom: "6px" }}>Workshare — ECC/HERS</div>
-      <p style={{ fontSize: "13px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)", marginBottom: "16px", maxWidth: "640px" }}>
+      <p style={{ fontSize: "14px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)", marginBottom: "16px", maxWidth: "640px" }}>
         This job came from an ECC/HERS request sent by <strong>{senderCompanyName}</strong> for {customer}. Review the test
         result, then send it to them when you&apos;re ready — nothing is shared automatically.
       </p>
@@ -99,10 +99,10 @@ export default function ReceiverWorksharePanel({
             marginBottom: "16px",
           }}
         >
-          <div style={{ fontSize: "12.5px", fontWeight: 700, color: "oklch(0.5 0.12 65)" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: "oklch(0.5 0.12 65)" }}>
             Retest requested{request.retest_requested_at ? ` · ${formatWorkshareDateTime(request.retest_requested_at)}` : ""}
           </div>
-          <p style={{ fontSize: "13px", lineHeight: 1.5, color: "oklch(0.42 0.04 65)", marginTop: "4px" }}>
+          <p style={{ fontSize: "14px", lineHeight: 1.5, color: "oklch(0.42 0.04 65)", marginTop: "4px" }}>
             {clean(request.retest_note)
               ? `The contractor reported: ${clean(request.retest_note)}`
               : "The contractor asked for a retest. Re-run the test on this job."}
@@ -111,7 +111,7 @@ export default function ReceiverWorksharePanel({
       ) : null}
 
       {!currentResult ? (
-        <p style={{ fontSize: "12.5px", color: "oklch(0.55 0.015 262)", marginBottom: "16px" }}>
+        <p style={{ fontSize: "14px", color: "oklch(0.55 0.015 262)", marginBottom: "16px" }}>
           No result yet — complete the ECC test on this job, then you can send the pass/fail to the contractor.
         </p>
       ) : readyToSend ? (
@@ -128,12 +128,12 @@ export default function ReceiverWorksharePanel({
           }}
         >
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "oklch(0.3 0.02 262)" }}>Test result ready:</span>
+            <span style={{ fontSize: "14px", fontWeight: 600, color: "oklch(0.3 0.02 262)" }}>Test result ready:</span>
             <span
               style={{
                 padding: "5px 12px",
                 borderRadius: "999px",
-                fontSize: "11px",
+                fontSize: "12px",
                 fontWeight: 700,
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
@@ -144,9 +144,9 @@ export default function ReceiverWorksharePanel({
             >
               {currentResult === "passed" ? "Passed" : "Failed"}
             </span>
-            <span style={{ fontSize: "12px", color: "oklch(0.5 0.12 65)", fontWeight: 600 }}>Not sent yet</span>
+            <span style={{ fontSize: "14px", color: "oklch(0.5 0.12 65)", fontWeight: 600 }}>Not sent yet</span>
           </div>
-          <p style={{ fontSize: "12.5px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)" }}>
+          <p style={{ fontSize: "14px", lineHeight: 1.5, color: "oklch(0.5 0.02 262)" }}>
             Double-check the result, then send it to {senderCompanyName} when you&apos;re ready.
           </p>
           <form action={sendWorkshareOutcomeToContractorFromForm} style={{ display: "grid", gap: "8px" }}>
@@ -173,7 +173,7 @@ export default function ReceiverWorksharePanel({
               style={{
                 padding: "5px 12px",
                 borderRadius: "999px",
-                fontSize: "11px",
+                fontSize: "12px",
                 fontWeight: 700,
                 letterSpacing: "0.04em",
                 textTransform: "uppercase",
@@ -184,10 +184,10 @@ export default function ReceiverWorksharePanel({
             >
               Sent: {currentResult === "passed" ? "Passed" : "Failed"}
             </span>
-            <span style={{ fontSize: "12px", color: "oklch(0.55 0.015 262)" }}>The contractor has been notified.</span>
+            <span style={{ fontSize: "14px", color: "oklch(0.55 0.015 262)" }}>The contractor has been notified.</span>
           </div>
           {request.outcome_note ? (
-            <div style={{ fontSize: "12.5px", color: "oklch(0.45 0.02 262)" }}>Last note sent: {request.outcome_note}</div>
+            <div style={{ fontSize: "14px", color: "oklch(0.45 0.02 262)" }}>Last note sent: {request.outcome_note}</div>
           ) : null}
           <form action={addWorkshareOutcomeNoteFromForm} style={{ display: "grid", gap: "8px" }}>
             <input type="hidden" name="receiving_job_id" value={receivingJobId} />

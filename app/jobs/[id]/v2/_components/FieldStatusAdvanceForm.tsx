@@ -97,7 +97,7 @@ export default function FieldStatusAdvanceForm({
           role="alert"
           style={{
             marginTop: "6px",
-            fontSize: "12.5px",
+            fontSize: "14px",
             lineHeight: 1.4,
             fontWeight: 500,
             color: "oklch(0.5 0.19 27)",

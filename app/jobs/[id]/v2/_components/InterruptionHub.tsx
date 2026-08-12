@@ -102,7 +102,7 @@ export default function InterruptionHub({
               <span
                 style={{
                   display: "block",
-                  fontSize: "12.5px",
+                  fontSize: "14px",
                   fontWeight: 700,
                   color: active ? "oklch(0.5 0.12 65)" : "oklch(0.32 0.02 262)",
                 }}
@@ -112,7 +112,7 @@ export default function InterruptionHub({
               <span
                 style={{
                   display: "block",
-                  fontSize: "11px",
+                  fontSize: "12px",
                   color: "oklch(0.58 0.015 262)",
                   marginTop: "2px",
                   lineHeight: 1.35,
@@ -156,7 +156,7 @@ export default function InterruptionHub({
               borderRadius: "7px",
               border: "1px solid oklch(0.88 0.1 70)",
               padding: "0 10px",
-              fontSize: "12.5px",
+              fontSize: "14px",
               fontFamily: "inherit",
               color: "oklch(0.33 0.02 262)",
               background: "#fff",
@@ -174,7 +174,7 @@ export default function InterruptionHub({
               border: "none",
               background: "oklch(0.55 0.15 70)",
               color: "#fff",
-              fontSize: "12.5px",
+              fontSize: "14px",
               fontWeight: 600,
               cursor: "pointer",
               fontFamily: "inherit",

@@ -51,7 +51,7 @@ export default function ScrollSpyNav({ items }: { items: NavItem[] }) {
               padding: "8px 10px",
               borderRadius: "8px",
               textDecoration: "none",
-              fontSize: "13px",
+              fontSize: "14px",
               fontWeight: 700,
               color: isActive ? NAV_ACTIVE : NAV_MUTED,
               transition: "color .12s",

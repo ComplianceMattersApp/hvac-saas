@@ -179,7 +179,7 @@ export default function AlertBanner({ slug }: { slug: string }) {
       <span
         style={{
           flex: 1,
-          fontSize: "13px",
+          fontSize: "14px",
           fontWeight: 500,
           color: t.text,
         }}
@@ -193,7 +193,7 @@ export default function AlertBanner({ slug }: { slug: string }) {
           background: "none",
           cursor: "pointer",
           fontFamily: "var(--font-geist-mono), monospace",
-          fontSize: "11px",
+          fontSize: "12px",
           fontWeight: 600,
           color: t.dismiss,
           padding: 0,

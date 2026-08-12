@@ -859,7 +859,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                       </>
                     ) : null}
                   </div>
-                  <div className={isActive ? "mt-2 text-[11px] font-semibold leading-tight text-slate-950 min-[390px]:text-xs" : "mt-2 text-[11px] font-medium leading-tight text-slate-500 min-[390px]:text-xs"}>
+                  <div className={isActive ? "mt-2 text-xs font-semibold leading-tight text-slate-950" : "mt-2 text-xs font-medium leading-tight text-slate-500"}>
                     {stage.label}
                   </div>
                 </div>
