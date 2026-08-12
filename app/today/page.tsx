@@ -153,13 +153,14 @@ export default async function TodayPage() {
       </div>
 
       {/* WIDE DESKTOP MAIN COLUMN + INDEPENDENT RIGHT RAIL */}
-      <div className="hidden xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(22rem,25rem)] xl:items-start xl:gap-6">
+      <div className="hidden xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] xl:items-start xl:gap-6">
         <main className="min-w-0 space-y-5">
           <NextBestActionCard action={model.nextBestAction} />
           {model.teamCoverage.visible ? (
             <TeamCoverageSection
               coverage={model.teamCoverage}
               label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
+              wide
             />
           ) : null}
           <div className="space-y-5">
@@ -688,9 +689,11 @@ function chipAccentClass(chip: PriorityChip): string {
 function TeamCoverageSection({
   coverage,
   label = "Team Coverage",
+  wide = false,
 }: {
   coverage: TeamCoverage;
   label?: string;
+  wide?: boolean;
 }) {
   return (
     <section className={CARD_SHELL}>
@@ -717,14 +720,14 @@ function TeamCoverageSection({
         <ul className="mt-3 space-y-2">
           {coverage.assignees.map((row) => (
             <li key={row.key} className={ROW_SHELL}>
-              <div className="flex items-center justify-between gap-3">
+              <div className={wide ? `grid gap-1.5 sm:grid-cols-[minmax(8rem,0.75fr)_minmax(0,1.6fr)_auto_auto] sm:items-center` : "grid gap-1.5"}>
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-[#0f1f35]">{row.assigneeName}</div>
                   <div className="mt-0.5 truncate text-sm leading-5 text-slate-600" title={row.areaLabel}>
                     {row.areaLabel}
                   </div>
                 </div>
-                <span className="inline-flex shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-sm font-semibold tabular-nums text-blue-800">
+                <span className={`inline-flex shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-sm font-semibold tabular-nums text-blue-800 ${wide ? "" : "justify-self-start"}`}>
                   {row.jobCount} {row.jobCount === 1 ? "job" : "jobs"}
                 </span>
               </div>
