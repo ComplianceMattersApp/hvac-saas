@@ -143,9 +143,15 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
 
       if (table === "job_events") {
         return {
-          insert: vi.fn(async (values: unknown) => {
+          // Supports both `await insert(...)` and `insert(...).select().single()`.
+          insert: vi.fn((values: unknown) => {
             writes.push({ table, op: "insert", payload: values });
-            return { error: null };
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "job-event-1" }, error: null })),
+              })),
+              then: (resolve: (value: { error: null }) => unknown) => resolve({ error: null }),
+            };
           }),
         };
       }

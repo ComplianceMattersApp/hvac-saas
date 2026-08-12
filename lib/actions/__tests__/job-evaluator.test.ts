@@ -204,7 +204,9 @@ describe("evaluateJobOpsStatus", () => {
       })
     );
 
-    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "scheduled");
+    // pending_info is an active primary responsibility: scheduling must not
+    // erase it, and the write still routes through the manual-lock boundary.
+    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "pending_info");
     expect(setOpsStatusIfNotManualMock).toHaveBeenCalledTimes(1);
   });
 

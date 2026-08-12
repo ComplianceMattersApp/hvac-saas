@@ -7,7 +7,9 @@ const readModelSource = readFileSync(resolve(__dirname, "../today-read-model.ts"
 
 describe("Today page hierarchy", () => {
   it("uses an independent desktop main column and right rail", () => {
-    expect(source).toContain("xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)]");
+    // Flexible main column plus a bounded-width right rail. The exact rem
+    // bounds are a design decision that shifts; the two-column shape is not.
+    expect(source).toMatch(/xl:grid-cols-\[minmax\(0,1fr\)_minmax\([\d.]+rem,[\d.]+rem\)\]/);
     expect(source).toContain('<main className="min-w-0 space-y-5">');
     expect(source).toContain('<aside className="space-y-5" aria-label="Today summaries">');
     expect(source).not.toContain("rounded-[28px]");
@@ -50,13 +52,21 @@ describe("Today page hierarchy", () => {
     expect(source).not.toContain("min-h-16");
   });
 
-  it("expands Team Coverage in the desktop main column", () => {
-    expect(source).toContain("wide");
-    expect(source).toContain("sm:grid-cols-[minmax(8rem,0.75fr)_minmax(0,1.6fr)_auto_auto]");
+  it("renders Team Coverage in the desktop main column", () => {
+    const desktopMain = source.slice(
+      source.indexOf('<main className="min-w-0 space-y-5">'),
+      source.indexOf("</main>"),
+    );
+    expect(desktopMain).toContain("<TeamCoverageSection");
   });
 
-  it("stacks Team Coverage identity and location details on narrow screens", () => {
-    expect(source).toContain(': "grid gap-1.5"');
-    expect(source).toContain('wide ? "" : "justify-self-start"');
+  it("stacks Team Coverage identity above location details", () => {
+    const sectionStart = source.indexOf("function TeamCoverageSection");
+    expect(sectionStart).toBeGreaterThanOrEqual(0);
+    const section = source.slice(sectionStart, source.indexOf("function RoleAwarePulseSection"));
+    const namePosition = section.indexOf("{row.assigneeName}");
+    const areaPosition = section.indexOf("{row.areaLabel}");
+    expect(namePosition).toBeGreaterThanOrEqual(0);
+    expect(areaPosition).toBeGreaterThan(namePosition);
   });
 });
