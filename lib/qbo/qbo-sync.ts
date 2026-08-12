@@ -3,12 +3,18 @@ import { getQboConnectionForAccount, getValidQboAccessToken, recordQboConnection
 import {
   createQboInvoice,
   findQboInvoiceByDocNumber,
+  findQboInvoiceById,
   findOrCreateQboCustomer,
-  findOrCreateQboServicesItem,
+  findOrCreateEveryStepServicesItem,
   updateQboInvoice,
   type QboCustomerInput,
   type QboInvoiceInput,
 } from "./qbo-api-client";
+import {
+  readAccountDefaultQboItem,
+  readPricebookQboItemMappings,
+  type QboItemMapping,
+} from "./qbo-item-mapping";
 
 /**
  * One-way EveryStep -> QBO invoice sync orchestrator.
@@ -31,9 +37,29 @@ interface QboSyncContext {
   accessToken: string;
   realmId: string;
   baseUrl: string;
-  servicesItemRef: string;
+  /** Account-level fallback item for lines with no pricebook mapping. */
+  defaultQboItem: QboItemMapping | null;
+  /**
+   * Last-resort item ref, resolved at most once per sync run and only when a
+   * line actually needs it — an account that maps everything never has an
+   * EveryStep-owned item created in its QuickBooks file.
+   */
+  resolveFallbackItemRef: () => Promise<string>;
   /** Connect-time cutoff: invoices issued before this instant never sync. */
   syncStartAt?: string | null;
+}
+
+/** Memoizes the find-or-create so one run makes at most one round trip for it. */
+function createFallbackItemRefResolver(params: {
+  accessToken: string;
+  realmId: string;
+  baseUrl: string;
+}): () => Promise<string> {
+  let inFlight: Promise<string> | null = null;
+  return () => {
+    inFlight ??= findOrCreateEveryStepServicesItem(params);
+    return inFlight;
+  };
 }
 
 /** True when an issued invoice predates the connect-time sync-start cutoff. */
@@ -113,18 +139,78 @@ function resolveCustomerInput(invoiceRow: any, customerRow: any | null): QboCust
   };
 }
 
+type ResolvedLineItemRefs = {
+  /** One QBO Item.Id per line, positionally aligned with `lineItems`. */
+  itemRefs: string[];
+  /**
+   * Human-readable description of every EXPLICIT mapping this invoice relied
+   * on. Reported back when QuickBooks rejects the write so an operator can see
+   * which mapping to fix — a silent fallback would hide a books problem.
+   */
+  mappingsUsed: string[];
+};
+
+function describeMapping(label: string, mapping: QboItemMapping): string {
+  const name = mapping.qboItemName ? ` ("${mapping.qboItemName}")` : "";
+  return `${label} → QuickBooks item ${mapping.qboItemId}${name}`;
+}
+
+/**
+ * Per-line item resolution: pricebook mapping, then the account default, then
+ * the app-owned EveryStep Services item. Pricebook mappings are read in one
+ * batched query for the whole invoice, never per line.
+ */
+async function resolveLineItemRefs(
+  ctx: QboSyncContext,
+  lineItems: any[],
+): Promise<ResolvedLineItemRefs> {
+  const pricebookMappings = await readPricebookQboItemMappings({
+    supabase: ctx.supabase,
+    accountOwnerUserId: ctx.accountOwnerUserId,
+    pricebookItemIds: lineItems
+      .map((line) => nonEmpty(line.source_pricebook_item_id))
+      .filter((id): id is string => Boolean(id)),
+  });
+
+  const mappingsUsed = new Set<string>();
+  const itemRefs: string[] = [];
+  let fallbackItemRef: string | null = null;
+
+  for (const line of lineItems) {
+    const pricebookItemId = nonEmpty(line.source_pricebook_item_id);
+    const mapped = pricebookItemId ? pricebookMappings.get(pricebookItemId) : undefined;
+    if (mapped) {
+      mappingsUsed.add(
+        describeMapping(`pricebook item "${mapped.pricebookItemName ?? pricebookItemId}"`, mapped),
+      );
+      itemRefs.push(mapped.qboItemId);
+      continue;
+    }
+    if (ctx.defaultQboItem) {
+      mappingsUsed.add(describeMapping("account default item", ctx.defaultQboItem));
+      itemRefs.push(ctx.defaultQboItem.qboItemId);
+      continue;
+    }
+    fallbackItemRef ??= await ctx.resolveFallbackItemRef();
+    itemRefs.push(fallbackItemRef);
+  }
+
+  return { itemRefs, mappingsUsed: [...mappingsUsed] };
+}
+
 function buildInvoiceInput(
   invoiceRow: any,
   lineItems: any[],
   customerRef: string,
   jobContext: string | null,
   jobContextByJobId: Map<string, string> = new Map(),
+  itemRefs: string[] = [],
 ): QboInvoiceInput {
   return {
     docNumber: String(invoiceRow.invoice_display_number ?? invoiceRow.invoice_number ?? ""),
     txnDate: String(invoiceRow.invoice_date ?? "").slice(0, 10),
     customerRef,
-    lines: lineItems.map((line) => {
+    lines: lineItems.map((line, index) => {
       const quantity = toNumber(line.quantity);
       const unitPrice = toNumber(line.unit_price);
       const amount = line.line_subtotal != null ? toNumber(line.line_subtotal) : quantity * unitPrice;
@@ -137,17 +223,85 @@ function buildInvoiceInput(
         amount,
         quantity,
         unitPrice,
+        itemRef: itemRefs[index] ?? "",
       };
     }),
     privateNote: [nonEmpty(invoiceRow.notes), qboInvoiceOriginMarker(invoiceRow.id)].filter(Boolean).join(" Â· "),
   };
 }
 
+/** Cent-safe comparison — QBO returns dollars as floats. */
+function toCents(amount: number): number {
+  return Math.round(Number(amount ?? 0) * 100);
+}
+
+/**
+ * Confirm the invoice against QuickBooks' own state after a write.
+ *
+ * A 2xx from the write endpoint is not proof: production has returned success
+ * for a request QuickBooks then processed differently (that is the drift this
+ * lane exists to prevent). Throws — the caller's catch records 'error', which
+ * is the safe direction: a false negative just retries on the next sweep, while
+ * a false positive retires the row and hides the drift for good.
+ */
+async function verifyQboInvoiceAfterWrite(params: {
+  accessToken: string;
+  realmId: string;
+  baseUrl: string;
+  qboInvoiceId: string;
+  expectedDocNumber: string;
+  expectedTotal: number;
+}): Promise<{ syncToken: string }> {
+  const { qboInvoiceId, expectedDocNumber, expectedTotal } = params;
+
+  let confirmation;
+  try {
+    confirmation = await findQboInvoiceById({
+      accessToken: params.accessToken,
+      realmId: params.realmId,
+      baseUrl: params.baseUrl,
+      qboInvoiceId,
+    });
+  } catch (error) {
+    // The write landed but we could not look at it. Distinct from a mismatch:
+    // nothing is known to be wrong in QuickBooks, only unconfirmed.
+    const reason = error instanceof Error ? error.message : "unknown error";
+    throw new Error(
+      `QuickBooks accepted invoice ${expectedDocNumber} (QBO id ${qboInvoiceId}) but the confirming read-back failed `
+      + `— unverified — read-back failed: ${reason}. It was NOT recorded as synced; the next sync run retries it.`,
+    );
+  }
+
+  if (!confirmation) {
+    throw new Error(
+      `QuickBooks accepted invoice ${expectedDocNumber} but a read-back found no invoice with QBO id ${qboInvoiceId} `
+      + `— verified mismatch. It was NOT recorded as synced.`,
+    );
+  }
+
+  // Only compare the document number when we actually sent one: with an empty
+  // DocNumber QuickBooks assigns its own, so there is nothing to match against
+  // and the amount is the only meaningful check.
+  const docNumberMatches =
+    !expectedDocNumber || String(confirmation.docNumber ?? "") === String(expectedDocNumber);
+  const totalMatches = Math.abs(toCents(confirmation.totalAmount) - toCents(expectedTotal)) <= 1;
+  if (!docNumberMatches || !totalMatches) {
+    throw new Error(
+      `QuickBooks accepted invoice ${expectedDocNumber} but the read-back does not match — verified mismatch `
+      + `(QBO id ${confirmation.id}, observed doc number ${confirmation.docNumber ?? "(EMPTY)"} vs expected `
+      + `${expectedDocNumber || "(EMPTY)"}, observed total $${confirmation.totalAmount.toFixed(2)} vs expected `
+      + `$${expectedTotal.toFixed(2)}). It was NOT recorded as synced.`,
+    );
+  }
+
+  return { syncToken: confirmation.syncToken };
+}
+
 async function syncSingleInvoiceWithContext(
   ctx: QboSyncContext,
   invoiceId: string,
 ): Promise<QboInvoiceSyncResult> {
-  const { supabase, accountOwnerUserId, accessToken, realmId, baseUrl, servicesItemRef } = ctx;
+  const { supabase, accountOwnerUserId, accessToken, realmId, baseUrl } = ctx;
   try {
     // Load invoice (scoped to account)
     const { data: invoiceRow, error: invoiceError } = await supabase
@@ -246,13 +400,35 @@ async function syncSingleInvoiceWithContext(
       }
     }
 
+    const { itemRefs, mappingsUsed } = await resolveLineItemRefs(ctx, lineItems);
     const invoiceInput = buildInvoiceInput(
       invoiceRow,
       lineItems,
       qboCustomer.id,
       resolveJobContext(customerRow, jobRow),
       jobContextByJobId,
+      itemRefs,
     );
+    const expectedTotal =
+      Math.round(invoiceInput.lines.reduce((sum, line) => sum + toCents(line.amount), 0)) / 100;
+
+    // A QuickBooks rejection on a line we deliberately mapped is a books
+    // problem (item deleted, made inactive, wrong type), not a transient
+    // failure — so the error names the mappings instead of silently falling
+    // back to the catch-all item, which would hide it.
+    const withMappingContext = async <T>(write: () => Promise<T>): Promise<T> => {
+      try {
+        return await write();
+      } catch (error) {
+        if (mappingsUsed.length === 0) throw error;
+        const reason = error instanceof Error ? error.message : "Unknown QBO error";
+        throw new Error(
+          `${reason} — QuickBooks item mapping(s) used on this invoice: ${mappingsUsed.join("; ")}. `
+          + `If a mapped QuickBooks item was deleted, renamed away, or made inactive, fix the mapping in `
+          + `Admin Center and retry.`,
+        );
+      }
+    };
 
     let synced;
     if (!invoiceRow.qbo_invoice_id) {
@@ -274,32 +450,54 @@ async function syncSingleInvoiceWithContext(
           );
         }
       } else {
-        synced = await createQboInvoice({
+        synced = await withMappingContext(() => createQboInvoice({
           accessToken,
           realmId,
           baseUrl,
           invoice: invoiceInput,
-          servicesItemRef,
           requestId: `esinv-${invoiceId}`,
-        });
+        }));
       }
     } else {
-      synced = await updateQboInvoice({
+      synced = await withMappingContext(() => updateQboInvoice({
         accessToken,
         realmId,
         baseUrl,
         qboInvoiceId: invoiceRow.qbo_invoice_id,
         syncToken: invoiceRow.qbo_sync_token ?? "0",
         invoice: invoiceInput,
-        servicesItemRef,
         requestId: `esinvupd-${invoiceId}-${invoiceRow.qbo_sync_token ?? "0"}`,
-      });
+      }));
     }
 
+    // Durable identity BEFORE the confirming read: the write reached
+    // QuickBooks, so the id must survive even if verification fails, or a retry
+    // would create a second invoice there. 'pending' is retryable and is a
+    // candidate for the next sweep — it is never a terminal state.
     await updateInvoiceSyncFields(supabase, invoiceId, {
       qbo_invoice_id: synced.id,
       qbo_customer_id: qboCustomer.id,
       qbo_sync_token: synced.syncToken,
+      qbo_sync_status: "pending",
+      qbo_sync_error: null,
+    });
+
+    const confirmed = await verifyQboInvoiceAfterWrite({
+      accessToken,
+      realmId,
+      baseUrl,
+      qboInvoiceId: synced.id,
+      expectedDocNumber: invoiceInput.docNumber,
+      expectedTotal,
+    });
+
+    await updateInvoiceSyncFields(supabase, invoiceId, {
+      qbo_invoice_id: synced.id,
+      qbo_customer_id: qboCustomer.id,
+      // The live token from the confirming read, not the write response: it is
+      // the freshest one observed, so a later update is least likely to hit a
+      // stale-object (5010) fault.
+      qbo_sync_token: confirmed.syncToken,
       qbo_sync_status: "synced",
       qbo_last_synced_at: new Date().toISOString(),
       qbo_sync_error: null,
@@ -332,12 +530,6 @@ export async function syncInvoiceToQbo(params: {
     if (!token) return { invoiceId, status: "skipped", error: "No QBO connection" };
 
     const baseUrl = getQboBaseUrl();
-    const servicesItemRef = await findOrCreateQboServicesItem({
-      accessToken: token.accessToken,
-      realmId: token.realmId,
-      baseUrl,
-    });
-
     return await syncSingleInvoiceWithContext(
       {
         supabase,
@@ -345,7 +537,12 @@ export async function syncInvoiceToQbo(params: {
         accessToken: token.accessToken,
         realmId: token.realmId,
         baseUrl,
-        servicesItemRef,
+        defaultQboItem: await readAccountDefaultQboItem({ supabase, accountOwnerUserId }),
+        resolveFallbackItemRef: createFallbackItemRefResolver({
+          accessToken: token.accessToken,
+          realmId: token.realmId,
+          baseUrl,
+        }),
       },
       invoiceId,
     );
@@ -379,14 +576,17 @@ export async function syncAllPendingInvoicesToQbo(params: {
     syncStartAt = null;
   }
 
-  // Candidate query: issued invoices not yet synced (or previously errored),
-  // restricted to those issued on/after the sync-start cutoff.
+  // Candidate query: issued invoices not yet synced, previously errored, or
+  // left 'pending' (written to QuickBooks but never confirmed — including the
+  // unverified read-back failures, which must always be retryable and are never
+  // recorded as synced), restricted to those issued on/after the sync-start
+  // cutoff.
   let candidateQuery = supabase
     .from("internal_invoices")
     .select("id")
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("status", "issued")
-    .or("qbo_sync_status.is.null,qbo_sync_status.eq.error");
+    .or("qbo_sync_status.is.null,qbo_sync_status.eq.error,qbo_sync_status.eq.pending");
   if (syncStartAt) candidateQuery = candidateQuery.gte("issued_at", syncStartAt);
   const { data: candidateRows, error: candidateError } = await candidateQuery;
 
@@ -403,7 +603,9 @@ export async function syncAllPendingInvoicesToQbo(params: {
     return { synced: 0, skipped: results.length, errors: 0, results };
   }
 
-  // Resolve auth + the catch-all Services item once for the whole run.
+  // Resolve auth + the account's default item once for the whole run. The
+  // catch-all EveryStep Services item is resolved lazily (also once per run),
+  // so an account that maps every line never has one created in its books.
   let ctx: QboSyncContext;
   try {
     const token = await getValidQboAccessToken({ supabase, accountOwnerUserId });
@@ -411,18 +613,18 @@ export async function syncAllPendingInvoicesToQbo(params: {
       return { synced: 0, skipped: 0, errors: 0, results };
     }
     const baseUrl = getQboBaseUrl();
-    const servicesItemRef = await findOrCreateQboServicesItem({
-      accessToken: token.accessToken,
-      realmId: token.realmId,
-      baseUrl,
-    });
     ctx = {
       supabase,
       accountOwnerUserId,
       accessToken: token.accessToken,
       realmId: token.realmId,
       baseUrl,
-      servicesItemRef,
+      defaultQboItem: await readAccountDefaultQboItem({ supabase, accountOwnerUserId }),
+      resolveFallbackItemRef: createFallbackItemRefResolver({
+        accessToken: token.accessToken,
+        realmId: token.realmId,
+        baseUrl,
+      }),
       syncStartAt,
     };
   } catch (error) {

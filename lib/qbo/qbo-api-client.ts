@@ -35,6 +35,12 @@ export interface QboInvoiceLineInput {
   amount: number; // dollars, 2 decimal places
   quantity: number;
   unitPrice: number;
+  /**
+   * QBO Item.Id this line posts against. Per line, not per invoice: every line
+   * used to share one catch-all item, which is why quantities showed up as
+   * hours in files that already had an hours-based item named "Services".
+   */
+  itemRef: string;
 }
 
 export interface QboInvoiceInput {
@@ -241,7 +247,20 @@ async function qboFetch(opts: {
   return json;
 }
 
-export async function findOrCreateQboServicesItem(
+/** The app-owned catch-all item. Deliberately namespaced — see below. */
+export const EVERYSTEP_FALLBACK_QBO_ITEM_NAME = "EveryStep Services";
+
+/**
+ * Find (or create) the app-owned fallback item every unmapped invoice line
+ * posts against.
+ *
+ * The name is namespaced on purpose. This used to find-or-create a bare
+ * "Services" item, which meant any QuickBooks file that already had an item by
+ * that name — commonly an hours-based service item — silently absorbed every
+ * EveryStep line, rendering our quantities as hours. Matching only the
+ * namespaced name means we adopt an item we created, never the tenant's own.
+ */
+export async function findOrCreateEveryStepServicesItem(
   params: QboRequestBase,
 ): Promise<string> {
   const { accessToken, realmId, baseUrl } = params;
@@ -252,7 +271,7 @@ export async function findOrCreateQboServicesItem(
     baseUrl,
     path: "query",
     method: "GET",
-    query: "select * from Item where Name = 'Services'",
+    query: `select * from Item where Name = '${escapeQboQueryValue(EVERYSTEP_FALLBACK_QBO_ITEM_NAME)}'`,
   });
   const existing = found?.QueryResponse?.Item?.[0];
   if (existing?.Id) return String(existing.Id);
@@ -267,7 +286,10 @@ export async function findOrCreateQboServicesItem(
   });
   const incomeAccount = accounts?.QueryResponse?.Account?.[0];
   if (!incomeAccount?.Id) {
-    throw new QboApiError(0, "No QBO income account available to attach the Services item to");
+    throw new QboApiError(
+      0,
+      `No QBO income account available to attach the ${EVERYSTEP_FALLBACK_QBO_ITEM_NAME} item to`,
+    );
   }
 
   const created = await qboFetch({
@@ -277,7 +299,7 @@ export async function findOrCreateQboServicesItem(
     path: "item",
     method: "POST",
     body: {
-      Name: "Services",
+      Name: EVERYSTEP_FALLBACK_QBO_ITEM_NAME,
       Type: "Service",
       IncomeAccountRef: { value: String(incomeAccount.Id) },
     },
@@ -285,6 +307,39 @@ export async function findOrCreateQboServicesItem(
   const item = created?.Item;
   if (!item?.Id) throw new QboApiError(0, "QBO item creation returned no Id");
   return String(item.Id);
+}
+
+export type QboItemOption = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+/**
+ * Active QBO items an invoice line can post against, for the mapping selectors.
+ *
+ * Only Service and NonInventory are offered: those are the types QBO accepts on
+ * a SalesItemLineDetail without inventory tracking, so anything else would be a
+ * mapping that fails at push time.
+ */
+export async function listActiveQboItems(params: QboRequestBase): Promise<QboItemOption[]> {
+  const found = await qboFetch({
+    accessToken: params.accessToken,
+    realmId: params.realmId,
+    baseUrl: params.baseUrl,
+    path: "query",
+    method: "GET",
+    query: "select Id, Name, Type from Item where Active = true maxresults 1000",
+  });
+  const rows: any[] = found?.QueryResponse?.Item ?? [];
+  return rows
+    .map((row) => ({
+      id: String(row?.Id ?? "").trim(),
+      name: String(row?.Name ?? "").trim(),
+      type: String(row?.Type ?? "").trim(),
+    }))
+    .filter((row) => row.id && row.name && (row.type === "Service" || row.type === "NonInventory"))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function findOrCreateQboCustomer(
@@ -330,7 +385,7 @@ export async function findOrCreateQboCustomer(
   return { id: String(createdCustomer.Id), syncToken: String(createdCustomer.SyncToken) };
 }
 
-function buildInvoiceBody(invoice: QboInvoiceInput, servicesItemRef: string): Record<string, unknown> {
+function buildInvoiceBody(invoice: QboInvoiceInput): Record<string, unknown> {
   return {
     DocNumber: invoice.docNumber,
     TxnDate: invoice.txnDate,
@@ -340,7 +395,7 @@ function buildInvoiceBody(invoice: QboInvoiceInput, servicesItemRef: string): Re
       Amount: round2(line.amount),
       Description: line.description,
       SalesItemLineDetail: {
-        ItemRef: { value: servicesItemRef },
+        ItemRef: { value: line.itemRef },
         Qty: line.quantity,
         UnitPrice: round2(line.unitPrice),
       },
@@ -350,9 +405,9 @@ function buildInvoiceBody(invoice: QboInvoiceInput, servicesItemRef: string): Re
 }
 
 export async function createQboInvoice(
-  params: QboRequestBase & { invoice: QboInvoiceInput; servicesItemRef: string; requestId?: string | null },
+  params: QboRequestBase & { invoice: QboInvoiceInput; requestId?: string | null },
 ): Promise<QboSyncedEntity> {
-  const { accessToken, realmId, baseUrl, invoice, servicesItemRef } = params;
+  const { accessToken, realmId, baseUrl, invoice } = params;
   const created = await qboFetch({
     accessToken,
     realmId,
@@ -360,10 +415,11 @@ export async function createQboInvoice(
     path: "invoice",
     method: "POST",
     requestId: String(params.requestId ?? "").trim() || undefined,
-    body: buildInvoiceBody(invoice, servicesItemRef),
+    body: buildInvoiceBody(invoice),
   });
   const inv = created?.Invoice;
   if (!inv?.Id) throw new QboApiError(0, "QBO invoice creation returned no Id");
+  // A 2xx is NOT proof the invoice landed as sent — callers confirm by re-reading.
   return { id: String(inv.Id), syncToken: String(inv.SyncToken) };
 }
 
@@ -372,11 +428,10 @@ export async function updateQboInvoice(
     qboInvoiceId: string;
     syncToken: string;
     invoice: QboInvoiceInput;
-    servicesItemRef: string;
     requestId?: string | null;
   },
 ): Promise<QboSyncedEntity> {
-  const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken, invoice, servicesItemRef } = params;
+  const { accessToken, realmId, baseUrl, qboInvoiceId, syncToken, invoice } = params;
   const updated = await qboFetch({
     accessToken,
     realmId,
@@ -385,7 +440,7 @@ export async function updateQboInvoice(
     method: "POST",
     requestId: String(params.requestId ?? "").trim() || undefined,
     body: {
-      ...buildInvoiceBody(invoice, servicesItemRef),
+      ...buildInvoiceBody(invoice),
       Id: qboInvoiceId,
       SyncToken: syncToken,
     },
@@ -520,6 +575,35 @@ export type QboPaymentSnapshot = {
   appliedAmountByInvoiceId: Record<string, number>;
 };
 
+function toQboPaymentSnapshot(payment: any): QboPaymentSnapshot {
+  const appliedAmountByInvoiceId: Record<string, number> = {};
+  for (const line of payment?.Line ?? []) {
+    const amount = Number(line?.Amount ?? 0);
+    for (const transaction of line?.LinkedTxn ?? []) {
+      if (String(transaction?.TxnType ?? "") !== "Invoice") continue;
+      const invoiceId = String(transaction?.TxnId ?? "").trim();
+      if (!invoiceId) continue;
+      appliedAmountByInvoiceId[invoiceId] = round2((appliedAmountByInvoiceId[invoiceId] ?? 0) + amount);
+    }
+  }
+  return {
+    id: String(payment.Id),
+    totalAmount: Number(payment.TotalAmt ?? 0),
+    txnDate: String(payment.TxnDate ?? "").trim() || null,
+    linkedInvoiceIds: [
+      ...new Set(
+        (payment?.Line ?? []).flatMap((line: any) =>
+          (line?.LinkedTxn ?? [])
+            .filter((txn: any) => String(txn?.TxnType ?? "") === "Invoice")
+            .map((txn: any) => String(txn?.TxnId ?? "").trim())
+            .filter(Boolean),
+        ),
+      ),
+    ] as string[],
+    appliedAmountByInvoiceId,
+  };
+}
+
 /** Every QBO payment with a transaction date on/after `fromDate` (YYYY-MM-DD). */
 export async function listQboPaymentsSince(
   params: QboRequestBase & { fromDate: string },
@@ -529,34 +613,32 @@ export async function listQboPaymentsSince(
     entity: "Payment",
     where: `TxnDate >= '${escapeQboQueryValue(params.fromDate)}'`,
   });
-  return rows.map((payment) => {
-    const appliedAmountByInvoiceId: Record<string, number> = {};
-    for (const line of payment?.Line ?? []) {
-      const amount = Number(line?.Amount ?? 0);
-      for (const transaction of line?.LinkedTxn ?? []) {
-        if (String(transaction?.TxnType ?? "") !== "Invoice") continue;
-        const invoiceId = String(transaction?.TxnId ?? "").trim();
-        if (!invoiceId) continue;
-        appliedAmountByInvoiceId[invoiceId] = round2((appliedAmountByInvoiceId[invoiceId] ?? 0) + amount);
-      }
-    }
-    return {
-      id: String(payment.Id),
-      totalAmount: Number(payment.TotalAmt ?? 0),
-      txnDate: String(payment.TxnDate ?? "").trim() || null,
-      linkedInvoiceIds: [
-      ...new Set(
-        (payment?.Line ?? []).flatMap((line: any) =>
-          (line?.LinkedTxn ?? [])
-            .filter((txn: any) => String(txn?.TxnType ?? "") === "Invoice")
-            .map((txn: any) => String(txn?.TxnId ?? "").trim())
-            .filter(Boolean),
-        ),
-      ),
-      ] as string[],
-      appliedAmountByInvoiceId,
-    };
+  return rows.map(toQboPaymentSnapshot);
+}
+
+/**
+ * Read one QBO payment by its QBO Id. Returns null when QBO has no such payment.
+ *
+ * This is the confirming read for the payment push: a 2xx from the create call
+ * is not proof the payment landed, nor that it applied to the invoice we asked
+ * for, so callers compare TotalAmt and the linked invoice against what was sent.
+ */
+export async function findQboPaymentById(
+  params: QboRequestBase & { qboPaymentId: string },
+): Promise<QboPaymentSnapshot | null> {
+  const qboPaymentId = String(params.qboPaymentId ?? "").trim();
+  if (!qboPaymentId) return null;
+  const found = await qboFetch({
+    accessToken: params.accessToken,
+    realmId: params.realmId,
+    baseUrl: params.baseUrl,
+    path: "query",
+    method: "GET",
+    query: `select * from Payment where Id = '${escapeQboQueryValue(qboPaymentId)}'`,
   });
+  const payment = found?.QueryResponse?.Payment?.[0];
+  if (!payment?.Id) return null;
+  return toQboPaymentSnapshot(payment);
 }
 
 export async function voidQboInvoice(

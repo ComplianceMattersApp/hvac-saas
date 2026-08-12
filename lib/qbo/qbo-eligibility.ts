@@ -133,7 +133,9 @@ function issuedBeforeCutoff(issuedAt: unknown, cutoff: string | null): boolean {
  *  10. unresolvable_customer (issued, retryable, in-window, no real customer identity)
  *   else → ELIGIBLE
  *
- * "retryable" = qbo_sync_status is null or 'error' (mirrors the bulk candidate query).
+ * "retryable" = qbo_sync_status is null, 'error', or 'pending' (mirrors the bulk
+ * candidate query). 'pending' means the invoice was written to QuickBooks but
+ * the confirming read-back never succeeded — unverified is never terminal.
  * Content reads (job disposition, line items, customer) run ONLY for retryable,
  * in-window issued invoices — terminal + pre-cutoff states are classified from
  * the invoice row alone.
@@ -177,7 +179,7 @@ export async function evaluateQboInvoiceEligibility(params: {
   // 2. Determine which invoices reach the content stage (issued + retryable +
   //    on/after the sync-start cutoff). Terminal + pre-cutoff rows are skipped.
   const syncStartCutoff = nonEmpty(scope?.issuedOnOrAfter);
-  const isRetryable = (s: unknown) => s == null || s === "error";
+  const isRetryable = (s: unknown) => s == null || s === "error" || s === "pending";
   const contentStageRows = invoiceRows.filter(
     (row) =>
       row.status === "issued" &&
