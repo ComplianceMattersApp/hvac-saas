@@ -4,18 +4,20 @@ const {
   getValidQboAccessToken,
   recordQboConnectionSyncOutcome,
   getQboConnectionForAccount,
-  findOrCreateQboServicesItem,
+  findOrCreateEveryStepServicesItem,
   findOrCreateQboCustomer,
   findQboInvoiceByDocNumber,
+  findQboInvoiceById,
   createQboInvoice,
   updateQboInvoice,
 } = vi.hoisted(() => ({
   getValidQboAccessToken: vi.fn(),
   recordQboConnectionSyncOutcome: vi.fn(),
   getQboConnectionForAccount: vi.fn(),
-  findOrCreateQboServicesItem: vi.fn(),
+  findOrCreateEveryStepServicesItem: vi.fn(),
   findOrCreateQboCustomer: vi.fn(),
   findQboInvoiceByDocNumber: vi.fn(),
+  findQboInvoiceById: vi.fn(),
   createQboInvoice: vi.fn(),
   updateQboInvoice: vi.fn(),
 }));
@@ -25,9 +27,10 @@ vi.mock("@/lib/qbo/qbo-connection", () => ({
   getQboConnectionForAccount,
 }));
 vi.mock("@/lib/qbo/qbo-api-client", () => ({
-  findOrCreateQboServicesItem,
+  findOrCreateEveryStepServicesItem,
   findOrCreateQboCustomer,
   findQboInvoiceByDocNumber,
+  findQboInvoiceById,
   createQboInvoice,
   updateQboInvoice,
 }));
@@ -64,14 +67,43 @@ function makeSupabase(tables: Record<string, { single?: any; list?: any[] }>) {
   return { builder, updates };
 }
 
+/** The invoice payload of the most recent create/update push. */
+function lastPushedInvoice(): any {
+  const calls = [...createQboInvoice.mock.calls, ...updateQboInvoice.mock.calls];
+  return calls.at(-1)?.[0]?.invoice ?? null;
+}
+
+/**
+ * Default read-back: QuickBooks agrees with what we just pushed, so the happy
+ * path verifies clean. Tests that exercise drift override this per case.
+ */
+function confirmingReadBack() {
+  return async ({ qboInvoiceId }: any) => {
+    const invoice = lastPushedInvoice();
+    const totalAmount = (invoice?.lines ?? []).reduce(
+      (sum: number, line: any) => sum + Number(line.amount ?? 0),
+      0,
+    );
+    return {
+      id: String(qboInvoiceId),
+      syncToken: "9",
+      docNumber: String(invoice?.docNumber ?? ""),
+      balance: totalAmount,
+      totalAmount,
+      looksVoided: false,
+    };
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getValidQboAccessToken.mockResolvedValue({ accessToken: "AT", realmId: "R" });
   getQboConnectionForAccount.mockResolvedValue(null);
   recordQboConnectionSyncOutcome.mockResolvedValue(undefined);
-  findOrCreateQboServicesItem.mockResolvedValue("7");
+  findOrCreateEveryStepServicesItem.mockResolvedValue("7");
   findOrCreateQboCustomer.mockResolvedValue({ id: "C1", syncToken: "0" });
   findQboInvoiceByDocNumber.mockResolvedValue(null);
+  findQboInvoiceById.mockImplementation(confirmingReadBack());
   createQboInvoice.mockResolvedValue({ id: "Q1", syncToken: "0" });
   updateQboInvoice.mockResolvedValue({ id: "Q9", syncToken: "6" });
 });
@@ -164,6 +196,10 @@ describe("syncInvoiceToQbo", () => {
       syncToken: "2",
       privateNote: "EveryStep invoice ID: inv-recover",
     });
+    // Nothing is pushed on the adoption path, so the read-back is stated here.
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q-recovered", syncToken: "3", docNumber: "2008", balance: 50, totalAmount: 50, looksVoided: false,
+    });
     const { builder, updates } = makeSupabase({
       internal_invoices: { single: {
         id: "inv-recover", status: "issued", account_owner_user_id: "acc", job_id: null,
@@ -244,7 +280,213 @@ describe("syncInvoiceToQbo", () => {
     const { builder } = makeSupabase({});
     const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv5" });
     expect(result.status).toBe("skipped");
-    expect(findOrCreateQboServicesItem).not.toHaveBeenCalled();
+    expect(findOrCreateEveryStepServicesItem).not.toHaveBeenCalled();
+  });
+});
+
+describe("per-line QuickBooks item mapping", () => {
+  const invoiceRow = (id: string) => ({
+    id, status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+    billing_name: "Cust", invoice_display_number: 4001, invoice_date: "2026-08-11", qbo_invoice_id: null,
+  });
+
+  it("posts each line to its own mapped QuickBooks item", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: { single: invoiceRow("inv-mapped") },
+      pricebook_items: { list: [
+        { id: "pb-duct", item_name: "Duct Cleaning", qbo_item_id: "41", qbo_item_name: "Duct Cleaning (QBO)" },
+        { id: "pb-filter", item_name: "Filter", qbo_item_id: "42", qbo_item_name: "Air Filter" },
+      ] },
+      internal_invoice_line_items: { list: [
+        { source_pricebook_item_id: "pb-duct", item_name_snapshot: "Duct Cleaning", quantity: 3, unit_price: 100, line_subtotal: 300, sort_order: 1 },
+        { source_pricebook_item_id: "pb-filter", item_name_snapshot: "Filter", quantity: 2, unit_price: 20, line_subtotal: 40, sort_order: 2 },
+      ] },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-mapped" });
+
+    expect(result.status).toBe("synced");
+    expect(createQboInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      invoice: expect.objectContaining({
+        lines: [
+          expect.objectContaining({ itemRef: "41", quantity: 3 }),
+          expect.objectContaining({ itemRef: "42", quantity: 2 }),
+        ],
+      }),
+    }));
+    // Nothing needed the catch-all, so none was created in the tenant's books.
+    expect(findOrCreateEveryStepServicesItem).not.toHaveBeenCalled();
+  });
+
+  it("posts an unmapped line to EveryStep Services when there is no account default", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: { single: invoiceRow("inv-unmapped") },
+      pricebook_items: { list: [] },
+      internal_invoice_line_items: { list: [
+        { source_pricebook_item_id: "pb-none", item_name_snapshot: "Repair", quantity: 1, unit_price: 100, line_subtotal: 100, sort_order: 1 },
+        { source_pricebook_item_id: null, item_name_snapshot: "Ad hoc", quantity: 1, unit_price: 25, line_subtotal: 25, sort_order: 2 },
+      ] },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-unmapped" });
+
+    expect(result.status).toBe("synced");
+    expect(createQboInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      invoice: expect.objectContaining({
+        lines: [expect.objectContaining({ itemRef: "7" }), expect.objectContaining({ itemRef: "7" })],
+      }),
+    }));
+    // Resolved once for the whole run, not once per line.
+    expect(findOrCreateEveryStepServicesItem).toHaveBeenCalledTimes(1);
+  });
+
+  it("prefers the account default over the EveryStep Services fallback for unmapped lines", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: { single: invoiceRow("inv-default") },
+      qbo_connections: { single: { default_qbo_item_id: "77", default_qbo_item_name: "Field Services" } },
+      pricebook_items: { list: [
+        { id: "pb-duct", item_name: "Duct Cleaning", qbo_item_id: "41", qbo_item_name: "Duct Cleaning (QBO)" },
+      ] },
+      internal_invoice_line_items: { list: [
+        { source_pricebook_item_id: "pb-duct", item_name_snapshot: "Duct", quantity: 1, unit_price: 100, line_subtotal: 100, sort_order: 1 },
+        { source_pricebook_item_id: null, item_name_snapshot: "Ad hoc", quantity: 1, unit_price: 25, line_subtotal: 25, sort_order: 2 },
+      ] },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-default" });
+
+    expect(result.status).toBe("synced");
+    expect(createQboInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      invoice: expect.objectContaining({
+        lines: [expect.objectContaining({ itemRef: "41" }), expect.objectContaining({ itemRef: "77" })],
+      }),
+    }));
+    expect(findOrCreateEveryStepServicesItem).not.toHaveBeenCalled();
+  });
+
+  it("records an error naming the mapping when QuickBooks rejects a mapped item", async () => {
+    createQboInvoice.mockRejectedValueOnce(new Error("Invalid Reference Id: Items element id 41 not found"));
+    const { builder, updates } = makeSupabase({
+      internal_invoices: { single: invoiceRow("inv-bad-map") },
+      pricebook_items: { list: [
+        { id: "pb-duct", item_name: "Duct Cleaning", qbo_item_id: "41", qbo_item_name: "Duct Cleaning (QBO)" },
+      ] },
+      internal_invoice_line_items: { list: [
+        { source_pricebook_item_id: "pb-duct", item_name_snapshot: "Duct", quantity: 3, unit_price: 100, line_subtotal: 300, sort_order: 1 },
+      ] },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-bad-map" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Items element id 41 not found");
+    expect(result.error).toContain('pricebook item "Duct Cleaning"');
+    expect(result.error).toContain("QuickBooks item 41");
+    const errored = (updates.internal_invoices ?? []).find((p) => p.qbo_sync_status === "error");
+    expect(errored.qbo_sync_error).toContain('pricebook item "Duct Cleaning"');
+    // Never silently re-posted against the catch-all item.
+    expect(findOrCreateEveryStepServicesItem).not.toHaveBeenCalled();
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "synced")).toBe(false);
+  });
+});
+
+describe("invoice sync verify-after-write", () => {
+  const invoiceRow = {
+    id: "inv-verify", status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+    billing_name: "Cust", invoice_display_number: 5001, invoice_date: "2026-08-11", qbo_invoice_id: null,
+  };
+  const lineItems = { list: [
+    { item_name_snapshot: "Svc", quantity: 2, unit_price: 150, line_subtotal: 300, sort_order: 1 },
+  ] };
+
+  function supabaseForVerify() {
+    return makeSupabase({ internal_invoices: { single: invoiceRow }, internal_invoice_line_items: lineItems });
+  }
+
+  it("records synced only after a confirming read-back, storing the live sync token", async () => {
+    const { builder, updates } = supabaseForVerify();
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result).toMatchObject({ status: "synced", qboInvoiceId: "Q1" });
+    expect(findQboInvoiceById).toHaveBeenCalledWith(expect.objectContaining({ qboInvoiceId: "Q1" }));
+    const payloads = updates.internal_invoices ?? [];
+    // Identity is durable before verification, so a failed read-back can never
+    // orphan the QBO invoice into a duplicate on retry.
+    expect(payloads.findIndex((p) => p.qbo_sync_status === "pending"))
+      .toBeLessThan(payloads.findIndex((p) => p.qbo_sync_status === "synced"));
+    expect(payloads.find((p) => p.qbo_sync_status === "pending")).toMatchObject({ qbo_invoice_id: "Q1" });
+    expect(payloads.find((p) => p.qbo_sync_status === "synced")).toMatchObject({ qbo_sync_token: "9" });
+  });
+
+  it("records an error with observed values when the read-back total does not match", async () => {
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q1", syncToken: "9", docNumber: "5001", balance: 100, totalAmount: 100, looksVoided: false,
+    });
+    const { builder, updates } = supabaseForVerify();
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("verified mismatch");
+    expect(result.error).toContain("observed total $100.00");
+    expect(result.error).toContain("expected $300.00");
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "synced")).toBe(false);
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "error")).toBe(true);
+  });
+
+  it("records an error when the read-back doc number does not match", async () => {
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q1", syncToken: "9", docNumber: "9999", balance: 300, totalAmount: 300, looksVoided: false,
+    });
+    const { builder, updates } = supabaseForVerify();
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("observed doc number 9999");
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "synced")).toBe(false);
+  });
+
+  it("marks the row unverified — never synced — when the read-back itself fails", async () => {
+    findQboInvoiceById.mockRejectedValueOnce(new Error("ETIMEDOUT"));
+    const { builder, updates } = supabaseForVerify();
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("unverified — read-back failed");
+    expect(result.error).toContain("ETIMEDOUT");
+    expect(result.error).not.toContain("verified mismatch");
+    const payloads = updates.internal_invoices ?? [];
+    // The QBO id was still written, so the retry updates rather than duplicates.
+    expect(payloads.find((p) => p.qbo_sync_status === "pending")).toMatchObject({ qbo_invoice_id: "Q1" });
+    expect(payloads.some((p) => p.qbo_sync_status === "synced")).toBe(false);
+  });
+
+  it("does not fail an invoice with no document number on QuickBooks' own numbering", async () => {
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q1", syncToken: "9", docNumber: "1042", balance: 300, totalAmount: 300, looksVoided: false,
+    });
+    const { builder } = makeSupabase({
+      internal_invoices: { single: { ...invoiceRow, invoice_display_number: null, invoice_number: null } },
+      internal_invoice_line_items: lineItems,
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("synced");
+  });
+
+  it("records an error when the read-back finds no invoice at all", async () => {
+    findQboInvoiceById.mockResolvedValueOnce(null);
+    const { builder, updates } = supabaseForVerify();
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("no invoice with QBO id Q1");
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "synced")).toBe(false);
   });
 });
 
