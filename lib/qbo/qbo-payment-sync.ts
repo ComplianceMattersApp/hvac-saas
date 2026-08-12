@@ -1,5 +1,10 @@
 import { preferredInvoiceReference } from "@/lib/utils/display-references";
-import { createQboPayment, findQboPaymentsLinkedToInvoice, getQboInvoicePaymentContext } from "./qbo-api-client";
+import {
+  createQboPayment,
+  findQboPaymentById,
+  findQboPaymentsLinkedToInvoice,
+  getQboInvoicePaymentContext,
+} from "./qbo-api-client";
 import { getValidQboAccessToken } from "./qbo-connection";
 import { getQboBaseUrl } from "./qbo-env";
 import { syncInvoiceToQbo } from "./qbo-sync";
@@ -68,6 +73,71 @@ async function findAdoptableQboPaymentId(params: {
   if (refMatches.length === 1) return refMatches[0].id;
   if (compatible.length === 1) return compatible[0].id;
   return null;
+}
+
+/** Cent-safe comparison — QBO returns dollars as floats. */
+function toCents(amount: number): number {
+  return Math.round(Number(amount ?? 0) * 100);
+}
+
+/**
+ * Confirm the payment against QuickBooks' own state after pushing it.
+ *
+ * A 2xx from the create endpoint is not proof the payment landed, nor that it
+ * applied to the invoice we asked for. Throws on anything unconfirmed — the
+ * caller records 'failed', which is retryable; recording an unverified success
+ * would retire the row and hide the drift.
+ *
+ * On purpose, the caller does NOT store qbo_payment_id when this throws: the
+ * stored id short-circuits later runs as already-synced. The retry instead goes
+ * through the balance guard and the adoption lookup, which links the very
+ * payment named in the error message without creating a duplicate.
+ */
+async function verifyQboPaymentAfterWrite(params: {
+  accessToken: string;
+  realmId: string;
+  qboPaymentId: string;
+  qboInvoiceId: string;
+  invoiceLabel: string;
+  expectedAmount: number;
+}): Promise<void> {
+  const { qboPaymentId, qboInvoiceId, invoiceLabel, expectedAmount } = params;
+
+  let confirmation;
+  try {
+    confirmation = await findQboPaymentById({
+      accessToken: params.accessToken,
+      realmId: params.realmId,
+      baseUrl: getQboBaseUrl(),
+      qboPaymentId,
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown error";
+    throw new Error(
+      `QuickBooks accepted the $${expectedAmount.toFixed(2)} payment for invoice ${invoiceLabel} `
+      + `(QuickBooks payment id ${qboPaymentId}) but the confirming read-back failed — unverified — read-back `
+      + `failed: ${reason}. It was NOT recorded as synced; retry to confirm and link it.`,
+    );
+  }
+
+  if (!confirmation) {
+    throw new Error(
+      `QuickBooks accepted the $${expectedAmount.toFixed(2)} payment for invoice ${invoiceLabel} but a read-back `
+      + `found no payment with QuickBooks id ${qboPaymentId} — verified mismatch. It was NOT recorded as synced.`,
+    );
+  }
+
+  const linksInvoice = confirmation.linkedInvoiceIds.includes(qboInvoiceId);
+  const totalMatches = Math.abs(toCents(confirmation.totalAmount) - toCents(expectedAmount)) <= 1;
+  if (!linksInvoice || !totalMatches) {
+    throw new Error(
+      `QuickBooks accepted the payment for invoice ${invoiceLabel} but the read-back does not match — verified `
+      + `mismatch (QuickBooks payment id ${confirmation.id}, observed total $${confirmation.totalAmount.toFixed(2)} `
+      + `vs expected $${expectedAmount.toFixed(2)}, applied to invoice(s) `
+      + `${confirmation.linkedInvoiceIds.join(", ") || "(NONE)"} vs expected ${qboInvoiceId}). `
+      + `It was NOT recorded as synced.`,
+    );
+  }
 }
 
 async function updatePaymentSyncFields(supabase: any, paymentId: string, patch: Record<string, unknown>) {
@@ -206,6 +276,16 @@ export async function syncPaymentToQbo(params: {
         privateNote: [String(payment.notes ?? "").trim(), String(payment.received_reference ?? "").trim() ? `EveryStep payment reference: ${String(payment.received_reference).trim()}` : ""].filter(Boolean).join(" · ") || null,
       },
     });
+
+    await verifyQboPaymentAfterWrite({
+      accessToken: token.accessToken,
+      realmId: token.realmId,
+      qboPaymentId: synced.id,
+      qboInvoiceId: String(invoice.qbo_invoice_id),
+      invoiceLabel,
+      expectedAmount: paymentAmount,
+    });
+
     await updatePaymentSyncFields(supabase, paymentId, {
       qbo_sync_status: "synced",
       qbo_payment_id: synced.id,
