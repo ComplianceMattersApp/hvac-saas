@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  EVERYSTEP_FALLBACK_QBO_ITEM_NAME,
   QboApiError,
   createQboInvoice,
   createQboPayment,
   findQboInvoiceByDocNumber,
+  findQboPaymentById,
   findOrCreateQboCustomer,
+  findOrCreateEveryStepServicesItem,
   getQboInvoicePaymentContext,
+  listActiveQboItems,
   listQboPaymentsSince,
 } from "@/lib/qbo/qbo-api-client";
 
@@ -122,13 +126,12 @@ describe("qbo-api-client", () => {
     ]);
     const result = await createQboInvoice({
       ...base,
-      servicesItemRef: "7",
       requestId: "esinv-invoice-1",
       invoice: {
         docNumber: "2001",
         txnDate: "2026-07-10",
         customerRef: "55",
-        lines: [{ description: "AC repair", amount: 100, quantity: 1, unitPrice: 100 }],
+        lines: [{ description: "AC repair", amount: 100, quantity: 1, unitPrice: 100, itemRef: "7" }],
         privateNote: null,
       },
     });
@@ -140,6 +143,95 @@ describe("qbo-api-client", () => {
     expect(body.Line[0].Amount).toBe(100);
     const requestUrl = new URL(String(fetchMock.mock.calls[0][0]));
     expect(requestUrl.searchParams.get("requestid")).toBe("esinv-invoice-1");
+  });
+
+  it("posts each line against its own ItemRef, not one catch-all item", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { Invoice: { Id: "101", SyncToken: "0" } } },
+    ]);
+    await createQboInvoice({
+      ...base,
+      invoice: {
+        docNumber: "2002",
+        txnDate: "2026-07-11",
+        customerRef: "55",
+        lines: [
+          { description: "Duct cleaning", amount: 300, quantity: 3, unitPrice: 100, itemRef: "41" },
+          { description: "Filter", amount: 40, quantity: 2, unitPrice: 20, itemRef: "42" },
+          { description: "Misc", amount: 15, quantity: 1, unitPrice: 15, itemRef: "7" },
+        ],
+      },
+    });
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.Line.map((line: any) => line.SalesItemLineDetail.ItemRef.value)).toEqual(["41", "42", "7"]);
+    expect(body.Line[0].SalesItemLineDetail.Qty).toBe(3);
+    expect(body.Line[0].SalesItemLineDetail.UnitPrice).toBe(100);
+  });
+
+  it("matches only the namespaced fallback item, never a tenant's own 'Services'", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { QueryResponse: { Item: [{ Id: "88" }] } } },
+    ]);
+    await expect(findOrCreateEveryStepServicesItem({ ...base })).resolves.toBe("88");
+    const query = new URL(String(fetchMock.mock.calls[0][0])).searchParams.get("query");
+    expect(query).toBe("select * from Item where Name = 'EveryStep Services'");
+    expect(query).not.toContain("Name = 'Services'");
+  });
+
+  it("creates the fallback item under the namespaced name when QBO has none", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { QueryResponse: {} } },
+      { status: 200, body: { QueryResponse: { Account: [{ Id: "12" }] } } },
+      { status: 200, body: { Item: { Id: "99" } } },
+    ]);
+    await expect(findOrCreateEveryStepServicesItem({ ...base })).resolves.toBe("99");
+    const createBody = JSON.parse(String((fetchMock.mock.calls[2][1] as RequestInit).body));
+    expect(createBody).toMatchObject({
+      Name: EVERYSTEP_FALLBACK_QBO_ITEM_NAME,
+      Type: "Service",
+      IncomeAccountRef: { value: "12" },
+    });
+  });
+
+  it("lists only active Service/NonInventory items for the mapping selectors", async () => {
+    mockFetchSequence([
+      { status: 200, body: { QueryResponse: { Item: [
+        { Id: "3", Name: "Zone Balancing", Type: "Service" },
+        { Id: "4", Name: "Air Filter", Type: "NonInventory" },
+        { Id: "5", Name: "Stocked Compressor", Type: "Inventory" },
+        { Id: "6", Name: "", Type: "Service" },
+      ] } } },
+    ]);
+    await expect(listActiveQboItems({ ...base })).resolves.toEqual([
+      { id: "4", name: "Air Filter", type: "NonInventory" },
+      { id: "3", name: "Zone Balancing", type: "Service" },
+    ]);
+  });
+
+  it("reads one payment back by id with its linked invoice allocations", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { QueryResponse: { Payment: [{
+        Id: "P9",
+        TotalAmt: 250,
+        TxnDate: "2026-08-04",
+        Line: [{ Amount: 250, LinkedTxn: [{ TxnId: "QI1", TxnType: "Invoice" }] }],
+      }] } } },
+    ]);
+    await expect(findQboPaymentById({ ...base, qboPaymentId: "P9" })).resolves.toEqual({
+      id: "P9",
+      totalAmount: 250,
+      txnDate: "2026-08-04",
+      linkedInvoiceIds: ["QI1"],
+      appliedAmountByInvoiceId: { QI1: 250 },
+    });
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get("query")).toBe(
+      "select * from Payment where Id = 'P9'",
+    );
+  });
+
+  it("findQboPaymentById returns null when QBO has no such payment", async () => {
+    mockFetchSequence([{ status: 200, body: { QueryResponse: {} } }]);
+    await expect(findQboPaymentById({ ...base, qboPaymentId: "P-GONE" })).resolves.toBeNull();
   });
 
   it("findQboInvoiceByDocNumber returns an exact existing invoice", async () => {
@@ -191,12 +283,11 @@ describe("qbo-api-client", () => {
     await expect(
       createQboInvoice({
         ...base,
-        servicesItemRef: "7",
         invoice: {
           docNumber: "2001",
           txnDate: "2026-07-10",
           customerRef: "55",
-          lines: [{ description: "x", amount: 1, quantity: 1, unitPrice: 1 }],
+          lines: [{ description: "x", amount: 1, quantity: 1, unitPrice: 1, itemRef: "7" }],
         },
       }),
     ).rejects.toMatchObject({ name: "QboApiError", status: 400, message: "Invalid invoice" });

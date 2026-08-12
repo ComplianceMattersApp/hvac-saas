@@ -1,14 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createQboPayment, findQboPaymentsLinkedToInvoice, getQboInvoicePaymentContext, getValidQboAccessToken, syncInvoiceToQbo } = vi.hoisted(() => ({
+const { createQboPayment, findQboPaymentById, findQboPaymentsLinkedToInvoice, getQboInvoicePaymentContext, getValidQboAccessToken, syncInvoiceToQbo } = vi.hoisted(() => ({
   createQboPayment: vi.fn(),
+  findQboPaymentById: vi.fn(),
   findQboPaymentsLinkedToInvoice: vi.fn(),
   getQboInvoicePaymentContext: vi.fn(),
   getValidQboAccessToken: vi.fn(),
   syncInvoiceToQbo: vi.fn(),
 }));
 
-vi.mock("@/lib/qbo/qbo-api-client", () => ({ createQboPayment, findQboPaymentsLinkedToInvoice, getQboInvoicePaymentContext }));
+vi.mock("@/lib/qbo/qbo-api-client", () => ({ createQboPayment, findQboPaymentById, findQboPaymentsLinkedToInvoice, getQboInvoicePaymentContext }));
 vi.mock("@/lib/qbo/qbo-connection", () => ({ getValidQboAccessToken }));
 vi.mock("@/lib/qbo/qbo-env", () => ({ getQboBaseUrl: () => "https://sandbox.example.com" }));
 vi.mock("@/lib/qbo/qbo-sync", () => ({ syncInvoiceToQbo }));
@@ -42,6 +43,18 @@ beforeEach(() => {
   createQboPayment.mockResolvedValue({ id: "QP1", syncToken: "0" });
   findQboPaymentsLinkedToInvoice.mockResolvedValue([]);
   getQboInvoicePaymentContext.mockResolvedValue({ id: "QI1", customerRef: "QC1", balance: 720, totalAmount: 720 });
+  // Default read-back: QuickBooks agrees with what was just pushed, so the
+  // happy path verifies clean. Drift cases override this per test.
+  findQboPaymentById.mockImplementation(async ({ qboPaymentId }: any) => {
+    const pushed = createQboPayment.mock.calls.at(-1)?.[0]?.payment;
+    return {
+      id: String(qboPaymentId),
+      totalAmount: Number(pushed?.amount ?? 0),
+      txnDate: pushed?.txnDate ?? null,
+      linkedInvoiceIds: [String(pushed?.invoiceRef ?? "")],
+      appliedAmountByInvoiceId: { [String(pushed?.invoiceRef ?? "")]: Number(pushed?.amount ?? 0) },
+    };
+  });
 });
 
 describe("syncPaymentToQbo", () => {
@@ -174,6 +187,79 @@ describe("syncPaymentToQbo", () => {
     const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
     expect(result).toMatchObject({ status: "error", error: expect.stringContaining("lookup could not run") });
     expect(result.error).not.toContain("No matching QuickBooks payment");
+  });
+
+  it("records synced only after a confirming read-back of the pushed payment", async () => {
+    const { supabase, updates } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000 },
+      invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
+    });
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+    expect(result).toEqual({ paymentId: "pay-1", status: "synced", qboPaymentId: "QP1" });
+    expect(findQboPaymentById).toHaveBeenCalledWith(expect.objectContaining({ qboPaymentId: "QP1" }));
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "synced", qbo_payment_id: "QP1" }));
+  });
+
+  it("fails with observed values when the read-back total does not match", async () => {
+    findQboPaymentById.mockResolvedValueOnce({
+      id: "QP1", totalAmount: 100, txnDate: "2026-07-14", linkedInvoiceIds: ["QI1"], appliedAmountByInvoiceId: { QI1: 100 },
+    });
+    const { supabase, updates } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000 },
+      invoice: { id: "inv-1", invoice_display_number: 2116, qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
+    });
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("verified mismatch");
+    expect(result.error).toContain("observed total $100.00");
+    expect(result.error).toContain("expected $720.00");
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "failed" }));
+    // Never stored as synced, and the QBO id is deliberately not adopted here —
+    // the retry re-links it through the adoption lookup instead.
+    expect(updates.some((patch: any) => patch.qbo_sync_status === "synced")).toBe(false);
+    expect(updates.some((patch: any) => patch.qbo_payment_id)).toBe(false);
+  });
+
+  it("fails when the read-back payment does not link the expected invoice", async () => {
+    findQboPaymentById.mockResolvedValueOnce({
+      id: "QP1", totalAmount: 720, txnDate: "2026-07-14", linkedInvoiceIds: ["QI-OTHER"], appliedAmountByInvoiceId: { "QI-OTHER": 720 },
+    });
+    const { supabase, updates } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000 },
+      invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
+    });
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("applied to invoice(s) QI-OTHER vs expected QI1");
+    expect(updates.some((patch: any) => patch.qbo_sync_status === "synced")).toBe(false);
+  });
+
+  it("marks the payment unverified — never synced — when the read-back itself fails", async () => {
+    findQboPaymentById.mockRejectedValueOnce(new Error("ECONNRESET"));
+    const { supabase, updates } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000 },
+      invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
+    });
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("unverified — read-back failed");
+    expect(result.error).toContain("ECONNRESET");
+    expect(result.error).toContain("QuickBooks payment id QP1");
+    expect(result.error).not.toContain("verified mismatch");
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "failed" }));
+    expect(updates.some((patch: any) => patch.qbo_sync_status === "synced")).toBe(false);
+  });
+
+  it("fails when the read-back finds no payment at all", async () => {
+    findQboPaymentById.mockResolvedValueOnce(null);
+    const { supabase, updates } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000 },
+      invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
+    });
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("no payment with QuickBooks id QP1");
+    expect(updates.some((patch: any) => patch.qbo_sync_status === "synced")).toBe(false);
   });
 
   it("uses the invoice's current QBO customer reference instead of stale local mapping", async () => {
