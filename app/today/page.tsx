@@ -48,7 +48,7 @@ const CARD_SHELL =
   "rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_22px_48px_-30px_rgba(15,31,53,0.32)] sm:p-5";
 const CARD_SHELL_PRIMARY =
   "rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_28px_60px_-30px_rgba(15,31,53,0.36)] sm:p-6";
-const SECTION_EYEBROW_TEXT = "text-[11px] font-semibold uppercase tracking-[0.09em] text-blue-700";
+const SECTION_EYEBROW_TEXT = "text-xs font-semibold uppercase tracking-[0.09em] text-blue-700";
 const SECTION_HEADING_TEXT = "mt-0.5 text-base font-semibold tracking-tight text-[#0f1f35] sm:text-lg";
 const SECTION_HEADING_TEXT_LG = "mt-1 text-lg font-semibold tracking-tight text-[#0f1f35] sm:text-xl";
 const ROW_SHELL = "rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-[0_10px_24px_-20px_rgba(15,31,53,0.35)]";
@@ -107,7 +107,7 @@ export default async function TodayPage() {
 
   const model = result as TodayReadModel;
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6">
+    <div className="mx-auto w-full max-w-[84rem] space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6">
       <TodayWelcomeModal initiallyOpen={model.showWelcomeModal} />
       <HeaderSection
         header={model.todayHeader}
@@ -152,7 +152,7 @@ export default async function TodayPage() {
       </div>
 
       {/* WIDE DESKTOP MAIN COLUMN + INDEPENDENT RIGHT RAIL */}
-      <div className="hidden xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)] xl:items-start xl:gap-5">
+      <div className="hidden xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(22rem,25rem)] xl:items-start xl:gap-6">
         <main className="min-w-0 space-y-5">
           <NextBestActionCard action={model.nextBestAction} />
           {model.teamCoverage.visible ? (
@@ -207,17 +207,17 @@ function ComingUpSection({ comingUp }: { comingUp: ComingUp }) {
         <div>
           <SectionEyebrow label="Next 7 Days" />
           <h2 className={SECTION_HEADING_TEXT}>Coming Up</h2>
-          <p className="mt-1 text-xs text-slate-600">
+          <p className="mt-1 text-sm leading-5 text-slate-600">
             {comingUp.totalCount} booked {comingUp.totalCount === 1 ? "visit" : "visits"}
             {comingUp.unassignedCount ? ` · ${comingUp.unassignedCount} need assignment` : ""}
           </p>
         </div>
-        <Link href={comingUp.href} className="text-xs font-semibold text-blue-700 hover:underline">Open Calendar</Link>
+        <Link href={comingUp.href} className="inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">Open Calendar</Link>
       </div>
       <div className="mt-3 space-y-4">
         {dayGroups.map((group) => (
           <div key={group.date}>
-            <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
               <span>{formatComingUpDay(group.date)}</span>
               <span className="h-px flex-1 bg-slate-200" />
               <span className="tabular-nums">{group.jobs.length}</span>
@@ -229,13 +229,13 @@ function ComingUpSection({ comingUp }: { comingUp: ComingUp }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-[#0f1f35] group-hover:text-blue-700">{job.title}</div>
-                        <div className="mt-0.5 truncate text-xs font-medium text-slate-700">{job.customerName}</div>
+                        <div className="mt-0.5 truncate text-sm font-medium leading-5 text-slate-700">{job.customerName}</div>
                       </div>
-                      <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-800">
+                      <span className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-semibold tabular-nums text-blue-800">
                         {job.windowLabel ?? "Time pending"}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-[11px]">
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-2 text-xs leading-5">
                       <span className="min-w-0 truncate text-slate-500">{job.locationLabel}</span>
                       <span className="flex shrink-0 items-center gap-2">
                         <span className="text-slate-500">{job.statusLabel}</span>
@@ -253,7 +253,7 @@ function ComingUpSection({ comingUp }: { comingUp: ComingUp }) {
       </div>
       {comingUp.totalCount > comingUp.jobs.length ? (
         <div className="mt-3 border-t border-slate-200 pt-3">
-          <Link href={comingUp.href} className="text-xs font-semibold text-blue-700 hover:underline">
+          <Link href={comingUp.href} className="inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">
             View all {comingUp.totalCount} booked visits →
           </Link>
         </div>
@@ -282,12 +282,12 @@ function UpcomingServiceSection({ service }: { service: UpcomingService }) {
         <div>
           <SectionEyebrow label="Service Plans" />
           <h2 id="upcoming-service-heading" className={SECTION_HEADING_TEXT_LG}>Upcoming Service</h2>
-          <p className="mt-1 text-xs leading-5 text-slate-600">
+          <p className="mt-1 text-sm leading-6 text-slate-600">
             Recurring customer visits to review before they slip past due.
           </p>
         </div>
         {service.totalAttentionCount > 0 ? (
-          <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-amber-900">
+          <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-sm font-semibold tabular-nums text-amber-900">
             {service.totalAttentionCount}
           </span>
         ) : null}
@@ -305,9 +305,9 @@ function UpcomingServiceSection({ service }: { service: UpcomingService }) {
             >
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-[#0f1f35]">{item.label}</span>
-                <span className="mt-0.5 block text-xs leading-5 text-slate-600">{item.detail}</span>
+                <span className="mt-0.5 block text-sm leading-5 text-slate-600">{item.detail}</span>
               </span>
-              <span className="inline-flex min-w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-700">
+              <span className="inline-flex min-w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-sm font-semibold tabular-nums text-slate-700">
                 {item.count}
               </span>
             </Link>
@@ -315,7 +315,7 @@ function UpcomingServiceSection({ service }: { service: UpcomingService }) {
         </div>
       )}
 
-      <Link href={service.href} className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
+      <Link href={service.href} className="mt-3 inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">
         View all service plans →
       </Link>
     </section>
@@ -368,10 +368,10 @@ function HeaderSection({
           {header.unreadNotificationCount > 0 ? (
             <Link
               href="/ops/notifications"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
             >
               <span>Notifications</span>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold text-blue-700">
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-xs font-semibold text-blue-700">
                 {header.unreadNotificationCount > 99 ? "99+" : header.unreadNotificationCount}
               </span>
             </Link>
@@ -405,10 +405,10 @@ function ClockChip({ state }: { state: TodayHeader["clockState"] }) {
   return (
     <Link
       href="/time-clock"
-      className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-white ${tone}`}
+      className={`inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-white ${tone}`}
     >
       <span>{label}</span>
-      <span className="text-[10px] uppercase tracking-[0.1em] text-current/70">Open Time Clock</span>
+      <span className="text-xs uppercase tracking-[0.1em] text-current/70">Open Time Clock</span>
     </Link>
   );
 }
@@ -438,7 +438,7 @@ function NextBestActionCard({
       <div className="relative">
         <div className="flex items-center gap-2">
           <span className="h-3 w-1 rounded-full bg-gradient-to-b from-blue-300 to-blue-400/30" />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-200">
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-200">
             Next Best Action
           </span>
         </div>
@@ -527,7 +527,7 @@ function TodayWorkSection({
         {desktop ? (
           <Link
             href={showFieldActions ? "/ops/field" : "/ops?bucket=field_work#ops-workspace"}
-            className="text-xs font-semibold text-blue-700 hover:underline"
+            className="inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline"
           >
             {showFieldActions ? "View My Work" : "View Field Work"}
           </Link>
@@ -546,7 +546,7 @@ function TodayWorkSection({
             ))}
           </ul>
           <div className="mt-3">
-            <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
+            <Link href="/ops" className="inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">
               View Full Workboard
             </Link>
           </div>
@@ -585,11 +585,11 @@ function TodayJobRow({
         >
           {job.title}
         </Link>
-        <div className="truncate text-xs text-slate-600">
+        <div className="truncate text-sm leading-5 text-slate-600">
           {customer || "Customer"}
           {address ? ` · ${address}` : ""}
         </div>
-        <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+        <div className="flex flex-wrap gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{scheduleLabel}</span>
           {windowLabel ? (
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{windowLabel}</span>
@@ -605,14 +605,14 @@ function TodayJobRow({
       {showFieldActions ? (
         <Link
           href={`/jobs/${job.id}?tab=ops`}
-          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#0f1f35] px-3 text-xs font-semibold text-white shadow-[0_12px_26px_-14px_rgba(15,31,53,0.6)] transition hover:bg-[#16263f]"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#0f1f35] px-3 text-sm font-semibold text-white shadow-[0_12px_26px_-14px_rgba(15,31,53,0.6)] transition hover:bg-[#16263f]"
         >
           Open Job
         </Link>
       ) : (
         <Link
           href={`/jobs/${job.id}?tab=ops`}
-          className="inline-flex shrink-0 items-center text-xs font-semibold text-blue-700 hover:underline"
+          className="inline-flex min-h-6 shrink-0 items-center text-sm font-semibold text-blue-700 hover:underline"
         >
           Open
         </Link>
@@ -643,10 +643,10 @@ function PriorityChipsSection({
         <div>
           <SectionEyebrow label="Operations" />
           <h2 className={SECTION_HEADING_TEXT}>Operations snapshot</h2>
-          <p className="mt-1 text-xs text-slate-600">Live counts from the Operations workboard.</p>
+          <p className="mt-1 text-sm leading-5 text-slate-600">Live counts from the Operations workboard.</p>
         </div>
         {desktop ? (
-          <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
+          <Link href="/ops" className="inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">
             Open Operations →
           </Link>
         ) : null}
@@ -659,7 +659,7 @@ function PriorityChipsSection({
             className={`group flex min-h-11 items-center justify-between gap-4 border-l-[3px] border-b border-b-slate-200/80 px-3 py-2.5 text-slate-800 transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${chipAccentClass(chip)}`}
           >
             <span className="text-sm font-semibold">{chip.label}</span>
-            <span className="inline-flex min-w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-700">
+            <span className="inline-flex min-w-7 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-sm font-semibold tabular-nums text-slate-700">
               {chip.count}
             </span>
           </Link>
@@ -697,15 +697,15 @@ function TeamCoverageSection({
         <div>
           <SectionEyebrow label={label} />
           <h2 className={SECTION_HEADING_TEXT}>Today&apos;s assigned techs</h2>
-          <p className="mt-1 text-xs text-slate-600">{coverage.summaryLabel}</p>
+          <p className="mt-1 text-sm leading-5 text-slate-600">{coverage.summaryLabel}</p>
         </div>
-        <Link href={coverage.href} className="text-xs font-semibold text-blue-700 hover:underline">
+        <Link href={coverage.href} className="inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">
           Open Field Work
         </Link>
       </div>
 
       {coverage.unassignedCount > 0 ? (
-        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium leading-5 text-amber-800">
           {coverage.unassignedCount} scheduled {coverage.unassignedCount === 1 ? "visit needs" : "visits need"} assignment.
         </div>
       ) : null}
@@ -719,11 +719,11 @@ function TeamCoverageSection({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-[#0f1f35]">{row.assigneeName}</div>
-                  <div className="mt-0.5 truncate text-xs text-slate-600" title={row.areaLabel}>
+                  <div className="mt-0.5 truncate text-sm leading-5 text-slate-600" title={row.areaLabel}>
                     {row.areaLabel}
                   </div>
                 </div>
-                <span className="inline-flex shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-blue-800">
+                <span className="inline-flex shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-sm font-semibold tabular-nums text-blue-800">
                   {row.jobCount} {row.jobCount === 1 ? "job" : "jobs"}
                 </span>
               </div>
@@ -752,7 +752,7 @@ function RoleAwarePulseSection({ pulse }: {
     <section className={CARD_SHELL}>
       <SectionEyebrow label="Owner overview" />
       <h2 className={SECTION_HEADING_TEXT}>{pulse.title}</h2>
-      <p className="mt-1 text-xs leading-5 text-slate-600">{pulse.subtitle}</p>
+      <p className="mt-1 text-sm leading-5 text-slate-600">{pulse.subtitle}</p>
 
       {pulse.financialSnapshot ? (
         <FinancialSnapshotCard snapshot={pulse.financialSnapshot} />
@@ -778,23 +778,23 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
 
   return (
     <div className="mt-3">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
         Collected in {snapshot.monthLabel}
       </div>
       <div className="mt-1 text-2xl font-bold tracking-tight text-[#0f1f35] tabular-nums">
         {formatMoney(snapshot.collectedMonthToDateCents)}
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-2 text-xs">
+      <div className="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-2 text-sm">
         <span className="font-medium text-slate-600">{snapshot.priorPeriodLabel}</span>
         <span className="font-semibold tabular-nums text-slate-800">
           {formatMoney(snapshot.collectedPriorMonthToDateCents)}
         </span>
       </div>
       {comparison != null && comparisonLabel ? (
-        <div className={`mt-1 text-xs font-medium ${comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
+        <div className={`mt-1 text-sm font-medium leading-5 ${comparison > 0 ? "text-emerald-700" : "text-slate-600"}`}>{comparisonLabel}</div>
       ) : null}
       <JobVolumeChart snapshot={snapshot} />
-      <Link href="/reports/monthly" className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline">
+      <Link href="/reports/monthly" className="mt-3 inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">
         View monthly overview →
       </Link>
     </div>
@@ -804,10 +804,10 @@ function FinancialSnapshotCard({ snapshot }: { snapshot: FinancialSnapshot }) {
 function JobVolumeChart({ snapshot }: { snapshot: FinancialSnapshot }) {
   return (
     <div className="mt-4 border-t border-slate-200 pt-3" aria-label="Completed jobs and billed totals comparison">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
         Jobs &amp; billed total
       </div>
-      <p className="mt-1 text-[11px] leading-4 text-slate-500">Current pace, the same days last month, and last month&apos;s final total.</p>
+      <p className="mt-1 text-xs leading-5 text-slate-500">Current pace, the same days last month, and last month&apos;s final total.</p>
       <div className="mt-3 space-y-3">
         <CompactComparisonBars
           label="Completed jobs"
@@ -855,10 +855,10 @@ function CompactComparisonBars({
 
   return (
     <div>
-      <div className="mb-1 text-[11px] font-semibold text-slate-700">{label}</div>
+      <div className="mb-1 text-xs font-semibold text-slate-700">{label}</div>
       <div className="space-y-1.5">
         {rows.map((row) => (
-          <div key={row.label} className="grid grid-cols-[5.75rem_1fr_auto] items-center gap-2 text-[11px]">
+          <div key={row.label} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-2 text-xs">
             <span className="truncate text-slate-500">{row.label}</span>
             <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div
@@ -893,10 +893,10 @@ function RoleAwarePulseTileCard({
       className="flex min-h-11 items-center justify-between gap-3 py-2.5 text-slate-800 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
       <div className="min-w-0">
-        <div className="text-xs font-semibold text-[#0f1f35]">
+        <div className="text-sm font-semibold text-[#0f1f35]">
           {tile.label}
         </div>
-        <div className="text-[11px] text-slate-500">
+        <div className="text-xs leading-5 text-slate-500">
           {tile.valueDetail || tile.context}
         </div>
       </div>
@@ -933,15 +933,15 @@ function ResumeRecentSection({
                     <div className="truncate text-sm font-semibold text-[#0f1f35] group-hover:text-blue-700">
                       {item.title}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-600">
-                      <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                    <div className="mt-0.5 flex items-center gap-1.5 text-sm leading-5 text-slate-600">
+                      <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                         {item.itemType}
                       </span>
                       <span className="truncate">{item.subtitle}</span>
                     </div>
                   </div>
                   {item.updatedAtDisplay ? (
-                    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
                       {item.updatedAtDisplay}
                     </span>
                   ) : null}
@@ -954,7 +954,7 @@ function ResumeRecentSection({
 
       {hasMore ? (
         <div className="mt-3">
-          <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
+          <Link href="/ops" className="inline-flex min-h-6 items-center text-sm font-semibold text-blue-700 hover:underline">
             View more recent work
           </Link>
         </div>
