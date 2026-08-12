@@ -828,12 +828,13 @@ describe("buildFollowUpGroups", () => {
 });
 
 describe("buildTeamCoverageSnapshot", () => {
-  it("shows assignment rows for admin and counts unassigned gaps", () => {
+  it("groups today's jobs by tech, includes free city context, and counts unassigned gaps", () => {
     const result = buildTeamCoverageSnapshot({
       role: "admin",
       todayScheduledJobs: [
-        job({ id: "j1", title: "System Not Cooling", status: "scheduled", windowStart: "09:00:00" }),
+        job({ id: "j1", title: "System Not Cooling", status: "scheduled", windowStart: "09:00:00", city: "Reno" }),
         job({ id: "j2", title: "HVAC Replacement", status: "scheduled", windowStart: "11:00:00" }),
+        job({ id: "j3", title: "Tune-up", status: "scheduled", windowStart: "13:00:00", city: "Sparks" }),
       ],
       assignmentDisplayMap: {
         j1: [
@@ -845,13 +846,28 @@ describe("buildTeamCoverageSnapshot", () => {
             created_at: "2026-05-25T10:00:00.000Z",
           },
         ],
+        j3: [
+          {
+            job_id: "j3",
+            user_id: "u1",
+            display_name: "Alex Tech",
+            is_primary: true,
+            created_at: "2026-05-25T10:00:00.000Z",
+          },
+        ],
       },
-      maxRows: 5,
     });
 
     expect(result.visible).toBe(true);
-    expect(result.assignments.length).toBe(1);
-    expect(result.assignments[0].assigneeName).toBe("Alex Tech");
+    expect(result.assignees).toEqual([
+      {
+        key: "u1",
+        assigneeName: "Alex Tech",
+        jobCount: 2,
+        areaLabel: "Reno · Sparks",
+      },
+    ]);
+    expect(result.summaryLabel).toBe("1 tech across 2 jobs today");
     expect(result.unassignedCount).toBe(1);
   });
 
@@ -870,11 +886,38 @@ describe("buildTeamCoverageSnapshot", () => {
           },
         ],
       },
-      maxRows: 5,
     });
 
     expect(result.visible).toBe(false);
-    expect(result.assignments).toEqual([]);
+    expect(result.assignees).toEqual([]);
+  });
+
+  it("does not cap the number of assigned techs shown", () => {
+    const todayScheduledJobs = Array.from({ length: 7 }, (_, index) =>
+      job({ id: `j${index}`, city: `Area ${index}` }),
+    );
+    const assignmentDisplayMap = Object.fromEntries(
+      todayScheduledJobs.map((scheduledJob, index) => [
+        scheduledJob.id,
+        [
+          {
+            job_id: scheduledJob.id,
+            user_id: `u${index}`,
+            display_name: `Tech ${index}`,
+            is_primary: true,
+            created_at: "2026-05-25T10:00:00.000Z",
+          },
+        ],
+      ]),
+    );
+
+    const result = buildTeamCoverageSnapshot({
+      role: "office",
+      todayScheduledJobs,
+      assignmentDisplayMap,
+    });
+
+    expect(result.assignees).toHaveLength(7);
   });
 
   it("returns assignment-needed empty state when only unassigned work exists", () => {
@@ -882,10 +925,9 @@ describe("buildTeamCoverageSnapshot", () => {
       role: "office",
       todayScheduledJobs: [job({ id: "j1", title: "Tune-up", status: "scheduled" })],
       assignmentDisplayMap: {},
-      maxRows: 5,
     });
 
-    expect(result.assignments.length).toBe(0);
+    expect(result.assignees.length).toBe(0);
     expect(result.unassignedCount).toBe(1);
     expect(result.emptyStateMessage).toBe("Scheduled work needs assignment.");
   });
@@ -895,10 +937,9 @@ describe("buildTeamCoverageSnapshot", () => {
       role: "admin",
       todayScheduledJobs: [],
       assignmentDisplayMap: {},
-      maxRows: 5,
     });
 
-    expect(result.assignments.length).toBe(0);
+    expect(result.assignees.length).toBe(0);
     expect(result.unassignedCount).toBe(0);
     expect(result.emptyStateMessage).toBe("No assigned field work scheduled for today.");
   });

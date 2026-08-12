@@ -126,7 +126,6 @@ export default async function TodayPage() {
           <TeamCoverageSection
             coverage={model.teamCoverage}
             label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
-            mobile
           />
         ) : null}
 
@@ -160,7 +159,6 @@ export default async function TodayPage() {
             <TeamCoverageSection
               coverage={model.teamCoverage}
               label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
-              wide
             />
           ) : null}
           {model.upcomingService.visible ? (
@@ -689,20 +687,16 @@ function chipAccentClass(chip: PriorityChip): string {
 function TeamCoverageSection({
   coverage,
   label = "Team Coverage",
-  mobile = false,
-  wide = false,
 }: {
   coverage: TeamCoverage;
   label?: string;
-  mobile?: boolean;
-  wide?: boolean;
 }) {
   return (
     <section className={CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
         <div>
           <SectionEyebrow label={label} />
-          <h2 className={SECTION_HEADING_TEXT}>Who&apos;s assigned today</h2>
+          <h2 className={SECTION_HEADING_TEXT}>Today&apos;s assigned techs</h2>
           <p className="mt-1 text-xs text-slate-600">{coverage.summaryLabel}</p>
         </div>
         <Link href={coverage.href} className="text-xs font-semibold text-blue-700 hover:underline">
@@ -716,59 +710,27 @@ function TeamCoverageSection({
         </div>
       ) : null}
 
-      {coverage.assignments.length === 0 ? (
+      {coverage.assignees.length === 0 ? (
         <EmptyState message={coverage.emptyStateMessage ?? "No assigned field work scheduled for today."} />
       ) : (
         <ul className="mt-3 space-y-2">
-          {coverage.assignments.slice(0, mobile ? 3 : 5).map((row) => (
+          {coverage.assignees.map((row) => (
             <li key={row.key} className={ROW_SHELL}>
-              <div
-                className={
-                  wide
-                    ? "grid items-center gap-3 sm:grid-cols-[minmax(8rem,0.75fr)_minmax(0,1.6fr)_auto_auto]"
-                    : "grid gap-1.5"
-                }
-              >
+              <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-[#0f1f35]">{row.assigneeName}</div>
+                  <div className="mt-0.5 truncate text-xs text-slate-600" title={row.areaLabel}>
+                    {row.areaLabel}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <Link href={row.href} className="block text-xs font-medium text-blue-700 hover:underline">
-                    {row.jobTitle}
-                  </Link>
-                  <div className="mt-0.5 text-xs leading-5 text-slate-600">{row.customerLocationLabel}</div>
-                </div>
-                {wide ? (
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    {row.windowLabel ?? "Window pending"}
-                  </span>
-                ) : null}
-                <span className={`shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 ${wide ? "" : "justify-self-start"}`}>
-                  {row.statusLabel}
+                <span className="inline-flex shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold tabular-nums text-blue-800">
+                  {row.jobCount} {row.jobCount === 1 ? "job" : "jobs"}
                 </span>
-              </div>
-              <div className={`mt-2 flex items-center gap-3 ${wide ? "justify-end" : "justify-between"}`}>
-                {!wide ? (
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    {row.windowLabel ?? "Window pending"}
-                  </span>
-                ) : null}
-                <Link href={row.href} className="text-xs font-semibold text-blue-700 hover:underline">
-                  Open Job
-                </Link>
               </div>
             </li>
           ))}
         </ul>
       )}
-
-      {coverage.hasMore ? (
-        <div className="mt-3">
-          <Link href={coverage.href} className="text-xs font-semibold text-blue-700 hover:underline">
-            View all assignments
-          </Link>
-        </div>
-      ) : null}
     </section>
   );
 }

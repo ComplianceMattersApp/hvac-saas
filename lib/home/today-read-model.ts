@@ -239,23 +239,18 @@ export type FinancialSnapshot = {
   billedPriorMonthCents: number;
 };
 
-export type TeamCoverageAssignment = {
+export type TeamCoverageAssignee = {
   key: string;
   assigneeName: string;
-  jobId: string;
-  jobTitle: string;
-  windowLabel: string | null;
-  customerLocationLabel: string;
-  statusLabel: string;
-  href: string;
+  jobCount: number;
+  areaLabel: string;
 };
 
 export type TeamCoverage = {
   visible: boolean;
   summaryLabel: string;
-  assignments: TeamCoverageAssignment[];
+  assignees: TeamCoverageAssignee[];
   unassignedCount: number;
-  hasMore: boolean;
   href: string;
   emptyStateMessage: string | null;
 };
@@ -556,25 +551,10 @@ function formatStatusLabel(status: string | null, opsStatus: string | null): str
   return source.replaceAll("_", " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
 }
 
-function coverageCustomerLocationLabel(job: TodayJobSummary): string {
-  const customer = [job.customerFirstName ?? "", job.customerLastName ?? ""]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(" ");
-  const location = [job.jobAddress ?? "", job.city ?? ""]
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .join(", ");
-
-  if (customer && location) return `${customer} • ${location}`;
-  return customer || location || "Customer / location pending";
-}
-
 export function buildTeamCoverageSnapshot(params: {
   role: InternalRole;
   todayScheduledJobs: TodayJobSummary[];
   assignmentDisplayMap: Record<string, ActiveJobAssignmentDisplay[]>;
-  maxRows: number;
 }): TeamCoverage {
   const href = opsWorkspaceQueueHref("field_work");
 
@@ -582,15 +562,17 @@ export function buildTeamCoverageSnapshot(params: {
     return {
       visible: false,
       summaryLabel: "",
-      assignments: [],
+      assignees: [],
       unassignedCount: 0,
-      hasMore: false,
       href,
       emptyStateMessage: null,
     };
   }
 
-  const assignments: TeamCoverageAssignment[] = [];
+  const assigneesByUserId = new Map<
+    string,
+    { assigneeName: string; jobIds: Set<string>; cities: string[] }
+  >();
   let unassignedCount = 0;
 
   const sortedJobs = [...params.todayScheduledJobs].sort((a, b) => {
@@ -607,32 +589,49 @@ export function buildTeamCoverageSnapshot(params: {
     }
 
     for (const assignment of jobAssignments) {
-      const windowLabel = displayWindowLA(job.windowStart, job.windowEnd) || null;
-      assignments.push({
-        key: `${job.id}:${assignment.user_id}`,
+      const userId = String(assignment.user_id ?? "").trim();
+      if (!userId) continue;
+
+      const existing = assigneesByUserId.get(userId) ?? {
         assigneeName: assignment.display_name,
-        jobId: job.id,
-        jobTitle: job.title,
-        windowLabel,
-        customerLocationLabel: coverageCustomerLocationLabel(job),
-        statusLabel: formatStatusLabel(job.status, job.opsStatus),
-        href: `/jobs/${job.id}?tab=ops`,
-      });
+        jobIds: new Set<string>(),
+        cities: [],
+      };
+      existing.jobIds.add(job.id);
+
+      const city = String(job.city ?? "").trim();
+      if (city && !existing.cities.includes(city)) existing.cities.push(city);
+      assigneesByUserId.set(userId, existing);
     }
   }
 
-  const hasMore = assignments.length > params.maxRows;
-  const visibleAssignments = assignments.slice(0, params.maxRows);
+  const assignees: TeamCoverageAssignee[] = Array.from(assigneesByUserId.entries())
+    .map(([userId, assignee]) => ({
+      key: userId,
+      assigneeName: assignee.assigneeName,
+      jobCount: assignee.jobIds.size,
+      areaLabel:
+        assignee.cities.length === 0
+          ? "Area not set"
+          : assignee.cities.length <= 2
+            ? assignee.cities.join(" · ")
+            : `${assignee.cities[0]} + ${assignee.cities.length - 1} more`,
+    }))
+    .sort((a, b) => b.jobCount - a.jobCount || a.assigneeName.localeCompare(b.assigneeName));
+
+  const assignedJobCount = sortedJobs.filter(
+    (job) => (params.assignmentDisplayMap[job.id] ?? []).length > 0,
+  ).length;
 
   const summaryLabel =
-    visibleAssignments.length > 0
-      ? `${visibleAssignments.length} assigned ${visibleAssignments.length === 1 ? "visit" : "visits"} today`
+    assignees.length > 0
+      ? `${assignees.length} ${assignees.length === 1 ? "tech" : "techs"} across ${assignedJobCount} ${assignedJobCount === 1 ? "job" : "jobs"} today`
       : unassignedCount > 0
       ? "Scheduled work needs assignment."
       : "No assigned field work scheduled for today.";
 
   const emptyStateMessage =
-    visibleAssignments.length === 0
+    assignees.length === 0
       ? unassignedCount > 0
         ? "Scheduled work needs assignment."
         : "No assigned field work scheduled for today."
@@ -641,9 +640,8 @@ export function buildTeamCoverageSnapshot(params: {
   return {
     visible: true,
     summaryLabel,
-    assignments: visibleAssignments,
+    assignees,
     unassignedCount,
-    hasMore,
     href,
     emptyStateMessage,
   };
@@ -653,14 +651,12 @@ async function safeLoadTeamCoverage(params: {
   supabase: any;
   role: InternalRole;
   today: string;
-  maxRows: number;
 }): Promise<TeamCoverage> {
   if (params.role === "tech" || params.role === "billing") {
     return buildTeamCoverageSnapshot({
       role: params.role,
       todayScheduledJobs: [],
       assignmentDisplayMap: {},
-      maxRows: params.maxRows,
     });
   }
 
@@ -680,7 +676,6 @@ async function safeLoadTeamCoverage(params: {
         role: params.role,
         todayScheduledJobs: [],
         assignmentDisplayMap: {},
-        maxRows: params.maxRows,
       });
     }
 
@@ -697,14 +692,12 @@ async function safeLoadTeamCoverage(params: {
       role: params.role,
       todayScheduledJobs: jobs,
       assignmentDisplayMap,
-      maxRows: params.maxRows,
     });
   } catch {
     return buildTeamCoverageSnapshot({
       role: params.role,
       todayScheduledJobs: [],
       assignmentDisplayMap: {},
-      maxRows: params.maxRows,
     });
   }
 }
@@ -2361,7 +2354,6 @@ async function buildTodayReadModelForInternalActor(
       supabase,
       role,
       today,
-      maxRows: 5,
     }),
   );
 
