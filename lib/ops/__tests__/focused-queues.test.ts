@@ -86,7 +86,7 @@ describe("focused ops queue filtering", () => {
     expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3"]);
   });
 
-  it("moves automatic permit waits into Waiting only after invoicing is complete", () => {
+  it("keeps permit waits in Waiting while invoice work overlaps in Closeout", () => {
     const rows = buildWaitingQueueRows([
       {
         id: "permit-needs-invoice",
@@ -117,6 +117,7 @@ describe("focused ops queue filtering", () => {
     expect(rows.map((row) => row.id)).toEqual([
       "manual-hold-needs-invoice",
       "permit-invoiced",
+      "permit-needs-invoice",
     ]);
   });
 
@@ -499,6 +500,10 @@ describe("focused queue display labels", () => {
     expect(getOpsQueueCardStatusReason({ ops_status: "paperwork_required" })).toBe("Closeout: Paperwork Required");
     expect(getOpsQueueCardStatusReason({ ops_status: "invoice_required" })).toBe("Closeout: Invoice Required");
     expect(getOpsQueueCardStatusReason({
+      ops_status: "follow_up",
+      next_action_note: "Confirm the customer is ready to schedule",
+    })).toBe("Follow Up: Confirm the customer is ready to schedule");
+    expect(getOpsQueueCardStatusReason({
       ops_status: "custom_status",
       pending_info_reason: "Needs coordinator review",
     })).toBe("Needs coordinator review");
@@ -625,7 +630,8 @@ describe("focused ops queue pages", () => {
   it("uses the same waiting predicate for the Operations count and preview", () => {
     expect(opsPageSource).toContain('["pending_info", buildWaitingQueueRows(pendingInfoRowsRes.data ?? []).length]');
     expect(opsPageSource).toContain('const currentRows = workspaceKey === "waiting"');
-    expect(opsPageSource).toContain("...buildWaitingQueueRows(");
+    expect(opsPageSource).toContain('? buildWaitingQueueRows(typedHistoryFilteredRows)');
+    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold", "waiting"])');
   });
 
   it("waiting page includes safe empty state and return navigation", () => {

@@ -4,6 +4,7 @@ import {
   buildOpsQueueCsv,
   buildOpsQueueExport,
   escapeCsvCell,
+  normalizeOpsExportQueue,
 } from "@/lib/ops/ops-queue-export";
 
 vi.mock("@/lib/staffing/human-layer", () => ({
@@ -85,6 +86,9 @@ const job = {
 };
 
 describe("ops queue CSV export", () => {
+  it("normalizes Follow Ups to its own export instead of Needs Scheduling", () => {
+    expect(normalizeOpsExportQueue("follow_ups")).toBe("follow_ups");
+  });
   it("escapes commas, quotes, and newlines", () => {
     expect(escapeCsvCell('A, "quoted"\nvalue')).toBe('"A, ""quoted""\nvalue"');
     expect(buildOpsQueueCsv([{ A: "plain", B: "two, parts" }])).toBe("A,B\r\nplain,\"two, parts\"");

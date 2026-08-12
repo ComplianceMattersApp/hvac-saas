@@ -60,6 +60,7 @@ import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billi
 import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 import { isContractorIntakeQueueAvailableForProductMode } from "@/lib/ops/ops-workspace-queues";
 import { opsWorkspaceQueueHref } from "@/lib/ops/ops-nav-queue-links";
+import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
 import { listActivePermitRequestQueueRowsIfAvailable } from "@/lib/permits/permit-requests-read-model";
 import {
   listInternalContractorUpdateAwareness,
@@ -905,11 +906,14 @@ async function safeLoadPriorityCounts(params: {
     try {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, status, ops_status, scheduled_date, window_start")
+        .select("id, status, ops_status, scheduled_date, window_start, follow_up_date, next_action_note, action_required_by")
         .is("deleted_at", null)
         .neq("status", "cancelled")
         .eq("status", "open")
         .eq("ops_status", "scheduled")
+        .is("follow_up_date", null)
+        .is("next_action_note", null)
+        .is("action_required_by", null)
         .order("scheduled_date", { ascending: true })
         .order("window_start", { ascending: true })
         .limit(50);
@@ -929,6 +933,56 @@ async function safeLoadPriorityCounts(params: {
         assignmentDisplayMap,
         previewLimit: 10,
       }).count;
+    } catch {
+      return null;
+    }
+  })();
+
+  const scheduledTodayAssignedPromise = (async (): Promise<number | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, status, ops_status, follow_up_date, next_action_note, action_required_by")
+        .is("deleted_at", null)
+        .in("status", ["open", "on_the_way", "in_process", "in_progress"])
+        .neq("ops_status", "closed")
+        .eq("field_complete", false)
+        .is("follow_up_date", null)
+        .is("next_action_note", null)
+        .is("action_required_by", null)
+        .gte("scheduled_date", startOfTodayUtcIsoLA())
+        .lt("scheduled_date", startOfTomorrowUtcIsoLA());
+      if (error) return null;
+
+      const rows = data ?? [];
+      const ids = rows.map((row: any) => String(row?.id ?? "").trim()).filter(Boolean);
+      const assignmentMap = ids.length
+        ? await getActiveJobAssignmentDisplayMap({ supabase, jobIds: ids })
+        : {};
+
+      return rows.filter((row: any) => {
+        const jobId = String(row?.id ?? "").trim();
+        return (
+          resolvePrimaryOpsQueue(row) === null &&
+          Array.isArray(assignmentMap[jobId]) &&
+          assignmentMap[jobId].length > 0
+        );
+      }).length;
+    } catch {
+      return null;
+    }
+  })();
+
+  const followUpCountPromise = (async (): Promise<number | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, status, ops_status, follow_up_date, next_action_note, action_required_by")
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null");
+      if (error) return null;
+      return (data ?? []).filter((row: any) => isPrimaryQueueJob(row, "follow_ups")).length;
     } catch {
       return null;
     }
@@ -1002,31 +1056,26 @@ async function safeLoadPriorityCounts(params: {
   ] = await Promise.all([
     scheduledTodayWithoutTechPromise,
     safeCount(supabase, "jobs", (q) =>
-      base(q).eq("ops_status", "need_to_schedule").eq("status", "open").neq("status", "cancelled"),
-    ),
-    safeCount(supabase, "jobs", (q) =>
       base(q)
+        .eq("ops_status", "need_to_schedule")
+        .eq("status", "open")
         .neq("status", "cancelled")
-        .neq("ops_status", "closed")
-        .eq("field_complete", false)
-        .gte("scheduled_date", startOfTodayUtcIsoLA())
-        .lt("scheduled_date", startOfTomorrowUtcIsoLA()),
+        .is("follow_up_date", null)
+        .is("next_action_note", null)
+        .is("action_required_by", null),
     ),
+    scheduledTodayAssignedPromise,
     safeCount(supabase, "jobs", (q) =>
       base(q).eq("ops_status", "pending_info").neq("status", "cancelled"),
     ),
     safeCount(supabase, "jobs", (q) =>
       base(q)
-        .in("ops_status", ["on_hold", "waiting", "pending_office_review"])
+        .in("ops_status", ["on_hold", "waiting"])
         .neq("status", "cancelled"),
     ),
     exceptionCountPromise,
     closeoutCountPromise,
-    safeCount(supabase, "jobs", (q) =>
-      base(q)
-        .neq("status", "cancelled")
-        .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null"),
-    ),
+    followUpCountPromise,
     params.role === "admin" || params.role === "office"
       ? countPendingContractorIntakeQueueRows({
           supabase,

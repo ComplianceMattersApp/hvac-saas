@@ -14,6 +14,7 @@ import { formatBusinessDateUS, displayWindowLA, startOfTodayUtcIsoLA, startOfTom
 import { formatCityNamePart, formatPersonNamePart } from "@/lib/utils/identity-display";
 import { resolveLifecycleDaysAgingLabel } from "@/lib/utils/lifecycle-aging";
 import { getCloseoutNeeds } from "@/lib/utils/closeout";
+import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
 
 export type OpsExportMode = "internal" | "contractor_safe";
 export type OpsExportQueueKey =
@@ -22,13 +23,14 @@ export type OpsExportQueueKey =
   | "without_tech"
   | "waiting"
   | "exceptions"
+  | "follow_ups"
   | "closeout";
 
 export const CONTRACTOR_SAFE_REQUIRED_MESSAGE = "Select a contractor before exporting contractor-safe CSV.";
 
 const EXPORT_LIMIT = 1000;
 const WORKSPACE_SELECT =
-  "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, permit_number, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
+  "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, permit_number, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
 
 const QUEUE_LABELS: Record<OpsExportQueueKey, string> = {
   need_to_schedule: "Needs Scheduling",
@@ -36,6 +38,7 @@ const QUEUE_LABELS: Record<OpsExportQueueKey, string> = {
   without_tech: "Needs Assignment",
   waiting: "Waiting / Pending Info",
   exceptions: "Exceptions",
+  follow_ups: "Follow Ups",
   closeout: "Closeout & Review",
 };
 
@@ -77,6 +80,7 @@ export function normalizeOpsExportQueue(value: unknown, fallbackBucket?: unknown
   if (normalized === "without_tech") return "without_tech";
   if (normalized === "waiting") return "waiting";
   if (normalized === "exceptions") return "exceptions";
+  if (normalized === "follow_ups") return "follow_ups";
   if (normalized === "closeout") return "closeout";
   return "need_to_schedule";
 }
@@ -237,20 +241,42 @@ async function loadJobRows(params: {
     .order("created_at", { ascending: true })
     .limit(EXPORT_LIMIT);
 
-  if (params.queueKey === "need_to_schedule") q = q.eq("status", "open").eq("ops_status", "need_to_schedule");
+  if (params.queueKey === "need_to_schedule") {
+    q = q
+      .eq("status", "open")
+      .eq("ops_status", "need_to_schedule")
+      .is("follow_up_date", null)
+      .is("next_action_note", null)
+      .is("action_required_by", null);
+  }
   else if (params.queueKey === "field_work") {
     q = q
+      .in("status", ["open", "on_the_way", "in_process", "in_progress"])
       .neq("ops_status", "closed")
       .eq("field_complete", false)
+      .is("follow_up_date", null)
+      .is("next_action_note", null)
+      .is("action_required_by", null)
       .gte("scheduled_date", today)
       .lt("scheduled_date", tomorrow)
       .order("window_start", { ascending: true });
   } else if (params.queueKey === "waiting") {
-    q = q.neq("ops_status", "closed").in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"]);
+    q = q.neq("ops_status", "closed").in("ops_status", ["pending_info", "on_hold", "waiting"]);
   } else if (params.queueKey === "exceptions") {
     q = q.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
+  } else if (params.queueKey === "follow_ups") {
+    q = q
+      .neq("ops_status", "closed")
+      .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null");
   } else if (params.queueKey === "without_tech") {
-    q = q.eq("status", "open").eq("ops_status", "scheduled").order("scheduled_date", { ascending: true }).order("window_start", { ascending: true });
+    q = q
+      .eq("status", "open")
+      .eq("ops_status", "scheduled")
+      .is("follow_up_date", null)
+      .is("next_action_note", null)
+      .is("action_required_by", null)
+      .order("scheduled_date", { ascending: true })
+      .order("window_start", { ascending: true });
   }
 
   q = applyContractorExportScope(q, params.contractorId);
@@ -258,6 +284,23 @@ async function loadJobRows(params: {
   if (res.error) throw res.error;
 
   let rows = (res.data ?? []) as ExportJob[];
+  if (params.queueKey === "follow_ups") {
+    rows = rows.filter((row) => isPrimaryQueueJob(row, "follow_ups"));
+  }
+  if (params.queueKey === "field_work") {
+    const ids = rows.map((row) => String(row?.id ?? "").trim()).filter(Boolean);
+    const assignmentMap = ids.length
+      ? await getActiveJobAssignmentDisplayMap({ supabase: params.supabase, jobIds: ids })
+      : {};
+    rows = rows.filter((row) => {
+      const jobId = String(row?.id ?? "").trim();
+      return (
+        resolvePrimaryOpsQueue(row) === null &&
+        Array.isArray(assignmentMap[jobId]) &&
+        assignmentMap[jobId].length > 0
+      );
+    });
+  }
   if (params.queueKey === "without_tech") {
     const ids = rows.map((row) => String(row?.id ?? "").trim()).filter(Boolean);
     const assignmentMap = ids.length ? await getActiveJobAssignmentDisplayMap({ supabase: params.supabase, jobIds: ids }) : {};

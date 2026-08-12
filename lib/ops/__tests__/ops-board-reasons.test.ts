@@ -82,7 +82,7 @@ describe("Operations Board reason mapping", () => {
     ]);
   });
 
-  it("keeps manual waits and holds out of Closeout invoice reasons", () => {
+  it("shows the invoice obligation in Closeout while waits and holds remain primary reasons", () => {
     const rows = [
       {
         id: "approval",
@@ -104,9 +104,9 @@ describe("Operations Board reason mapping", () => {
 
     expect(getOpsBoardReasonLabel(rows[0])?.label).toBe("Waiting on approval");
     expect(getOpsBoardReasonLabel(rows[1])?.label).toBe("On hold");
-    expect(getOpsBoardReasonLabel(rows[0], { queueKey: "closeout" })?.label).toBe("Waiting on approval");
-    expect(getOpsBoardReasonLabel(rows[1], { queueKey: "closeout" })?.label).toBe("On hold");
-    expect(filterOpsBoardRowsByReason(rows, "needs_invoice", { queueKey: "closeout" })).toEqual([]);
+    expect(getOpsBoardReasonLabel(rows[0], { queueKey: "closeout" })?.label).toBe("Needs invoice");
+    expect(getOpsBoardReasonLabel(rows[1], { queueKey: "closeout" })?.label).toBe("Needs invoice");
+    expect(filterOpsBoardRowsByReason(rows, "needs_invoice", { queueKey: "closeout" })).toEqual(rows);
   });
 
   it("builds Closeout reason options from contextual closeout work instead of permit text", () => {

@@ -14,7 +14,8 @@ describe("Today Ops queue count wiring", () => {
   });
 
   it("uses the complete Ops waiting and exception status sets", () => {
-    expect(source).toContain('["on_hold", "waiting", "pending_office_review"]');
+    expect(source).toContain('["on_hold", "waiting"]');
+    expect(source).not.toContain('["on_hold", "waiting", "pending_office_review"]');
     expect(source).toContain('["failed", "retest_needed", "pending_office_review", "problem"]');
     expect(source).toContain("countCurrentExceptionStatuses(");
   });

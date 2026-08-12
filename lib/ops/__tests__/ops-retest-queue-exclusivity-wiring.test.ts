@@ -19,7 +19,7 @@ describe("/ops ECC retest queue exclusivity wiring", () => {
       'workspaceKey === "exceptions" || workspaceKey === "waiting"',
     );
     expect(source).toContain(
-      "excludeHistoricalRetestParents(queueRes.data ?? [], retestContinuationParentIds)",
+      "excludeHistoricalRetestParents(queueRows, retestContinuationParentIds)",
     );
     expect(exceptionsSource).toContain("excludeHistoricalRetestParents(");
     expect(waitingSource).toContain("excludeHistoricalRetestParents(");
