@@ -15,7 +15,7 @@ vi.mock("@/lib/home/today-field-conditions", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: (...args: unknown[]) => createClient(...args),
+  createClient: () => createClient(),
 }));
 
 async function getFieldConditions(params?: { lat?: string; lon?: string }) {

@@ -16,7 +16,7 @@ vi.mock("@/lib/invoices/invoice-suggestions", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: (...args: unknown[]) => createClient(...args),
+  createClient: () => createClient(),
 }));
 
 async function getSuggestions(query: string | null) {

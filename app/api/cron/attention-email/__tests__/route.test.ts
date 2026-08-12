@@ -17,7 +17,7 @@ vi.mock("@/lib/reports/attention-email-delivery", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createAdminClient: (...args: unknown[]) => createAdminClient(...args),
+  createAdminClient: () => createAdminClient(),
 }));
 
 async function getAttentionEmail(authHeader?: string) {

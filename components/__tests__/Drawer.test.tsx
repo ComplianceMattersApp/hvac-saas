@@ -36,7 +36,7 @@ describe("Drawer", () => {
       </Drawer>,
     );
 
-    const dialog = screen.getByRole("dialog", { hidden: true });
+    const dialog = screen.getByRole<HTMLDialogElement>("dialog", { hidden: true });
     expect(dialog.open).toBe(true);
     expect(screen.getByRole("heading", { name: "Replace equipment" })).toBeInTheDocument();
     expect(screen.getByText("Swap the outdoor unit")).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe("Drawer", () => {
         <p>Body</p>
       </Drawer>,
     );
-    const dialog = screen.getByRole("dialog", { hidden: true });
+    const dialog = screen.getByRole<HTMLDialogElement>("dialog", { hidden: true });
     expect(dialog.open).toBe(false);
   });
 
@@ -70,14 +70,14 @@ describe("Drawer", () => {
         <p>Body</p>
       </Drawer>,
     );
-    expect(screen.getByRole("dialog", { hidden: true }).open).toBe(true);
+    expect(screen.getByRole<HTMLDialogElement>("dialog", { hidden: true }).open).toBe(true);
 
     rerender(
       <Drawer open={false} onClose={() => {}} title="Edit">
         <p>Body</p>
       </Drawer>,
     );
-    expect(screen.getByRole("dialog", { hidden: true }).open).toBe(false);
+    expect(screen.getByRole<HTMLDialogElement>("dialog", { hidden: true }).open).toBe(false);
   });
 
   it("calls onClose when the close (X) button is clicked", () => {

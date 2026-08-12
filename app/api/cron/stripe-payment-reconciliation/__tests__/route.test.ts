@@ -9,7 +9,7 @@ vi.mock("@/lib/business/stripe-successful-payment-reconciliation", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createAdminClient: (...args: unknown[]) => createAdminClient(...args),
+  createAdminClient: () => createAdminClient(),
 }));
 
 async function getReconciliation(authHeader?: string) {

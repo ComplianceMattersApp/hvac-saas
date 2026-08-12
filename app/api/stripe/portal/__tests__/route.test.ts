@@ -16,7 +16,7 @@ vi.mock("@/lib/auth/internal-user", () => ({
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: (...args: unknown[]) => createClient(...args),
+  createClient: () => createClient(),
 }));
 
 async function postPortal() {
