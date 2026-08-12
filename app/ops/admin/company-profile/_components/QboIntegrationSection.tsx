@@ -5,7 +5,7 @@ import {
 import { saveDefaultQboItemFromForm } from "@/lib/actions/qbo-connection-actions";
 import type { QboConnection } from "@/lib/qbo/qbo-connection";
 import type { QboItemCatalog } from "@/lib/qbo/qbo-item-catalog";
-import { encodeQboItemSelection, type QboItemMapping } from "@/lib/qbo/qbo-item-mapping";
+import type { QboItemMapping } from "@/lib/qbo/qbo-item-mapping";
 import { SettingsSection } from "./SettingsSection";
 import { QboIntegrationControls, type QboConnectionSummary } from "./QboIntegrationControls";
 
@@ -70,18 +70,14 @@ function QboDefaultItemForm({
   defaultQboItem: QboItemMapping | null;
 }) {
   const listUnavailable = catalog.items.length === 0;
-  // A mapping saved earlier may point at an item QuickBooks no longer returns
-  // (renamed, deactivated). Keep it selectable so opening this form does not
-  // silently reset the mapping.
+  // Options are keyed by QuickBooks item id alone, so a rename in QuickBooks
+  // still matches the stored mapping. A mapping pointing at an item the catalog
+  // no longer returns (deactivated, deleted) gets its own option so opening this
+  // form cannot silently reset it.
   const knownIds = new Set(catalog.items.map((item) => item.id));
   const staleSelection =
     defaultQboItem && !knownIds.has(defaultQboItem.qboItemId) ? defaultQboItem : null;
-  const selectedValue = defaultQboItem
-    ? encodeQboItemSelection({
-        id: defaultQboItem.qboItemId,
-        name: defaultQboItem.qboItemName ?? "",
-      })
-    : "";
+  const selectedValue = defaultQboItem?.qboItemId ?? "";
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
@@ -109,18 +105,13 @@ function QboDefaultItemForm({
           >
             <option value="">None (use EveryStep Services)</option>
             {staleSelection ? (
-              <option
-                value={encodeQboItemSelection({
-                  id: staleSelection.qboItemId,
-                  name: staleSelection.qboItemName ?? "",
-                })}
-              >
+              <option value={staleSelection.qboItemId}>
                 {staleSelection.qboItemName ?? `QuickBooks item ${staleSelection.qboItemId}`} (not in
                 the current QuickBooks list)
               </option>
             ) : null}
             {catalog.items.map((item) => (
-              <option key={item.id} value={encodeQboItemSelection(item)}>
+              <option key={item.id} value={item.id}>
                 {item.name}
               </option>
             ))}

@@ -36,10 +36,8 @@ COMMENT ON COLUMN public.qbo_connections.default_qbo_item_id IS
 COMMENT ON COLUMN public.qbo_connections.default_qbo_item_name IS
   'Cached QuickBooks item display name for the admin UI. NOT authoritative — the id is.';
 
--- Partial index: the sync engine batches one lookup per invoice over the
--- pricebook ids on its lines, and only mapped rows matter.
-CREATE INDEX IF NOT EXISTS pricebook_items_qbo_item_mapped_idx
-  ON public.pricebook_items (account_owner_user_id, id)
-  WHERE qbo_item_id IS NOT NULL;
+-- No new index: the only read path filters by (account_owner_user_id, id IN …),
+-- which the primary key and the existing owner indexes already serve. A partial
+-- index on qbo_item_id would never be chosen for it.
 
 COMMIT;

@@ -7,7 +7,27 @@ import {
 } from "./qbo-api-client";
 import { getValidQboAccessToken } from "./qbo-connection";
 import { getQboBaseUrl } from "./qbo-env";
+import { centsMatch } from "./qbo-money";
 import { syncInvoiceToQbo } from "./qbo-sync";
+
+/**
+ * Payment sync states that must be re-attempted, and the single source of truth
+ * for every surface that offers a retry — the bulk sweep below, the invoice
+ * workspace button, and the attention center.
+ *
+ * 'pending' is in here because it is written BEFORE the QuickBooks call: a
+ * process that dies mid-push (or a verification that never resolved) leaves the
+ * row pending forever, with real collected money unlinked and nothing offering
+ * to try again. Unverified is never terminal.
+ */
+export const RETRYABLE_QBO_PAYMENT_SYNC_STATUSES = ["not_synced", "failed", "pending"] as const;
+
+/**
+ * How long a 'pending' payment must sit before it counts as stuck rather than
+ * in flight. A normal push passes through 'pending' for a second or two, so
+ * surfacing it immediately would flap an attention item on every sync.
+ */
+export const STUCK_QBO_PAYMENT_PENDING_MS = 15 * 60 * 1000;
 
 export type QboPaymentSyncResult = {
   paymentId: string;
@@ -75,11 +95,6 @@ async function findAdoptableQboPaymentId(params: {
   return null;
 }
 
-/** Cent-safe comparison — QBO returns dollars as floats. */
-function toCents(amount: number): number {
-  return Math.round(Number(amount ?? 0) * 100);
-}
-
 /**
  * Confirm the payment against QuickBooks' own state after pushing it.
  *
@@ -128,7 +143,7 @@ async function verifyQboPaymentAfterWrite(params: {
   }
 
   const linksInvoice = confirmation.linkedInvoiceIds.includes(qboInvoiceId);
-  const totalMatches = Math.abs(toCents(confirmation.totalAmount) - toCents(expectedAmount)) <= 1;
+  const totalMatches = centsMatch(confirmation.totalAmount, expectedAmount);
   if (!linksInvoice || !totalMatches) {
     throw new Error(
       `QuickBooks accepted the payment for invoice ${invoiceLabel} but the read-back does not match — verified `
@@ -301,5 +316,60 @@ export async function syncPaymentToQbo(params: {
       // Payment recording remains authoritative even when downstream accounting fails.
     }
     return { paymentId, status: "error", error: message };
+  }
+}
+
+/**
+ * Retry sweep for recorded payments that have not reached QuickBooks.
+ *
+ * The invoice push has always had a sweep; payments only ever synced at record
+ * time or from a per-payment button, so anything that failed while nobody was
+ * looking stayed unlinked until someone opened that invoice. Runs alongside the
+ * invoice sweep off the same "Sync pending invoices" action.
+ *
+ * 'pending' rows are included once they are older than the in-flight window —
+ * those are pushes that died between marking intent and recording an outcome.
+ */
+export async function syncAllPendingPaymentsToQbo(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<{ synced: number; errors: number; results: QboPaymentSyncResult[] }> {
+  const { supabase, accountOwnerUserId } = params;
+  const empty = { synced: 0, errors: 0, results: [] as QboPaymentSyncResult[] };
+
+  try {
+    const stuckPendingBefore = new Date(Date.now() - STUCK_QBO_PAYMENT_PENDING_MS).toISOString();
+    const { data: candidateRows, error: candidateError } = await supabase
+      .from("internal_invoice_payments")
+      .select("id, qbo_sync_status, created_at")
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("payment_status", "recorded")
+      .is("qbo_payment_id", null)
+      .or(
+        `qbo_sync_status.is.null,qbo_sync_status.in.(${RETRYABLE_QBO_PAYMENT_SYNC_STATUSES.join(",")})`,
+      );
+    if (candidateError || !candidateRows || candidateRows.length === 0) return empty;
+
+    const candidateIds = candidateRows
+      .filter((row: any) =>
+        String(row.qbo_sync_status ?? "") !== "pending"
+        || String(row.created_at ?? "") <= stuckPendingBefore,
+      )
+      .map((row: any) => String(row.id));
+    if (candidateIds.length === 0) return empty;
+
+    const results: QboPaymentSyncResult[] = [];
+    for (const paymentId of candidateIds) {
+      // Sequential — QBO throttles hard, same as the invoice sweep.
+      results.push(await syncPaymentToQbo({ supabase, accountOwnerUserId, paymentId }));
+    }
+    return {
+      synced: results.filter((r) => r.status === "synced").length,
+      errors: results.filter((r) => r.status === "error").length,
+      results,
+    };
+  } catch {
+    // A sweep must never break the action that triggered it.
+    return empty;
   }
 }

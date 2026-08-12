@@ -12,8 +12,9 @@ import { buildQboAuthorizationUrl } from "@/lib/qbo/qbo-oauth-client";
 import { disconnectQboConnection } from "@/lib/qbo/qbo-connection";
 import {
   isMissingQboItemMappingColumnError,
-  parseQboItemSelection,
+  parseQboItemIdSelection,
 } from "@/lib/qbo/qbo-item-mapping";
+import { loadQboItemCatalog, resolveQboItemName } from "@/lib/qbo/qbo-item-catalog";
 
 const STATE_COOKIE = "qbo_oauth_state";
 const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
@@ -80,21 +81,36 @@ export async function initiateQboOAuthFromForm(
 export async function saveDefaultQboItemFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { internalUser } = await requireInternalRole("admin", { supabase });
+  const accountOwnerUserId = internalUser.account_owner_user_id;
 
-  const selection = parseQboItemSelection(formData.get("default_qbo_item"));
-  const { error } = await supabase
+  const qboItemId = parseQboItemIdSelection(formData.get("default_qbo_item"));
+  // The display name is resolved from the live catalog, never trusted from the
+  // form: it is a cache for the admin UI, and QuickBooks may have renamed the
+  // item since the page rendered.
+  const qboItemName = qboItemId
+    ? resolveQboItemName(await loadQboItemCatalog({ supabase, accountOwnerUserId }), qboItemId)
+    : null;
+
+  const { data, error } = await supabase
     .from("qbo_connections")
-    .update({
-      default_qbo_item_id: selection?.qboItemId ?? null,
-      default_qbo_item_name: selection?.qboItemName ?? null,
-    })
-    .eq("account_owner_user_id", internalUser.account_owner_user_id);
+    .update({ default_qbo_item_id: qboItemId, default_qbo_item_name: qboItemName })
+    // Only the live connection carries a default. Without this an update could
+    // land on a disconnected row and report success for a mapping nothing reads.
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("status", "active")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     const notice = isMissingQboItemMappingColumnError(error)
       ? "qbo_default_item_unavailable"
       : "qbo_default_item_failed";
     redirect(`${COMPANY_PROFILE_PATH}?notice=${notice}#integrations`);
+  }
+  // No row matched — the connection was disconnected or replaced while the form
+  // was open. Never report a save that did not happen.
+  if (!data?.id) {
+    redirect(`${COMPANY_PROFILE_PATH}?notice=qbo_default_item_not_connected#integrations`);
   }
 
   revalidatePath(COMPANY_PROFILE_PATH);

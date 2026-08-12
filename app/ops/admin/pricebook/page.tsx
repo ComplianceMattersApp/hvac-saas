@@ -20,7 +20,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/auth/request-identity";
 import { loadQboItemCatalog, type QboItemCatalog } from "@/lib/qbo/qbo-item-catalog";
 import {
-  encodeQboItemSelection,
   readPricebookQboItemMappings,
   type PricebookQboItemMapping,
 } from "@/lib/qbo/qbo-item-mapping";
@@ -199,10 +198,10 @@ function QboItemMappingField({
   mapping: PricebookQboItemMapping | null;
 }) {
   const listUnavailable = catalog.items.length === 0;
+  // Keyed by QuickBooks item id alone, so a rename in QuickBooks still matches
+  // the stored mapping instead of falling back to "None" and clearing it.
   const staleSelection = mapping && !knownItemIds.has(mapping.qboItemId) ? mapping : null;
-  const selectedValue = mapping
-    ? encodeQboItemSelection({ id: mapping.qboItemId, name: mapping.qboItemName ?? "" })
-    : "";
+  const selectedValue = mapping?.qboItemId ?? "";
 
   return (
     <label className="block space-y-1 text-xs text-slate-700">
@@ -216,18 +215,13 @@ function QboItemMappingField({
       >
         <option value="">None (use the account default)</option>
         {staleSelection ? (
-          <option
-            value={encodeQboItemSelection({
-              id: staleSelection.qboItemId,
-              name: staleSelection.qboItemName ?? "",
-            })}
-          >
+          <option value={staleSelection.qboItemId}>
             {staleSelection.qboItemName ?? `QuickBooks item ${staleSelection.qboItemId}`} (not in the
             current QuickBooks list)
           </option>
         ) : null}
         {catalog.items.map((item) => (
-          <option key={item.id} value={encodeQboItemSelection(item)}>
+          <option key={item.id} value={item.id}>
             {item.name}
           </option>
         ))}

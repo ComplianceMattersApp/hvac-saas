@@ -1,4 +1,5 @@
 import { VOIDED_INVOICE_CHARGE_MARKER } from "@/lib/business/voided-invoice-charge-marker";
+import { STUCK_QBO_PAYMENT_PENDING_MS } from "@/lib/qbo/qbo-payment-sync";
 
 function countOf(result: { count?: number | null; error?: unknown }) {
   return result.error ? 0 : Math.max(0, Number(result.count ?? 0));
@@ -8,9 +9,14 @@ export async function countAttentionCenterItems(params: { supabase: any; account
   const ownerId = String(params.accountOwnerUserId ?? "").trim();
   if (!ownerId) return 0;
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const [qboFailed, qboStripeUnsent, invoiceErrors, voidDrift, reconciliation, moneyOut, chargedAfterVoid, staleStripe, uncertainSavedMethod, fieldReports, failedAttempts, qboConnection] = await Promise.all([
+  const stuckPendingBefore = new Date(Date.now() - STUCK_QBO_PAYMENT_PENDING_MS).toISOString();
+  const [qboFailed, qboStripeUnsent, qboStuckPending, invoiceErrors, voidDrift, reconciliation, moneyOut, chargedAfterVoid, staleStripe, uncertainSavedMethod, fieldReports, failedAttempts, qboConnection] = await Promise.all([
     params.supabase.from("internal_invoice_payments").select("id", { count: "exact", head: true }).eq("account_owner_user_id", ownerId).eq("payment_status", "recorded").eq("qbo_sync_status", "failed"),
     params.supabase.from("internal_invoice_payments").select("id", { count: "exact", head: true }).eq("account_owner_user_id", ownerId).eq("payment_status", "recorded").eq("processor_name", "stripe").eq("qbo_sync_status", "not_synced"),
+    // Pushes that died between marking intent and recording an outcome: real
+    // collected money, unlinked, with nothing else surfacing it. Aged past the
+    // in-flight window so a sync in progress does not flap an attention item.
+    params.supabase.from("internal_invoice_payments").select("id", { count: "exact", head: true }).eq("account_owner_user_id", ownerId).eq("payment_status", "recorded").eq("qbo_sync_status", "pending").is("qbo_payment_id", null).lte("created_at", stuckPendingBefore),
     params.supabase.from("internal_invoices").select("id", { count: "exact", head: true }).eq("account_owner_user_id", ownerId).eq("qbo_sync_status", "error"),
     // Voids not confirmed in QuickBooks. countOf() already returns 0 on error, so
     // an undeployed qbo_void_* migration just contributes nothing to the badge.
@@ -32,6 +38,6 @@ export async function countAttentionCenterItems(params: { supabase: any; account
     params.supabase.from("tenant_saved_method_payment_attempts").select("id", { count: "exact", head: true }).eq("account_owner_user_id", ownerId).eq("attempt_kind", "scheduled_autopay").in("attempt_status", ["failed_declined", "failed_requires_action", "blocked_precondition"]).is("resolved_at", null),
     params.supabase.from("qbo_connections").select("status").eq("account_owner_user_id", ownerId).maybeSingle(),
   ]);
-  return countOf(qboFailed) + countOf(qboStripeUnsent) + countOf(invoiceErrors) + countOf(voidDrift) + countOf(reconciliation) + countOf(moneyOut) + countOf(chargedAfterVoid) + countOf(staleStripe) + countOf(uncertainSavedMethod)
+  return countOf(qboFailed) + countOf(qboStripeUnsent) + countOf(qboStuckPending) + countOf(invoiceErrors) + countOf(voidDrift) + countOf(reconciliation) + countOf(moneyOut) + countOf(chargedAfterVoid) + countOf(staleStripe) + countOf(uncertainSavedMethod)
     + countOf(fieldReports) + countOf(failedAttempts) + (qboConnection.data?.status === "error" ? 1 : 0);
 }

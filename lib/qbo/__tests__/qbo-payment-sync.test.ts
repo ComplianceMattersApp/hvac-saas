@@ -14,7 +14,13 @@ vi.mock("@/lib/qbo/qbo-connection", () => ({ getValidQboAccessToken }));
 vi.mock("@/lib/qbo/qbo-env", () => ({ getQboBaseUrl: () => "https://sandbox.example.com" }));
 vi.mock("@/lib/qbo/qbo-sync", () => ({ syncInvoiceToQbo }));
 
-import { normalizeQboPaymentRefNum, syncPaymentToQbo } from "@/lib/qbo/qbo-payment-sync";
+import {
+  RETRYABLE_QBO_PAYMENT_SYNC_STATUSES,
+  STUCK_QBO_PAYMENT_PENDING_MS,
+  normalizeQboPaymentRefNum,
+  syncAllPendingPaymentsToQbo,
+  syncPaymentToQbo,
+} from "@/lib/qbo/qbo-payment-sync";
 
 function makeSupabase(params: { payment: any; invoice: any }) {
   const updates: any[] = [];
@@ -267,5 +273,85 @@ describe("syncPaymentToQbo", () => {
     const { supabase } = makeSupabase({ payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000 }, invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC-STALE" } });
     await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
     expect(createQboPayment).toHaveBeenCalledWith(expect.objectContaining({ payment: expect.objectContaining({ customerRef: "QC-CURRENT" }) }));
+  });
+});
+
+describe("syncAllPendingPaymentsToQbo", () => {
+  /** Fake that serves the candidate list once, then the per-payment reads. */
+  function makeSweepSupabase(candidates: any[], payment: any, invoice: any) {
+    const filters: any[] = [];
+    let candidateListServed = false;
+    const supabase = {
+      from(table: string) {
+        const builder: any = {
+          select() { return builder; },
+          eq(column: string, value: unknown) { filters.push([column, value]); return builder; },
+          is(column: string, value: unknown) { filters.push([column, value]); return builder; },
+          not() { return builder; },
+          or(expression: string) { filters.push(["or", expression]); return builder; },
+          update() { return builder; },
+          async maybeSingle() {
+            return { data: table === "internal_invoice_payments" ? payment : invoice, error: null };
+          },
+          then(resolve: (value: any) => void) {
+            if (table === "internal_invoice_payments" && !candidateListServed) {
+              candidateListServed = true;
+              return resolve({ data: candidates, error: null });
+            }
+            return resolve({ data: null, error: null });
+          },
+        };
+        return builder;
+      },
+    };
+    return { supabase, filters };
+  }
+
+  const recordedPayment = {
+    id: "pay-stuck", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000,
+  };
+  const syncedInvoice = { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" };
+
+  it("retries every retryable state, including a stuck pending push", async () => {
+    const stale = new Date(Date.now() - STUCK_QBO_PAYMENT_PENDING_MS - 60_000).toISOString();
+    const { supabase, filters } = makeSweepSupabase(
+      [{ id: "pay-stuck", qbo_sync_status: "pending", created_at: stale }],
+      recordedPayment,
+      syncedInvoice,
+    );
+
+    const result = await syncAllPendingPaymentsToQbo({ supabase, accountOwnerUserId: "owner-1" });
+
+    expect(result.synced).toBe(1);
+    expect(createQboPayment).toHaveBeenCalledTimes(1);
+    // Only unlinked, recorded payments are candidates.
+    expect(filters).toContainEqual(["payment_status", "recorded"]);
+    expect(filters).toContainEqual(["qbo_payment_id", null]);
+    const orFilter = filters.find(([key]) => key === "or")?.[1] ?? "";
+    for (const status of RETRYABLE_QBO_PAYMENT_SYNC_STATUSES) expect(orFilter).toContain(status);
+  });
+
+  it("leaves a pending push that is still in flight alone", async () => {
+    const { supabase } = makeSweepSupabase(
+      [{ id: "pay-inflight", qbo_sync_status: "pending", created_at: new Date().toISOString() }],
+      recordedPayment,
+      syncedInvoice,
+    );
+
+    const result = await syncAllPendingPaymentsToQbo({ supabase, accountOwnerUserId: "owner-1" });
+
+    expect(result).toEqual({ synced: 0, errors: 0, results: [] });
+    expect(createQboPayment).not.toHaveBeenCalled();
+  });
+
+  it("never throws out of the sweep when the candidate read fails", async () => {
+    const supabase = {
+      from() {
+        throw new Error("relation does not exist");
+      },
+    };
+    await expect(syncAllPendingPaymentsToQbo({ supabase, accountOwnerUserId: "owner-1" })).resolves.toEqual({
+      synced: 0, errors: 0, results: [],
+    });
   });
 });

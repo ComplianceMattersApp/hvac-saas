@@ -29,10 +29,18 @@ describe("account default QuickBooks item admin wiring", () => {
     expect(companyProfilePage).toContain("readAccountDefaultQboItem");
   });
 
-  it("stores the id and its cached name, nulling both on an empty selection", () => {
-    expect(connectionActions).toContain("parseQboItemSelection(formData.get(\"default_qbo_item\"))");
-    expect(connectionActions).toContain("default_qbo_item_id: selection?.qboItemId ?? null");
-    expect(connectionActions).toContain("default_qbo_item_name: selection?.qboItemName ?? null");
+  it("submits the item id alone and resolves the cached name server-side", () => {
+    expect(integrationSection).toContain("value={item.id}");
+    expect(integrationSection).toContain("defaultQboItem?.qboItemId ?? \"\"");
+    expect(connectionActions).toContain('parseQboItemIdSelection(formData.get("default_qbo_item"))');
+    expect(connectionActions).toContain("resolveQboItemName(await loadQboItemCatalog(");
+    expect(connectionActions).toContain("default_qbo_item_id: qboItemId, default_qbo_item_name: qboItemName");
+  });
+
+  it("only writes the live connection, and reports nothing saved when no row matched", () => {
+    expect(connectionActions).toContain('.eq("status", "active")');
+    expect(connectionActions).toContain("if (!data?.id)");
+    expect(connectionActions).toContain("qbo_default_item_not_connected");
   });
 });
 
@@ -57,7 +65,14 @@ describe("pricebook QuickBooks item mapping wiring", () => {
 
   it("saves the mapping in its own statement that tolerates an undeployed column", () => {
     expect(pricebookActions).toContain('normalizeText(params.formData.get("qbo_item_mapping_present")) !== "1"');
-    expect(pricebookActions).toContain("qbo_item_id: selection?.qboItemId ?? null");
+    expect(pricebookActions).toContain("qbo_item_id: qboItemId, qbo_item_name: qboItemName");
     expect(pricebookActions).toContain("if (error && !isMissingQboItemMappingColumnError(error))");
+  });
+
+  it("submits the item id alone and resolves the cached name server-side", () => {
+    expect(pricebookPage).toContain("value={item.id}");
+    expect(pricebookPage).toContain('mapping?.qboItemId ?? ""');
+    expect(pricebookActions).toContain('parseQboItemIdSelection(params.formData.get("qbo_item"))');
+    expect(pricebookActions).toContain("resolveQboItemName(");
   });
 });

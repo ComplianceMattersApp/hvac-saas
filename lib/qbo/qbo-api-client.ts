@@ -320,25 +320,23 @@ export type QboItemOption = {
  *
  * Only Service and NonInventory are offered: those are the types QBO accepts on
  * a SalesItemLineDetail without inventory tracking, so anything else would be a
- * mapping that fails at push time.
+ * mapping that fails at push time. Both filters run server-side, and the walk is
+ * paginated — a mature catalog runs past QBO's 1000-row response cap, and a
+ * truncated list would silently hide items an operator needs to map.
  */
 export async function listActiveQboItems(params: QboRequestBase): Promise<QboItemOption[]> {
-  const found = await qboFetch({
-    accessToken: params.accessToken,
-    realmId: params.realmId,
-    baseUrl: params.baseUrl,
-    path: "query",
-    method: "GET",
-    query: "select Id, Name, Type from Item where Active = true maxresults 1000",
+  const rows = await queryQboAll({
+    ...params,
+    entity: "Item",
+    where: "Active = true and Type in ('Service', 'NonInventory')",
   });
-  const rows: any[] = found?.QueryResponse?.Item ?? [];
   return rows
     .map((row) => ({
       id: String(row?.Id ?? "").trim(),
       name: String(row?.Name ?? "").trim(),
       type: String(row?.Type ?? "").trim(),
     }))
-    .filter((row) => row.id && row.name && (row.type === "Service" || row.type === "NonInventory"))
+    .filter((row) => row.id && row.name)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -455,7 +453,14 @@ export interface QboInvoiceSnapshot {
   syncToken: string;
   docNumber: string | null;
   balance: number;
+  /** TotalAmt — INCLUDES sales tax when the company has it enabled. */
   totalAmount: number;
+  /**
+   * TxnTaxDetail.TotalTax. QuickBooks' Automated Sales Tax adds this on its own
+   * side, so it is present on the read-back even though EveryStep never sends
+   * tax. Anything comparing our line total against QuickBooks must subtract it.
+   */
+  totalTax: number;
   /**
    * QBO exposes no explicit "voided" flag on Invoice — voiding zeroes every line,
    * so TotalAmt and Balance both land on 0. An invoice can only reach EveryStep's
@@ -463,6 +468,20 @@ export interface QboInvoiceSnapshot {
    * so a zeroed synced invoice means it was voided in QBO already.
    */
   looksVoided: boolean;
+}
+
+function toQboInvoiceSnapshot(invoice: any): QboInvoiceSnapshot {
+  const balance = Number(invoice.Balance ?? 0);
+  const totalAmount = Number(invoice.TotalAmt ?? 0);
+  return {
+    id: String(invoice.Id),
+    syncToken: String(invoice.SyncToken ?? "0"),
+    docNumber: String(invoice.DocNumber ?? "").trim() || null,
+    balance,
+    totalAmount,
+    totalTax: Number(invoice.TxnTaxDetail?.TotalTax ?? 0),
+    looksVoided: totalAmount === 0 && balance === 0,
+  };
 }
 
 /**
@@ -490,17 +509,7 @@ export async function findQboInvoiceById(
   });
   const invoice = found?.QueryResponse?.Invoice?.[0];
   if (!invoice?.Id) return null;
-
-  const balance = Number(invoice.Balance ?? 0);
-  const totalAmount = Number(invoice.TotalAmt ?? 0);
-  return {
-    id: String(invoice.Id),
-    syncToken: String(invoice.SyncToken ?? "0"),
-    docNumber: String(invoice.DocNumber ?? "").trim() || null,
-    balance,
-    totalAmount,
-    looksVoided: totalAmount === 0 && balance === 0,
-  };
+  return toQboInvoiceSnapshot(invoice);
 }
 
 /**
@@ -519,7 +528,7 @@ export async function findQboInvoiceById(
  * both slow and far more likely to trip a rate limit mid-run.
  */
 async function queryQboAll(
-  params: QboRequestBase & { entity: "Invoice" | "Payment"; where: string },
+  params: QboRequestBase & { entity: "Invoice" | "Payment" | "Item"; where: string },
 ): Promise<any[]> {
   const { accessToken, realmId, baseUrl, entity, where } = params;
   const PAGE_SIZE = 500;
@@ -551,18 +560,7 @@ export async function listQboInvoicesSince(
     entity: "Invoice",
     where: `TxnDate >= '${escapeQboQueryValue(params.fromDate)}'`,
   });
-  return rows.map((invoice) => {
-    const balance = Number(invoice.Balance ?? 0);
-    const totalAmount = Number(invoice.TotalAmt ?? 0);
-    return {
-      id: String(invoice.Id),
-      syncToken: String(invoice.SyncToken ?? "0"),
-      docNumber: String(invoice.DocNumber ?? "").trim() || null,
-      balance,
-      totalAmount,
-      looksVoided: totalAmount === 0 && balance === 0,
-    };
-  });
+  return rows.map(toQboInvoiceSnapshot);
 }
 
 export type QboPaymentSnapshot = {

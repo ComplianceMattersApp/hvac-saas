@@ -6,6 +6,7 @@ import {
   createQboInvoice,
   createQboPayment,
   findQboInvoiceByDocNumber,
+  findQboInvoiceById,
   findQboPaymentById,
   findOrCreateQboCustomer,
   findOrCreateEveryStepServicesItem,
@@ -193,12 +194,11 @@ describe("qbo-api-client", () => {
     });
   });
 
-  it("lists only active Service/NonInventory items for the mapping selectors", async () => {
-    mockFetchSequence([
+  it("filters items to Service/NonInventory server-side and pages the query", async () => {
+    const fetchMock = mockFetchSequence([
       { status: 200, body: { QueryResponse: { Item: [
         { Id: "3", Name: "Zone Balancing", Type: "Service" },
         { Id: "4", Name: "Air Filter", Type: "NonInventory" },
-        { Id: "5", Name: "Stocked Compressor", Type: "Inventory" },
         { Id: "6", Name: "", Type: "Service" },
       ] } } },
     ]);
@@ -206,6 +206,44 @@ describe("qbo-api-client", () => {
       { id: "4", name: "Air Filter", type: "NonInventory" },
       { id: "3", name: "Zone Balancing", type: "Service" },
     ]);
+    const query = new URL(String(fetchMock.mock.calls[0][0])).searchParams.get("query");
+    expect(query).toContain("Active = true and Type in ('Service', 'NonInventory')");
+    // Paged, so a catalog past QBO's response cap is not silently truncated.
+    expect(query).toContain("startposition 1");
+    expect(query).toContain("maxresults 500");
+  });
+
+  it("walks every page of a catalog larger than one QBO response", async () => {
+    const page = (start: number, count: number) => ({
+      status: 200,
+      body: { QueryResponse: { Item: Array.from({ length: count }, (_unused, index) => ({
+        Id: String(start + index), Name: `Item ${String(start + index).padStart(4, "0")}`, Type: "Service",
+      })) } },
+    });
+    const fetchMock = mockFetchSequence([page(1, 500), page(501, 12)]);
+    await expect(listActiveQboItems({ ...base })).resolves.toHaveLength(512);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("startposition+501");
+  });
+
+  it("reports the sales tax QuickBooks added, so callers can compare pre-tax", async () => {
+    mockFetchSequence([
+      { status: 200, body: { QueryResponse: { Invoice: [{
+        Id: "4520", SyncToken: "2", DocNumber: "2001", Balance: 108.25, TotalAmt: 108.25,
+        TxnTaxDetail: { TotalTax: 8.25 },
+      }] } } },
+    ]);
+    await expect(findQboInvoiceById({ ...base, qboInvoiceId: "4520" })).resolves.toMatchObject({
+      totalAmount: 108.25,
+      totalTax: 8.25,
+    });
+  });
+
+  it("reports zero tax when QuickBooks sends no TxnTaxDetail", async () => {
+    mockFetchSequence([
+      { status: 200, body: { QueryResponse: { Invoice: [{ Id: "4521", SyncToken: "0", DocNumber: "2002", Balance: 100, TotalAmt: 100 }] } } },
+    ]);
+    await expect(findQboInvoiceById({ ...base, qboInvoiceId: "4521" })).resolves.toMatchObject({ totalTax: 0 });
   });
 
   it("reads one payment back by id with its linked invoice allocations", async () => {

@@ -8,7 +8,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { getQboConnectionForAccount } from "@/lib/qbo/qbo-connection";
 import { syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
-import { syncPaymentToQbo } from "@/lib/qbo/qbo-payment-sync";
+import { syncAllPendingPaymentsToQbo, syncPaymentToQbo } from "@/lib/qbo/qbo-payment-sync";
 import { voidAllPendingInvoiceVoidsInQbo, voidInvoiceInQbo } from "@/lib/qbo/qbo-void-sync";
 import {
   persistReconciliationFindings,
@@ -230,23 +230,32 @@ export async function syncAllPendingInvoicesToQboFromForm(
       accountOwnerUserId: internalUser.account_owner_user_id,
     });
 
+    // ...and recorded payments that never linked. Runs after the invoices so a
+    // payment whose invoice just synced is picked up in the same pass.
+    const payments = await syncAllPendingPaymentsToQbo({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+
     revalidatePath(COMPANY_PROFILE_PATH);
 
     const baseMessage =
       result.errors > 0
         ? `Synced ${result.synced} invoice(s), ${result.errors} failed to sync — check individual invoices for details.`
         : `Synced ${result.synced} invoice(s), ${result.skipped} skipped, 0 errors.`;
-    const voidParts = [
+    const alsoParts = [
       voids.voided > 0 ? `voided ${voids.voided} in QuickBooks` : null,
       voids.blocked > 0 ? `${voids.blocked} void(s) blocked by applied payments — reconcile in QuickBooks` : null,
       voids.errors > 0 ? `${voids.errors} void(s) failed` : null,
+      payments.synced > 0 ? `linked ${payments.synced} payment(s)` : null,
+      payments.errors > 0 ? `${payments.errors} payment(s) failed to link` : null,
     ].filter((part): part is string => Boolean(part));
-    const message = voidParts.length > 0 ? `${baseMessage} Also ${voidParts.join("; ")}.` : baseMessage;
+    const message = alsoParts.length > 0 ? `${baseMessage} Also ${alsoParts.join("; ")}.` : baseMessage;
 
     return {
       synced: result.synced,
       skipped: result.skipped,
-      errors: result.errors + voids.errors,
+      errors: result.errors + voids.errors + payments.errors,
       message,
     };
   } catch (error) {

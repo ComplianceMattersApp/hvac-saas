@@ -59,6 +59,7 @@ import {
 } from "@/lib/actions/internal-invoice-actions";
 import { retryQboInvoiceVoidFromForm, syncSingleInvoiceToQboFromForm, syncSinglePaymentToQboFromForm } from "@/lib/actions/qbo-sync-actions";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
+import { RETRYABLE_QBO_PAYMENT_SYNC_STATUSES } from "@/lib/qbo/qbo-payment-sync";
 import { readInvoiceQboVoidState } from "@/lib/qbo/qbo-void-state";
 import {
   collectIssuedInvoiceCardPaymentFromForm,
@@ -195,6 +196,15 @@ function formatSupplementalReasonLabel(reason?: string | null) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join(" ");
+}
+
+/**
+ * Payments whose QuickBooks link can still be re-attempted. Includes 'pending':
+ * that state is written before the QuickBooks call, so a push that died mid-way
+ * leaves collected money unlinked with no way to try again.
+ */
+function qboPaymentSyncIsRetryable(status: unknown) {
+  return (RETRYABLE_QBO_PAYMENT_SYNC_STATUSES as readonly string[]).includes(String(status ?? ""));
 }
 
 function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
@@ -1961,7 +1971,7 @@ export default async function InternalInvoiceWorkspacePage({
                         {payment.qbo_sync_status === "failed" && payment.qbo_sync_error ? (
                           <div className="mt-1 text-xs leading-5 text-rose-700">QuickBooks: {payment.qbo_sync_error}</div>
                         ) : null}
-                        {getQboAvailability().available && (payment.qbo_sync_status === "failed" || payment.qbo_sync_status === "not_synced") ? (
+                        {getQboAvailability().available && qboPaymentSyncIsRetryable(payment.qbo_sync_status) ? (
                           <form action={syncSinglePaymentToQboFromForm} className="mt-2">
                             <input type="hidden" name="job_id" value={jobId} />
                             <input type="hidden" name="invoice_id" value={invoice.id} />

@@ -1,6 +1,10 @@
 import { VOIDED_INVOICE_CHARGE_MARKER } from "@/lib/business/voided-invoice-charge-marker";
 import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
+import {
+  RETRYABLE_QBO_PAYMENT_SYNC_STATUSES,
+  STUCK_QBO_PAYMENT_PENDING_MS,
+} from "@/lib/qbo/qbo-payment-sync";
 
 export type AttentionItem = {
   id: string;
@@ -22,10 +26,13 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
   const ownerId = clean(params.accountOwnerUserId);
   const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
   const [paymentResult, invoiceErrorResult, voidDriftResult, reconciliationResult, moneyOutResult, chargedAfterVoidResult, staleResult, uncertainSavedMethodResult, connectionResult, failedPayments, fieldReports] = await Promise.all([
+    // 'pending' is included and then aged below: it is written before the
+    // QuickBooks call, so a push that died mid-way leaves collected money
+    // unlinked and nothing else would ever surface it.
     params.admin.from("internal_invoice_payments")
-      .select("id, invoice_id, job_id, amount_cents, paid_at, qbo_sync_status, qbo_sync_error, processor_name")
+      .select("id, invoice_id, job_id, amount_cents, paid_at, created_at, qbo_payment_id, qbo_sync_status, qbo_sync_error, processor_name")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "recorded")
-      .in("qbo_sync_status", ["failed", "not_synced"]).order("paid_at", { ascending: false }).limit(250),
+      .in("qbo_sync_status", [...RETRYABLE_QBO_PAYMENT_SYNC_STATUSES]).order("paid_at", { ascending: false }).limit(250),
     params.admin.from("internal_invoices")
       .select("id, job_id, invoice_number, invoice_display_number, qbo_sync_error, updated_at")
       .eq("account_owner_user_id", ownerId).eq("qbo_sync_status", "error").order("updated_at", { ascending: false }).limit(100),
@@ -93,9 +100,14 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
   const labels = new Map((labelsResult.data ?? []).map((row: any) => [clean(row.id), clean(row.invoice_display_number) || clean(row.invoice_number) || clean(row.id)]));
   const jobIds = new Map((labelsResult.data ?? []).map((row: any) => [clean(row.id), clean(row.job_id)]));
 
+  const stuckPendingBefore = new Date(Date.now() - STUCK_QBO_PAYMENT_PENDING_MS).toISOString();
   const items: AttentionItem[] = [];
   for (const payment of paymentResult.data ?? []) {
     if (payment.qbo_sync_status === "not_synced" && clean(payment.processor_name).toLowerCase() !== "stripe") continue;
+    // A push in flight passes through 'pending' for a second or two — only
+    // surface one that has been sitting there, and never one already linked.
+    if (payment.qbo_sync_status === "pending"
+      && (clean(payment.qbo_payment_id) || clean(payment.created_at) > stuckPendingBefore)) continue;
     const invoiceId = clean(payment.invoice_id); const jobId = clean(payment.job_id);
     items.push({
       id: `qbo-payment-${payment.id}`, category: "qbo_payment", severity: "critical",
