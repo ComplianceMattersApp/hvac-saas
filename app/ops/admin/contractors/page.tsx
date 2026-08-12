@@ -28,6 +28,8 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   invite_not_pending: { tone: "warn", message: "That contractor invite is no longer pending." },
   invite_already_accepted: { tone: "warn", message: "That contractor invite has already been accepted and cannot be resent." },
   password_reset_sent: { tone: "success", message: "Password reset email sent." },
+  password_reset_failed: { tone: "error", message: "Password reset email could not be sent. Please try again." },
+  password_reset_out_of_scope: { tone: "error", message: "That email does not match a user in your account, so no password reset was sent." },
   contractor_created_invite_sent: { tone: "success", message: "Contractor created and invite sent." },
   contractor_created_no_email: { tone: "warn", message: "Contractor created. No invite sent because no email was provided." },
   contractor_created_invite_failed: { tone: "warn", message: "Contractor created, but invite could not be sent." },
