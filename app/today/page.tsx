@@ -161,9 +161,6 @@ export default async function TodayPage() {
               label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
             />
           ) : null}
-          {model.upcomingService.visible ? (
-            <UpcomingServiceSection service={model.upcomingService} />
-          ) : null}
           <div className="space-y-5">
             <TodayWorkSection
               label={model.todayWork.label}
@@ -182,6 +179,9 @@ export default async function TodayPage() {
         <aside className="space-y-5" aria-label="Today summaries">
           {model.priorityChips.length > 0 ? (
             <PriorityChipsSection chips={model.priorityChips} desktop />
+          ) : null}
+          {model.upcomingService.visible ? (
+            <UpcomingServiceSection service={model.upcomingService} />
           ) : null}
           {model.roleAwarePulse.visible ? (
             <RoleAwarePulseSection pulse={model.roleAwarePulse} />
