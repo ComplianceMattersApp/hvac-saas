@@ -22,6 +22,9 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text-summary", "text", "html", "json-summary"],
       reportsDirectory: "./coverage",
+      // Still produce the report when tests fail — a red run is exactly when
+      // the uploaded coverage artifact is needed to see what regressed.
+      reportOnFailure: true,
       // Measure coverage of the code we actually ship, not the tests/config.
       include: ["lib/**", "app/**", "components/**"],
       exclude: [

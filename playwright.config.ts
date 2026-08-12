@@ -13,7 +13,9 @@ import { defineConfig, devices } from "@playwright/test";
  * until E2E_BASE_URL / E2E_TEST_EMAIL / E2E_TEST_PASSWORD are provided.
  */
 
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+// `||` (not `??`): CI passes unset secrets through as empty strings, which must
+// fall back to the local dev server exactly like a missing variable does.
+const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 // In sandboxes/CI where a matched browser is pre-installed at a fixed path,
 // point Playwright straight at it (set PLAYWRIGHT_CHROMIUM_PATH). When unset,

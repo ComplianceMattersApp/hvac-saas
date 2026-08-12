@@ -27,11 +27,16 @@ jobs:
       - name: Install Playwright Chromium + OS deps
         run: npx playwright install --with-deps chromium
 
-      # Phase 1 only: public pages, booted against a placeholder backend (env is
-      # supplied by playwright.config.ts's webServer). Authenticated specs skip
-      # themselves unless E2E_TEST_* secrets are provided.
+      # Phase 1: public pages, booted against a placeholder backend (env is
+      # supplied by playwright.config.ts's webServer). Phase 2 (authenticated
+      # specs) activates automatically once the E2E_* repository secrets are
+      # set; until then those specs skip themselves.
       - name: Run E2E tests
         run: npm run test:e2e
+        env:
+          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
+          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
 
       - name: Upload Playwright report
         if: always()

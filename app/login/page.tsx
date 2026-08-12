@@ -239,8 +239,9 @@ export default function LoginPage() {
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-stone-700">Email</label>
+              <label htmlFor="login-email" className="text-sm font-medium text-stone-700">Email</label>
               <input
+                id="login-email"
                 className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-[#0f1f35] shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#c2622a]/40"
                 type="email"
                 name="email"
@@ -253,7 +254,7 @@ export default function LoginPage() {
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-3">
-                <label className="text-sm font-medium text-stone-700">Password</label>
+                <label htmlFor="login-password" className="text-sm font-medium text-stone-700">Password</label>
                 <button
                   type="button"
                   aria-label={showPassword ? "Hide password" : "Show password"}
@@ -264,6 +265,7 @@ export default function LoginPage() {
                 </button>
               </div>
               <input
+                id="login-password"
                 className="w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-[#0f1f35] shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#c2622a]/40"
                 type={showPassword ? "text" : "password"}
                 name="password"

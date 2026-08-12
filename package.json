@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:rls": "bash scripts/run-rls-tests.sh",
     "test:e2e:report": "playwright show-report",
     "test:smoke:visit-scope-inline-price-mobile": "node scripts/__tests__/visit-scope-inline-price-mobile.smoke.js"
   },
@@ -42,6 +44,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@capacitor/assets": "^3.0.5",
     "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4.2.2",
