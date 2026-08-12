@@ -21,6 +21,19 @@ export type QboItemCatalog = {
 
 const UNAVAILABLE: QboItemCatalog = { connected: false, items: [], error: null };
 
+/**
+ * The display name QuickBooks currently uses for an item id.
+ *
+ * Returns null when the catalog could not be loaded or the id is not in it —
+ * the name is a cache for the admin UI, never a reference, so storing null is
+ * correct rather than storing a name we could not confirm.
+ */
+export function resolveQboItemName(catalog: QboItemCatalog, qboItemId: string): string | null {
+  const id = String(qboItemId ?? "").trim();
+  if (!id) return null;
+  return catalog.items.find((item) => item.id === id)?.name ?? null;
+}
+
 export async function loadQboItemCatalog(params: {
   supabase: any;
   accountOwnerUserId: string;

@@ -17,8 +17,9 @@ import {
 } from "@/lib/business/pricebook-options";
 import {
   isMissingQboItemMappingColumnError,
-  parseQboItemSelection,
+  parseQboItemIdSelection,
 } from "@/lib/qbo/qbo-item-mapping";
+import { loadQboItemCatalog, resolveQboItemName } from "@/lib/qbo/qbo-item-catalog";
 import { createClient } from "@/lib/supabase/server";
 
 const ITEM_TYPES = new Set(["service", "material", "diagnostic", "adjustment"]);
@@ -415,13 +416,22 @@ async function saveQboItemMapping(params: {
 }) {
   if (normalizeText(params.formData.get("qbo_item_mapping_present")) !== "1") return;
 
-  const selection = parseQboItemSelection(params.formData.get("qbo_item"));
+  const qboItemId = parseQboItemIdSelection(params.formData.get("qbo_item"));
+  // Display name resolved from the live catalog, never trusted from the form —
+  // it is a cache, and QuickBooks may have renamed the item since render.
+  const qboItemName = qboItemId
+    ? resolveQboItemName(
+        await loadQboItemCatalog({
+          supabase: params.supabase,
+          accountOwnerUserId: params.accountOwnerUserId,
+        }),
+        qboItemId,
+      )
+    : null;
+
   const { error } = await params.supabase
     .from("pricebook_items")
-    .update({
-      qbo_item_id: selection?.qboItemId ?? null,
-      qbo_item_name: selection?.qboItemName ?? null,
-    })
+    .update({ qbo_item_id: qboItemId, qbo_item_name: qboItemName })
     .eq("id", params.itemId)
     .eq("account_owner_user_id", params.accountOwnerUserId);
 

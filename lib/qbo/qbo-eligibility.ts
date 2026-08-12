@@ -83,7 +83,11 @@ function nonEmpty(value: unknown): string | null {
   return s.length > 0 ? s : null;
 }
 
-function toCents(value: unknown): number {
+/**
+ * Read an integer-cents column. Distinct from qbo-money's toCents, which
+ * converts QuickBooks' dollar floats — these values are already cents.
+ */
+function readCentsColumn(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value ?? 0);
   return Number.isFinite(n) ? n : 0;
 }
@@ -267,7 +271,7 @@ export async function evaluateQboInvoiceEligibility(params: {
         // so diagnostics is a complete superset; primary stays the first hit.
         const disposition = row.job_id ? dispositionByJobId.get(String(row.job_id)) ?? null : null;
         if (disposition) flag("external_billing_or_no_charge");
-        if (toCents(row.total_cents) <= 0) flag("zero_or_invalid_total");
+        if (readCentsColumn(row.total_cents) <= 0) flag("zero_or_invalid_total");
         if ((lineCountByInvoiceId.get(invoiceId) ?? 0) === 0) flag("no_line_items");
         const customerRow = row.customer_id ? customerById.get(String(row.customer_id)) ?? null : null;
         if (!hasResolvableCustomer(row, customerRow)) flag("unresolvable_customer");

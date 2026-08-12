@@ -107,25 +107,16 @@ export async function readPricebookQboItemMappings(params: {
 }
 
 /**
- * Form encoding for the mapping selectors.
+ * Form value for the mapping selectors: the QuickBooks item id, alone.
  *
- * The <option> carries both id and name so saving does not need a second QBO
- * round-trip. Only the id is authoritative; the name is a cached display label,
- * so accepting it from the form costs nothing. Split on the FIRST separator —
- * QuickBooks item names may contain one.
+ * The id is the only authoritative reference. An earlier version encoded
+ * `id|name` in the option value so saving needed no QBO round-trip, but that
+ * made the stored value depend on the display name: rename an item in
+ * QuickBooks and the stored `id|old name` matched no option, so the select fell
+ * back to "None" and the next save silently cleared a working mapping. Matching
+ * on the id alone survives renames; the cached name is resolved server-side
+ * from the live catalog at save time.
  */
-const QBO_ITEM_SELECTION_SEPARATOR = "|";
-
-export function encodeQboItemSelection(item: { id: string; name: string }): string {
-  return `${String(item.id ?? "").trim()}${QBO_ITEM_SELECTION_SEPARATOR}${String(item.name ?? "").trim()}`;
-}
-
-export function parseQboItemSelection(raw: unknown): QboItemMapping | null {
-  const value = String(raw ?? "").trim();
-  if (!value) return null;
-  const separatorIndex = value.indexOf(QBO_ITEM_SELECTION_SEPARATOR);
-  const id = (separatorIndex === -1 ? value : value.slice(0, separatorIndex)).trim();
-  if (!id) return null;
-  const name = separatorIndex === -1 ? "" : value.slice(separatorIndex + 1).trim();
-  return { qboItemId: id, qboItemName: name || null };
+export function parseQboItemIdSelection(raw: unknown): string | null {
+  return String(raw ?? "").trim() || null;
 }

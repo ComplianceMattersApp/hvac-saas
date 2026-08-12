@@ -93,6 +93,10 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
     tone: "warn",
     message: "QuickBooks item mapping isn't available on this database yet. Apply the pending migration, then try again.",
   },
+  qbo_default_item_not_connected: {
+    tone: "warn",
+    message: "The default QuickBooks item was not saved because QuickBooks is no longer connected. Reconnect, then set it again.",
+  },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {

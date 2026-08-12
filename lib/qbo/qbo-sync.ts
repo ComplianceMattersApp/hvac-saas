@@ -15,6 +15,7 @@ import {
   readPricebookQboItemMappings,
   type QboItemMapping,
 } from "./qbo-item-mapping";
+import { centsMatch, toCents } from "./qbo-money";
 
 /**
  * One-way EveryStep -> QBO invoice sync orchestrator.
@@ -49,7 +50,13 @@ interface QboSyncContext {
   syncStartAt?: string | null;
 }
 
-/** Memoizes the find-or-create so one run makes at most one round trip for it. */
+/**
+ * Memoizes the find-or-create so one run makes at most one round trip for it.
+ *
+ * The memo is cleared on rejection: caching a rejected promise would make one
+ * transient QBO failure fail every remaining invoice in a bulk run with the same
+ * stale error, turning a single blip into a whole-sweep outage.
+ */
 function createFallbackItemRefResolver(params: {
   accessToken: string;
   realmId: string;
@@ -57,7 +64,10 @@ function createFallbackItemRefResolver(params: {
 }): () => Promise<string> {
   let inFlight: Promise<string> | null = null;
   return () => {
-    inFlight ??= findOrCreateEveryStepServicesItem(params);
+    inFlight ??= findOrCreateEveryStepServicesItem(params).catch((error) => {
+      inFlight = null;
+      throw error;
+    });
     return inFlight;
   };
 }
@@ -101,12 +111,23 @@ function resolveJobContext(customerRow: any | null, jobRow: any | null): string 
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+/**
+ * Persist sync bookkeeping, throwing when the write did not land.
+ *
+ * Silently ignoring the Supabase error is what lets a row be reported 'synced'
+ * while the database still says otherwise — the same class of unverified
+ * success this lane exists to prevent, one layer down. Callers let it throw;
+ * the sync's own catch records the failure.
+ */
 async function updateInvoiceSyncFields(
   supabase: any,
   invoiceId: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
-  await supabase.from("internal_invoices").update(patch).eq("id", invoiceId);
+  const { error } = await supabase.from("internal_invoices").update(patch).eq("id", invoiceId);
+  if (error) {
+    throw new Error(`Failed to persist QBO invoice sync state: ${error.message ?? "unknown error"}`);
+  }
 }
 
 function resolveCustomerInput(invoiceRow: any, customerRow: any | null): QboCustomerInput {
@@ -230,11 +251,6 @@ function buildInvoiceInput(
   };
 }
 
-/** Cent-safe comparison — QBO returns dollars as floats. */
-function toCents(amount: number): number {
-  return Math.round(Number(amount ?? 0) * 100);
-}
-
 /**
  * Confirm the invoice against QuickBooks' own state after a write.
  *
@@ -284,13 +300,23 @@ async function verifyQboInvoiceAfterWrite(params: {
   // and the amount is the only meaningful check.
   const docNumberMatches =
     !expectedDocNumber || String(confirmation.docNumber ?? "") === String(expectedDocNumber);
-  const totalMatches = Math.abs(toCents(confirmation.totalAmount) - toCents(expectedTotal)) <= 1;
+  // Compare against the pre-tax subtotal. EveryStep never sends tax, but a
+  // company on QuickBooks' Automated Sales Tax has it added on QBO's side, so
+  // TotalAmt legitimately exceeds our line sum. Comparing TotalAmt directly
+  // would fail those tenants on every run forever — and because the sweep
+  // retries error rows, it would also rewrite their QBO invoice each time.
+  const observedTax = Number(confirmation.totalTax ?? 0) || 0;
+  const observedSubtotal = confirmation.totalAmount - observedTax;
+  const totalMatches = centsMatch(observedSubtotal, expectedTotal);
   if (!docNumberMatches || !totalMatches) {
+    const taxNote = observedTax
+      ? ` (QuickBooks added $${observedTax.toFixed(2)} sales tax; compared pre-tax)`
+      : "";
     throw new Error(
       `QuickBooks accepted invoice ${expectedDocNumber} but the read-back does not match — verified mismatch `
       + `(QBO id ${confirmation.id}, observed doc number ${confirmation.docNumber ?? "(EMPTY)"} vs expected `
-      + `${expectedDocNumber || "(EMPTY)"}, observed total $${confirmation.totalAmount.toFixed(2)} vs expected `
-      + `$${expectedTotal.toFixed(2)}). It was NOT recorded as synced.`,
+      + `${expectedDocNumber || "(EMPTY)"}, observed total $${observedSubtotal.toFixed(2)} vs expected `
+      + `$${expectedTotal.toFixed(2)}${taxNote}). It was NOT recorded as synced.`,
     );
   }
 
@@ -474,13 +500,26 @@ async function syncSingleInvoiceWithContext(
     // QuickBooks, so the id must survive even if verification fails, or a retry
     // would create a second invoice there. 'pending' is retryable and is a
     // candidate for the next sweep — it is never a terminal state.
-    await updateInvoiceSyncFields(supabase, invoiceId, {
-      qbo_invoice_id: synced.id,
-      qbo_customer_id: qboCustomer.id,
-      qbo_sync_token: synced.syncToken,
-      qbo_sync_status: "pending",
-      qbo_sync_error: null,
-    });
+    try {
+      await updateInvoiceSyncFields(supabase, invoiceId, {
+        qbo_invoice_id: synced.id,
+        qbo_customer_id: qboCustomer.id,
+        qbo_sync_token: synced.syncToken,
+        qbo_sync_status: "pending",
+        qbo_sync_error: null,
+      });
+    } catch (error) {
+      // The identity did NOT persist. Continuing would verify and then report
+      // 'synced' for a row that has no QBO id stored — and the retry would
+      // create a duplicate in QuickBooks. Stop here and report it as the
+      // unverified state it is, naming the id so it can be linked by hand.
+      const reason = error instanceof Error ? error.message : "unknown error";
+      throw new Error(
+        `QuickBooks accepted invoice ${invoiceInput.docNumber} (QBO id ${synced.id}) but EveryStep could not `
+        + `record the link — unverified — identity write failed: ${reason}. The invoice was NOT recorded as `
+        + `synced; retry, and if QuickBooks reports a duplicate number, link QBO id ${synced.id} by hand.`,
+      );
+    }
 
     const confirmed = await verifyQboInvoiceAfterWrite({
       accessToken,

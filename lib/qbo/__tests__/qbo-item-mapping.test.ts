@@ -3,12 +3,12 @@ import { resolve } from "path";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  encodeQboItemSelection,
   isMissingQboItemMappingColumnError,
-  parseQboItemSelection,
+  parseQboItemIdSelection,
   readAccountDefaultQboItem,
   readPricebookQboItemMappings,
 } from "@/lib/qbo/qbo-item-mapping";
+import { resolveQboItemName } from "@/lib/qbo/qbo-item-catalog";
 
 /** Minimal supabase double: one table, one canned result, recorded filters. */
 function makeSupabase(result: { data?: any; error?: any }) {
@@ -118,24 +118,33 @@ describe("readPricebookQboItemMappings", () => {
 });
 
 describe("QBO item form selection", () => {
-  it("round-trips an id and its display name", () => {
-    expect(parseQboItemSelection(encodeQboItemSelection({ id: "41", name: "Duct Cleaning" }))).toEqual({
-      qboItemId: "41",
-      qboItemName: "Duct Cleaning",
-    });
-  });
-
-  it("keeps separators inside a QuickBooks item name", () => {
-    expect(parseQboItemSelection(encodeQboItemSelection({ id: "9", name: "HVAC | Repair" }))).toEqual({
-      qboItemId: "9",
-      qboItemName: "HVAC | Repair",
-    });
+  it("submits the QuickBooks item id alone, so a rename in QBO cannot break it", () => {
+    expect(parseQboItemIdSelection("41")).toBe("41");
+    expect(parseQboItemIdSelection(" 41 ")).toBe("41");
   });
 
   it("treats an empty selection as clearing the mapping", () => {
-    expect(parseQboItemSelection("")).toBeNull();
-    expect(parseQboItemSelection(null)).toBeNull();
-    expect(parseQboItemSelection("|Just a name")).toBeNull();
+    expect(parseQboItemIdSelection("")).toBeNull();
+    expect(parseQboItemIdSelection(null)).toBeNull();
+    expect(parseQboItemIdSelection("   ")).toBeNull();
+  });
+});
+
+describe("resolveQboItemName", () => {
+  const catalog = {
+    connected: true,
+    items: [{ id: "41", name: "Duct Cleaning (renamed)", type: "Service" }],
+    error: null,
+  };
+
+  it("takes the display name from the live catalog, not from the form", () => {
+    expect(resolveQboItemName(catalog, "41")).toBe("Duct Cleaning (renamed)");
+  });
+
+  it("returns null rather than a name it could not confirm", () => {
+    expect(resolveQboItemName(catalog, "999")).toBeNull();
+    expect(resolveQboItemName({ connected: true, items: [], error: "unreachable" }, "41")).toBeNull();
+    expect(resolveQboItemName(catalog, "")).toBeNull();
   });
 });
 

@@ -104,7 +104,7 @@ describe("findQboInvoiceById", () => {
     const snapshot = await findQboInvoiceById({ ...BASE, qboInvoiceId: "4534" });
 
     expect(snapshot).toEqual({
-      id: "4534", syncToken: "5", docNumber: "2109", balance: 840, totalAmount: 840, looksVoided: false,
+      id: "4534", syncToken: "5", docNumber: "2109", balance: 840, totalAmount: 840, totalTax: 0, looksVoided: false,
     });
   });
 

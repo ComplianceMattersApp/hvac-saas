@@ -42,12 +42,17 @@ import { syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-syn
  * Fake supabase that serves per-table `single` (for .maybeSingle) and `list`
  * (for awaited chains) and records .update() payloads per table.
  */
-function makeSupabase(tables: Record<string, { single?: any; list?: any[] }>) {
+function makeSupabase(
+  tables: Record<string, { single?: any; list?: any[] }>,
+  /** Return an error to make that particular update fail, as Postgres would. */
+  options: { updateFails?: (table: string, payload: any) => { message: string } | null } = {},
+) {
   const updates: Record<string, any[]> = {};
-  const builder: any = { __table: "" };
+  const builder: any = { __table: "", __pendingUpdate: null };
   Object.assign(builder, {
     from: vi.fn((t: string) => {
       builder.__table = t;
+      builder.__pendingUpdate = null;
       return builder;
     }),
     select: vi.fn(() => builder),
@@ -59,10 +64,16 @@ function makeSupabase(tables: Record<string, { single?: any; list?: any[] }>) {
     maybeSingle: vi.fn(async () => ({ data: tables[builder.__table]?.single ?? null, error: null })),
     update: vi.fn((payload: any) => {
       (updates[builder.__table] ??= []).push(payload);
+      builder.__pendingUpdate = { table: builder.__table, payload };
       return builder;
     }),
-    then: (resolve: (v: any) => void) =>
-      resolve({ data: tables[builder.__table]?.list ?? [], error: null }),
+    then: (resolve: (v: any) => void) => {
+      const pending = builder.__pendingUpdate;
+      builder.__pendingUpdate = null;
+      const updateError = pending ? options.updateFails?.(pending.table, pending.payload) ?? null : null;
+      if (updateError) return resolve({ data: null, error: updateError });
+      return resolve({ data: tables[builder.__table]?.list ?? [], error: null });
+    },
   });
   return { builder, updates };
 }
@@ -90,6 +101,7 @@ function confirmingReadBack() {
       docNumber: String(invoice?.docNumber ?? ""),
       balance: totalAmount,
       totalAmount,
+      totalTax: 0,
       looksVoided: false,
     };
   };
@@ -198,7 +210,7 @@ describe("syncInvoiceToQbo", () => {
     });
     // Nothing is pushed on the adoption path, so the read-back is stated here.
     findQboInvoiceById.mockResolvedValueOnce({
-      id: "Q-recovered", syncToken: "3", docNumber: "2008", balance: 50, totalAmount: 50, looksVoided: false,
+      id: "Q-recovered", syncToken: "3", docNumber: "2008", balance: 50, totalAmount: 50, totalTax: 0, looksVoided: false,
     });
     const { builder, updates } = makeSupabase({
       internal_invoices: { single: {
@@ -421,7 +433,7 @@ describe("invoice sync verify-after-write", () => {
 
   it("records an error with observed values when the read-back total does not match", async () => {
     findQboInvoiceById.mockResolvedValueOnce({
-      id: "Q1", syncToken: "9", docNumber: "5001", balance: 100, totalAmount: 100, looksVoided: false,
+      id: "Q1", syncToken: "9", docNumber: "5001", balance: 100, totalAmount: 100, totalTax: 0, looksVoided: false,
     });
     const { builder, updates } = supabaseForVerify();
 
@@ -437,7 +449,7 @@ describe("invoice sync verify-after-write", () => {
 
   it("records an error when the read-back doc number does not match", async () => {
     findQboInvoiceById.mockResolvedValueOnce({
-      id: "Q1", syncToken: "9", docNumber: "9999", balance: 300, totalAmount: 300, looksVoided: false,
+      id: "Q1", syncToken: "9", docNumber: "9999", balance: 300, totalAmount: 300, totalTax: 0, looksVoided: false,
     });
     const { builder, updates } = supabaseForVerify();
 
@@ -466,7 +478,7 @@ describe("invoice sync verify-after-write", () => {
 
   it("does not fail an invoice with no document number on QuickBooks' own numbering", async () => {
     findQboInvoiceById.mockResolvedValueOnce({
-      id: "Q1", syncToken: "9", docNumber: "1042", balance: 300, totalAmount: 300, looksVoided: false,
+      id: "Q1", syncToken: "9", docNumber: "1042", balance: 300, totalAmount: 300, totalTax: 0, looksVoided: false,
     });
     const { builder } = makeSupabase({
       internal_invoices: { single: { ...invoiceRow, invoice_display_number: null, invoice_number: null } },
@@ -476,6 +488,72 @@ describe("invoice sync verify-after-write", () => {
     const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
 
     expect(result.status).toBe("synced");
+  });
+
+  it("syncs an Automated Sales Tax invoice by comparing the pre-tax subtotal", async () => {
+    // QuickBooks adds the tax on its own side; EveryStep never sends any. A raw
+    // TotalAmt comparison would fail these tenants on every run forever.
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q1", syncToken: "9", docNumber: "5001", balance: 324.75, totalAmount: 324.75,
+      totalTax: 24.75, looksVoided: false,
+    });
+    const { builder, updates } = supabaseForVerify();
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("synced");
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "synced")).toBe(true);
+  });
+
+  it("still catches a real mismatch on a taxed invoice, and says it compared pre-tax", async () => {
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q1", syncToken: "9", docNumber: "5001", balance: 124.75, totalAmount: 124.75,
+      totalTax: 24.75, looksVoided: false,
+    });
+    const { builder } = supabaseForVerify();
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("observed total $100.00");
+    expect(result.error).toContain("expected $300.00");
+    expect(result.error).toContain("$24.75 sales tax");
+  });
+
+  it("stops at the unverified state when the identity write itself fails", async () => {
+    const { builder, updates } = makeSupabase(
+      { internal_invoices: { single: invoiceRow }, internal_invoice_line_items: lineItems },
+      { updateFails: (table, payload) =>
+          table === "internal_invoices" && payload.qbo_sync_status === "pending"
+            ? { message: "deadlock detected" }
+            : null },
+    );
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("unverified — identity write failed");
+    expect(result.error).toContain("QBO id Q1");
+    // Never verified, and never reported as synced off a link that did not persist.
+    expect(findQboInvoiceById).not.toHaveBeenCalled();
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "synced")).toBe(false);
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "error")).toBe(true);
+  });
+
+  it("does not report synced when the terminal write fails", async () => {
+    const { builder, updates } = makeSupabase(
+      { internal_invoices: { single: invoiceRow }, internal_invoice_line_items: lineItems },
+      { updateFails: (table, payload) =>
+          table === "internal_invoices" && payload.qbo_sync_status === "synced"
+            ? { message: "connection reset" }
+            : null },
+    );
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-verify" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("Failed to persist QBO invoice sync state");
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "error")).toBe(true);
   });
 
   it("records an error when the read-back finds no invoice at all", async () => {
@@ -602,6 +680,48 @@ describe("bill-to-aware QBO customer mapping", () => {
       expect.objectContaining({ description: expect.stringContaining("Job #1401") }),
       expect.objectContaining({ description: expect.stringContaining("Job #1402") }),
     ] }) }));
+  });
+});
+
+describe("EveryStep Services fallback resolution across a bulk run", () => {
+  const lineItems = { list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 10, line_subtotal: 10, sort_order: 1 }] };
+
+  function bulkSupabase(ids: string[]) {
+    return makeSupabase({
+      internal_invoices: {
+        list: ids.map((id) => ({ id })),
+        single: {
+          id: ids[0], status: "issued", account_owner_user_id: "acc", issued_at: "2026-08-11T10:00:00Z",
+          job_id: null, customer_id: null, billing_name: "X", invoice_display_number: 1,
+          invoice_date: "2026-08-11", qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: lineItems,
+    });
+  }
+
+  it("does not let one transient failure poison the rest of the run", async () => {
+    // A cached rejected promise would fail every later invoice with this same
+    // stale error, turning one blip into a whole-sweep outage.
+    findOrCreateEveryStepServicesItem.mockRejectedValueOnce(new Error("QBO 429"));
+    const { builder } = bulkSupabase(["inv-a", "inv-b"]);
+
+    const res = await syncAllPendingInvoicesToQbo({ supabase: builder, accountOwnerUserId: "acc" });
+
+    expect(res.errors).toBe(1);
+    expect(res.synced).toBe(1);
+    expect(res.results[0]).toMatchObject({ status: "error", error: expect.stringContaining("QBO 429") });
+    expect(res.results[1].status).toBe("synced");
+    expect(findOrCreateEveryStepServicesItem).toHaveBeenCalledTimes(2);
+  });
+
+  it("resolves the fallback once for a whole successful run", async () => {
+    const { builder } = bulkSupabase(["inv-a", "inv-b", "inv-c"]);
+
+    const res = await syncAllPendingInvoicesToQbo({ supabase: builder, accountOwnerUserId: "acc" });
+
+    expect(res.synced).toBe(3);
+    expect(findOrCreateEveryStepServicesItem).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { findQboInvoiceById, voidQboInvoice } from "./qbo-api-client";
 import { getValidQboAccessToken } from "./qbo-connection";
 import { getQboAvailability, getQboBaseUrl } from "./qbo-env";
+import { toCents } from "./qbo-money";
 import { isMissingQboVoidColumnError } from "./qbo-void-state";
 
 /**
@@ -34,11 +35,6 @@ export type QboInvoiceVoidResult = {
 
 const VOID_INVOICE_SELECT =
   "id, status, qbo_invoice_id, qbo_void_status, invoice_display_number, invoice_number";
-
-/** Cent-safe comparison — QBO returns dollars as floats. */
-function toCents(amount: number): number {
-  return Math.round(Number(amount ?? 0) * 100);
-}
 
 function invoiceLabel(row: any): string {
   return (
