@@ -10,6 +10,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { buildQboAuthorizationUrl } from "@/lib/qbo/qbo-oauth-client";
 import { disconnectQboConnection } from "@/lib/qbo/qbo-connection";
+import {
+  isMissingQboItemMappingColumnError,
+  parseQboItemSelection,
+} from "@/lib/qbo/qbo-item-mapping";
 
 const STATE_COOKIE = "qbo_oauth_state";
 const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
@@ -64,6 +68,37 @@ export async function initiateQboOAuthFromForm(
   }
 
   redirect(authorizationUrl);
+}
+
+/**
+ * Save the account-level default QuickBooks item.
+ *
+ * Applies to every invoice line whose pricebook item has no mapping of its own.
+ * An empty selection clears both columns, which puts those lines back on the
+ * app-owned "EveryStep Services" item.
+ */
+export async function saveDefaultQboItemFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalRole("admin", { supabase });
+
+  const selection = parseQboItemSelection(formData.get("default_qbo_item"));
+  const { error } = await supabase
+    .from("qbo_connections")
+    .update({
+      default_qbo_item_id: selection?.qboItemId ?? null,
+      default_qbo_item_name: selection?.qboItemName ?? null,
+    })
+    .eq("account_owner_user_id", internalUser.account_owner_user_id);
+
+  if (error) {
+    const notice = isMissingQboItemMappingColumnError(error)
+      ? "qbo_default_item_unavailable"
+      : "qbo_default_item_failed";
+    redirect(`${COMPANY_PROFILE_PATH}?notice=${notice}#integrations`);
+  }
+
+  revalidatePath(COMPANY_PROFILE_PATH);
+  redirect(`${COMPANY_PROFILE_PATH}?notice=qbo_default_item_saved#integrations`);
 }
 
 export async function disconnectQboFromForm(

@@ -18,6 +18,12 @@ import {
 } from "@/lib/business/pricebook-options";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/auth/request-identity";
+import { loadQboItemCatalog, type QboItemCatalog } from "@/lib/qbo/qbo-item-catalog";
+import {
+  encodeQboItemSelection,
+  readPricebookQboItemMappings,
+  type PricebookQboItemMapping,
+} from "@/lib/qbo/qbo-item-mapping";
 import { PricebookImportPanel } from "./PricebookImportPanel";
 
 type SearchParams = Promise<{ notice?: string; view?: string; q?: string; category?: string }>;
@@ -55,6 +61,10 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   },
   not_found: { tone: "error", message: "That item was not found in your account scope." },
   save_failed: { tone: "error", message: "Could not save changes. Please try again." },
+  qbo_item_save_failed: {
+    tone: "warn",
+    message: "The item was saved, but its QuickBooks item mapping was not. Please try that change again.",
+  },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -171,6 +181,62 @@ function normalizeCategoryFilter(raw: unknown) {
   return String(raw ?? "").trim();
 }
 
+/**
+ * Optional QuickBooks item mapping for one pricebook item.
+ *
+ * Only rendered when QuickBooks is connected. When the item list can't be
+ * loaded the selector is disabled and the hidden presence marker is omitted, so
+ * saving the rest of the row leaves the existing mapping untouched rather than
+ * clearing it.
+ */
+function QboItemMappingField({
+  catalog,
+  knownItemIds,
+  mapping,
+}: {
+  catalog: QboItemCatalog;
+  knownItemIds: Set<string>;
+  mapping: PricebookQboItemMapping | null;
+}) {
+  const listUnavailable = catalog.items.length === 0;
+  const staleSelection = mapping && !knownItemIds.has(mapping.qboItemId) ? mapping : null;
+  const selectedValue = mapping
+    ? encodeQboItemSelection({ id: mapping.qboItemId, name: mapping.qboItemName ?? "" })
+    : "";
+
+  return (
+    <label className="block space-y-1 text-xs text-slate-700">
+      <span className="font-semibold text-slate-900">QuickBooks item</span>
+      {listUnavailable ? null : <input type="hidden" name="qbo_item_mapping_present" value="1" />}
+      <select
+        name="qbo_item"
+        defaultValue={selectedValue}
+        disabled={listUnavailable}
+        className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100 disabled:text-slate-500"
+      >
+        <option value="">None (use the account default)</option>
+        {staleSelection ? (
+          <option
+            value={encodeQboItemSelection({
+              id: staleSelection.qboItemId,
+              name: staleSelection.qboItemName ?? "",
+            })}
+          >
+            {staleSelection.qboItemName ?? `QuickBooks item ${staleSelection.qboItemId}`} (not in the
+            current QuickBooks list)
+          </option>
+        ) : null}
+        {catalog.items.map((item) => (
+          <option key={item.id} value={encodeQboItemSelection(item)}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+      {catalog.error ? <span className="text-[10px] text-amber-700">{catalog.error}</span> : null}
+    </label>
+  );
+}
+
 async function requireAdminOrRedirect() {
   const supabase = await createClient();
   const user = await getRequestUser();
@@ -233,6 +299,22 @@ export default async function AdminPricebookPage({
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   }));
+
+  // QuickBooks item mapping. Read through the dedicated helpers rather than the
+  // catalog SELECT above: a lagging migration would otherwise turn one missing
+  // column into a 42703 that takes down the whole Pricebook page.
+  const qboItemCatalog: QboItemCatalog = await loadQboItemCatalog({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  const qboMappingByItemId: Map<string, PricebookQboItemMapping> = qboItemCatalog.connected
+    ? await readPricebookQboItemMappings({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        pricebookItemIds: rows.map((row) => row.id),
+      })
+    : new Map();
+  const qboKnownItemIds = new Set(qboItemCatalog.items.map((item) => item.id));
 
   const availableCategories = Array.from(
     new Set(rows.map((row) => String(row.category ?? "").trim()).filter((value) => value.length > 0)),
@@ -693,6 +775,13 @@ export default async function AdminPricebookPage({
                                 className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
                               />
                             </label>
+                            {qboItemCatalog.connected ? (
+                              <QboItemMappingField
+                                catalog={qboItemCatalog}
+                                knownItemIds={qboKnownItemIds}
+                                mapping={qboMappingByItemId.get(row.id) ?? null}
+                              />
+                            ) : null}
                             <button
                               type="submit"
                               className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-900 transition hover:bg-slate-100"
