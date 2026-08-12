@@ -1,6 +1,6 @@
 # Operations Desktop Queue Contract
 
-Status: approved desktop baseline as of July 25, 2026.
+Status: desktop baseline revised with the queue-state matrix on August 11, 2026.
 
 This is the authoritative handoff for future `/ops` desktop work. The current
 queue engine is authoritative for membership, counts, reasons, sorting,
@@ -31,22 +31,36 @@ builder applies a stricter rule.
 
 | Queue | Current membership source |
 | --- | --- |
-| Needs Scheduling | Open jobs with `ops_status = need_to_schedule` |
-| Field Work | Not closed, not field-complete, scheduled during the current Los Angeles business day |
+| Needs Scheduling | Open jobs with `ops_status = need_to_schedule` and no active follow-up reminder |
+| Field Work | Assigned, active, not field-complete work scheduled during the current Los Angeles business day, with no primary office-action responsibility |
 | Needs Assignment | The scheduled-without-technician snapshot |
-| Waiting / Pending Info | Current `pending_info`, `on_hold`, `waiting`, and `pending_office_review` work; pending-info rows pass through the waiting-queue builder |
+| Waiting / Pending Info | Current `pending_info`, `on_hold`, and `waiting` work; pending-info rows pass through the waiting-queue builder |
 | Exceptions | Current `failed`, `retest_needed`, `pending_office_review`, and `problem` work |
-| Follow Ups | A follow-up date, next-action note, or action-required-by value exists |
-| Closeout & Review | The uncapped field-complete set passed through billing-truth projection and `listCloseoutQueueJobs` |
+| Follow Ups | Active `follow_up` work or a nonterminal job with a follow-up date, next-action note, or action-required-by value, unless Waiting or Exceptions has precedence |
+| Closeout & Review | Field-complete actionable closeout work. An outstanding invoice may overlap the one primary queue; after invoice completion, the primary responsibility remains and Closeout drops away |
 | Contractor Intake | Pending contractor intake rows when the product surface enables contractor/rater handoff |
 | Permits | Active permit requests when both the workflow and schema are available |
 | Updates | Existing unread contractor-update and new-work-request awareness |
 
+Each job has at most one primary operational queue: Exceptions, Waiting,
+Follow Ups, Needs Scheduling, Needs Assignment, or Field Work. Precedence is
+Exceptions, then Waiting, then Follow Ups, followed by the normal scheduling
+and field-work flow. Needs Assignment and Field Work are mutually exclusive.
+Closeout remains the separate invoice/cert work axis, but it may coexist with a
+primary queue only while an actionable invoice obligation remains. That invoice
+work may overlap Exceptions, Waiting, or Follow Ups; cert-only work does not.
+A closed or cancelled job has no active queue membership, even if legacy
+reminder fields remain populated.
+
+Scheduling resolves and clears active follow-up reminder metadata. Scheduling
+does not silently erase a higher-priority hold or exception; that responsibility
+must be released by its own transition. Completing invoice work removes only
+Closeout membership and cannot clear Waiting, Exceptions, or Follow Ups.
+
 Exceptions are available to `hvac_service`, `ecc_hers`, and `hybrid` accounts.
 They stay visible and reachable at a zero count. Historical ECC retest parents
 in `failed`, `retest_needed`, or `pending_office_review` are excluded after a
-real continuation job exists. `pending_office_review` intentionally contributes
-to both Waiting and Exceptions.
+real continuation job exists. `pending_office_review` belongs only to Exceptions.
 
 Do not replace these rules with card labels, mockup examples, old status lists,
 or inferred workflow semantics.
