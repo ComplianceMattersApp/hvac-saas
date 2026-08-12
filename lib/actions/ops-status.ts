@@ -9,6 +9,7 @@ export type OpsStatus =
   | "pending_info"
   | "pending_office_review"
   | "on_hold"
+  | "follow_up"
   | "failed"
   | "retest_needed"
   | "paperwork_required"
@@ -19,6 +20,7 @@ const MANUAL_STATUSES: OpsStatus[] = [
   "pending_info",
   "pending_office_review",
   "on_hold",
+  "follow_up",
   "retest_needed",
   "paperwork_required",
 ];

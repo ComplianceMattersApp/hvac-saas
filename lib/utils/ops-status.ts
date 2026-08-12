@@ -12,6 +12,27 @@ export type ResolveOpsStatusInput = {
   current_ops_status?: string | null;
 };
 
+export const ACTIVE_PRIMARY_RESPONSIBILITY_OPS_STATUSES = [
+  "pending_info",
+  "on_hold",
+  "waiting",
+  "failed",
+  "retest_needed",
+  "pending_office_review",
+  "problem",
+  "follow_up",
+] as const;
+
+const ACTIVE_PRIMARY_RESPONSIBILITY_STATUS_SET = new Set<string>(
+  ACTIVE_PRIMARY_RESPONSIBILITY_OPS_STATUSES,
+);
+
+export function isActivePrimaryResponsibilityOpsStatus(value: unknown): boolean {
+  return ACTIVE_PRIMARY_RESPONSIBILITY_STATUS_SET.has(
+    String(value ?? "").trim().toLowerCase(),
+  );
+}
+
 export function resolveOpsStatus(job: ResolveOpsStatusInput): string {
   const status = (job.status ?? "").toLowerCase();
   const jobType = (job.job_type ?? "").toLowerCase();
@@ -24,21 +45,15 @@ export function resolveOpsStatus(job: ResolveOpsStatusInput): string {
   const certsComplete = !!job.certs_complete;
   const invoiceComplete = !!job.invoice_complete;
 
+  // Holds, exceptions, and follow-ups are primary operational responsibilities.
+  // Invoice/cert completion is a separate axis and must not erase them.
+  if (isActivePrimaryResponsibilityOpsStatus(currentOps)) {
+    return currentOps;
+  }
+
   // Pre-field workflow
   if (!fieldComplete) {
     return isScheduled ? "scheduled" : "need_to_schedule";
-  }
-
-  // Preserve unresolved ECC failure states.
-  // Failed originals and retest-needed jobs should not be auto-resolved
-  // by generic closeout actions.
-  if (
-    jobType === "ecc" &&
-    (currentOps === "failed" ||
-      currentOps === "retest_needed" ||
-      currentOps === "pending_office_review")
-  ) {
-    return currentOps;
   }
 
   // Post-field / closeout workflow
@@ -73,11 +88,9 @@ export function getPendingInfoSignal(input: PendingInfoSignalInput): boolean {
   const legacyPendingInfo =
     String(input.ops_status ?? "").trim().toLowerCase() === "pending_info";
 
-  const derivedPendingInfo =
-    hasSignalValue(input.pending_info_reason) ||
-    hasSignalValue(input.follow_up_date) ||
-    hasSignalValue(input.next_action_note) ||
-    hasSignalValue(input.action_required_by);
+  // Follow-up reminders are their own primary responsibility. They must not
+  // make a job look like it is blocked on missing information.
+  const derivedPendingInfo = hasSignalValue(input.pending_info_reason);
 
   return legacyPendingInfo || derivedPendingInfo;
 }

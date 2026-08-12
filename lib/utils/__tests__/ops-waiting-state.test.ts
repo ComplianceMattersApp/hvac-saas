@@ -4,10 +4,24 @@ import {
   formatWaitingStateReason,
   getActiveWaitingState,
   getInterruptClearActionLabel,
+  getPendingInfoSignal,
   parseWaitingStateReason,
 } from "@/lib/utils/ops-status";
 
 describe("ops waiting-state helpers", () => {
+  it("does not treat Follow Up reminder metadata as Pending Info", () => {
+    expect(getPendingInfoSignal({
+      ops_status: "follow_up",
+      follow_up_date: "2026-08-15",
+      next_action_note: "Call customer",
+      action_required_by: "customer",
+    })).toBe(false);
+
+    expect(getPendingInfoSignal({
+      ops_status: "pending_info",
+      pending_info_reason: "Need access code",
+    })).toBe(true);
+  });
   it("formats waiting-on-part reason with readable prefix", () => {
     expect(formatWaitingStateReason("waiting_on_part", "condenser fan motor")).toBe(
       "Waiting on part: condenser fan motor",

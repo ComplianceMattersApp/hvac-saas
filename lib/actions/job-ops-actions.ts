@@ -60,6 +60,11 @@ import {
 import {
   withJobsBillingDispositionSelectFallback,
 } from "@/lib/supabase/jobs-billing-disposition-compat";
+import {
+  hasActiveFollowUpReminder,
+  isPrimaryQueueJob,
+  resolvePrimaryOpsQueue,
+} from "@/lib/ops/queue-membership";
 export type { ContractorFailureDetail } from "@/lib/portal/resolveContractorIssues";
 
 type CloseoutInternalInvoiceSnapshot =
@@ -71,6 +76,7 @@ const OPS_STATUSES = [
   "pending_info",
   "pending_office_review",
   "on_hold",
+  "follow_up",
   "failed",
   "retest_needed",
   "field_complete",
@@ -103,6 +109,10 @@ type CertCloseoutJobSnapshot = {
   billing_disposition: string | null;
   ops_status: string | null;
   pending_info_reason: string | null;
+  on_hold_reason: string | null;
+  follow_up_date: string | null;
+  next_action_note: string | null;
+  action_required_by: string | null;
   permit_number: string | null;
   scheduled_date: string | null;
   window_start: string | null;
@@ -120,7 +130,7 @@ async function readCertCloseoutJobSnapshot(params: {
       params.supabase
         .from("jobs")
         .select(
-          "id, status, job_type, field_complete, certs_complete, invoice_complete, billing_disposition, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+          "id, status, job_type, field_complete, certs_complete, invoice_complete, billing_disposition, ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
         )
         .eq("id", params.jobId)
         .single(),
@@ -128,7 +138,7 @@ async function readCertCloseoutJobSnapshot(params: {
       params.supabase
         .from("jobs")
         .select(
-          "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+          "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
         )
         .eq("id", params.jobId)
         .single(),
@@ -1543,7 +1553,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     field_complete: job.field_complete,
     certs_complete: true,
     invoice_complete: billedTruthSatisfied,
-    current_ops_status: job.ops_status,
+    current_ops_status: isPrimaryQueueJob(job, "follow_ups") ? "follow_up" : job.ops_status,
   });
 
   const { error: opsErr } = await supabase
@@ -1739,7 +1749,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
     )
     .eq("id", jobId)
     .single();
@@ -1771,7 +1781,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
     field_complete: job.field_complete,
     certs_complete: job.certs_complete,
     invoice_complete: true,
-    current_ops_status: job.ops_status,
+    current_ops_status: isPrimaryQueueJob(job, "follow_ups") ? "follow_up" : job.ops_status,
   });
 
   // ECC guard:
@@ -1874,7 +1884,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
 
   const { data: beforeJob, error: beforeErr } = await supabase
     .from('jobs')
-    .select('ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, ops_board_failure_note')
+    .select('status, job_type, scheduled_date, window_start, window_end, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, ops_board_failure_note')
     .eq('id', jobId)
     .single();
 
@@ -1925,8 +1935,39 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
         : null
       : before.ops_board_failure_note ?? null;
 
+  const hasFollowUpAfterSave = hasActiveFollowUpReminder({
+    follow_up_date,
+    next_action_note,
+    action_required_by,
+  });
+  const currentOpsStatus = String(before.ops_status ?? "").trim().toLowerCase();
+  const isTerminalJob =
+    currentOpsStatus === "closed" ||
+    String(beforeJob.status ?? "").trim().toLowerCase() === "cancelled";
+  const primaryQueueBefore = resolvePrimaryOpsQueue(beforeJob);
+  const primaryResponsibilityAlreadyActive =
+    primaryQueueBefore === "waiting" || primaryQueueBefore === "exceptions";
+
+  let nextOpsStatus = before.ops_status;
+  if (hasFollowUpAfterSave && !primaryResponsibilityAlreadyActive && !isTerminalJob) {
+    nextOpsStatus = "follow_up";
+  } else if (!hasFollowUpAfterSave && currentOpsStatus === "follow_up") {
+    nextOpsStatus = resolveOpsStatus({
+      status: beforeJob.status ?? null,
+      job_type: beforeJob.job_type ?? null,
+      scheduled_date: beforeJob.scheduled_date ?? null,
+      window_start: beforeJob.window_start ?? null,
+      window_end: beforeJob.window_end ?? null,
+      field_complete: beforeJob.field_complete ?? false,
+      certs_complete: beforeJob.certs_complete ?? false,
+      invoice_complete: beforeJob.invoice_complete ?? false,
+      current_ops_status: null,
+    });
+  }
+
   const after: OpsSnapshot = {
     ...before,
+    ops_status: nextOpsStatus,
     follow_up_date,
     next_action_note,
     action_required_by,
@@ -1943,6 +1984,7 @@ export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<v
   const { error: updateErr } = await supabase
     .from('jobs')
     .update({
+      ops_status: nextOpsStatus,
       follow_up_date,
       next_action_note,
       action_required_by,
@@ -2067,9 +2109,11 @@ export async function releaseAndReevaluate(
   if (!before?.id) throw new Error("Job not found");
 
   const currentOps = String(before.ops_status ?? "").trim().toLowerCase();
+  const isFollowUpRelease = currentOps === "follow_up";
   const releasable = new Set([
     "pending_info",
     "on_hold",
+    "follow_up",
     "failed",
     "retest_needed",
     "paperwork_required",
@@ -2105,6 +2149,9 @@ export async function releaseAndReevaluate(
       ops_status: neutralOps,
       pending_info_reason: null,
       on_hold_reason: hasOnHoldState ? null : before.on_hold_reason ?? null,
+      ...(isFollowUpRelease
+        ? { follow_up_date: null, next_action_note: null, action_required_by: null }
+        : {}),
     };
 
     if (shouldSetCompletedLifecycle) {
@@ -2139,13 +2186,19 @@ export async function releaseAndReevaluate(
       field_complete: before.field_complete,
       certs_complete: before.certs_complete,
       invoice_complete: before.invoice_complete,
-      current_ops_status: before.ops_status,
+      // This action explicitly releases the current primary responsibility.
+      // Passing the protected value back into the lifecycle resolver would
+      // immediately re-lock the job in the queue we are clearing.
+      current_ops_status: null,
     });
 
     const releasePatch: Record<string, any> = {
       ops_status: nextOps,
       pending_info_reason: null,
       on_hold_reason: hasOnHoldState ? null : before.on_hold_reason ?? null,
+      ...(isFollowUpRelease
+        ? { follow_up_date: null, next_action_note: null, action_required_by: null }
+        : {}),
     };
 
     if (shouldSetCompletedLifecycle) {
@@ -2173,9 +2226,9 @@ export async function releaseAndReevaluate(
       ops_status: nextOps,
       pending_info_reason: null,
       on_hold_reason: hasOnHoldState ? null : before.on_hold_reason ?? null,
-      follow_up_date: before.follow_up_date ?? null,
-      next_action_note: before.next_action_note ?? null,
-      action_required_by: before.action_required_by ?? null,
+      follow_up_date: isFollowUpRelease ? null : before.follow_up_date ?? null,
+      next_action_note: isFollowUpRelease ? null : before.next_action_note ?? null,
+      action_required_by: isFollowUpRelease ? null : before.action_required_by ?? null,
     }
   );
 

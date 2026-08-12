@@ -145,7 +145,7 @@ async function applyResolvedEccCloseoutStatus(params: {
   });
 }
 
-const ECC_HARD_LOCKS = new Set<string>(["pending_info", "on_hold"]);
+const ECC_HARD_LOCKS = new Set<string>(["pending_info", "on_hold", "follow_up"]);
 
 async function applyEccPermitNeededBlocker(params: {
   supabase: any;
@@ -230,7 +230,7 @@ async function applyEccPermitNeededBlocker(params: {
  * - Otherwise: do not force to paperwork/failed (leave schedule/call list/etc)
  *
  * Guardrails:
- * - Does NOT overwrite true admin holds (pending_info, on_hold) when setting ops_status.
+ * - Does NOT overwrite active primary responsibilities (pending_info, on_hold, follow_up).
  * - Canonical failure (anyRequiredFail) uses forceSetOpsStatus to override ECC-derived
  *   states like paperwork_required that must be re-derivable after test edits.
  * - Does NOT close jobs; paperwork completion remains separate.

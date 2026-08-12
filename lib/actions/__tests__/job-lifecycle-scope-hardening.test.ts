@@ -825,6 +825,42 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     );
   });
 
+  it("resolves Follow Up reminder state when the job is scheduled", async () => {
+    const { supabase, jobsUpdates, jobEvents } = makeSchedulePreservationFixture({
+      ops_status: "follow_up",
+      follow_up_date: "2026-04-22",
+      next_action_note: "Call when ready to schedule",
+      action_required_by: "customer",
+    });
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobScheduleFromForm } = await import("@/lib/actions/job-actions");
+    await updateJobScheduleFromForm(buildScheduleOnlyFormData());
+
+    expect(jobsUpdates[0]).toEqual(expect.objectContaining({
+      ops_status: "scheduled",
+      follow_up_date: null,
+      next_action_note: null,
+      action_required_by: null,
+    }));
+    expect(jobEvents[0]).toEqual(expect.objectContaining({
+      meta: expect.objectContaining({
+        follow_up_resolved_by_scheduling: true,
+        before: expect.objectContaining({
+          ops_status: "follow_up",
+          follow_up_date: "2026-04-22",
+        }),
+        after: expect.objectContaining({
+          ops_status: "scheduled",
+          follow_up_date: null,
+          next_action_note: null,
+          action_required_by: null,
+        }),
+      }),
+    }));
+  });
+
   it.each(["on_the_way", "in_process", "in_progress"])(
     "requires explicit confirmation before rescheduling active lifecycle %s",
     async (status) => {

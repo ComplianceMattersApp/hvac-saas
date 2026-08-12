@@ -91,13 +91,6 @@ export function buildWaitingQueueRows(jobs: FocusedQueueJob[]): FocusedQueueJob[
     .filter((job) => {
       if (!String(job?.id ?? "").trim()) return false;
       if (job?.service_follow_up_continued) return false;
-      const isAutomaticPermitWait =
-        normalize(job?.ops_status) === "pending_info" &&
-        job?.field_complete === true &&
-        normalize(job?.job_type) === "ecc" &&
-        isEccPermitNeededReason(job?.pending_info_reason) &&
-        job?.invoice_complete === false;
-      if (isAutomaticPermitWait) return false;
       return isWaitingQueueStatus(job?.ops_status);
     })
     .sort(compareByCreatedAtOldest);
@@ -382,6 +375,10 @@ export function getOpsQueueCardStatusReason(
       : "Office Review Needed";
   }
   if (status === "problem") return "Operational Issue";
+  if (status === "follow_up") {
+    const nextAction = cleanReason(job?.next_action_note);
+    return nextAction ? `Follow Up: ${nextAction}` : "Follow Up";
+  }
   if (status === "paperwork_required") return "Closeout: Paperwork Required";
   if (status === "invoice_required") return "Closeout: Invoice Required";
   if (status === "closed") return "Closeout Complete";

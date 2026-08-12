@@ -6,6 +6,7 @@ import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { resolveOpsStatus } from "@/lib/utils/ops-status";
 import { forceSetOpsStatus, setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import type { OpsStatus } from "@/lib/actions/ops-status";
+import { isPrimaryQueueJob } from "@/lib/ops/queue-membership";
 
 /**
  * Job-type-aware ops_status resolver entry point.
@@ -16,13 +17,13 @@ import type { OpsStatus } from "@/lib/actions/ops-status";
  * ECC jobs:
  *   Delegates entirely to evaluateEccOpsStatus, which is test-run-aware,
  *   scenario-driven, and handles its own DB write with appropriate hard-lock
- *   guards (pending_info, on_hold are never cleared by ECC evaluation).
+ *   guards (active primary responsibilities are never cleared by ECC evaluation).
  *
  * Service jobs (and unknown/fallback job types):
  *   Computes next status via resolveOpsStatus (pure lifecycle utility), then
  *   writes via setOpsStatusIfNotManual, which respects the manual-lock list
- *   (pending_info, on_hold, retest_needed, paperwork_required, invoice_required
- *   are not overwritten by automated resolution).
+ *   so active primary responsibilities are not overwritten by automated
+ *   closeout resolution.
  */
 export async function evaluateJobOpsStatus(jobId: string): Promise<void> {
   const supabase = await createClient();
@@ -30,7 +31,7 @@ export async function evaluateJobOpsStatus(jobId: string): Promise<void> {
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, job_type, status, scheduled_date, window_start, window_end, field_complete, certs_complete, invoice_complete, ops_status"
+      "id, job_type, status, scheduled_date, window_start, window_end, field_complete, certs_complete, invoice_complete, ops_status, deleted_at, follow_up_date, next_action_note, action_required_by"
     )
     .eq("id", jobId)
     .single();
@@ -41,6 +42,14 @@ export async function evaluateJobOpsStatus(jobId: string): Promise<void> {
   const jobType = String(job.job_type ?? "").trim().toLowerCase();
   const currentOps = String(job.ops_status ?? "").trim().toLowerCase();
   const isFieldComplete = Boolean(job.field_complete) || String(job.status ?? "").trim().toLowerCase() === "completed";
+
+  // Legacy rows can carry reminder fields while their ops_status still points
+  // at scheduling or closeout. Canonicalize that responsibility before any
+  // lifecycle evaluator gets a chance to erase it.
+  if (currentOps !== "follow_up" && isPrimaryQueueJob(job, "follow_ups")) {
+    await forceSetOpsStatus(jobId, "follow_up");
+    return;
+  }
 
   // Pre-field lifecycle is universal and schedule-driven.
   // Guard: never auto-overwrite true ECC failure/retest states with scheduling-derived statuses.

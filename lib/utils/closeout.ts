@@ -59,6 +59,12 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
   // If closed jobs ever become queue-eligible, update those reads too.
   if (opsStatus === "closed") return false;
 
+  // Billing is an independent obligation. A completed job may therefore be in
+  // Closeout at the same time as its one primary action queue (Waiting,
+  // Exceptions, or Follow Ups). Paying/issuing the invoice removes only this
+  // Closeout membership; it must not resolve the primary responsibility.
+  if (needs.needsInvoice) return true;
+
   if (needs.isBlockedForCloseout) {
     const isAutomaticPermitWait =
       opsStatus === "pending_info" &&
@@ -69,13 +75,8 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
 
   // The Closeout queue contains work that can be completed now. A missing permit
   // remains a job-detail blocker, but by itself belongs in Waiting / Pending Info.
-  const hasCloseoutWork = needs.needsInvoice || needs.needsCerts;
+  const hasCloseoutWork = needs.needsCerts;
   if (!hasCloseoutWork) return false;
-
-  // Invoice-needed closeout remains visible across active workflow statuses.
-  // Manual pending/hold states were routed out above; automatic permit waiting
-  // stays here only until its invoice is complete.
-  if (needs.needsInvoice) return true;
 
   if (opsStatus === "invoice_required" || opsStatus === "paperwork_required") return true;
 

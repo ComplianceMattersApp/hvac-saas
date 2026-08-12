@@ -91,7 +91,7 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
-  it("routes manual pending info to waiting even when invoice remains pending", () => {
+  it("allows invoice closeout to overlap manual pending info", () => {
     const job = {
       field_complete: true,
       job_type: "ecc",
@@ -106,7 +106,7 @@ describe("closeout queue projection", () => {
       needsCerts: false,
       isBlockedForCloseout: true,
     });
-    expect(isInCloseoutQueue(job)).toBe(false);
+    expect(isInCloseoutQueue(job)).toBe(true);
   });
 
   it("keeps permit-missing jobs in closeout when invoice remains pending", () => {
@@ -122,7 +122,7 @@ describe("closeout queue projection", () => {
     expect(isInCloseoutQueue(job)).toBe(true);
   });
 
-  it("routes manual permit holds to waiting even when invoice remains pending", () => {
+  it("allows invoice closeout to overlap a manual permit hold", () => {
     expect(
       isInCloseoutQueue({
         field_complete: true,
@@ -132,7 +132,7 @@ describe("closeout queue projection", () => {
         invoice_complete: false,
         certs_complete: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("routes permit-missing jobs to waiting after billing is complete", () => {
@@ -148,7 +148,7 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
-  it("keeps manual holds out of closeout while retaining other active invoice work", () => {
+  it("keeps invoice work in closeout even while a primary hold or exception remains active", () => {
     expect(
       isInCloseoutQueue({
         field_complete: true,
@@ -157,7 +157,7 @@ describe("closeout queue projection", () => {
         on_hold_reason: "Status interrupt state test",
         invoice_complete: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
 
     expect(
       isInCloseoutQueue({

@@ -115,6 +115,7 @@ import {
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { listScopedContractorsForJobDetail } from "@/lib/actions/internal-job-detail-read-boundary";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
+import { hasActiveFollowUpReminder, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
 
 export type { JobStatus } from "@/lib/types/job";
 
@@ -11518,6 +11519,26 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     next_ops_status = String(before?.ops_status ?? "").trim() || next_ops_status;
   }
 
+  const isScheduledAfterSave = Boolean(scheduled_date || window_start || window_end);
+  const resolvesFollowUpByScheduling =
+    !unscheduleRequested &&
+    isScheduledAfterSave &&
+    hasActiveFollowUpReminder({
+      follow_up_date: before?.follow_up_date ?? null,
+      next_action_note: before?.next_action_note ?? null,
+      action_required_by: before?.action_required_by ?? null,
+    });
+  const primaryResponsibilityBefore = String(before?.ops_status ?? "").trim().toLowerCase();
+  const primaryQueueBefore = resolvePrimaryOpsQueue(before ?? {});
+  const preservesHigherPriorityResponsibility =
+    primaryQueueBefore === "waiting" || primaryQueueBefore === "exceptions";
+
+  if (resolvesFollowUpByScheduling) {
+    next_ops_status = preservesHigherPriorityResponsibility
+      ? primaryResponsibilityBefore
+      : "scheduled";
+  }
+
   const permit_number = hasPermitNumberInput
     ? (permitNumberRaw || null)
     : before?.permit_number ?? null;
@@ -11562,7 +11583,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   const scheduleReason =
     String(formData.get("schedule_reason") || formData.get("reason") || "").trim() || null;
 
-  if (!didScheduleFieldsChange && !didPermitFieldsChange) {
+  if (!didScheduleFieldsChange && !didPermitFieldsChange && !resolvesFollowUpByScheduling) {
     revalidatePath(`/jobs/${id}`);
     revalidatePath(`/calendar`);
     return finishScheduleTarget("schedule_already_saved");
@@ -11575,7 +11596,19 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     windowEnd: window_end,
     unscheduleRequested,
     resetActiveLifecycle,
-    extraFields: { permit_number, jurisdiction, permit_date },
+    extraFields: {
+      permit_number,
+      jurisdiction,
+      permit_date,
+      ...(resolvesFollowUpByScheduling
+        ? {
+            ...(preservesHigherPriorityResponsibility ? {} : { ops_status: "scheduled" }),
+            follow_up_date: null,
+            next_action_note: null,
+            action_required_by: null,
+          }
+        : {}),
+    },
   });
 
   if (scheduleUpdateResult.opsEvalFailed) {
@@ -11661,6 +11694,9 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         permit_number: before?.permit_number ?? null,
         jurisdiction: before?.jurisdiction ?? null,
         permit_date: before?.permit_date ?? null,
+        follow_up_date: before?.follow_up_date ?? null,
+        next_action_note: before?.next_action_note ?? null,
+        action_required_by: before?.action_required_by ?? null,
       },
       after: {
         scheduled_date,
@@ -11672,7 +11708,11 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         permit_number,
         jurisdiction,
         permit_date,
+        follow_up_date: resolvesFollowUpByScheduling ? null : before?.follow_up_date ?? null,
+        next_action_note: resolvesFollowUpByScheduling ? null : before?.next_action_note ?? null,
+        action_required_by: resolvesFollowUpByScheduling ? null : before?.action_required_by ?? null,
       },
+      follow_up_resolved_by_scheduling: resolvesFollowUpByScheduling,
       active_lifecycle_reset: resetActiveLifecycle,
       active_lifecycle_before: resetActiveLifecycle ? activeLifecycleStatus : null,
     },

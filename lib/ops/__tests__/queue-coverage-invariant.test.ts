@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildExceptionQueueRows, buildWaitingQueueRows } from "@/lib/ops/focused-queues";
 import { isInCloseoutQueue } from "@/lib/utils/closeout";
+import { resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Queue coverage invariant
@@ -30,6 +31,7 @@ const OPS_STATUSES = [
   "pending_info",
   "pending_office_review",
   "on_hold",
+  "follow_up",
   "failed",
   "retest_needed",
   "paperwork_required",
@@ -115,7 +117,7 @@ function isTerminalState(job: MatrixJob): boolean {
 
 // Mirrors app/ops/page.tsx needToScheduleCountQ (requireOpenStatus).
 function claimedByNeedToSchedule(job: MatrixJob): boolean {
-  return job.ops_status === "need_to_schedule" && job.status === "open";
+  return resolvePrimaryOpsQueue(job) === "need_to_schedule";
 }
 
 // Dispatch / Today / Field Work surfaces: scheduled or actively-worked jobs
@@ -123,6 +125,7 @@ function claimedByNeedToSchedule(job: MatrixJob): boolean {
 // scheduledOpenRowsQ + calendar/Today read models).
 function claimedByDispatchSurfaces(job: MatrixJob): boolean {
   if (job.field_complete) return false;
+  if (resolvePrimaryOpsQueue(job) !== null) return false;
   if (job.ops_status === "scheduled") return true;
   return job.status === "on_the_way" || job.status === "in_process";
 }
@@ -142,9 +145,8 @@ function claimedByCloseout(job: MatrixJob): boolean {
   return isInCloseoutQueue(job);
 }
 
-// pending_office_review is additionally surfaced in the Waiting count on /ops.
-function claimedByOfficeReview(job: MatrixJob): boolean {
-  return job.ops_status === "pending_office_review";
+function claimedByFollowUps(job: MatrixJob): boolean {
+  return resolvePrimaryOpsQueue(job) === "follow_ups";
 }
 
 const QUEUES: Array<[string, (job: MatrixJob) => boolean]> = [
@@ -152,8 +154,8 @@ const QUEUES: Array<[string, (job: MatrixJob) => boolean]> = [
   ["dispatch", claimedByDispatchSurfaces],
   ["waiting", claimedByWaiting],
   ["exceptions", claimedByExceptions],
+  ["follow_ups", claimedByFollowUps],
   ["closeout", claimedByCloseout],
-  ["office_review", claimedByOfficeReview],
 ];
 
 function describeState(job: MatrixJob): string {
@@ -209,18 +211,6 @@ const ALLOWED_ORPHAN_RULES: Array<{ reason: string; matches: (job: MatrixJob) =>
       !job.certs_complete &&
       job.permit_number === "none" &&
       job.invoice_complete,
-  },
-  {
-    // Automatic permit wait whose permit has since been recorded but whose
-    // pending_info hold has not been released yet. Both permit writers release
-    // it (releasePendingInfoAndRecompute via auto_release_on_permit_save and
-    // permit_available), so this exists only inside those transactions.
-    reason: "writer-protected released-permit hold (permit saves release pending_info)",
-    matches: (job) =>
-      job.job_type === "ecc" &&
-      job.ops_status === "pending_info" &&
-      job.pending_info_reason === "Permit Needed" &&
-      job.permit_number !== "none",
   },
 ];
 
