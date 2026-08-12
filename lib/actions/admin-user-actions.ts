@@ -72,6 +72,56 @@ async function getAuthUserIdByEmail(admin: any, email: string): Promise<string |
   return null;
 }
 
+async function isOwnerScopedInternalUser(params: {
+  admin: any;
+  userId: string;
+  accountOwnerUserId: string;
+}): Promise<boolean> {
+  const { data: scopedInternalUser, error: scopedInternalUserErr } = await params.admin
+    .from("internal_users")
+    .select("user_id")
+    .eq("user_id", params.userId)
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .maybeSingle();
+
+  if (scopedInternalUserErr) throw scopedInternalUserErr;
+  return Boolean(scopedInternalUser?.user_id);
+}
+
+async function isOwnerScopedContractorMember(params: {
+  admin: any;
+  userId: string;
+  accountOwnerUserId: string;
+}): Promise<boolean> {
+  const { data: membershipRows, error: membershipErr } = await params.admin
+    .from("contractor_users")
+    .select("contractor_id")
+    .eq("user_id", params.userId);
+
+  if (membershipErr) throw membershipErr;
+
+  const contractorIds = Array.from(
+    new Set(
+      (membershipRows ?? [])
+        .map((row: any) => String(row?.contractor_id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (contractorIds.length === 0) return false;
+
+  const { data: scopedContractor, error: scopedContractorErr } = await params.admin
+    .from("contractors")
+    .select("id")
+    .in("id", contractorIds)
+    .eq("owner_user_id", params.accountOwnerUserId)
+    .limit(1)
+    .maybeSingle();
+
+  if (scopedContractorErr) throw scopedContractorErr;
+  return Boolean(scopedContractor?.id);
+}
+
 async function assertOwnerScopedInternalTargetByEmail(params: {
   admin: any;
   email: string;
@@ -84,17 +134,47 @@ async function assertOwnerScopedInternalTargetByEmail(params: {
     throw new Error("OUT_OF_SCOPE_TARGET");
   }
 
-  const { data: scopedInternalUser, error: scopedInternalUserErr } = await admin
-    .from("internal_users")
-    .select("user_id")
-    .eq("user_id", targetUserId)
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .maybeSingle();
+  const isInternal = await isOwnerScopedInternalUser({
+    admin,
+    userId: targetUserId,
+    accountOwnerUserId,
+  });
 
-  if (scopedInternalUserErr) throw scopedInternalUserErr;
-  if (!scopedInternalUser?.user_id) {
+  if (!isInternal) {
     throw new Error("OUT_OF_SCOPE_TARGET");
   }
+}
+
+// Password recovery is offered for both internal users (People & Access) and
+// contractor members (Contractors screen), so the target may live in either
+// internal_users or contractor_users — as long as it is scoped to this account.
+async function assertOwnerScopedPasswordResetTargetByEmail(params: {
+  admin: any;
+  email: string;
+  accountOwnerUserId: string;
+}) {
+  const { admin, email, accountOwnerUserId } = params;
+
+  const targetUserId = await getAuthUserIdByEmail(admin, email);
+  if (!targetUserId) {
+    throw new Error("OUT_OF_SCOPE_TARGET");
+  }
+
+  const isInternal = await isOwnerScopedInternalUser({
+    admin,
+    userId: targetUserId,
+    accountOwnerUserId,
+  });
+  if (isInternal) return;
+
+  const isContractorMember = await isOwnerScopedContractorMember({
+    admin,
+    userId: targetUserId,
+    accountOwnerUserId,
+  });
+  if (isContractorMember) return;
+
+  throw new Error("OUT_OF_SCOPE_TARGET");
 }
 
 async function assertOwnerScopedContractorTarget(params: {
@@ -251,13 +331,13 @@ export async function sendPasswordResetFromForm(formData: FormData): Promise<voi
   const admin = createAdminClient();
 
   try {
-    await assertOwnerScopedInternalTargetByEmail({
+    await assertOwnerScopedPasswordResetTargetByEmail({
       admin,
       email,
       accountOwnerUserId: internalUser.account_owner_user_id,
     });
   } catch {
-    redirect(returnTo);
+    redirect(withNotice(returnTo, "password_reset_out_of_scope"));
   }
 
   // Use the same implicit-flow initiation strategy as /login forgot-password.

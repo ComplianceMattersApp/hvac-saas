@@ -33,6 +33,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   invite_failed: { tone: "error", message: "The invitation could not be sent. Please try again." },
   password_reset_sent: { tone: "success", message: "Password reset email sent." },
   password_reset_failed: { tone: "error", message: "Password reset email could not be sent." },
+  password_reset_out_of_scope: { tone: "error", message: "That email does not match a user in your account, so no password reset was sent." },
 };
 
 function noticeClass(tone: "success" | "warn" | "error") {

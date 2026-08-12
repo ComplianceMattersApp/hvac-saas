@@ -150,6 +150,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   recovery_sent: { tone: "success", message: "Account setup recovery email sent successfully." },
   password_reset_sent: { tone: "success", message: "Password reset email sent successfully." },
   password_reset_failed: { tone: "error", message: "Could not send password reset email. Verify reset redirect configuration and try again." },
+  password_reset_out_of_scope: { tone: "error", message: "That email does not match a user in your account, so no password reset was sent." },
   invalid_email: { tone: "error", message: "Please provide a valid email address." },
   invalid_invite_target: { tone: "error", message: "Invite target is missing required information." },
   support_console_unavailable: { tone: "warn", message: "Support Console is currently disabled." },

@@ -18,6 +18,7 @@ type FixtureOptions = {
   internalUsersById?: Record<string, InternalUserRow>;
   emailUserIdMap?: Record<string, string>;
   contractorOwnersById?: Record<string, string>;
+  contractorMembershipsByUserId?: Record<string, string[]>;
   throwOnInternalUsersWrite?: boolean;
   throwOnInvite?: boolean;
   throwOnGetUserById?: boolean;
@@ -74,10 +75,11 @@ function buildAdminFixture(options: FixtureOptions = {}) {
   const internalUsersById = { ...(options.internalUsersById ?? {}) };
   const emailUserIdMap = { ...(options.emailUserIdMap ?? {}) };
   const contractorOwnersById = { ...(options.contractorOwnersById ?? {}) };
+  const contractorMembershipsByUserId = { ...(options.contractorMembershipsByUserId ?? {}) };
   const internalUsersWrites: Array<{ method: "insert" | "update" | "delete" }> = [];
 
   function withFilters(table: string) {
-    const filters: Array<{ type: "eq" | "ilike"; column: string; value: unknown }> = [];
+    const filters: Array<{ type: "eq" | "ilike" | "in"; column: string; value: unknown }> = [];
     let isHeadCountQuery = false;
 
     const query: any = {
@@ -93,6 +95,10 @@ function buildAdminFixture(options: FixtureOptions = {}) {
         filters.push({ type: "ilike", column, value });
         return query;
       }),
+      in: vi.fn((column: string, value: unknown) => {
+        filters.push({ type: "in", column, value });
+        return query;
+      }),
       limit: vi.fn(() => query),
       maybeSingle: vi.fn(async () => resolveMaybeSingle()),
       single: vi.fn(async () => resolveSingle()),
@@ -102,6 +108,11 @@ function buildAdminFixture(options: FixtureOptions = {}) {
 
     function eqValue(column: string) {
       const hit = filters.find((filter) => filter.type === "eq" && filter.column === column);
+      return hit?.value;
+    }
+
+    function inValue(column: string) {
+      const hit = filters.find((filter) => filter.type === "in" && filter.column === column);
       return hit?.value;
     }
 
@@ -125,8 +136,17 @@ function buildAdminFixture(options: FixtureOptions = {}) {
       }
 
       if (table === "contractors") {
-        const contractorId = String(eqValue("id") ?? "").trim();
         const ownerUserId = String(eqValue("owner_user_id") ?? "").trim();
+        const inIds = inValue("id");
+
+        if (Array.isArray(inIds)) {
+          const matched = inIds
+            .map((id) => String(id).trim())
+            .find((id) => contractorOwnersById[id] === ownerUserId);
+          return { data: matched ? { id: matched } : null, error: null };
+        }
+
+        const contractorId = String(eqValue("id") ?? "").trim();
         const owner = contractorOwnersById[contractorId];
         return {
           data: owner && owner === ownerUserId ? { id: contractorId } : null,
@@ -155,6 +175,15 @@ function buildAdminFixture(options: FixtureOptions = {}) {
     function resolveThenable() {
       if (table === "internal_users" && isHeadCountQuery) {
         return { count: options.activeAdminCount ?? 2, error: null };
+      }
+
+      if (table === "contractor_users") {
+        const userId = String(eqValue("user_id") ?? "").trim();
+        const contractorIds = contractorMembershipsByUserId[userId] ?? [];
+        return {
+          data: contractorIds.map((contractorId) => ({ contractor_id: contractorId })),
+          error: null,
+        };
       }
 
       if (table === "job_assignments") {
@@ -298,6 +327,13 @@ function buildAdminEmailFormData() {
   formData.set("return_to", "/ops/admin/users");
   formData.set("email", "target@example.com");
   formData.set("role", "office");
+  return formData;
+}
+
+function buildContractorMemberEmailFormData() {
+  const formData = new FormData();
+  formData.set("return_to", "/ops/admin/contractors");
+  formData.set("email", "contractor@example.com");
   return formData;
 }
 
@@ -668,6 +704,46 @@ describe("identity/admin same-account hardening", () => {
         return fixture;
       },
       expectedCrossAccountError: "REDIRECT:/ops/admin/users",
+    },
+    {
+      entrypoint: "sendPasswordResetFromForm (contractor member target)",
+      invoke: async () => {
+        const mod = await import("@/lib/actions/admin-user-actions");
+        return mod.sendPasswordResetFromForm(buildContractorMemberEmailFormData());
+      },
+      setupAllow: () => {
+        const fixture = buildAdminFixture({
+          emailUserIdMap: {
+            "contractor@example.com": "contractor-user",
+          },
+          contractorMembershipsByUserId: {
+            "contractor-user": ["contractor-1"],
+          },
+          contractorOwnersById: {
+            "contractor-1": "owner-1",
+          },
+        });
+        createAdminClientMock.mockReturnValue(fixture.admin);
+        resetPasswordForEmailMock.mockRejectedValueOnce(new Error(ALLOW_PATH_REACHED));
+        return fixture;
+      },
+      setupCrossAccount: () => {
+        const fixture = buildAdminFixture({
+          emailUserIdMap: {
+            "contractor@example.com": "contractor-user",
+          },
+          contractorMembershipsByUserId: {
+            "contractor-user": ["contractor-1"],
+          },
+          contractorOwnersById: {
+            "contractor-1": "owner-2",
+          },
+        });
+        createAdminClientMock.mockReturnValue(fixture.admin);
+        return fixture;
+      },
+      expectedCrossAccountError:
+        "REDIRECT:/ops/admin/contractors?notice=password_reset_out_of_scope",
     },
     {
       entrypoint: "resendContractorInviteFromForm",
