@@ -31,6 +31,7 @@ import {
 } from "@/lib/auth/dual-context-access";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 
 export const dynamic = "force-dynamic";
 
@@ -107,7 +108,7 @@ export default async function TodayPage() {
 
   const model = result as TodayReadModel;
   return (
-    <div className="mx-auto w-full max-w-[84rem] space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6">
+    <div className={`mx-auto w-full ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6`}>
       <TodayWelcomeModal initiallyOpen={model.showWelcomeModal} />
       <HeaderSection
         header={model.todayHeader}

@@ -1,6 +1,8 @@
+import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
+
 export default function OpsLoading() {
   return (
-    <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 sm:space-y-4 sm:p-4 xl:px-6" aria-busy="true" aria-live="polite">
+    <div className={`mx-auto ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-3 p-2.5 sm:space-y-4 sm:p-4 xl:px-6`} aria-busy="true" aria-live="polite">
       <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

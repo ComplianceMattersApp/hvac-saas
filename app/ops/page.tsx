@@ -68,6 +68,7 @@ import {
   getCachedProductMode,
 } from "@/lib/business/tenant-reference-cache";
 import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
+import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
   buildLatestCustomerAttemptByJob,
@@ -2067,7 +2068,7 @@ export default async function OpsPage({
     return (
       <div
         data-ops-visual-scope
-        className="mx-auto max-w-[104rem] space-y-3 bg-slate-50/45 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6"
+        className={`mx-auto ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-3 bg-slate-50/45 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6`}
       >
         {notice === "estimates_unavailable" ? (
           <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.24)]">

@@ -203,6 +203,7 @@ import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";
 import DesktopJobDetailV2Page from "./v2/page";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 import { isMissingJobsBillingDispositionColumnError } from "@/lib/supabase/jobs-billing-disposition-compat";
+import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -3793,7 +3794,7 @@ const showCorrectionReviewResolution =
   const desktopV2SearchParams = Promise.resolve(sp);
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:overflow-x-visible lg:p-6">
+    <div className={`mx-auto w-full min-w-0 ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:overflow-x-visible lg:p-6`}>
       <div className="block lg:hidden">
         <MobileJobDetailMobileComponent
           activeWaitingState={activeWaitingState}

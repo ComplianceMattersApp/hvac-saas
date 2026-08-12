@@ -1,6 +1,8 @@
+import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
+
 export default function InternalInvoiceWorkspaceLoading() {
   return (
-    <div className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6" aria-busy="true" aria-live="polite">
+    <div className={`mx-auto ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6`} aria-busy="true" aria-live="polite">
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>

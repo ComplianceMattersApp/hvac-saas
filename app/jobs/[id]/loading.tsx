@@ -1,7 +1,9 @@
+import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
+
 export default function JobDetailLoading() {
   return (
     <div
-      className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6"
+      className={`mx-auto w-full min-w-0 ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6`}
       aria-busy="true"
       aria-live="polite"
     >

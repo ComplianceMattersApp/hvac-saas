@@ -13,6 +13,7 @@ import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal
 import { createClient } from "@/lib/supabase/server";
 import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
+import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 import {
   type BillingMode,
   resolveBillingModeByAccountOwnerId,
@@ -927,7 +928,7 @@ export default async function InternalInvoiceWorkspacePage({
       : null;
   const supplementalReasonLabel = formatSupplementalReasonLabel(invoice?.supplemental_reason);
   return (
-    <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
+    <div id="invoice-workspace" className={`mx-auto ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6`}>
       <section className={`${panelClass} overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-5 sm:p-6`}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
