@@ -34,10 +34,11 @@ type NotificationRow = {
 };
 
 function makeScopedSupabaseFixture(rows: NotificationRow[]) {
-  const writeCalls: Array<{ table: string; method: "update"; scopedOwner: string | null }> = [];
+  const writeCalls: Array<{ table: string; method: "update" | "upsert"; scopedOwner: string | null }> = [];
 
   const state = {
     notifications: rows.map((row) => ({ ...row })),
+    readStates: [] as Array<{ notification_id: string; user_id: string; read_at: string }>,
   };
 
   function buildSelectQuery(table: string) {
@@ -77,11 +78,13 @@ function makeScopedSupabaseFixture(rows: NotificationRow[]) {
         return { data: [], error: null };
       }
 
-      if (table !== "notifications") {
+      if (table !== "notifications" && table !== "notification_user_read_states") {
         throw new Error(`Unexpected table for select: ${table}`);
       }
 
-      let nextRows = [...state.notifications];
+      let nextRows: Array<Record<string, unknown>> = table === "notifications"
+        ? state.notifications.map((row) => ({ ...row }))
+        : state.readStates.map((row) => ({ ...row }));
 
       for (const filter of filters) {
         if (filter.kind === "eq") {
@@ -104,6 +107,30 @@ function makeScopedSupabaseFixture(rows: NotificationRow[]) {
     };
 
     return query;
+  }
+
+  async function upsertReadStates(
+    table: string,
+    values: Record<string, unknown> | Array<Record<string, unknown>>,
+  ) {
+    if (table !== "notification_user_read_states") {
+      throw new Error(`Unexpected table for upsert: ${table}`);
+    }
+
+    for (const value of Array.isArray(values) ? values : [values]) {
+      const notificationId = String(value.notification_id ?? "");
+      const userId = String(value.user_id ?? "");
+      const readAt = String(value.read_at ?? "");
+      const existingIndex = state.readStates.findIndex(
+        (row) => row.notification_id === notificationId && row.user_id === userId,
+      );
+      const nextRow = { notification_id: notificationId, user_id: userId, read_at: readAt };
+      if (existingIndex >= 0) state.readStates[existingIndex] = nextRow;
+      else state.readStates.push(nextRow);
+    }
+
+    writeCalls.push({ table, method: "upsert", scopedOwner: null });
+    return { data: null, error: null };
   }
 
   function buildUpdateQuery(table: string) {
@@ -178,6 +205,9 @@ function makeScopedSupabaseFixture(rows: NotificationRow[]) {
           const query = buildUpdateQuery(table);
           return query.update(patch);
         }),
+        upsert: vi.fn((values: Record<string, unknown> | Array<Record<string, unknown>>) =>
+          upsertReadStates(table, values)
+        ),
       };
     },
   };
@@ -269,7 +299,7 @@ describe("notification read-state same-account hardening", () => {
     expect(count).toBe(1);
   });
 
-  it("allows same-account internal markNotificationAsRead for scoped notification", async () => {
+  it("stores a same-account notification read only for the current internal user", async () => {
     const fixture = makeScopedSupabaseFixture(buildSeedRows());
     createClientMock.mockResolvedValue(fixture.supabase);
 
@@ -279,9 +309,15 @@ describe("notification read-state same-account hardening", () => {
 
     expect(
       fixture.state.notifications.find((row) => row.id === "notif-owner-1-unread")?.read_at
-    ).not.toBeNull();
+    ).toBeNull();
+    expect(fixture.state.readStates).toEqual([
+      expect.objectContaining({
+        notification_id: "notif-owner-1-unread",
+        user_id: "internal-user-1",
+      }),
+    ]);
     expect(fixture.writeCalls).toHaveLength(1);
-    expect(fixture.writeCalls[0]?.scopedOwner).toBe("owner-1");
+    expect(fixture.writeCalls[0]?.table).toBe("notification_user_read_states");
   });
 
   it("denies cross-account internal markNotificationAsRead before notifications write", async () => {
@@ -300,7 +336,7 @@ describe("notification read-state same-account hardening", () => {
     ).toBeNull();
   });
 
-  it("allows same-account internal markAllNotificationsAsRead without mutating cross-account notifications", async () => {
+  it("marks all visible same-account notifications read only for the current user", async () => {
     const fixture = makeScopedSupabaseFixture(buildSeedRows());
     createClientMock.mockResolvedValue(fixture.supabase);
 
@@ -310,11 +346,44 @@ describe("notification read-state same-account hardening", () => {
 
     expect(
       fixture.state.notifications.find((row) => row.id === "notif-owner-1-unread")?.read_at
-    ).not.toBeNull();
+    ).toBeNull();
     expect(
       fixture.state.notifications.find((row) => row.id === "notif-owner-2-unread")?.read_at
     ).toBeNull();
+    expect(fixture.state.readStates.map((row) => [row.notification_id, row.user_id])).toEqual([
+      ["notif-owner-1-unread", "internal-user-1"],
+    ]);
     expect(fixture.writeCalls).toHaveLength(1);
+  });
+
+  it("keeps a shared notification unread for another internal user in the same account", async () => {
+    const fixture = makeScopedSupabaseFixture(buildSeedRows());
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const {
+      markNotificationAsRead,
+      listInternalNotifications,
+      getInternalUnreadNotificationCount,
+    } = await import("@/lib/actions/notification-read-actions");
+
+    await markNotificationAsRead({ notificationId: "notif-owner-1-unread" });
+    const userOneRows = await listInternalNotifications({ onlyUnread: false, limit: 20 });
+    expect(userOneRows.find((row) => row.id === "notif-owner-1-unread")?.is_unread).toBe(false);
+    expect(await getInternalUnreadNotificationCount()).toBe(0);
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: "internal-user-2",
+      internalUser: {
+        user_id: "internal-user-2",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const userTwoRows = await listInternalNotifications({ onlyUnread: true, limit: 20 });
+    expect(userTwoRows.map((row) => row.id)).toEqual(["notif-owner-1-unread"]);
+    expect(await getInternalUnreadNotificationCount()).toBe(1);
   });
 
   it("denies non-internal access before scoped list/count/read-state mutation flows", async () => {

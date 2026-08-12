@@ -52,10 +52,17 @@ type SubmissionRow = {
   proposed_permit_date?: string | null;
 };
 
+type NotificationReadStateRow = {
+  notification_id: string;
+  user_id: string;
+  read_at: string;
+};
+
 let lastSupabaseFixture: any = null;
 
 function makeSupabase(fixture: {
   notifications: NotificationRow[];
+  readStates?: NotificationReadStateRow[];
   submissions: SubmissionRow[];
   contractors?: Array<{ id: string; name: string }>;
   jobs?: Array<{
@@ -77,6 +84,21 @@ function makeSupabase(fixture: {
       const filters: Array<{ kind: "eq" | "is" | "in"; column: string; value: unknown }> = [];
 
       const resolve = () => {
+        if (table === "notification_user_read_states") {
+          let rows = [...(fixture.readStates ?? [])];
+
+          for (const filter of filters) {
+            if (filter.kind === "eq") {
+              rows = rows.filter((row) => (row as Record<string, unknown>)[filter.column] === filter.value);
+            } else if (filter.kind === "in") {
+              const values = Array.isArray(filter.value) ? filter.value : [];
+              rows = rows.filter((row) => values.includes((row as Record<string, unknown>)[filter.column]));
+            }
+          }
+
+          return { data: rows, error: null };
+        }
+
         if (table === "notifications") {
           let rows = [...fixture.notifications];
 

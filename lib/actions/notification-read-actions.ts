@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import {
@@ -26,6 +27,11 @@ type NotificationRow = {
 type NotificationPayload = Record<string, unknown>;
 
 const INTERNAL_NOTIFICATION_RECIPIENT_TYPES = ["internal", "internal_user"] as const;
+
+type NotificationReadStateRow = {
+  notification_id: string;
+  read_at: string;
+};
 
 export type ProposalEnrichment = {
   contractor_name: string | null;
@@ -329,6 +335,43 @@ function isNotificationVisibleToUser(
   if (notificationType === "internal_note_tag" && !recipientRef) return false;
   if (!recipientRef) return true;
   return recipientRef === String(userId ?? "").trim();
+}
+
+async function getUserNotificationReadStateMap(
+  supabase: SupabaseClient,
+  userId: string,
+  rows: Array<Pick<NotificationRow, "id">>,
+): Promise<Map<string, string>> {
+  const notificationIds = Array.from(
+    new Set(rows.map((row) => String(row.id ?? "").trim()).filter(Boolean)),
+  );
+  if (!notificationIds.length) return new Map();
+
+  const { data, error } = await supabase
+    .from("notification_user_read_states")
+    .select("notification_id, read_at")
+    .eq("user_id", userId)
+    .in("notification_id", notificationIds);
+
+  if (error) throw error;
+
+  return new Map(
+    ((data ?? []) as NotificationReadStateRow[]).map((row) => [
+      String(row.notification_id),
+      String(row.read_at),
+    ]),
+  );
+}
+
+function applyUserNotificationReadState(
+  rows: NotificationRow[],
+  readStateByNotificationId: Map<string, string>,
+): NotificationRow[] {
+  return rows.map((row) => ({
+    ...row,
+    // Preserve legacy global reads; otherwise use only this user's receipt.
+    read_at: row.read_at ?? readStateByNotificationId.get(row.id) ?? null,
+  }));
 }
 
 function isHiddenInternalNotificationType(value: string): boolean {
@@ -740,8 +783,17 @@ export async function listInternalNotifications(params: {
   const readRetentionCutoffMs = nowMs - DEFAULT_READ_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
   const recipientScopedRows = (data ?? []).filter((row) => isNotificationVisibleToUser(row as NotificationRow, userId));
+  const readStateByNotificationId = await getUserNotificationReadStateMap(
+    supabase,
+    userId,
+    recipientScopedRows as NotificationRow[],
+  );
+  const personallyScopedRows = applyUserNotificationReadState(
+    recipientScopedRows as NotificationRow[],
+    readStateByNotificationId,
+  ).filter((row) => !params.onlyUnread || row.read_at === null);
 
-  const retainedRows = recipientScopedRows.filter((row) => {
+  const retainedRows = personallyScopedRows.filter((row) => {
     if (row.read_at === null) return true;
     const readAtMs = Date.parse(String(row.read_at ?? ""));
     if (!Number.isFinite(readAtMs)) return true;
@@ -806,7 +858,7 @@ export async function listInternalContractorUpdateAwareness(params: {
 
   let query = supabase
     .from("notifications")
-    .select("job_id, recipient_ref, notification_type, read_at, created_at")
+    .select("id, job_id, recipient_ref, notification_type, read_at, created_at")
     .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
     .order("created_at", { ascending: false });
@@ -826,12 +878,23 @@ export async function listInternalContractorUpdateAwareness(params: {
 
   const shouldTrackMapAndFilter = isOpsNotificationTimingEnabled();
   const mapAndFilterStartedAt = shouldTrackMapAndFilter ? Date.now() : 0;
-  const rows = ((data ?? []) as Array<{
+  const recipientScopedRows = ((data ?? []) as Array<{
+    id: string;
     job_id: string | null;
     recipient_ref: string | null;
     notification_type: string | null;
+    read_at: string | null;
     created_at: string | null;
   }>).filter((row) => isNotificationVisibleToUser(row as NotificationRow, userId));
+  const readStateByNotificationId = await getUserNotificationReadStateMap(
+    supabase,
+    userId,
+    recipientScopedRows as NotificationRow[],
+  );
+  const rows = applyUserNotificationReadState(
+    recipientScopedRows as NotificationRow[],
+    readStateByNotificationId,
+  ).filter((row) => !onlyUnread || row.read_at === null);
 
   const contractorUpdateRows = rows
     .filter((row) =>
@@ -883,7 +946,18 @@ export async function listInternalNewWorkRequestAwareness(params: {
 
   if (error) throw error;
 
-  const rows = ((data ?? []) as NotificationRow[]).filter((row) => isNotificationVisibleToUser(row, userId));
+  const recipientScopedRows = ((data ?? []) as NotificationRow[]).filter((row) =>
+    isNotificationVisibleToUser(row, userId),
+  );
+  const readStateByNotificationId = await getUserNotificationReadStateMap(
+    supabase,
+    userId,
+    recipientScopedRows,
+  );
+  const rows = applyUserNotificationReadState(
+    recipientScopedRows,
+    readStateByNotificationId,
+  ).filter((row) => !onlyUnread || row.read_at === null);
   const newWorkRows = rows.filter((row) =>
     matchesInternalNotificationFilter(
       String(row.notification_type ?? "").trim().toLowerCase(),
@@ -918,7 +992,7 @@ export async function markNotificationAsRead(input: {
 
   const { data: scopedNotification, error: scopedNotificationErr } = await supabase
     .from("notifications")
-    .select("id, recipient_ref")
+    .select("id, recipient_ref, read_at")
     .eq("id", notificationId)
     .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
     .eq("account_owner_user_id", accountOwnerUserId)
@@ -929,12 +1003,18 @@ export async function markNotificationAsRead(input: {
     throw new Error("NOT_AUTHORIZED");
   }
 
+  // A non-null notifications.read_at is a legacy global read. Leave it as-is.
+  // All new read actions are isolated to the authenticated user.
   const { error } = await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", notificationId)
-    .in("recipient_type", INTERNAL_NOTIFICATION_RECIPIENT_TYPES)
-    .eq("account_owner_user_id", accountOwnerUserId);
+    .from("notification_user_read_states")
+    .upsert(
+      {
+        notification_id: notificationId,
+        user_id: userId,
+        read_at: new Date().toISOString(),
+      },
+      { onConflict: "notification_id,user_id" },
+    );
 
   if (error) throw error;
 
@@ -955,16 +1035,31 @@ export async function markAllNotificationsAsRead(): Promise<void> {
 
   if (unreadErr) throw unreadErr;
 
-  const targetIds = (unreadRows ?? [])
-    .filter((row: any) => isNotificationVisibleToUser(row as NotificationRow, userId))
-    .map((row: any) => String(row?.id ?? "").trim())
-    .filter(Boolean);
+  const visibleUnreadRows = ((unreadRows ?? []) as Array<
+    Pick<NotificationRow, "id" | "recipient_ref" | "notification_type">
+  >)
+    .filter((row) => isNotificationVisibleToUser(row, userId))
+    .filter((row) => String(row.id ?? "").trim());
+  const readStateByNotificationId = await getUserNotificationReadStateMap(
+    supabase,
+    userId,
+    visibleUnreadRows as NotificationRow[],
+  );
+  const targetIds = visibleUnreadRows
+    .map((row) => String(row.id).trim())
+    .filter((notificationId: string) => !readStateByNotificationId.has(notificationId));
 
   if (targetIds.length > 0) {
     const { error } = await supabase
-      .from("notifications")
-      .update({ read_at: new Date().toISOString() })
-      .in("id", targetIds);
+      .from("notification_user_read_states")
+      .upsert(
+        targetIds.map((notificationId) => ({
+          notification_id: notificationId,
+          user_id: userId,
+          read_at: new Date().toISOString(),
+        })),
+        { onConflict: "notification_id,user_id" },
+      );
 
     if (error) throw error;
   }
@@ -1002,8 +1097,19 @@ export async function getInternalUnreadNotificationBadgeCount(params: {
 
   if (error) throw error;
 
-  const awarenessRows = ((data ?? []) as NotificationRow[])
-    .filter((row) => isNotificationVisibleToUser(row, currentUserId))
+  const recipientScopedRows = ((data ?? []) as NotificationRow[]).filter((row) =>
+    isNotificationVisibleToUser(row, currentUserId),
+  );
+  const readStateByNotificationId = await getUserNotificationReadStateMap(
+    supabase,
+    currentUserId,
+    recipientScopedRows,
+  );
+  const awarenessRows = applyUserNotificationReadState(
+    recipientScopedRows,
+    readStateByNotificationId,
+  )
+    .filter((row) => row.read_at === null)
     .filter((row) => {
     const type = String(row.notification_type ?? "").trim().toLowerCase();
     return !isHiddenInternalNotificationType(type);
