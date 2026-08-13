@@ -360,6 +360,7 @@ export default async function InvoiceLedgerPage({
                     {sortableHeader("Age", "age_asc", "age_desc", "age_desc")}
                     <th className="px-3 py-3">Last Sent</th>
                     <th className="px-3 py-3">Send Status</th>
+                    <th className="px-3 py-3">Tax</th>
                     {sortableHeader("Total", "total_asc", "total_desc", "total_desc")}
                     {sortableHeader("Paid", "paid_asc", "paid_desc", "paid_desc")}
                     {sortableHeader("Still Owed", "balance_asc", "balance_desc", "balance_desc")}
@@ -372,7 +373,7 @@ export default async function InvoiceLedgerPage({
                 <tbody>
                   {ledger.rows.length === 0 ? (
                     <tr>
-                      <td colSpan={17} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={18} className="px-4 py-12 text-center text-sm text-slate-500">
                         <div className="mx-auto max-w-md space-y-2">
                           <div className="font-semibold text-slate-700">{emptyTitle}</div>
                           <div className="text-xs leading-5 text-slate-500">{emptyBody}</div>
@@ -410,6 +411,7 @@ export default async function InvoiceLedgerPage({
                         <td className="px-3 py-3 font-medium text-slate-900">{row.ageDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.lastCommunicationDateDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.communicationStateLabel}</td>
+                        <td className="px-3 py-3 text-slate-700">{row.taxDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.totalDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.amountPaidDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.balanceDueDisplay}</td>

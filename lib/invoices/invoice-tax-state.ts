@@ -170,6 +170,32 @@ export async function readPricebookItemTaxable(params: {
 }
 
 /**
+ * Taxability for a specific set of pricebook items, keyed by id.
+ *
+ * Batched so a conversion importing many lines makes one query, not one per
+ * line. Missing ids and an undeployed column both read as non-taxable.
+ */
+export async function readPricebookTaxabilityByIds(params: {
+  supabase: any;
+  pricebookItemIds: unknown[];
+}): Promise<Map<string, boolean>> {
+  const result = new Map<string, boolean>();
+  const ids = [...new Set((params.pricebookItemIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean))];
+  if (ids.length === 0) return result;
+  try {
+    const { data, error } = await params.supabase
+      .from("pricebook_items")
+      .select("id, is_taxable")
+      .in("id", ids);
+    if (error || !data) return result;
+    for (const row of data) result.set(String(row.id), Boolean(row.is_taxable));
+    return result;
+  } catch {
+    return result;
+  }
+}
+
+/**
  * Taxability for an account's whole catalog, keyed by pricebook item id.
  *
  * Returns null when the column is not deployed — meaningfully different from an

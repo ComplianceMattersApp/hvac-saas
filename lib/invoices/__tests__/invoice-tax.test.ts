@@ -143,3 +143,56 @@ describe("rate parsing and display", () => {
     expect(formatTaxRatePercent(null)).toBeNull();
   });
 });
+
+describe("CSV import taxability", () => {
+  it("offers Taxable in the template without making it required", async () => {
+    const {
+      PRICEBOOK_IMPORT_HEADERS,
+      PRICEBOOK_IMPORT_OPTIONAL_HEADERS,
+      PRICEBOOK_IMPORT_TEMPLATE_CSV,
+    } = await import("@/lib/business/pricebook-import");
+    // An operator's existing export predates sales tax and must still import.
+    expect(PRICEBOOK_IMPORT_HEADERS).not.toContain("Taxable");
+    expect(PRICEBOOK_IMPORT_OPTIONAL_HEADERS).toContain("Taxable");
+    expect(PRICEBOOK_IMPORT_TEMPLATE_CSV.split("\r\n")[0]).toContain("Taxable");
+  });
+
+  it("imports a taxable material and a non-taxable service from the template", async () => {
+    const { buildPricebookImportPreview } = await import("@/lib/business/pricebook-import");
+    const csv = [
+      "Service Name,Category,Kind,Unit,Price,Active,Taxable,Description",
+      "Compressor,Parts,Material,Item,500,Yes,Yes,Replacement compressor",
+      "Diagnostic,Service,Service,Job,150,Yes,No,Diagnostic visit",
+    ].join("\r\n");
+
+    const preview = await buildPricebookImportPreview({
+      csv,
+      accountOwnerUserId: "acct-1",
+      store: {
+        async listExistingPricebookItems() { return { data: [], error: null }; },
+      },
+    });
+
+    expect(preview.errors).toEqual([]);
+    expect(preview.readyToAdd.map((row: any) => row.insertRow?.is_taxable)).toEqual([true, false]);
+  });
+
+  it("treats a missing Taxable column as non-taxable", async () => {
+    const { buildPricebookImportPreview } = await import("@/lib/business/pricebook-import");
+    const csv = [
+      "Service Name,Category,Kind,Unit,Price,Active,Description",
+      "Legacy Item,Service,Service,Job,100,Yes,From an older export",
+    ].join("\r\n");
+
+    const preview = await buildPricebookImportPreview({
+      csv,
+      accountOwnerUserId: "acct-1",
+      store: {
+        async listExistingPricebookItems() { return { data: [], error: null }; },
+      },
+    });
+
+    expect(preview.missingHeaders).toEqual([]);
+    expect(preview.readyToAdd[0]?.insertRow?.is_taxable).toBe(false);
+  });
+});

@@ -27,12 +27,19 @@ import { isMissingInvoiceTaxColumnError } from "./invoice-tax-state";
  */
 export async function insertInvoiceLineItemWithTaxability(params: {
   supabase: any;
-  payload: Record<string, unknown>;
+  /** One row, or a batch — the visit-scope import inserts many at once. */
+  payload: Record<string, unknown> | Record<string, unknown>[];
 }): Promise<{ error: any }> {
   const first = await params.supabase.from("internal_invoice_line_items").insert(params.payload);
   if (!first?.error || !isMissingInvoiceTaxColumnError(first.error)) return { error: first?.error ?? null };
-  const withoutTax = { ...params.payload };
-  delete withoutTax.is_taxable;
+  const strip = (row: Record<string, unknown>) => {
+    const copy = { ...row };
+    delete copy.is_taxable;
+    return copy;
+  };
+  const withoutTax = Array.isArray(params.payload)
+    ? params.payload.map(strip)
+    : strip(params.payload);
   const retry = await params.supabase.from("internal_invoice_line_items").insert(withoutTax);
   return { error: retry?.error ?? null };
 }

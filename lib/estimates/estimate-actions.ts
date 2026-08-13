@@ -37,6 +37,8 @@ import {
 } from "@/lib/estimates/estimate-domain";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { sanitizeVisitScopeItems, type VisitScopeItem } from "@/lib/jobs/visit-scope";
+import { insertInvoiceLineItemWithTaxability, recalculateInvoiceTotals } from "@/lib/invoices/invoice-totals";
+import { readPricebookTaxabilityByIds } from "@/lib/invoices/invoice-tax-state";
 
 export { getEstimateById, listEstimatesByAccount };
 
@@ -3050,6 +3052,16 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
       return (value / divisor).toFixed(scale);
     };
 
+    // Taxability travels with the line from the pricebook item it came from.
+    // A converted line silently defaulting to non-taxable would under-bill tax
+    // on real work, so this is batched in before the rows are built.
+    const taxableByPricebookItemId = await readPricebookTaxabilityByIds({
+      supabase,
+      pricebookItemIds: visitScopeItems.map(
+        (item) => (item as { source_pricebook_item_id?: unknown }).source_pricebook_item_id,
+      ),
+    });
+
     invoiceLineItems = visitScopeItems.map((item, index) => {
       const itemName = String((item as { title?: unknown }).title ?? "")
         .trim()
@@ -3072,6 +3084,7 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
         source_kind: "visit_scope" as const,
         source_visit_scope_item_id: String(item.id ?? "").trim() || null,
         source_pricebook_item_id: String(item.source_pricebook_item_id ?? "").trim() || null,
+        is_taxable: taxableByPricebookItemId.get(String(item.source_pricebook_item_id ?? "").trim()) ?? false,
         item_name_snapshot: itemName || "Visit Scope Item",
         description_snapshot: description,
         item_type_snapshot: itemType,
@@ -3086,24 +3099,17 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
     });
 
     if (invoiceLineItems.length > 0) {
-      const { error: insertLinesErr } = await supabase
-        .from("internal_invoice_line_items")
-        .insert(invoiceLineItems);
+      const { error: insertLinesErr } = await insertInvoiceLineItemWithTaxability({
+        supabase,
+        payload: invoiceLineItems,
+      });
 
       if (insertLinesErr) throw insertLinesErr;
     }
 
-    const { error: syncTotalsErr } = await supabase
-      .from("internal_invoices")
-      .update({
-        subtotal_cents: invoiceSubtotalCents,
-        total_cents: invoiceSubtotalCents,
-        updated_by_user_id: userId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", invoiceId)
-      .eq("account_owner_user_id", accountOwnerUserId);
-    if (syncTotalsErr) throw syncTotalsErr;
+    // Through the shared seam so a converted invoice gets the same
+    // total = subtotal + tax treatment as one built in the editor.
+    await recalculateInvoiceTotals({ supabase, invoiceId, userId });
   } catch (error) {
     if (isEstimateConversionSchemaUnavailableError(error)) {
       return { success: false, error: "invoice_conversion_schema_unavailable" };

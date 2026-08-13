@@ -615,6 +615,7 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
           };
         } else if (table === "internal_invoice_line_items") {
           return {
+            select: vi.fn(() => ({ eq: vi.fn(async () => ({ data: [], error: null })) })),
             insert: vi.fn((items: any[]) => {
               insertedLines = items;
               return Promise.resolve({ error: null });
@@ -805,7 +806,11 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
             }),
           };
         } else if (table === "internal_invoice_line_items") {
-          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+          return {
+            // The shared totals seam re-reads the lines after inserting them.
+            select: vi.fn(() => ({ eq: vi.fn(async () => ({ data: [], error: null })) })),
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          };
         } else if (table === "estimate_events") {
           return { insert: vi.fn().mockResolvedValue({ error: null }) };
         }
@@ -898,7 +903,11 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
             }),
           };
         } else if (table === "internal_invoice_line_items") {
-          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+          return {
+            // The shared totals seam re-reads the lines after inserting them.
+            select: vi.fn(() => ({ eq: vi.fn(async () => ({ data: [], error: null })) })),
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          };
         } else if (table === "estimate_events") {
           return {
             insert: vi.fn((payload: any) => {
@@ -1004,7 +1013,11 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
             }),
           };
         } else if (table === "internal_invoice_line_items") {
-          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+          return {
+            // The shared totals seam re-reads the lines after inserting them.
+            select: vi.fn(() => ({ eq: vi.fn(async () => ({ data: [], error: null })) })),
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          };
         } else if (table === "estimate_events") {
           return { insert: vi.fn().mockResolvedValue({ error: null }) };
         }

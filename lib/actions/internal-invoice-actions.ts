@@ -2658,6 +2658,12 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
       sort_order: nextSortOrder + index,
       source_kind: 'visit_scope',
       source_visit_scope_item_id: scopeItemId,
+      // Snapshot taxability from the originating pricebook item. A scope item
+      // with no pricebook provenance is non-taxable, same as a manual line.
+      is_taxable: await readPricebookItemTaxable({
+        supabase: context.supabase,
+        pricebookItemId: scopeItem.source_pricebook_item_id,
+      }),
       item_name_snapshot: getTrimmedString(scopeItem.title),
       description_snapshot: getOptionalText(scopeItem.details),
       item_type_snapshot: scopeItem.item_type
@@ -2673,9 +2679,10 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
     };
   }));
 
-  const { error: insertErr } = await context.supabase
-    .from('internal_invoice_line_items')
-    .insert(payload);
+  const { error: insertErr } = await insertInvoiceLineItemWithTaxability({
+    supabase: context.supabase,
+    payload,
+  });
 
   if (insertErr) throw insertErr;
 
@@ -2819,6 +2826,18 @@ export async function updateInternalInvoiceLineItemFromForm(formData: FormData):
     .eq('invoice_id', invoice.id);
 
   if (error) throw error;
+
+  // Per-line taxability, written separately and tolerantly: the column is newer
+  // than the rest of the row, and the presence marker keeps a form that never
+  // rendered the toggle from flipping a line to non-taxable.
+  if (getTrimmedString(formData.get('tax_fields_present')) === '1') {
+    const { error: taxError } = await context.supabase
+      .from('internal_invoice_line_items')
+      .update({ is_taxable: getTrimmedString(formData.get('line_is_taxable')) === '1' })
+      .eq('id', lineItemId)
+      .eq('invoice_id', invoice.id);
+    if (taxError && !isMissingInvoiceTaxColumnError(taxError)) throw taxError;
+  }
 
   await syncInvoiceTotalsFromLineItems({
     supabase: context.supabase,

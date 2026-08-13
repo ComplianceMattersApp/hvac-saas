@@ -584,6 +584,23 @@ export default async function AdminPricebookPage({
               </select>
             </label>
 
+            {taxColumnsDeployed ? (
+              <label className="flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
+                <input
+                  type="checkbox"
+                  name="is_taxable"
+                  value="1"
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                />
+                <span>
+                  <span className="font-semibold text-slate-900">Taxable</span>
+                  <span className="block text-xs text-slate-500">
+                    Sales tax applies when this item is invoiced.
+                  </span>
+                </span>
+              </label>
+            ) : null}
+
             <label className="space-y-2 text-sm text-slate-700 md:col-span-2">
               <span className="font-semibold text-slate-900">Default Description</span>
               <input

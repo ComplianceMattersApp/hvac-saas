@@ -44,10 +44,10 @@ describe("pricebook import UI source", () => {
     expect(routeSource).toContain('requireInternalRole("admin"');
     expect(routeSource).toContain("PRICEBOOK_IMPORT_TEMPLATE_CSV");
     expect(PRICEBOOK_IMPORT_TEMPLATE_CSV).toContain(
-      "Service Name,Category,Kind,Unit,Price,Active,Description",
+      "Service Name,Category,Kind,Unit,Price,Active,Taxable,Description",
     );
     expect(PRICEBOOK_IMPORT_TEMPLATE_CSV).toContain(
-      "General Cleaning,Cleaning,Service,Job,0,Yes,Standard one-off cleaning service",
+      "General Cleaning,Cleaning,Service,Job,0,Yes,No,Standard one-off cleaning service",
     );
   });
 });

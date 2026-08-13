@@ -46,6 +46,23 @@ type InternalInvoiceLineItemsTableProps = {
   capabilities: FieldBillingCapabilities;
   lineItems: InternalInvoiceLineItemRecord[];
   totalCents: number;
+  /**
+   * Sales tax presentation. Absent (or `enabled: false`) means the Slice-02
+   * columns are not deployed, and every tax control and row is hidden — the
+   * table renders exactly as it did before tax existed.
+   */
+  tax?: {
+    enabled: boolean;
+    subtotalCents: number;
+    taxCents: number;
+    /** Operator-supplied name for the tax line, e.g. "Sales Tax (Stanislaus County)". */
+    taxTitle: string;
+    /** Null when this invoice charges no tax. */
+    ratePercent: number | null;
+    /** Per-line taxability keyed by line item id. */
+    taxableByLineItemId: Map<string, boolean>;
+    customerTaxExempt: boolean;
+  } | null;
   addLineItemAction: ServerFormAction;
   addPricebookLineItemAction: ServerFormAction;
   addVisitScopeLineItemsAction: ServerFormAction;
@@ -238,12 +255,39 @@ type DesktopLineItemEditFormProps = {
   workspaceFieldLabelClass: string;
   workspaceInputClass: string;
   secondaryButtonClass: string;
+  /** Rendered only when this invoice actually charges tax. */
+  showTaxToggle?: boolean;
+  lineIsTaxable?: boolean;
 };
 
 // Lane 3: desktop charge edit form with progressive disclosure. Item Name +
 // Unit Price + live Subtotal stay in Tier 1; Type / Quantity / Description
 // collapse behind "More details". Extracted from the row map so each row owns
 // its own live-subtotal state (hooks cannot live inside .map()).
+/**
+ * Per-line taxability control. Rendered only where tax is in play; the presence
+ * marker travels with it so a form without the toggle never clears the flag.
+ */
+function LineTaxableField({ show, defaultChecked }: { show: boolean; defaultChecked: boolean }) {
+  if (!show) return null;
+  return (
+    <label className="flex items-start gap-2 text-sm text-slate-700">
+      <input type="hidden" name="tax_fields_present" value="1" />
+      <input
+        type="checkbox"
+        name="line_is_taxable"
+        value="1"
+        defaultChecked={defaultChecked}
+        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+      />
+      <span>
+        <span className="font-medium text-slate-900">Taxable</span>
+        <span className="block text-xs text-slate-500">Sales tax applies to this line.</span>
+      </span>
+    </label>
+  );
+}
+
 function DesktopLineItemEditForm({
   lineItem,
   index,
@@ -262,6 +306,8 @@ function DesktopLineItemEditForm({
   workspaceFieldLabelClass,
   workspaceInputClass,
   secondaryButtonClass,
+  showTaxToggle = false,
+  lineIsTaxable = false,
 }: DesktopLineItemEditFormProps) {
   const priceRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
@@ -396,6 +442,10 @@ function DesktopLineItemEditForm({
                   disabled={!canEditDescription}
                   placeholder="Scope detail, work instruction, or install note"
                 />
+              </div>
+
+              <div className="sm:col-span-2">
+                <LineTaxableField show={showTaxToggle} defaultChecked={lineIsTaxable} />
               </div>
             </div>
           </details>
@@ -573,6 +623,7 @@ export default function InternalInvoiceLineItemsTable({
   capabilities,
   lineItems,
   totalCents,
+  tax = null,
   addLineItemAction,
   addPricebookLineItemAction,
   addVisitScopeLineItemsAction,
@@ -690,6 +741,11 @@ export default function InternalInvoiceLineItemsTable({
   const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded);
   const billingDispositionLabel = formatBillingDispositionLabel(billingDisposition);
   const totalCentsValue = Number(totalCents ?? 0);
+  // The quiet default: only show the tax controls and the split totals once
+  // this account actually charges tax on this invoice.
+  const taxEnabled = Boolean(tax?.enabled);
+  const taxApplies = taxEnabled && (tax!.ratePercent !== null || tax!.taxCents > 0);
+  const showTaxTotals = taxApplies && !tax!.customerTaxExempt;
   const isZeroDollarDraft = totalCentsValue === 0;
   const pricebookSearch = pricebookSearchQuery.trim().toLowerCase();
   const matchingPricebookPickerItems = pricebookSearch
@@ -1225,6 +1281,11 @@ export default function InternalInvoiceLineItemsTable({
                             placeholder="Scope detail, work instruction, or install note"
                           />
                         </div>
+
+                        <LineTaxableField
+                          show={showTaxTotals}
+                          defaultChecked={tax?.taxableByLineItemId.get(lineItem.id) ?? false}
+                        />
                       </div>
                     </details>
                   </div>
@@ -1271,6 +1332,8 @@ export default function InternalInvoiceLineItemsTable({
               handleUpdateLineItem={handleUpdateLineItem}
               handleRemoveLineItem={handleRemoveLineItem}
               onHideDetails={() => setExpandedAdditionalRowId(null)}
+              showTaxToggle={showTaxTotals}
+              lineIsTaxable={tax?.taxableByLineItemId.get(lineItem.id) ?? false}
               canEditDescription={canEditDescription}
               canEditQuantity={canEditQuantity}
               canEditPrice={canEditPrice}
@@ -1503,10 +1566,38 @@ export default function InternalInvoiceLineItemsTable({
         )}
       </div>
 
+      {/* Subtotal / Tax / Total only once tax is actually in play. With no rate
+          configured and nothing taxable — every rater invoice — this collapses
+          back to the single Running Total line the workspace has always had. */}
+      {/* An exemption is the reason there is no tax, so say so rather than
+          leaving the operator to wonder why the rate did not apply. */}
+      {taxApplies && tax!.customerTaxExempt ? (
+        <div className="border-t border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-600 lg:border-slate-200/80 lg:bg-white/88 lg:px-5">
+          Tax exempt customer — no sales tax is charged on this invoice.
+        </div>
+      ) : null}
+
+      {showTaxTotals ? (
+        <div className="border-t border-slate-200 bg-white px-4 py-3 lg:border-slate-200/80 lg:bg-white/88 lg:px-5">
+          <dl className="ml-auto max-w-xs space-y-1 text-sm">
+            <div className="flex items-center justify-between gap-6">
+              <dt className="text-slate-600">Subtotal</dt>
+              <dd className="font-medium text-slate-900">{formatCurrencyFromCents(tax!.subtotalCents)}</dd>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <dt className="text-slate-600">{tax!.taxTitle}</dt>
+              <dd className="font-medium text-slate-900">{formatCurrencyFromCents(tax!.taxCents)}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+
       <div
         className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 shadow-[0_-8px_20px_-16px_rgba(15,23,42,0.4)] lg:static lg:border-slate-200/80 lg:bg-white/88 lg:px-5 lg:py-3.5 lg:shadow-none"
       >
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Running Total</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          {showTaxTotals ? 'Total' : 'Running Total'}
+        </div>
         <div className="text-sm font-semibold text-slate-950">{formatCurrencyFromCents(totalCents)}</div>
       </div>
     </div>

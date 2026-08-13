@@ -60,6 +60,11 @@ import {
 import { retryQboInvoiceVoidFromForm, syncSingleInvoiceToQboFromForm, syncSinglePaymentToQboFromForm } from "@/lib/actions/qbo-sync-actions";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { RETRYABLE_QBO_PAYMENT_SYNC_STATUSES } from "@/lib/qbo/qbo-payment-sync";
+import {
+  readCustomerTaxExempt,
+  readInvoiceLineTaxability,
+  readInvoiceTaxState,
+} from "@/lib/invoices/invoice-tax-state";
 import { readInvoiceQboVoidState } from "@/lib/qbo/qbo-void-state";
 import {
   collectIssuedInvoiceCardPaymentFromForm,
@@ -713,6 +718,68 @@ export default async function InternalInvoiceWorkspacePage({
     : `/jobs/${jobId}/invoice`;
   const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
   const paymentSummary = internalInvoicePaymentLedger?.summary ?? null;
+
+  // Sales tax, all read through the tolerant helpers. With the Slice-02
+  // migration unapplied every one of these is null/empty and the whole tax
+  // block — controls, toggles, split totals — is simply absent.
+  const invoiceTaxState = invoice ? await readInvoiceTaxState({ supabase, invoiceId: invoice.id }) : null;
+  const invoiceLineTaxability = invoice
+    ? await readInvoiceLineTaxability({ supabase, invoiceId: invoice.id })
+    : new Map<string, boolean>();
+  const customerTaxExempt = invoice
+    ? await readCustomerTaxExempt({ supabase, customerId: (invoice as any).customer_id })
+    : false;
+  const invoiceTaxProps = invoiceTaxState
+    ? {
+        enabled: true,
+        subtotalCents: Number(invoice?.subtotal_cents ?? 0),
+        taxCents: invoiceTaxState.taxCents,
+        taxTitle: invoiceTaxState.label ?? "Sales Tax",
+        ratePercent: invoiceTaxState.ratePercent,
+        taxableByLineItemId: invoiceLineTaxability,
+        customerTaxExempt,
+      }
+    : null;
+  // Quiet default: no rate configured and nothing taxable means no tax fields
+  // at all, so a rater invoice looks exactly as it does today.
+  const showTaxSettings =
+    Boolean(invoiceTaxState)
+    && (invoiceTaxState!.ratePercent !== null
+      || invoiceTaxState!.taxCents > 0
+      || [...invoiceLineTaxability.values()].some(Boolean));
+  const taxSettingsFields = showTaxSettings ? (
+    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+      <div className="text-xs font-semibold text-slate-900">Sales tax</div>
+      {customerTaxExempt ? (
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Tax exempt customer — no sales tax is charged on this invoice.
+        </p>
+      ) : (
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          <input type="hidden" name="tax_settings_present" value="1" />
+          <div>
+            <label className={labelClass}>Rate (%)</label>
+            <input
+              name="tax_rate_percent"
+              inputMode="decimal"
+              defaultValue={invoiceTaxState?.ratePercent ?? ""}
+              placeholder="7.975"
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Tax line label</label>
+            <input
+              name="tax_label"
+              defaultValue={invoiceTaxState?.label ?? ""}
+              placeholder="Sales Tax"
+              className={inputClass}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
   const canManageFinancialInvoiceLifecycle = canManageInvoiceLifecycle({
     actorUserId: user.id,
     internalUser,
@@ -1225,6 +1292,7 @@ export default async function InternalInvoiceWorkspacePage({
                       capabilities={fieldBillingCapabilities}
                       lineItems={invoice.line_items}
                       totalCents={invoice.total_cents}
+                      tax={invoiceTaxProps}
                       addLineItemAction={addInternalInvoiceLineItemFromForm}
                       addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
                       addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
@@ -1342,6 +1410,7 @@ export default async function InternalInvoiceWorkspacePage({
                         <input name="billing_zip" defaultValue={invoice.billing_zip ?? ""} className={inputClass} />
                       </div>
                     </div>
+                    {taxSettingsFields}
                     <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full`}>
                       Save Billing Details
                     </SubmitButton>
@@ -1538,6 +1607,7 @@ export default async function InternalInvoiceWorkspacePage({
                   capabilities={fieldBillingCapabilities}
                   lineItems={invoice.line_items}
                   totalCents={invoice.total_cents}
+                      tax={invoiceTaxProps}
                   addLineItemAction={addInternalInvoiceLineItemFromForm}
                   addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
                   addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
@@ -2279,6 +2349,7 @@ export default async function InternalInvoiceWorkspacePage({
                         <input name="billing_zip" defaultValue={invoice.billing_zip ?? ""} className={inputClass} />
                       </div>
                     </div>
+                     {taxSettingsFields}
                     <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
                       Save Billing Details
                     </SubmitButton>

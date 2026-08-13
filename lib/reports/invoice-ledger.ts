@@ -1,6 +1,7 @@
 import { displayDateLA, formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
 import { preferredInvoiceReference, preferredJobReference } from "@/lib/utils/display-references";
 import { normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
+import { isMissingInvoiceTaxColumnError } from "@/lib/invoices/invoice-tax-state";
 
 export const INVOICE_LEDGER_PAGE_LIMIT = 250;
 export const INVOICE_LEDGER_EXPORT_LIMIT = 5000;
@@ -109,6 +110,8 @@ export type InvoiceLedgerRow = {
   recipientDisplay: string;
   communicationStateLabel: string;
   subtotalDisplay: string;
+  /** Sales tax charged. "$0.00" when this invoice has none. */
+  taxDisplay: string;
   totalDisplay: string;
   voidedDateDisplay: string;
   amountPaidDisplay: string;
@@ -160,6 +163,7 @@ type InvoiceRow = {
   voided_at: string | null;
   source_type: string;
   subtotal_cents: number;
+  tax_cents?: number | null;
   total_cents: number;
   billing_name: string | null;
   billing_email: string | null;
@@ -663,16 +667,23 @@ export async function listInvoiceLedgerRows(params: {
   limit?: number;
 }): Promise<InvoiceLedgerResult> {
   const limit = params.limit ?? INVOICE_LEDGER_PAGE_LIMIT;
-  let query = params.supabase
-    .from("internal_invoices")
-    .select(
-      "id, job_id, customer_id, bill_to_kind, bill_to_contractor_id, location_id, service_case_id, invoice_display_number, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at, consolidated_request_key"
-    )
-    .eq("account_owner_user_id", params.accountOwnerUserId);
+  const LEDGER_COLUMNS_BASE =
+    "id, job_id, customer_id, bill_to_kind, bill_to_contractor_id, location_id, service_case_id, invoice_display_number, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at, consolidated_request_key";
 
-  query = applyInvoiceLedgerFilters(query, params.filters);
+  const runLedgerQuery = (columns: string) => {
+    const built = params.supabase
+      .from("internal_invoices")
+      .select(columns)
+      .eq("account_owner_user_id", params.accountOwnerUserId);
+    return applyInvoiceLedgerFilters(built, params.filters).limit(INVOICE_LEDGER_EXPORT_LIMIT + 1);
+  };
 
-  const { data, error } = await query.limit(INVOICE_LEDGER_EXPORT_LIMIT + 1);
+  // tax_cents is additive; on a deployment without it the report still runs and
+  // simply shows no tax, rather than 42703-ing the whole invoices report.
+  let { data, error } = await runLedgerQuery(`${LEDGER_COLUMNS_BASE}, tax_cents`);
+  if (error && isMissingInvoiceTaxColumnError(error)) {
+    ({ data, error } = await runLedgerQuery(LEDGER_COLUMNS_BASE));
+  }
 
   if (error) throw error;
 
@@ -862,6 +873,7 @@ export async function listInvoiceLedgerRows(params: {
       recipientDisplay: delivery?.recipientEmail || String(invoice.billing_email ?? "").trim() || "-",
       communicationStateLabel: formatCommunicationStateLabel(delivery),
       subtotalDisplay: formatCurrencyCents(invoice.subtotal_cents),
+      taxDisplay: formatCurrencyCents(Number(invoice.tax_cents ?? 0) || 0),
       totalDisplay: formatCurrencyCents(invoice.total_cents),
       voidedDateDisplay: formatTimestampDisplay(invoice.voided_at),
       amountPaidDisplay: formatCurrencyCents(amountPaidCents),
@@ -910,6 +922,7 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     "Recipient",
     "Send Status",
     "Subtotal",
+    "Tax",
     "Total",
     "Voided Date",
     "Amount Paid",
@@ -938,6 +951,7 @@ export function buildInvoiceLedgerCsv(rows: InvoiceLedgerRow[]) {
     row.recipientDisplay,
     row.communicationStateLabel,
     row.subtotalDisplay,
+    row.taxDisplay,
     row.totalDisplay,
     row.voidedDateDisplay,
     row.amountPaidDisplay,

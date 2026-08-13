@@ -146,6 +146,17 @@ function createPricebookImportStore(supabase: Awaited<ReturnType<typeof createCl
     },
     async insertPricebookItems(rows) {
       const { error } = await supabase.from("pricebook_items").insert(rows);
+      // Retry without taxability if the column is not deployed — an import
+      // must not start failing because a newer column is missing.
+      if (error && isMissingInvoiceTaxColumnError(error)) {
+        const withoutTax = rows.map((row) => {
+          const copy = { ...row } as Record<string, unknown>;
+          delete copy.is_taxable;
+          return copy;
+        });
+        const retry = await supabase.from("pricebook_items").insert(withoutTax);
+        return { error: retry.error ? { message: retry.error.message } : null };
+      }
       return { error: error ? { message: error.message } : null };
     },
   };
@@ -302,7 +313,7 @@ export async function createPricebookItemFromForm(formData: FormData) {
     redirect(withNotice("invalid_unit_label"));
   }
 
-  const { error } = await supabase.from("pricebook_items").insert({
+  const basePayload = {
     account_owner_user_id: accountOwnerUserId,
     item_name: itemName,
     item_type: itemType,
@@ -311,7 +322,14 @@ export async function createPricebookItemFromForm(formData: FormData) {
     default_unit_price: unitPrice,
     unit_label: unitLabel,
     is_active: true,
-  });
+  };
+  const isTaxable = normalizeText(formData.get("is_taxable")) === "1";
+
+  let { error } = await supabase.from("pricebook_items").insert({ ...basePayload, is_taxable: isTaxable });
+  // Tolerated: creating an item must keep working before the tax migration lands.
+  if (error && isMissingInvoiceTaxColumnError(error)) {
+    ({ error } = await supabase.from("pricebook_items").insert(basePayload));
+  }
 
   if (error) {
     redirect(withNotice("save_failed"));

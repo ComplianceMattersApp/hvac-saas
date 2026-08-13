@@ -8,13 +8,26 @@ export const PRICEBOOK_IMPORT_HEADERS = [
   "Description",
 ] as const;
 
+/**
+ * Columns the template offers but does not require. An operator’s existing
+ * export predates sales tax, so a missing Taxable column means non-taxable
+ * rather than a rejected import.
+ */
+export const PRICEBOOK_IMPORT_OPTIONAL_HEADERS = ["Taxable"] as const;
+
+const PRICEBOOK_IMPORT_TEMPLATE_HEADERS = [
+  ...PRICEBOOK_IMPORT_HEADERS.slice(0, -1),
+  ...PRICEBOOK_IMPORT_OPTIONAL_HEADERS,
+  "Description",
+] as const;
+
 export const PRICEBOOK_IMPORT_MAX_ROWS = 500;
 export const PRICEBOOK_IMPORT_TEMPLATE_CSV = [
-  PRICEBOOK_IMPORT_HEADERS.join(","),
-  "General Cleaning,Cleaning,Service,Job,0,Yes,Standard one-off cleaning service",
-  "After-Hours Service,Add-on,Service,Job,0,No,Optional after-hours add-on",
-  "Extra Labor Hour,Labor,Labor,Hour,0,Yes,Additional labor time",
-  "Supplies / Consumables,Supplies,Material,Item,0,Yes,Materials or consumables used for the job",
+  PRICEBOOK_IMPORT_TEMPLATE_HEADERS.join(","),
+  "General Cleaning,Cleaning,Service,Job,0,Yes,No,Standard one-off cleaning service",
+  "After-Hours Service,Add-on,Service,Job,0,No,No,Optional after-hours add-on",
+  "Extra Labor Hour,Labor,Labor,Hour,0,Yes,No,Additional labor time",
+  "Supplies / Consumables,Supplies,Material,Item,0,Yes,Yes,Materials or consumables used for the job",
 ].join("\r\n");
 
 export type PricebookImportItemType = "service" | "material" | "diagnostic" | "adjustment";
@@ -28,6 +41,8 @@ export type PricebookImportInsertRow = {
   default_unit_price: number;
   unit_label: string | null;
   is_active: boolean;
+  /** Omitted from the insert when the column is not deployed. */
+  is_taxable?: boolean;
   is_starter: false;
   seed_key: null;
 };
@@ -180,7 +195,7 @@ function makeReviewRow(rowNumber: number, reason: string, values: Partial<Priceb
 }
 
 export function parsePricebookImportCsv(csv: string): {
-  rows: Array<Record<(typeof PRICEBOOK_IMPORT_HEADERS)[number], string> & { rowNumber: number }>;
+  rows: Array<Record<string, string> & { rowNumber: number }>;
   missingHeaders: string[];
   errors: string[];
 } {
@@ -200,10 +215,10 @@ export function parsePricebookImportCsv(csv: string): {
   }
 
   const rows = parsedRows.slice(1).map((csvRow, index) => {
-    const row = { rowNumber: index + 2 } as Record<(typeof PRICEBOOK_IMPORT_HEADERS)[number], string> & {
+    const row = { rowNumber: index + 2 } as Record<string, string> & {
       rowNumber: number;
     };
-    PRICEBOOK_IMPORT_HEADERS.forEach((header) => {
+    [...PRICEBOOK_IMPORT_HEADERS, ...PRICEBOOK_IMPORT_OPTIONAL_HEADERS].forEach((header) => {
       row[header] = csvRow[headerIndex.get(header.toLowerCase()) ?? -1] ?? "";
     });
     return row;
@@ -257,6 +272,9 @@ export async function buildPricebookImportPreview(params: {
     const priceRaw = clean(row.Price);
     const activeRaw = clean(row.Active);
     const description = clean(row.Description) || null;
+    // Blank Taxable means non-taxable, which is the safe default: it never
+    // adds tax the operator did not ask for.
+    const isTaxable = parseActive(clean(row.Taxable)) === true;
     const normalizedName = normalizePricebookImportName(serviceName);
 
     const baseValues = {
@@ -344,6 +362,7 @@ export async function buildPricebookImportPreview(params: {
         default_unit_price: price,
         unit_label: unitLabel,
         is_active: active,
+        is_taxable: isTaxable,
         is_starter: false,
         seed_key: null,
       },
