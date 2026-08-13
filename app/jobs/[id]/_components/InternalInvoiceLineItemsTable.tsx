@@ -153,6 +153,7 @@ function invoiceBannerMessage(banner?: string | null) {
     internal_invoice_locked: 'Invoice is locked and cannot be edited.',
     internal_invoice_line_items_locked: 'Invoice charges are locked.',
     internal_invoice_missing: 'Invoice was not found.',
+    internal_invoice_invalid_tax_rate: 'Enter a sales tax rate between 0 and 100, or leave it blank. Nothing was saved.',
   };
 
   return messages[normalized] ?? null;

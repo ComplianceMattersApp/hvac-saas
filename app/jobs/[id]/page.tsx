@@ -6140,6 +6140,13 @@ const showCorrectionReviewResolution =
         />
       )}
 
+      {banner === "internal_invoice_invalid_tax_rate" && (
+        <FlashBanner
+          type="warning"
+          message="Enter a sales tax rate between 0 and 100, or leave it blank. Nothing was saved."
+        />
+      )}
+
       {banner === "internal_invoice_line_items_locked" && (
         <FlashBanner
           type="warning"

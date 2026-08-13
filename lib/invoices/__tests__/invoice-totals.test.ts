@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { insertInvoiceLineItemWithTaxability, recalculateInvoiceTotals } from "@/lib/invoices/invoice-totals";
+import {
+  insertInvoiceLineItemWithTaxability,
+  recalculateDraftInvoiceTotalsForCustomer,
+  recalculateInvoiceTotals,
+} from "@/lib/invoices/invoice-totals";
 import { isMissingInvoiceTaxColumnError } from "@/lib/invoices/invoice-tax-state";
 
 const MISSING_TAX_COLUMN = {
@@ -19,6 +23,10 @@ function makeSupabase(config: {
   customer?: any;
   failSelectsMentioning?: string[];
   failUpdatesWithTax?: boolean;
+  /** Exact error the tax-bearing UPDATE should return (e.g. the PGRST204 shape). */
+  updateErrorWithTax?: any;
+  /** Exact error the tax-bearing INSERT should return. */
+  insertErrorWithTax?: any;
 }) {
   const updates: any[] = [];
   const inserts: any[] = [];
@@ -42,6 +50,9 @@ function makeSupabase(config: {
         then(resolve: (value: any) => void) {
           if (state.isInsert) {
             const hasTax = Object.prototype.hasOwnProperty.call(state.payload ?? {}, "is_taxable");
+            if (hasTax && config.insertErrorWithTax) {
+              return resolve({ data: null, error: config.insertErrorWithTax });
+            }
             if (hasTax && (config.failSelectsMentioning ?? []).includes("is_taxable")) {
               return resolve({ data: null, error: MISSING_TAX_COLUMN });
             }
@@ -50,8 +61,11 @@ function makeSupabase(config: {
           }
           if (state.isUpdate) {
             const hasTax = Object.prototype.hasOwnProperty.call(state.payload ?? {}, "tax_cents");
-            if (hasTax && config.failUpdatesWithTax) {
-              return resolve({ data: null, error: { code: "42703", message: "column tax_cents does not exist" } });
+            if (hasTax && (config.updateErrorWithTax || config.failUpdatesWithTax)) {
+              return resolve({
+                data: null,
+                error: config.updateErrorWithTax ?? { code: "42703", message: "column tax_cents does not exist" },
+              });
             }
             updates.push({ table, payload: state.payload });
             return resolve({ data: null, error: null });
@@ -194,5 +208,163 @@ describe("isMissingInvoiceTaxColumnError", () => {
   it("does not swallow unrelated failures", () => {
     expect(isMissingInvoiceTaxColumnError({ code: "42703", message: "column x.widget does not exist" })).toBe(false);
     expect(isMissingInvoiceTaxColumnError(new Error("permission denied"))).toBe(false);
+  });
+});
+
+describe("PostgREST write-failure shape", () => {
+  // A SELECT fails as 42703 "does not exist"; an INSERT/UPDATE is rejected by
+  // PostgREST against its schema cache as PGRST204 "Could not find ...". Only
+  // matching the read shape left every tolerant write throwing.
+  const PGRST204 = {
+    code: "PGRST204",
+    message: "Could not find the 'tax_cents' column of 'internal_invoices' in the schema cache",
+  };
+
+  it("recognizes the PGRST204 write shape", () => {
+    expect(isMissingInvoiceTaxColumnError(PGRST204)).toBe(true);
+    expect(
+      isMissingInvoiceTaxColumnError({
+        code: "PGRST204",
+        message: "Could not find the 'is_taxable' column of 'pricebook_items' in the schema cache",
+      }),
+    ).toBe(true);
+  });
+
+  it("matches on message alone when no code is supplied", () => {
+    expect(
+      isMissingInvoiceTaxColumnError({ message: "Could not find the 'tax_exempt' column" }),
+    ).toBe(true);
+  });
+
+  it("reads details as well as message", () => {
+    expect(
+      isMissingInvoiceTaxColumnError({ message: "Bad Request", details: "could not find the 'tax_label' column" }),
+    ).toBe(true);
+  });
+
+  it("still refuses to swallow an unrelated PGRST204", () => {
+    expect(
+      isMissingInvoiceTaxColumnError({
+        code: "PGRST204",
+        message: "Could not find the 'widget' column of 'internal_invoices' in the schema cache",
+      }),
+    ).toBe(false);
+  });
+
+  it("retries the totals write when PostgREST rejects tax_cents", async () => {
+    const { supabase, updates } = makeSupabase({
+      lineItems: [{ line_subtotal: "100.00", is_taxable: true }],
+      invoice: { id: "inv-1", customer_id: null, tax_rate_percent: 7.975 },
+      updateErrorWithTax: PGRST204,
+    });
+
+    const totals = await recalculateInvoiceTotals({ supabase, invoiceId: "inv-1", userId: "user-1" });
+
+    expect(totals).toMatchObject({ taxCents: 0, totalCents: 10000, taxSupported: false });
+    expect(updates.at(-1)?.payload).not.toHaveProperty("tax_cents");
+  });
+
+  it("retries a line insert when PostgREST rejects is_taxable", async () => {
+    const { supabase, inserts } = makeSupabase({
+      lineItems: [],
+      insertErrorWithTax: {
+        code: "PGRST204",
+        message: "Could not find the 'is_taxable' column of 'internal_invoice_line_items' in the schema cache",
+      },
+    });
+
+    const { error } = await insertInvoiceLineItemWithTaxability({
+      supabase,
+      payload: { invoice_id: "inv-1", is_taxable: true },
+    });
+
+    expect(error).toBeNull();
+    expect(inserts[0]).not.toHaveProperty("is_taxable");
+  });
+});
+
+describe("malformed line subtotals fail loudly", () => {
+  it("throws rather than counting a corrupt line as $0", async () => {
+    const { supabase } = makeSupabase({
+      lineItems: [{ line_subtotal: "100.00", is_taxable: false }, { line_subtotal: "not-a-number" }],
+      invoice: { id: "inv-1", customer_id: null, tax_rate_percent: null },
+    });
+    await expect(
+      recalculateInvoiceTotals({ supabase, invoiceId: "inv-1", userId: "user-1" }),
+    ).rejects.toThrow(/not a valid amount/);
+  });
+
+  it("throws on a negative line subtotal", async () => {
+    const { supabase } = makeSupabase({
+      lineItems: [{ line_subtotal: "-25.00" }],
+      invoice: { id: "inv-1", customer_id: null, tax_rate_percent: null },
+    });
+    await expect(
+      recalculateInvoiceTotals({ supabase, invoiceId: "inv-1", userId: "user-1" }),
+    ).rejects.toThrow(/must not be negative/);
+  });
+
+  it("treats a null subtotal as malformed, not as zero", async () => {
+    const { supabase } = makeSupabase({
+      lineItems: [{ line_subtotal: null }],
+      invoice: { id: "inv-1", customer_id: null, tax_rate_percent: null },
+    });
+    await expect(
+      recalculateInvoiceTotals({ supabase, invoiceId: "inv-1", userId: "user-1" }),
+    ).rejects.toThrow(/not a valid amount/);
+  });
+});
+
+describe("recalculateDraftInvoiceTotalsForCustomer", () => {
+  it("recomputes every draft for the customer and leaves issued alone", async () => {
+    const recalculated: string[] = [];
+    const supabase = {
+      from(table: string) {
+        const state: any = { table, filters: {} as Record<string, unknown>, isUpdate: false };
+        const builder: any = {
+          select() { return builder; },
+          eq(column: string, value: unknown) { state.filters[column] = value; return builder; },
+          update() { state.isUpdate = true; return builder; },
+          async maybeSingle() {
+            if (table === "internal_invoices") {
+              return { data: { id: "x", customer_id: null, tax_rate_percent: null }, error: null };
+            }
+            return { data: null, error: null };
+          },
+          then(resolve: (value: any) => void) {
+            if (table === "internal_invoices" && !state.isUpdate && state.filters.status === "draft") {
+              return resolve({ data: [{ id: "draft-1" }, { id: "draft-2" }], error: null });
+            }
+            if (table === "internal_invoices" && state.isUpdate) {
+              recalculated.push(String(state.filters.id ?? ""));
+              return resolve({ data: null, error: null });
+            }
+            return resolve({ data: [], error: null });
+          },
+        };
+        return builder;
+      },
+    };
+
+    const result = await recalculateDraftInvoiceTotalsForCustomer({
+      supabase,
+      accountOwnerUserId: "acct-1",
+      customerId: "cust-1",
+      userId: "user-1",
+    });
+
+    // Only drafts were selected, and each one was written.
+    expect(result.recalculated).toBe(2);
+    expect(recalculated).toEqual(["draft-1", "draft-2"]);
+  });
+
+  it("does nothing without a customer scope", async () => {
+    const supabase = { from: vi.fn() };
+    await expect(
+      recalculateDraftInvoiceTotalsForCustomer({
+        supabase, accountOwnerUserId: "acct-1", customerId: "  ", userId: "user-1",
+      }),
+    ).resolves.toEqual({ recalculated: 0 });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 });

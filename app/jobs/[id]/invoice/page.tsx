@@ -61,6 +61,7 @@ import { retryQboInvoiceVoidFromForm, syncSingleInvoiceToQboFromForm, syncSingle
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { RETRYABLE_QBO_PAYMENT_SYNC_STATUSES } from "@/lib/qbo/qbo-payment-sync";
 import {
+  readAccountTaxDefaults,
   readCustomerTaxExempt,
   readInvoiceLineTaxability,
   readInvoiceTaxState,
@@ -722,13 +723,15 @@ export default async function InternalInvoiceWorkspacePage({
   // Sales tax, all read through the tolerant helpers. With the Slice-02
   // migration unapplied every one of these is null/empty and the whole tax
   // block — controls, toggles, split totals — is simply absent.
-  const invoiceTaxState = invoice ? await readInvoiceTaxState({ supabase, invoiceId: invoice.id }) : null;
-  const invoiceLineTaxability = invoice
-    ? await readInvoiceLineTaxability({ supabase, invoiceId: invoice.id })
-    : new Map<string, boolean>();
-  const customerTaxExempt = invoice
-    ? await readCustomerTaxExempt({ supabase, customerId: (invoice as any).customer_id })
-    : false;
+  // Four independent reads — issued together, not in series.
+  const [invoiceTaxState, invoiceLineTaxability, customerTaxExempt, accountTaxDefaults] = invoice
+    ? await Promise.all([
+        readInvoiceTaxState({ supabase, invoiceId: invoice.id }),
+        readInvoiceLineTaxability({ supabase, invoiceId: invoice.id }),
+        readCustomerTaxExempt({ supabase, customerId: (invoice as any).customer_id }),
+        readAccountTaxDefaults({ supabase, accountOwnerUserId: internalUser.account_owner_user_id }),
+      ])
+    : [null, new Map<string, boolean>(), false, { ratePercent: null, label: null, deployed: false }];
   const invoiceTaxProps = invoiceTaxState
     ? {
         enabled: true,
@@ -742,9 +745,15 @@ export default async function InternalInvoiceWorkspacePage({
     : null;
   // Quiet default: no rate configured and nothing taxable means no tax fields
   // at all, so a rater invoice looks exactly as it does today.
+  // Columns deployed AND this account actually does tax somewhere: a configured
+  // account default, a rate on this invoice, or a taxable line. The account
+  // default is what gives a draft created before tax existed a way to opt in —
+  // without it those drafts could never show the rate field at all. A rater
+  // tenant with no default configured still sees nothing.
   const showTaxSettings =
     Boolean(invoiceTaxState)
-    && (invoiceTaxState!.ratePercent !== null
+    && (accountTaxDefaults.ratePercent !== null
+      || invoiceTaxState!.ratePercent !== null
       || invoiceTaxState!.taxCents > 0
       || [...invoiceLineTaxability.values()].some(Boolean));
   const taxSettingsFields = showTaxSettings ? (

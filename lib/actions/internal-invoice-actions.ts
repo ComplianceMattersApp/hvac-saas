@@ -69,6 +69,7 @@ import {
   readAccountTaxDefaults,
   readInvoiceTaxState,
   readPricebookItemTaxable,
+  readPricebookTaxabilityByIds,
 } from '@/lib/invoices/invoice-tax-state';
 import { parseTaxRatePercentInput } from '@/lib/invoices/invoice-tax';
 
@@ -414,11 +415,15 @@ async function applyInvoiceTaxSettingsFromForm(params: {
   supabase: any;
   invoiceId: string;
   formData: FormData;
-}): Promise<void> {
-  if (getTrimmedString(params.formData.get('tax_settings_present')) !== '1') return;
+}): Promise<{ invalidRate: boolean }> {
+  if (getTrimmedString(params.formData.get('tax_settings_present')) !== '1') {
+    return { invalidRate: false };
+  }
 
   const parsedRate = parseTaxRatePercentInput(params.formData.get('tax_rate_percent'));
-  if (parsedRate === 'INVALID') return;
+  // Reported, never swallowed: silently keeping the old rate while the save
+  // says "saved" is how an operator ends up billing a number they did not set.
+  if (parsedRate === 'INVALID') return { invalidRate: true };
 
   const { error } = await params.supabase
     .from('internal_invoices')
@@ -428,6 +433,7 @@ async function applyInvoiceTaxSettingsFromForm(params: {
     })
     .eq('id', params.invoiceId);
   if (error && !isMissingInvoiceTaxColumnError(error)) throw error;
+  return { invalidRate: false };
 }
 
 /**
@@ -438,8 +444,29 @@ async function applyInvoiceTaxSettingsFromForm(params: {
 async function buildInvoiceTaxSnapshotPatch(params: {
   supabase: any;
   accountOwnerUserId: string;
+  /**
+   * Invoice whose rate this draft should inherit — a supplemental bills the
+   * same customer for the same work under the same tax treatment, so it must
+   * follow its parent's rate, not whatever the account default happens to be
+   * now. The account default is the fallback for a parent with no rate.
+   */
+  inheritFromInvoiceId?: string | null;
 }): Promise<Record<string, unknown>> {
-  const defaults = await readAccountTaxDefaults(params);
+  const inheritFromInvoiceId = String(params.inheritFromInvoiceId ?? "").trim();
+  if (inheritFromInvoiceId) {
+    const parent = await readInvoiceTaxState({
+      supabase: params.supabase,
+      invoiceId: inheritFromInvoiceId,
+    });
+    if (parent?.ratePercent !== null && parent?.ratePercent !== undefined) {
+      return { tax_rate_percent: parent.ratePercent, tax_label: parent.label };
+    }
+  }
+
+  const defaults = await readAccountTaxDefaults({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+  });
   if (defaults.ratePercent === null && defaults.label === null) return {};
   return { tax_rate_percent: defaults.ratePercent, tax_label: defaults.label };
 }
@@ -1698,10 +1725,12 @@ export async function createSupplementalInternalInvoiceFromForm(formData: FormDa
     created_by_user_id: userId,
     updated_by_user_id: userId,
     // A supplemental bills the same customer under the same tax treatment, so
-    // it starts from the account default just like a first invoice.
+    // it inherits the parent's rate; the account default only fills in when the
+    // parent had none.
     ...(await buildInvoiceTaxSnapshotPatch({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
+      inheritFromInvoiceId: String(parentInvoice.id ?? '').trim(),
     })),
   };
 
@@ -1799,11 +1828,14 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
 
   // Persist any edited tax rate/label BEFORE recomputing, so the recompute sees
   // the new rate. Both are tolerated: an undeployed migration leaves them alone.
-  await applyInvoiceTaxSettingsFromForm({
+  const taxSettings = await applyInvoiceTaxSettingsFromForm({
     supabase: context.supabase,
     invoiceId: context.invoice.id,
     formData,
   });
+  if (taxSettings.invalidRate) {
+    redirectInternalInvoiceValidation(context.jobId, context.tab, 'internal_invoice_invalid_tax_rate');
+  }
 
   // The seam owns subtotal/tax/total — this update must not write them, or an
   // edit to the billing fields would silently drop the tax it just computed.
@@ -2644,6 +2676,12 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
 
+  // One taxability query for the whole import, not one per scope item.
+  const scopeTaxableByPricebookItemId = await readPricebookTaxabilityByIds({
+    supabase: context.supabase,
+    pricebookItemIds: idsToInsert.map((id) => scopeItemsById.get(id)?.source_pricebook_item_id),
+  });
+
   const payload = await Promise.all(idsToInsert.map(async (scopeItemId, index) => {
     const scopeItem = scopeItemsById.get(scopeItemId)!;
     const unitPriceCents = await resolveEffectiveUnitPriceCents(
@@ -2660,10 +2698,9 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
       source_visit_scope_item_id: scopeItemId,
       // Snapshot taxability from the originating pricebook item. A scope item
       // with no pricebook provenance is non-taxable, same as a manual line.
-      is_taxable: await readPricebookItemTaxable({
-        supabase: context.supabase,
-        pricebookItemId: scopeItem.source_pricebook_item_id,
-      }),
+      is_taxable: scopeTaxableByPricebookItemId.get(
+        String(scopeItem.source_pricebook_item_id ?? '').trim(),
+      ) ?? false,
       item_name_snapshot: getTrimmedString(scopeItem.title),
       description_snapshot: getOptionalText(scopeItem.details),
       item_type_snapshot: scopeItem.item_type

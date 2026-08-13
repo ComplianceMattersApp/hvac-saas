@@ -38,7 +38,22 @@ import {
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { sanitizeVisitScopeItems, type VisitScopeItem } from "@/lib/jobs/visit-scope";
 import { insertInvoiceLineItemWithTaxability, recalculateInvoiceTotals } from "@/lib/invoices/invoice-totals";
-import { readPricebookTaxabilityByIds } from "@/lib/invoices/invoice-tax-state";
+import { readAccountTaxDefaults, readPricebookTaxabilityByIds } from "@/lib/invoices/invoice-tax-state";
+
+/**
+ * Tax rate/label a converted invoice starts from: the account default,
+ * snapshotted — the same patch the job and supplemental draft paths apply.
+ * Empty for an account with no default, and for a deployment without the
+ * columns, so the insert stays identical to today in both cases.
+ */
+async function buildEstimateInvoiceTaxSnapshot(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<Record<string, unknown>> {
+  const defaults = await readAccountTaxDefaults(params);
+  if (defaults.ratePercent === null && defaults.label === null) return {};
+  return { tax_rate_percent: defaults.ratePercent, tax_label: defaults.label };
+}
 
 export { getEstimateById, listEstimatesByAccount };
 
@@ -3008,6 +3023,10 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
       billing_zip: null,
       created_by_user_id: userId,
       updated_by_user_id: userId,
+      // Same account-default tax snapshot every other draft-creation site
+      // applies. Without it a converted invoice carried taxable lines with no
+      // rate to apply to them, so its tax silently computed to zero.
+      ...(await buildEstimateInvoiceTaxSnapshot({ supabase, accountOwnerUserId })),
     };
 
     const { data: insertedInvoice, error: createInvoiceErr } = await supabase

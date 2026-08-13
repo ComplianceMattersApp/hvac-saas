@@ -21,23 +21,36 @@ export type InvoiceTaxState = {
 export type AccountTaxDefaults = {
   ratePercent: number | null;
   label: string | null;
+  /** False when the tax columns are not on this deployment at all. */
+  deployed: boolean;
 };
 
 const INVOICE_TAX_SELECT = "id, tax_rate_percent, tax_cents, tax_label";
 const LINE_ITEM_TAX_SELECT = "id, is_taxable";
 
-/** True when the failure is "these columns aren't deployed yet", not a real error. */
+/**
+ * True when the failure is "these columns aren't deployed yet", not a real error.
+ *
+ * Two shapes, because reads and writes fail differently. A SELECT reaches
+ * Postgres and comes back 42703 "column ... does not exist". An INSERT/UPDATE
+ * is rejected earlier by PostgREST against its cached schema, as PGRST204
+ * "Could not find the 'x' column of 'y' in the schema cache" — which never
+ * mentions "does not exist". Matching only the read shape meant every tolerant
+ * write path still threw on a lagging migration. Same precedent as
+ * lib/permits/permit-requests-read-model.ts.
+ */
 export function isMissingInvoiceTaxColumnError(error: unknown): boolean {
   const code = String((error as any)?.code ?? "").trim();
-  const message = String((error as any)?.message ?? "").toLowerCase();
+  const message = `${String((error as any)?.message ?? "")} ${String((error as any)?.details ?? "")}`.toLowerCase();
   const namesTaxColumn =
     message.includes("tax_rate_percent")
     || message.includes("tax_cents")
     || message.includes("tax_label")
     || message.includes("is_taxable")
     || message.includes("tax_exempt");
-  if (code === "42703") return namesTaxColumn;
-  return message.includes("column") && namesTaxColumn && message.includes("does not exist");
+  if (!namesTaxColumn) return false;
+  if (code === "42703" || code === "PGRST204") return true;
+  return message.includes("does not exist") || message.includes("could not find");
 }
 
 function toState(row: any): InvoiceTaxState {
@@ -98,36 +111,20 @@ export async function readInvoiceLineTaxability(params: {
 }
 
 /**
- * Whether the account-default tax columns exist on this deployment.
+ * The account's default rate/label.
  *
- * Distinct from "no default configured": the admin UI renders the rate fields
- * only when they can actually be saved, so an unapplied migration shows no tax
- * settings at all rather than a control that silently does nothing.
+ * `deployed` distinguishes "this account charges no tax" from "these columns do
+ * not exist yet" — the admin UI renders the rate fields only when they can
+ * actually be saved. Both answers come from one read; probing separately was
+ * two round trips for the same row.
  */
-export async function accountTaxColumnsDeployed(params: {
-  supabase: any;
-  accountOwnerUserId: string;
-}): Promise<boolean> {
-  try {
-    const { error } = await params.supabase
-      .from("internal_business_profiles")
-      .select("default_tax_rate_percent")
-      .eq("account_owner_user_id", String(params.accountOwnerUserId ?? "").trim())
-      .maybeSingle();
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-/** The account's default rate/label, or nulls when unset or undeployed. */
 export async function readAccountTaxDefaults(params: {
   supabase: any;
   accountOwnerUserId: string;
 }): Promise<AccountTaxDefaults> {
-  const empty: AccountTaxDefaults = { ratePercent: null, label: null };
+  const undeployed: AccountTaxDefaults = { ratePercent: null, label: null, deployed: false };
   const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
-  if (!accountOwnerUserId) return empty;
+  if (!accountOwnerUserId) return undeployed;
 
   try {
     const { data, error } = await params.supabase
@@ -135,13 +132,15 @@ export async function readAccountTaxDefaults(params: {
       .select("default_tax_rate_percent, default_tax_label")
       .eq("account_owner_user_id", accountOwnerUserId)
       .maybeSingle();
-    if (error || !data) return empty;
+    if (error) return undeployed;
+    // A missing profile row still proves the columns exist — the select ran.
     return {
-      ratePercent: normalizeTaxRatePercent(data.default_tax_rate_percent),
-      label: String(data.default_tax_label ?? "").trim() || null,
+      ratePercent: normalizeTaxRatePercent(data?.default_tax_rate_percent),
+      label: String(data?.default_tax_label ?? "").trim() || null,
+      deployed: true,
     };
   } catch {
-    return empty;
+    return undeployed;
   }
 }
 

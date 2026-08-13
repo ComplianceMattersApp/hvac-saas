@@ -44,6 +44,53 @@ export async function insertInvoiceLineItemWithTaxability(params: {
   return { error: retry?.error ?? null };
 }
 
+/**
+ * Recompute every DRAFT invoice billed to one customer.
+ *
+ * Called when `customers.tax_exempt` flips. Without it the editor would say
+ * "no sales tax is charged" while the stored total still carried tax — the
+ * displayed truth and the billed truth would disagree, and the invoice would
+ * issue at the stale number.
+ *
+ * Drafts only: an issued invoice is immutable except through the void path, so
+ * a later exemption never rewrites what a customer was already billed.
+ */
+export async function recalculateDraftInvoiceTotalsForCustomer(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  customerId: string;
+  userId: string;
+}): Promise<{ recalculated: number }> {
+  const customerId = String(params.customerId ?? "").trim();
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  if (!customerId || !accountOwnerUserId) return { recalculated: 0 };
+
+  const { data, error } = await params.supabase
+    .from("internal_invoices")
+    .select("id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("customer_id", customerId)
+    .eq("status", "draft");
+  if (error || !data) return { recalculated: 0 };
+
+  let recalculated = 0;
+  for (const row of data) {
+    // One bad draft must not block the rest, nor fail the customer save that
+    // triggered this — the exemption itself is already stored.
+    try {
+      await recalculateInvoiceTotals({
+        supabase: params.supabase,
+        invoiceId: String(row.id),
+        userId: params.userId,
+      });
+      recalculated += 1;
+    } catch {
+      /* keep going */
+    }
+  }
+  return { recalculated };
+}
+
 export type InvoiceTotalsResult = {
   subtotalCents: number;
   taxCents: number;
@@ -52,10 +99,23 @@ export type InvoiceTotalsResult = {
   taxSupported: boolean;
 };
 
-/** Dollars-as-numeric to integer cents, matching how line_subtotal is stored. */
+/**
+ * Dollars-as-numeric to integer cents, matching how line_subtotal is stored.
+ *
+ * Throws on anything malformed or negative rather than contributing $0. A
+ * corrupt line silently worth nothing would persist a total that under-bills
+ * the customer and balances against nothing — the pre-slice parseMoneyToCents
+ * failed loudly here, and that behavior is the safe one.
+ */
 function moneyToCents(value: unknown): number {
-  const amount = typeof value === "number" ? value : Number(String(value ?? "0").trim() || "0");
-  if (!Number.isFinite(amount)) return 0;
+  const raw = typeof value === "number" ? value : String(value ?? "").trim();
+  const amount = typeof raw === "number" ? raw : Number(raw === "" ? NaN : raw);
+  if (!Number.isFinite(amount)) {
+    throw new Error(`Line subtotal is not a valid amount: ${JSON.stringify(value)}`);
+  }
+  if (amount < 0) {
+    throw new Error(`Line subtotal must not be negative: ${JSON.stringify(value)}`);
+  }
   return Math.round(amount * 100);
 }
 

@@ -18,6 +18,7 @@ import {
 } from "@/lib/customers/customer-systems-equipment-read-model";
 import { redirect } from "next/navigation"
 import { isMissingInvoiceTaxColumnError } from "@/lib/invoices/invoice-tax-state"
+import { recalculateDraftInvoiceTotalsForCustomer } from "@/lib/invoices/invoice-totals"
 
 function toFullName(first?: string | null, last?: string | null) {
   const f = String(first ?? "").trim();
@@ -159,6 +160,18 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
       .update({ tax_exempt: String(formData.get("tax_exempt") ?? "").trim() === "1" })
       .eq("id", customer_id);
     if (taxExemptErr && !isMissingInvoiceTaxColumnError(taxExemptErr)) throw taxExemptErr;
+
+    // Exemption changes what this customer's open drafts should total, in both
+    // directions. Recompute them through the shared seam so the stored total
+    // agrees with what the editor now says. Issued invoices are untouched.
+    if (!taxExemptErr) {
+      await recalculateDraftInvoiceTotalsForCustomer({
+        supabase: admin,
+        accountOwnerUserId: scopedCustomer.accountOwnerUserId,
+        customerId: customer_id,
+        userId: String(scopedCustomer.internalUser.user_id ?? ""),
+      });
+    }
   }
 
   // 1B) Sync job snapshot fields for all jobs tied to this customer

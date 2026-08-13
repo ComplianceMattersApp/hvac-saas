@@ -77,3 +77,48 @@ describe("reports and pricebook admin", () => {
     expect(pricebookPage).toContain("taxColumnsDeployed");
   });
 });
+
+describe("review follow-ups", () => {
+  const customerActions = read("lib/actions/customer-actions.ts");
+  const jobPage = read("app/jobs/[id]/page.tsx");
+
+  it("recalculates the customer's drafts when the exemption flips", () => {
+    expect(customerActions).toContain("recalculateDraftInvoiceTotalsForCustomer");
+    // Drafts only — an issued invoice is immutable except through the void path.
+    expect(read("lib/invoices/invoice-totals.ts")).toContain('.eq("status", "draft")');
+  });
+
+  it("inherits the parent's rate on a supplemental, account default only as fallback", () => {
+    expect(invoiceActions).toContain("inheritFromInvoiceId: String(parentInvoice.id ?? '').trim()");
+    expect(invoiceActions).toContain("if (parent?.ratePercent !== null && parent?.ratePercent !== undefined)");
+  });
+
+  it("applies the account tax snapshot on estimate conversion", () => {
+    expect(estimateActions).toContain("buildEstimateInvoiceTaxSnapshot({ supabase, accountOwnerUserId })");
+  });
+
+  it("shows the tax UI when an account default exists, even on an older draft", () => {
+    expect(editorPage).toContain("accountTaxDefaults.ratePercent !== null");
+  });
+
+  it("surfaces an invalid rate instead of reporting a silent success", () => {
+    expect(invoiceActions).toContain("internal_invoice_invalid_tax_rate");
+    expect(jobPage).toContain('banner === "internal_invoice_invalid_tax_rate"');
+    expect(lineItemsTable).toContain("internal_invoice_invalid_tax_rate");
+  });
+
+  it("batches the visit-scope taxability lookup", () => {
+    expect(invoiceActions).toContain("scopeTaxableByPricebookItemId");
+    expect(invoiceActions).toContain("readPricebookTaxabilityByIds({");
+  });
+
+  it("reads the account defaults and their deployment state in one query", () => {
+    const taxState = read("lib/invoices/invoice-tax-state.ts");
+    expect(taxState).not.toContain("accountTaxColumnsDeployed");
+    expect(taxState).toContain("deployed: true");
+  });
+
+  it("issues the editor's independent tax reads together", () => {
+    expect(editorPage).toContain("await Promise.all([\n        readInvoiceTaxState(");
+  });
+});

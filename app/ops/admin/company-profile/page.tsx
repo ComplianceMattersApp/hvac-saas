@@ -32,7 +32,7 @@ import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { getQboConnectionForAccountIncludingInactive } from "@/lib/qbo/qbo-connection";
 import { loadQboItemCatalog, type QboItemCatalog } from "@/lib/qbo/qbo-item-catalog";
 import { readAccountDefaultQboItem } from "@/lib/qbo/qbo-item-mapping";
-import { accountTaxColumnsDeployed, readAccountTaxDefaults } from "@/lib/invoices/invoice-tax-state";
+import { readAccountTaxDefaults } from "@/lib/invoices/invoice-tax-state";
 import { QboIntegrationSection } from "./_components/QboIntegrationSection";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 import { SettingsSection } from "./_components/SettingsSection";
@@ -230,7 +230,7 @@ export default async function AdminCompanyProfilePage({
   // Sales tax defaults, read tolerantly. `deployed` false means the Slice-02
   // migration has not landed, and the tax fields are simply absent.
   const accountTaxDefaults = await readAccountTaxDefaults({ supabase, accountOwnerUserId: ownerId });
-  const taxDefaultsDeployed = await accountTaxColumnsDeployed({ supabase, accountOwnerUserId: ownerId });
+  const taxDefaultsDeployed = accountTaxDefaults.deployed;
 
   // QBO Integrations section. The read is defensive (returns null if the table
   // is missing or unreadable) so QBO never blocks the Company Profile page.
