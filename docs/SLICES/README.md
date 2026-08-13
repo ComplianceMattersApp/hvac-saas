@@ -18,7 +18,7 @@ Owner decisions already made (do not relitigate inside a slice):
 | # | Slice | Status |
 |---|-------|--------|
 | 1 | QBO correctness — per-line item mapping (Qty-shows-as-hours fix) + verify-after-write on invoice & payment sync | **Merged to main.** Owner note: QBO-sandbox manual QA deferred — owner holds the step list and will return to it |
-| 2 | Sales tax — schema, invoice UI/PDF, QBO tax mapping (rater default: non-taxable services) | **Ready — see SLICE-02-sales-tax.md** |
+| 2 | Sales tax — schema, invoice UI/PDF, QBO tax mapping (rater default: non-taxable services) | **Implemented + reviewed (2 passes), approved to merge.** Fail-loud subtotal change pre-verified against live data 2026-08-13: `line_subtotal` CHECK constraint confirmed present, zero rows violating — no watch period needed |
 | 3 | Offline draft persistence on ECC test forms (`/jobs/[id]/tests`) | **Ready — see SLICE-03-offline-test-drafts.md** |
 | 4 | Twilio self-serve tenant provisioning (in-app A2P registration wizard + status tracking + tenant-admin activation) | Not started |
 | 5 | Recurring visit generation → Needs Scheduling queue (no auto-booking) | Not started |
