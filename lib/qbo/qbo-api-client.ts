@@ -41,6 +41,12 @@ export interface QboInvoiceLineInput {
    * hours in files that already had an hours-based item named "Services".
    */
   itemRef: string;
+  /**
+   * Whether this line is subject to sales tax. Sent as the US semantic
+   * TaxCodeRef (TAX/NON) so QuickBooks computes its own tax from its own rates;
+   * EveryStep never sends TxnTaxDetail.
+   */
+  isTaxable?: boolean;
 }
 
 export interface QboInvoiceInput {
@@ -396,6 +402,11 @@ function buildInvoiceBody(invoice: QboInvoiceInput): Record<string, unknown> {
         ItemRef: { value: line.itemRef },
         Qty: line.quantity,
         UnitPrice: round2(line.unitPrice),
+        // TAX/NON are QuickBooks' US semantic tax codes: they say whether the
+        // line is taxable and let QBO apply its own rate. We deliberately send
+        // no TxnTaxDetail — QuickBooks owns the tax amount on its side, and our
+        // tax_cents never travels as a number.
+        TaxCodeRef: { value: line.isTaxable ? "TAX" : "NON" },
       },
     })),
     ...(invoice.privateNote ? { PrivateNote: invoice.privateNote } : {}),

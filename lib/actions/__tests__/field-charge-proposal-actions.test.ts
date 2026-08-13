@@ -157,6 +157,16 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
               eq: vi.fn(async () => ({ error: null })),
             };
           }),
+          // The shared totals seam reads the invoice's tax rate before it
+          // recomputes. No rate configured here — the rater default.
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { id: 'inv-1', customer_id: null, tax_rate_percent: null },
+                error: null,
+              })),
+            })),
+          })),
         };
       }
 

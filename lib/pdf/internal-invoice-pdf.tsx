@@ -107,6 +107,9 @@ function InvoicePdfDocument({ model, logoSource }: { model: InternalInvoiceDocum
 
         <View style={styles.totals} wrap={false}>
           <View style={styles.totalRow}><Text>Subtotal</Text><Text>{model.subtotalLabel}</Text></View>
+          {/* Tax appears only when there is tax — an untaxed invoice keeps the
+              exact Subtotal/Total block it has always had. */}
+          {model.taxCents > 0 ? <View style={styles.totalRow}><Text>{model.taxTitle}</Text><Text>{model.taxLabel}</Text></View> : null}
           <View style={styles.totalRow}><Text>Total</Text><Text>{model.totalLabel}</Text></View>
           {model.amountPaidCents > 0 ? <View style={styles.totalRow}><Text>Recorded Payments</Text><Text style={styles.paid}>-{model.amountPaidLabel}</Text></View> : null}
           <View style={[styles.totalRow, styles.totalStrong]}><Text>{model.paymentStatus === "paid" ? "Paid in Full" : "Balance Due"}</Text><Text style={model.paymentStatus === "paid" ? styles.paid : {}}>{model.balanceDueLabel}</Text></View>

@@ -63,6 +63,14 @@ import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/vi
 import { formatInvoiceDisplayReference } from '@/lib/utils/display-references';
 import { resolveInternalInvoiceDuplicateRisks } from '@/lib/business/internal-invoice-duplicate-risk';
 import { withJobsBillingDispositionSelectFallback } from '@/lib/supabase/jobs-billing-disposition-compat';
+import { insertInvoiceLineItemWithTaxability, recalculateInvoiceTotals } from '@/lib/invoices/invoice-totals';
+import {
+  isMissingInvoiceTaxColumnError,
+  readAccountTaxDefaults,
+  readInvoiceTaxState,
+  readPricebookItemTaxable,
+} from '@/lib/invoices/invoice-tax-state';
+import { parseTaxRatePercentInput } from '@/lib/invoices/invoice-tax';
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
   return String(value ?? '').trim();
@@ -372,36 +380,68 @@ async function recomputeOpsAfterInvoiceMutation(params: {
   });
 }
 
+/**
+ * Recompute and persist subtotal / tax / total from the invoice's line items.
+ *
+ * Thin wrapper over the shared seam in lib/invoices/invoice-totals.ts — the one
+ * routine allowed to write those columns, so `total = subtotal + tax` cannot
+ * drift. It lives outside this module because `"use server"` files may only
+ * export server actions, and the field-charge lane needs the same seam.
+ *
+ * Returns the SUBTOTAL for backwards compatibility with existing callers that
+ * only ever wanted a line sum; callers needing the tax-aware total use
+ * recalculateInvoiceTotals directly.
+ */
 async function syncInvoiceTotalsFromLineItems(params: {
   supabase: any;
   invoiceId: string;
   userId: string;
 }) {
-  const { data: lineItems, error: lineItemsErr } = await params.supabase
-    .from('internal_invoice_line_items')
-    .select('line_subtotal')
-    .eq('invoice_id', params.invoiceId);
+  const totals = await recalculateInvoiceTotals(params);
+  return totals.subtotalCents;
+}
 
-  if (lineItemsErr) throw lineItemsErr;
+/**
+ * Persist an edited tax rate / label from the invoice details form.
+ *
+ * The presence marker distinguishes "the operator cleared the rate" from "the
+ * tax block was never rendered" (columns undeployed, or a surface that does not
+ * show tax) — without it, saving any other field would wipe a configured rate.
+ * A missing-column failure is swallowed: tax is additive, and a lagging
+ * migration must never block saving an invoice's billing details.
+ */
+async function applyInvoiceTaxSettingsFromForm(params: {
+  supabase: any;
+  invoiceId: string;
+  formData: FormData;
+}): Promise<void> {
+  if (getTrimmedString(params.formData.get('tax_settings_present')) !== '1') return;
 
-  const subtotalCents = (lineItems ?? []).reduce((sum: number, row: any) => {
-    const normalized = parseMoneyToCents(String(row?.line_subtotal ?? '0'), 'Line subtotal');
-    return sum + normalized;
-  }, 0);
+  const parsedRate = parseTaxRatePercentInput(params.formData.get('tax_rate_percent'));
+  if (parsedRate === 'INVALID') return;
 
-  const { error: updateErr } = await params.supabase
+  const { error } = await params.supabase
     .from('internal_invoices')
     .update({
-      subtotal_cents: subtotalCents,
-      total_cents: subtotalCents,
-      updated_by_user_id: params.userId,
-      updated_at: new Date().toISOString(),
+      tax_rate_percent: parsedRate,
+      tax_label: getOptionalText(params.formData.get('tax_label')),
     })
     .eq('id', params.invoiceId);
+  if (error && !isMissingInvoiceTaxColumnError(error)) throw error;
+}
 
-  if (updateErr) throw updateErr;
-
-  return subtotalCents;
+/**
+ * Tax rate/label a new draft starts from: the account default, snapshotted.
+ * Returns an empty patch when the columns are not deployed or no default is
+ * configured, so rater tenants get byte-identical drafts to today.
+ */
+async function buildInvoiceTaxSnapshotPatch(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<Record<string, unknown>> {
+  const defaults = await readAccountTaxDefaults(params);
+  if (defaults.ratePercent === null && defaults.label === null) return {};
+  return { tax_rate_percent: defaults.ratePercent, tax_label: defaults.label };
 }
 
 function redirectInternalInvoiceValidation(jobId: string, tab: string, banner: string): never {
@@ -1493,6 +1533,13 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
     invoiceDate: new Date().toISOString().slice(0, 10),
   }).header;
 
+  // Snapshot the account's default rate/label onto the draft. Empty for any
+  // account that has not configured one — which is every rater tenant.
+  Object.assign(draftPayload, await buildInvoiceTaxSnapshotPatch({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+  }));
+
   const { data, error } = await context.supabase
     .from('internal_invoices')
     .insert(draftPayload)
@@ -1650,6 +1697,12 @@ export async function createSupplementalInternalInvoiceFromForm(formData: FormDa
     billing_zip: getOptionalText(parentInvoice.billing_zip),
     created_by_user_id: userId,
     updated_by_user_id: userId,
+    // A supplemental bills the same customer under the same tax treatment, so
+    // it starts from the account default just like a first invoice.
+    ...(await buildInvoiceTaxSnapshotPatch({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    })),
   };
 
   const { data, error } = await supabase
@@ -1744,7 +1797,17 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
     });
   }
 
-  const derivedSubtotalCents = await syncInvoiceTotalsFromLineItems({
+  // Persist any edited tax rate/label BEFORE recomputing, so the recompute sees
+  // the new rate. Both are tolerated: an undeployed migration leaves them alone.
+  await applyInvoiceTaxSettingsFromForm({
+    supabase: context.supabase,
+    invoiceId: context.invoice.id,
+    formData,
+  });
+
+  // The seam owns subtotal/tax/total — this update must not write them, or an
+  // edit to the billing fields would silently drop the tax it just computed.
+  await syncInvoiceTotalsFromLineItems({
     supabase: context.supabase,
     invoiceId: context.invoice.id,
     userId: context.userId,
@@ -1753,8 +1816,6 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
   const updates = {
     invoice_number: invoiceNumber,
     invoice_date: normalizeInvoiceDate(getTrimmedString(formData.get('invoice_date'))),
-    subtotal_cents: derivedSubtotalCents,
-    total_cents: derivedSubtotalCents,
     notes: getOptionalText(formData.get('notes')),
     billing_name: getOptionalText(formData.get('billing_name')),
     billing_email: getOptionalText(formData.get('billing_email')),
@@ -2404,13 +2465,19 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
   const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
 
-  const { error } = await context.supabase
-    .from('internal_invoice_line_items')
-    .insert({
+  const { error } = await insertInvoiceLineItemWithTaxability({
+    supabase: context.supabase,
+    payload: {
       invoice_id: invoice.id,
       sort_order: nextSortOrder,
       source_kind: 'pricebook',
       source_pricebook_item_id: String(pricebookItem.id),
+      // Snapshot at add time, editable per line afterwards — same philosophy as
+      // item_name_snapshot. Read separately so a lagging migration is tolerated.
+      is_taxable: await readPricebookItemTaxable({
+        supabase: context.supabase,
+        pricebookItemId: pricebookItem.id,
+      }),
       item_name_snapshot: getTrimmedString(pricebookItem.item_name),
       description_snapshot:
         capabilities.can_edit_invoice_line_description && formData.has('description_snapshot')
@@ -2424,7 +2491,8 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
       line_subtotal: formatScaledInt(lineSubtotalCents, 2),
       created_by_user_id: context.userId,
       updated_by_user_id: context.userId,
-    });
+    },
+  });
 
   if (error) throw error;
 
@@ -3041,6 +3109,7 @@ async function buildInternalInvoiceEmailForContext(context: LoadedInternalInvoic
     paymentSummary,
     tenantIdentity,
     memberContextByJobId,
+    taxState: await readInvoiceTaxState({ supabase: context.supabase, invoiceId: invoice.id }),
   });
 
   const invoiceReference = formatInvoiceDisplayReference({

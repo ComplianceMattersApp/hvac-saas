@@ -197,9 +197,114 @@ describe("syncInvoiceToQbo", () => {
     expect(result.status).toBe("synced");
     expect(createQboInvoice).not.toHaveBeenCalled();
     expect(findQboInvoiceByDocNumber).not.toHaveBeenCalled();
+    // The token comes from a live re-read, not the stored "5" — the stored one
+    // goes stale as soon as anything touches the invoice in QuickBooks.
     expect(updateQboInvoice).toHaveBeenCalledWith(
-      expect.objectContaining({ qboInvoiceId: "Q9", syncToken: "5", requestId: "esinvupd-inv3-5" }),
+      expect.objectContaining({ qboInvoiceId: "Q9", syncToken: "9", requestId: "esinvupd-inv3-9" }),
     );
+  });
+
+  it("updates with a freshly re-read SyncToken, not the stale stored one", async () => {
+    // A payment posting in QuickBooks bumps the token; using the stored one
+    // fails with a 5010 stale-object fault.
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q9", syncToken: "42", docNumber: "2002", balance: 50, totalAmount: 50, totalTax: 0, looksVoided: false,
+    });
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-stale", status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+          billing_name: "Cust", invoice_display_number: 2002, invoice_date: "2026-08-12",
+          qbo_invoice_id: "Q9", qbo_sync_token: "5",
+        },
+      },
+      internal_invoice_line_items: {
+        list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 50, line_subtotal: 50, sort_order: 1 }],
+      },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-stale" });
+
+    expect(result.status).toBe("synced");
+    expect(updateQboInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ qboInvoiceId: "Q9", syncToken: "42", requestId: "esinvupd-inv-stale-42" }),
+    );
+  });
+
+  it("takes the error path when the live SyncToken cannot be read", async () => {
+    // Never fall back to the stored token — guessing it is how drift starts.
+    findQboInvoiceById.mockResolvedValueOnce(null);
+    const { builder, updates } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-gone", status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+          billing_name: "Cust", invoice_display_number: 2002, invoice_date: "2026-08-12",
+          qbo_invoice_id: "Q9", qbo_sync_token: "5",
+        },
+      },
+      internal_invoice_line_items: {
+        list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 50, line_subtotal: 50, sort_order: 1 }],
+      },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-gone" });
+
+    expect(result.status).toBe("error");
+    expect(result.error).toContain("no longer has invoice");
+    expect(updateQboInvoice).not.toHaveBeenCalled();
+    expect((updates.internal_invoices ?? []).some((p) => p.qbo_sync_status === "synced")).toBe(false);
+  });
+
+  it("threads per-line taxability into the QuickBooks invoice body", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-tax", status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+          billing_name: "Cust", invoice_display_number: 2005, invoice_date: "2026-08-12", qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: {
+        list: [
+          { item_name_snapshot: "Part", quantity: 1, unit_price: 500, line_subtotal: 500, sort_order: 1, is_taxable: true },
+          { item_name_snapshot: "Labor", quantity: 1, unit_price: 200, line_subtotal: 200, sort_order: 2, is_taxable: false },
+        ],
+      },
+    });
+
+    await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-tax" });
+
+    expect(createQboInvoice).toHaveBeenCalledWith(expect.objectContaining({
+      invoice: expect.objectContaining({
+        lines: [
+          expect.objectContaining({ isTaxable: true }),
+          expect.objectContaining({ isTaxable: false }),
+        ],
+      }),
+    }));
+  });
+
+  it("verifies an Automated Sales Tax invoice against the pre-tax subtotal", async () => {
+    // QuickBooks adds its own tax; our tax_cents never travels. The expected
+    // total stays the line sum, so AST tenants verify clean.
+    findQboInvoiceById.mockResolvedValueOnce({
+      id: "Q1", syncToken: "9", docNumber: "2006", balance: 755.83, totalAmount: 755.83,
+      totalTax: 55.83, looksVoided: false,
+    });
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-ast", status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+          billing_name: "Cust", invoice_display_number: 2006, invoice_date: "2026-08-12", qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: {
+        list: [{ item_name_snapshot: "Part", quantity: 1, unit_price: 700, line_subtotal: 700, sort_order: 1, is_taxable: true }],
+      },
+    });
+
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-ast" });
+
+    expect(result.status).toBe("synced");
   });
 
   it("adopts an exact QBO invoice created by an earlier timed-out request", async () => {

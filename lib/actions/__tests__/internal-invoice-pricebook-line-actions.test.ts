@@ -129,6 +129,8 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
       }
 
       if (table === 'pricebook_items') {
+        // Two shapes: the scoped item read (.eq().eq().maybeSingle()) and the
+        // taxability read, which is account-agnostic (.eq().maybeSingle()).
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -137,6 +139,10 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
                   data: pricebookItem ?? null,
                   error: null,
                 })),
+              })),
+              maybeSingle: vi.fn(async () => ({
+                data: pricebookItem ?? null,
+                error: null,
               })),
             })),
           })),
@@ -173,6 +179,7 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
             eq: vi.fn(async () => ({
               data: [...insertedLineItems, ...updatedLineItems].map((lineItem) => ({
                 line_subtotal: lineItem.line_subtotal,
+                is_taxable: Boolean(lineItem.is_taxable),
               })),
               error: null,
             })),
@@ -207,6 +214,16 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
               eq: vi.fn(async () => ({ error: null })),
             };
           }),
+          // The totals seam reads the invoice's tax rate before recomputing.
+          // No rate configured here, which is the rater default.
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { id: 'inv-1', customer_id: null, tax_rate_percent: null },
+                error: null,
+              })),
+            })),
+          })),
         };
       }
 

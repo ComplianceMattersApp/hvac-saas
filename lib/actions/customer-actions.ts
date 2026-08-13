@@ -17,6 +17,7 @@ import {
   type CustomerEquipmentHistoryUnitSummary,
 } from "@/lib/customers/customer-systems-equipment-read-model";
 import { redirect } from "next/navigation"
+import { isMissingInvoiceTaxColumnError } from "@/lib/invoices/invoice-tax-state"
 
 function toFullName(first?: string | null, last?: string | null) {
   const f = String(first ?? "").trim();
@@ -147,6 +148,18 @@ export async function upsertCustomerProfileFromForm(formData: FormData) {
     .eq("id", customer_id);
 
   if (custErr) throw custErr;
+
+  // 1A) Tax exemption, written separately and tolerantly: the column is newer
+  // than the rest of the row, so a lagging migration must not fail a plain
+  // customer edit. The presence marker keeps a form that never rendered the
+  // control (undeployed column) from clearing an exemption that is already set.
+  if (String(formData.get("tax_fields_present") ?? "").trim() === "1") {
+    const { error: taxExemptErr } = await admin
+      .from("customers")
+      .update({ tax_exempt: String(formData.get("tax_exempt") ?? "").trim() === "1" })
+      .eq("id", customer_id);
+    if (taxExemptErr && !isMissingInvoiceTaxColumnError(taxExemptErr)) throw taxExemptErr;
+  }
 
   // 1B) Sync job snapshot fields for all jobs tied to this customer
   // This keeps /ops + job cards accurate even if they still read from jobs.* fields.

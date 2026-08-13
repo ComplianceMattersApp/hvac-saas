@@ -32,6 +32,7 @@ import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { getQboConnectionForAccountIncludingInactive } from "@/lib/qbo/qbo-connection";
 import { loadQboItemCatalog, type QboItemCatalog } from "@/lib/qbo/qbo-item-catalog";
 import { readAccountDefaultQboItem } from "@/lib/qbo/qbo-item-mapping";
+import { accountTaxColumnsDeployed, readAccountTaxDefaults } from "@/lib/invoices/invoice-tax-state";
 import { QboIntegrationSection } from "./_components/QboIntegrationSection";
 import { ProfileConsole, type ConsoleSectionState } from "./_components/ProfileConsole";
 import { SettingsSection } from "./_components/SettingsSection";
@@ -57,6 +58,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   logo_too_large: { tone: "error", message: "Logo files must be 5 MB or smaller." },
   save_failed: { tone: "error", message: "We couldn't save your company details. Please try again." },
   invoice_settings_saved: { tone: "success", message: "Invoice settings were saved." },
+  invalid_tax_rate: { tone: "error", message: "Enter a sales tax rate between 0 and 100, or leave it blank." },
   stripe_connect_status_refreshed: { tone: "success", message: "Online payment setup status was refreshed." },
   stripe_connect_onboarding_returned: {
     tone: "warn",
@@ -224,6 +226,11 @@ export default async function AdminCompanyProfilePage({
         ? { kind: "count", count: eccConnectedCount }
         : undefined;
   const platformBillingAvailability = getPlatformBillingAvailability();
+
+  // Sales tax defaults, read tolerantly. `deployed` false means the Slice-02
+  // migration has not landed, and the tax fields are simply absent.
+  const accountTaxDefaults = await readAccountTaxDefaults({ supabase, accountOwnerUserId: ownerId });
+  const taxDefaultsDeployed = await accountTaxColumnsDeployed({ supabase, accountOwnerUserId: ownerId });
 
   // QBO Integrations section. The read is defensive (returns null if the table
   // is missing or unreadable) so QBO never blocks the Company Profile page.
@@ -684,6 +691,42 @@ export default async function AdminCompanyProfilePage({
                 - create, send, and track invoices from each job.
               </p>
             </div>
+
+            {taxDefaultsDeployed ? (
+              <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3.5">
+                <div>
+                  <div className="text-sm font-semibold text-[#0f1f35]">Sales tax</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    New invoices start from this rate, applied only to lines marked taxable in your
+                    Pricebook. Leave it blank if your services aren&rsquo;t taxable.
+                  </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-sm text-slate-700">
+                    <span className="font-medium text-slate-800">Default rate (%)</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      name="default_tax_rate_percent"
+                      defaultValue={accountTaxDefaults.ratePercent ?? ""}
+                      placeholder="7.975"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-[#0f1f35] shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    />
+                  </label>
+                  <label className="space-y-1.5 text-sm text-slate-700">
+                    <span className="font-medium text-slate-800">Tax line label</span>
+                    <input
+                      type="text"
+                      name="default_tax_label"
+                      defaultValue={accountTaxDefaults.label ?? ""}
+                      placeholder="Sales Tax (Stanislaus County)"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-[#0f1f35] shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    />
+                  </label>
+                </div>
+                <input type="hidden" name="tax_fields_present" value="1" />
+              </div>
+            ) : null}
 
             {billingMode === "external_billing" ? (
               <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-900">

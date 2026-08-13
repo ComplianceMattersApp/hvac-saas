@@ -4,6 +4,7 @@ import { listQboInvoicesSince, listQboPaymentsSince } from "@/lib/qbo/qbo-api-cl
 import { getValidQboAccessToken } from "@/lib/qbo/qbo-connection";
 import { getQboAvailability, getQboBaseUrl } from "@/lib/qbo/qbo-env";
 import { getStripeServerClient } from "@/lib/business/platform-billing-stripe";
+import { isMissingInvoiceTaxColumnError } from "@/lib/invoices/invoice-tax-state";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 
 /**
@@ -136,17 +137,47 @@ function reconcileInvoices(params: {
     }
 
     if (status !== "void" && !qboInvoice.looksVoided) {
-      const everystepCents = Number(invoice.total_cents ?? 0);
-      const qboCents = toCents(qboInvoice.totalAmount);
+      // Compare PRE-TAX. Each side computes its own tax (we send taxability,
+      // QuickBooks applies its rate), so including tax here would report a
+      // rate disagreement as "the totals disagree" — a critical finding for
+      // something that is really the warning-level tax parity check below.
+      const everystepCents = Number(invoice.total_cents ?? 0) - (Number(invoice.tax_cents ?? 0) || 0);
+      const qboCents = toCents(qboInvoice.totalAmount) - toCents(qboInvoice.totalTax);
       if (everystepCents !== qboCents) {
         findings.push({
           ...base,
           findingType: "invoice_total_mismatch",
           title: `Invoice ${label} totals disagree`,
-          detail: `EveryStep has ${money(everystepCents)}; QuickBooks has ${money(qboCents)}.`,
+          detail: `EveryStep has ${money(everystepCents)} before tax; QuickBooks has ${money(qboCents)} before tax.`,
           truth: "One of the two has been edited since the sync. The books do not agree on what this customer was billed.",
           everystepValue: money(everystepCents),
           externalValue: money(qboCents),
+        });
+      }
+    }
+
+    // Tax parity. We send per-line TAX/NON and let QuickBooks compute the
+    // amount from its own rates, so the two can legitimately disagree — a
+    // different rate, a jurisdiction QBO resolves differently, Automated Sales
+    // Tax. That is a bookkeeping question for a human, NOT a sync failure: it
+    // never touches qbo_sync_status and never un-syncs an invoice. Reported as
+    // a warning so it is visible without competing with real drift.
+    if (status !== "void" && !qboInvoice.looksVoided) {
+      const everystepTaxCents = Number(invoice.tax_cents ?? 0) || 0;
+      const qboTaxCents = toCents(qboInvoice.totalTax);
+      if (Math.abs(everystepTaxCents - qboTaxCents) > 1) {
+        findings.push({
+          ...base,
+          findingType: "qbo_tax_mismatch",
+          severity: "warning",
+          title: `Sales tax differs on invoice ${label}`,
+          detail: `EveryStep computed ${money(everystepTaxCents)} tax; QuickBooks computed ${money(qboTaxCents)}.`,
+          truth:
+            "EveryStep sends which lines are taxable and QuickBooks applies its own rate, so the two can disagree. "
+            + "The customer was billed EveryStep's amount; QuickBooks will report its own. Payment application in "
+            + "QuickBooks may be over or under by the difference until the rates are reconciled.",
+          everystepValue: money(everystepTaxCents),
+          externalValue: money(qboTaxCents),
         });
       }
     }
@@ -403,12 +434,28 @@ export async function runThreeWayReconciliation(params: {
 
   const { data: invoiceRows, error: invoiceError } = await admin
     .from("internal_invoices")
-    .select("id, job_id, invoice_number, invoice_display_number, status, total_cents, qbo_invoice_id, invoice_date")
+    .select("id, job_id, invoice_number, invoice_display_number, status, total_cents, tax_cents, qbo_invoice_id, invoice_date")
     .eq("account_owner_user_id", accountOwnerUserId)
     .gte("invoice_date", sinceDate)
     .limit(5000);
-  if (invoiceError) throw new Error(`Failed to load invoices for reconciliation: ${invoiceError.message ?? "unknown error"}`);
-  const invoices: any[] = invoiceRows ?? [];
+  let invoices: any[] = invoiceRows ?? [];
+  if (invoiceError) {
+    // tax_cents is additive; on a deployment without it, reconcile everything
+    // else rather than going dark on the only external drift detector we have.
+    if (!isMissingInvoiceTaxColumnError(invoiceError)) {
+      throw new Error(`Failed to load invoices for reconciliation: ${invoiceError.message ?? "unknown error"}`);
+    }
+    const fallback = await admin
+      .from("internal_invoices")
+      .select("id, job_id, invoice_number, invoice_display_number, status, total_cents, qbo_invoice_id, invoice_date")
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .gte("invoice_date", sinceDate)
+      .limit(5000);
+    if (fallback.error) {
+      throw new Error(`Failed to load invoices for reconciliation: ${fallback.error.message ?? "unknown error"}`);
+    }
+    invoices = fallback.data ?? [];
+  }
 
   const { data: paymentRows, error: paymentError } = await admin
     .from("internal_invoice_payments")

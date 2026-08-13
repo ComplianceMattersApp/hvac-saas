@@ -8,6 +8,7 @@ import { loadInternalInvoiceMemberPresentationContexts } from "@/lib/business/in
 import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { renderInternalInvoicePdf } from "@/lib/pdf/internal-invoice-pdf";
+import { readInvoiceTaxState } from "@/lib/invoices/invoice-tax-state";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -104,6 +105,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     paymentSummary: paymentLedger.summary,
     tenantIdentity,
     memberContextByJobId,
+    taxState: await readInvoiceTaxState({ supabase, invoiceId: invoice.id }),
   });
 
   try {

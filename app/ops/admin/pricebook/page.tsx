@@ -23,6 +23,7 @@ import {
   readPricebookQboItemMappings,
   type PricebookQboItemMapping,
 } from "@/lib/qbo/qbo-item-mapping";
+import { readPricebookTaxability } from "@/lib/invoices/invoice-tax-state";
 import { PricebookImportPanel } from "./PricebookImportPanel";
 
 type SearchParams = Promise<{ notice?: string; view?: string; q?: string; category?: string }>;
@@ -309,6 +310,16 @@ export default async function AdminPricebookPage({
       })
     : new Map();
   const qboKnownItemIds = new Set(qboItemCatalog.items.map((item) => item.id));
+
+  // Taxability, read separately for the same reason: with the Slice-02
+  // migration unapplied this returns "not deployed" and the Taxable control is
+  // simply absent, leaving the page exactly as it is today.
+  const taxability = await readPricebookTaxability({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  const taxColumnsDeployed = taxability !== null;
+  const taxableByItemId = taxability ?? new Map<string, boolean>();
 
   const availableCategories = Array.from(
     new Set(rows.map((row) => String(row.category ?? "").trim()).filter((value) => value.length > 0)),
@@ -775,6 +786,24 @@ export default async function AdminPricebookPage({
                                 knownItemIds={qboKnownItemIds}
                                 mapping={qboMappingByItemId.get(row.id) ?? null}
                               />
+                            ) : null}
+                            {taxColumnsDeployed ? (
+                              <label className="flex items-start gap-2 text-xs text-slate-700">
+                                <input type="hidden" name="tax_fields_present" value="1" />
+                                <input
+                                  type="checkbox"
+                                  name="is_taxable"
+                                  value="1"
+                                  defaultChecked={taxableByItemId.get(row.id) ?? false}
+                                  className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                                />
+                                <span>
+                                  <span className="font-semibold text-slate-900">Taxable</span>
+                                  <span className="block text-[10px] text-slate-500">
+                                    Applies to future invoice lines only.
+                                  </span>
+                                </span>
+                              </label>
                             ) : null}
                             <button
                               type="submit"

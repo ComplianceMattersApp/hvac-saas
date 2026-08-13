@@ -13,6 +13,7 @@ import { normalizeInternalInvoiceItemType, resolveInternalInvoiceByJobId } from 
 import { normalizeFieldChargeProposalRow, type FieldChargeProposalRecord } from '@/lib/business/field-charge-proposals';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
+import { recalculateInvoiceTotals } from '@/lib/invoices/invoice-totals';
 
 const FIELD_BILLING_SUMMARY_HASH = 'field-billing-summary-title';
 const FIELD_CHARGE_PROPOSAL_STATUS = 'submitted_for_review';
@@ -303,34 +304,19 @@ async function insertFieldChargeProposal(params: {
   return proposalId;
 }
 
+/**
+ * Delegates to the shared totals seam so this lane cannot compute the
+ * `total = subtotal + tax` invariant differently from the invoice editor. It
+ * used to carry its own copy of this loop, which would have silently dropped
+ * tax on any invoice a field charge touched.
+ */
 async function syncDraftInvoiceTotalsFromLineItems(params: {
   supabase: any;
   invoiceId: string;
   userId: string;
 }) {
-  const { data: lineItems, error: lineItemsErr } = await params.supabase
-    .from('internal_invoice_line_items')
-    .select('line_subtotal')
-    .eq('invoice_id', params.invoiceId);
-
-  if (lineItemsErr) throw lineItemsErr;
-
-  const subtotalCents = (lineItems ?? []).reduce((sum: number, row: any) => {
-    return sum + parseMoneyToCents(String(row?.line_subtotal ?? '0'), 'Line subtotal');
-  }, 0);
-
-  const { error: updateErr } = await params.supabase
-    .from('internal_invoices')
-    .update({
-      subtotal_cents: subtotalCents,
-      total_cents: subtotalCents,
-      updated_by_user_id: params.userId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', params.invoiceId);
-
-  if (updateErr) throw updateErr;
-  return subtotalCents;
+  const totals = await recalculateInvoiceTotals(params);
+  return totals.subtotalCents;
 }
 
 async function loadScopedFieldChargeProposal(params: {

@@ -48,6 +48,20 @@ export default async function CustomerEditPage({
     .eq("owner_user_id", accountOwnerUserId)
     .maybeSingle();
 
+  // Read tax_exempt separately from the identity select above: the column is
+  // newer, so a lagging migration must degrade to "no tax control" rather than
+  // 42703-ing the whole customer edit page.
+  const taxExemptRead = await admin
+    .from("customers")
+    .select("id, tax_exempt")
+    .eq("id", id)
+    .eq("owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+  const taxExemptDeployed = !taxExemptRead.error;
+  if (customer && taxExemptDeployed) {
+    (customer as any).tax_exempt = Boolean(taxExemptRead.data?.tax_exempt);
+  }
+
   const { data: locations } = await admin
     .from("locations")
     .select("id, nickname, label, address_line1, address_line2, city, state, zip")
@@ -219,6 +233,26 @@ export default async function CustomerEditPage({
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
 
           <div className="text-base font-semibold text-slate-900">Customer</div>
+
+          {taxExemptDeployed ? (
+            <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700">
+              <input type="hidden" name="tax_fields_present" value="1" />
+              <input
+                type="checkbox"
+                name="tax_exempt"
+                value="1"
+                defaultChecked={Boolean((customer as any).tax_exempt)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300"
+              />
+              <span>
+                <span className="font-medium text-slate-900">Tax exempt</span>
+                <span className="block text-xs text-slate-600">
+                  This customer holds a resale or exemption certificate. Their invoices are billed
+                  without sales tax, even on taxable items.
+                </span>
+              </span>
+            </label>
+          ) : null}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">

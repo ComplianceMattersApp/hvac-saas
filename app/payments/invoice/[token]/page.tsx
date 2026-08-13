@@ -6,6 +6,7 @@ import {
 } from "@/lib/business/internal-invoice-payments";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { createAdminClient } from "@/lib/supabase/server";
+import { readInvoiceTaxState } from "@/lib/invoices/invoice-tax-state";
 
 type PaymentLinkState = "paid" | "changed" | "inactive";
 
@@ -68,6 +69,14 @@ export default async function TenantInvoicePaymentLinkPage({
   if (paymentSummary.balanceDueCents <= 0) return <PaymentLinkMessage state="paid" />;
   if (paymentSummary.balanceDueCents !== payload.balanceDueCents) return <PaymentLinkMessage state="changed" />;
 
+  // Null on a deployment without the tax columns, which renders the page
+  // exactly as before. Never allowed to fail this page — it takes money.
+  const taxState = await readInvoiceTaxState({
+    supabase,
+    invoiceId: String(invoice.id),
+    accountOwnerUserId: payload.accountOwnerUserId,
+  });
+
   const business = await resolveInternalBusinessIdentityByAccountOwnerId({
     accountOwnerUserId: payload.accountOwnerUserId,
     supabase,
@@ -102,6 +111,15 @@ export default async function TenantInvoicePaymentLinkPage({
           </div>
         </div>
         <dl className="divide-y divide-slate-200 px-4 sm:px-5">
+          {/* Tax is shown only when charged. The amount collected is still
+              invoiceTotalCents, which already includes it — Stripe checkout is
+              driven by the same total and needs no change. */}
+          {taxState && taxState.taxCents > 0 ? (
+            <>
+              <div className="flex items-center justify-between gap-4 py-4 text-sm"><dt className="text-slate-600">Subtotal</dt><dd className="font-medium text-slate-950">{money(paymentSummary.invoiceTotalCents - taxState.taxCents)}</dd></div>
+              <div className="flex items-center justify-between gap-4 py-4 text-sm"><dt className="text-slate-600">{taxState.label ?? "Sales Tax"}</dt><dd className="font-medium text-slate-950">{money(taxState.taxCents)}</dd></div>
+            </>
+          ) : null}
           <div className="flex items-center justify-between gap-4 py-4 text-sm"><dt className="text-slate-600">Invoice total</dt><dd className="font-medium text-slate-950">{money(paymentSummary.invoiceTotalCents)}</dd></div>
           <div className="flex items-center justify-between gap-4 py-4 text-sm"><dt className="text-slate-600">Payments received</dt><dd className="font-medium text-slate-950">{money(paymentSummary.amountPaidCents)}</dd></div>
           <div className="flex items-center justify-between gap-4 py-4"><dt className="font-semibold text-slate-950">Balance due</dt><dd className="text-xl font-semibold text-slate-950">{money(paymentSummary.balanceDueCents)}</dd></div>

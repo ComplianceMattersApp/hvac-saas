@@ -11,6 +11,7 @@ import {
   buildInternalInvoiceDocumentModel,
   formatInvoiceDocumentCurrencyFromCents,
 } from "@/lib/business/internal-invoice-document";
+import { readInvoiceTaxState } from "@/lib/invoices/invoice-tax-state";
 import PrintToolbar from "./PrintToolbar";
 
 export default async function InternalInvoicePrintPage({
@@ -124,6 +125,7 @@ export default async function InternalInvoicePrintPage({
     paymentSummary,
     tenantIdentity,
     memberContextByJobId,
+    taxState: await readInvoiceTaxState({ supabase, invoiceId: invoice.id }),
   });
   const customerFacingStatus = documentModel.statusLabel;
   const billingName = documentModel.billing.name;
@@ -274,6 +276,24 @@ export default async function InternalInvoicePrintPage({
               </div>
             )}
             </div>
+            {/* Subtotal / Tax / Total only when tax applies — an untaxed invoice
+                keeps the single Balance Due footer it has always had. */}
+            {documentModel.taxCents > 0 ? (
+              <div className="space-y-1 border-t border-slate-200 px-4 py-3 text-sm text-slate-700 print:border-slate-300">
+                <div className="flex items-center justify-end gap-6">
+                  <span>Subtotal</span>
+                  <span className="font-semibold text-slate-900">{documentModel.subtotalLabel}</span>
+                </div>
+                <div className="flex items-center justify-end gap-6">
+                  <span>{documentModel.taxTitle}</span>
+                  <span className="font-semibold text-slate-900">{documentModel.taxLabel}</span>
+                </div>
+                <div className="flex items-center justify-end gap-6">
+                  <span>Total</span>
+                  <span className="font-semibold text-slate-900">{documentModel.totalLabel}</span>
+                </div>
+              </div>
+            ) : null}
             <div className="flex items-center justify-end gap-6 border-t border-slate-200 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-900 print:border-slate-300 print:bg-white">
               <span>{paymentSummary.paymentStatus === "paid" ? "Paid in Full" : "Balance Due"}</span>
               <span className={paymentSummary.paymentStatus === "paid" ? "text-emerald-700" : undefined}>{formatInvoiceDocumentCurrencyFromCents(paymentSummary.balanceDueCents)}</span>

@@ -169,6 +169,45 @@ describe("qbo-api-client", () => {
     expect(body.Line[0].SalesItemLineDetail.UnitPrice).toBe(100);
   });
 
+  it("sends per-line TAX/NON tax codes and never a TxnTaxDetail", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { Invoice: { Id: "102", SyncToken: "0" } } },
+    ]);
+    await createQboInvoice({
+      ...base,
+      invoice: {
+        docNumber: "2003",
+        txnDate: "2026-08-12",
+        customerRef: "55",
+        lines: [
+          { description: "Compressor", amount: 500, quantity: 1, unitPrice: 500, itemRef: "41", isTaxable: true },
+          { description: "Labor", amount: 200, quantity: 2, unitPrice: 100, itemRef: "42", isTaxable: false },
+        ],
+      },
+    });
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.Line.map((line: any) => line.SalesItemLineDetail.TaxCodeRef.value)).toEqual(["TAX", "NON"]);
+    // QuickBooks computes the amount from its own rates; we never send one.
+    expect(body).not.toHaveProperty("TxnTaxDetail");
+  });
+
+  it("defaults a line with no taxability to NON", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { Invoice: { Id: "103", SyncToken: "0" } } },
+    ]);
+    await createQboInvoice({
+      ...base,
+      invoice: {
+        docNumber: "2004",
+        txnDate: "2026-08-12",
+        customerRef: "55",
+        lines: [{ description: "Rating", amount: 450, quantity: 1, unitPrice: 450, itemRef: "7" }],
+      },
+    });
+    const body = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(body.Line[0].SalesItemLineDetail.TaxCodeRef).toEqual({ value: "NON" });
+  });
+
   it("matches only the namespaced fallback item, never a tenant's own 'Services'", async () => {
     const fetchMock = mockFetchSequence([
       { status: 200, body: { QueryResponse: { Item: [{ Id: "88" }] } } },

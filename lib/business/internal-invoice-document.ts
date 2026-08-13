@@ -52,6 +52,15 @@ export type InternalInvoiceDocumentModel = {
   lineItems: InternalInvoiceDocumentLineItem[];
   subtotalCents: number;
   subtotalLabel: string;
+  /**
+   * Sales tax. Zero on every invoice with no taxable lines or no rate — which
+   * is every invoice for a rater tenant — and surfaces render the Tax row only
+   * when this is positive, so those documents look exactly as they always have.
+   */
+  taxCents: number;
+  taxLabel: string;
+  /** Operator-supplied name for the tax line, e.g. "Sales Tax (Stanislaus County)". */
+  taxTitle: string;
   totalCents: number;
   totalLabel: string;
   amountPaidCents: number;
@@ -141,8 +150,16 @@ export function buildInternalInvoiceDocumentModel(params: {
   paymentSummary: InvoiceDocumentPaymentSummary;
   tenantIdentity: OperationalTenantIdentity;
   memberContextByJobId?: Map<string, InternalInvoiceMemberPresentationContext>;
+  /**
+   * Sales tax, read separately from the shared invoice SELECT (see
+   * lib/invoices/invoice-tax-state.ts). Omitted or null means "this deployment
+   * has no tax" and the document renders exactly as it did before Slice 02.
+   */
+  taxState?: { taxCents: number; label: string | null } | null;
 }): InternalInvoiceDocumentModel {
   const { invoice, job, tenantIdentity } = params;
+  const taxCentsForDocument =
+    Number(params.taxState?.taxCents ?? (invoice as any).tax_cents ?? 0) || 0;
   const paymentStatus = normalizePaymentStatus(params.paymentSummary.paymentStatus);
   const customerName = formatPersonNamePart(
     [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ") || "Customer",
@@ -210,6 +227,10 @@ export function buildInternalInvoiceDocumentModel(params: {
     }),
     subtotalCents: invoice.subtotal_cents,
     subtotalLabel: formatInvoiceDocumentCurrencyFromCents(invoice.subtotal_cents),
+    // Reads as 0 when the tax columns are not deployed, which renders no Tax row.
+    taxCents: taxCentsForDocument,
+    taxLabel: formatInvoiceDocumentCurrencyFromCents(taxCentsForDocument),
+    taxTitle: String(params.taxState?.label ?? (invoice as any).tax_label ?? "").trim() || "Sales Tax",
     totalCents: invoice.total_cents,
     totalLabel: formatInvoiceDocumentCurrencyFromCents(invoice.total_cents),
     amountPaidCents,

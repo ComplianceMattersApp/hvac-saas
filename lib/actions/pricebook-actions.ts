@@ -20,6 +20,7 @@ import {
   parseQboItemIdSelection,
 } from "@/lib/qbo/qbo-item-mapping";
 import { loadQboItemCatalog, resolveQboItemName } from "@/lib/qbo/qbo-item-catalog";
+import { isMissingInvoiceTaxColumnError } from "@/lib/invoices/invoice-tax-state";
 import { createClient } from "@/lib/supabase/server";
 
 const ITEM_TYPES = new Set(["service", "material", "diagnostic", "adjustment"]);
@@ -394,9 +395,35 @@ export async function updatePricebookItemFromForm(formData: FormData) {
   }
 
   await saveQboItemMapping({ supabase, accountOwnerUserId, itemId, formData });
+  await savePricebookTaxability({ supabase, accountOwnerUserId, itemId, formData });
 
   revalidatePath("/ops/admin/pricebook");
   redirect(withNotice("updated"));
+}
+
+/**
+ * Persist the item's taxability as its own statement, tolerating an undeployed
+ * column — same reasoning as the QuickBooks mapping above: a lagging migration
+ * must not be able to fail an ordinary pricebook edit. Editing this changes
+ * only FUTURE invoice lines; existing lines keep the value they snapshotted.
+ */
+async function savePricebookTaxability(params: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  accountOwnerUserId: string;
+  itemId: string;
+  formData: FormData;
+}) {
+  if (normalizeText(params.formData.get("tax_fields_present")) !== "1") return;
+
+  const { error } = await params.supabase
+    .from("pricebook_items")
+    .update({ is_taxable: normalizeText(params.formData.get("is_taxable")) === "1" })
+    .eq("id", params.itemId)
+    .eq("account_owner_user_id", params.accountOwnerUserId);
+
+  if (error && !isMissingInvoiceTaxColumnError(error)) {
+    redirect(withNotice("save_failed"));
+  }
 }
 
 /**

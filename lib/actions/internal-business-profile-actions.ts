@@ -20,6 +20,8 @@ import {
 } from "@/lib/business/tenant-stripe-connect-onboarding";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { tenantReferenceCacheTag } from "@/lib/business/tenant-reference-cache";
+import { parseTaxRatePercentInput } from "@/lib/invoices/invoice-tax";
+import { isMissingInvoiceTaxColumnError } from "@/lib/invoices/invoice-tax-state";
 
 const MAX_LOGO_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -413,6 +415,25 @@ export async function saveInvoiceModeFromForm(formData: FormData): Promise<void>
 
   if (error) {
     redirect(withNotice("save_failed"));
+  }
+
+  // Sales tax defaults ride along with invoice settings but are written
+  // separately, so an undeployed Slice-02 migration cannot fail the whole save.
+  if (String(formData.get("tax_fields_present") ?? "").trim() === "1") {
+    const parsedRate = parseTaxRatePercentInput(formData.get("default_tax_rate_percent"));
+    if (parsedRate === "INVALID") {
+      redirect(withNotice("invalid_tax_rate"));
+    }
+    const { error: taxError } = await admin
+      .from("internal_business_profiles")
+      .update({
+        default_tax_rate_percent: parsedRate,
+        default_tax_label: normalizeNullableText(String(formData.get("default_tax_label") ?? "")),
+      })
+      .eq("account_owner_user_id", internalUser.account_owner_user_id);
+    if (taxError && !isMissingInvoiceTaxColumnError(taxError)) {
+      redirect(withNotice("save_failed"));
+    }
   }
 
   updateTag(tenantReferenceCacheTag(internalUser.account_owner_user_id));

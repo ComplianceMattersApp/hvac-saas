@@ -245,6 +245,9 @@ function buildInvoiceInput(
         quantity,
         unitPrice,
         itemRef: itemRefs[index] ?? "",
+        // Undefined until the Slice-02 migration lands, which reads as
+        // non-taxable — exactly the behavior before tax existed.
+        isTaxable: Boolean(line.is_taxable),
       };
     }),
     privateNote: [nonEmpty(invoiceRow.notes), qboInvoiceOriginMarker(invoiceRow.id)].filter(Boolean).join(" Â· "),
@@ -485,14 +488,31 @@ async function syncSingleInvoiceWithContext(
         }));
       }
     } else {
+      // Re-read the LIVE SyncToken immediately before updating. The stored one
+      // goes stale the moment anything touches the invoice in QuickBooks — a
+      // payment posting is enough — and using it fails with a 5010 stale-object
+      // fault. No fallback to the stored token: if this read fails we take the
+      // error path, because guessing the token is how the drift starts.
+      const live = await findQboInvoiceById({
+        accessToken,
+        realmId,
+        baseUrl,
+        qboInvoiceId: String(invoiceRow.qbo_invoice_id),
+      });
+      if (!live) {
+        throw new Error(
+          `QuickBooks no longer has invoice ${invoiceInput.docNumber} (QBO id ${invoiceRow.qbo_invoice_id}). `
+          + `It was deleted there, or the stored link is stale — relink or re-create it in QuickBooks.`,
+        );
+      }
       synced = await withMappingContext(() => updateQboInvoice({
         accessToken,
         realmId,
         baseUrl,
         qboInvoiceId: invoiceRow.qbo_invoice_id,
-        syncToken: invoiceRow.qbo_sync_token ?? "0",
+        syncToken: live.syncToken,
         invoice: invoiceInput,
-        requestId: `esinvupd-${invoiceId}-${invoiceRow.qbo_sync_token ?? "0"}`,
+        requestId: `esinvupd-${invoiceId}-${live.syncToken}`,
       }));
     }
 
