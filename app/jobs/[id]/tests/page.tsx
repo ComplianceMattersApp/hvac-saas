@@ -21,6 +21,9 @@ import {
 } from "@/lib/business/internal-business-profile";
 import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import JobSubpageContextHeader from "../_components/JobSubpageContextHeader";
+import FormDraftGuard from "@/components/jobs/FormDraftGuard";
+import FieldConnectivityBanner from "@/components/jobs/FieldConnectivityBanner";
+import { buildFieldDraftKey } from "@/lib/field-drafts/form-drafts";
 
 import {
   completeEccTestRunFromForm,
@@ -1169,6 +1172,15 @@ export default async function JobTestsPage({
     { label: "Completed Test Runs", value: completedReportRunCount ? `${completedReportRunCount}` : "" },
   ]);
 
+  // Draft keys are per user AND per job: raters share tablets, and one login's
+  // unsaved readings must never surface under another's.
+  const buildTestFormDraftKey = (formKind: string, runId: unknown) =>
+    buildFieldDraftKey({
+      internalUserId: String(internalUser?.user_id ?? ""),
+      jobId: String(job.id ?? ""),
+      formScope: `${formKind}:${String(runId ?? "none")}`,
+    });
+
   const runDL = selectedSystemId ? pickRunForSystem(job, "duct_leakage", selectedSystemId) : null;
   const runAF = selectedSystemId ? pickRunForSystem(job, "airflow", selectedSystemId) : null;
   const runFan = selectedSystemId ? pickRunForSystem(job, "fan_watt_draw", selectedSystemId) : null;
@@ -1930,6 +1942,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           compactMobile
         />
         ) : null}
+
+        {/* Renders nothing while online. Says only what is true: typed values
+            are on the device, and Save is still the only way to send them. */}
+        <FieldConnectivityBanner />
 
       <section className={`${isCompactTestWorkspace || isCompletionReportFocused ? "hidden" : "space-y-3"} sm:hidden print:hidden`}>
         <div className="flex gap-2">
@@ -3158,6 +3174,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               // states the outcome. Everything else on this page is a diagnostic
               // with a formula behind it.
               <div className="grid gap-3">
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("custom-test", focusedCustomRun?.id)}
+                  serverStateToken={focusedCustomRun?.updated_at ?? null}
+                >
                 <form
                   action={saveAndCompleteCustomVerificationFromForm}
                   className="grid gap-3"
@@ -3227,6 +3247,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     {focusedCustomRun.is_completed ? "Save Changes" : "Save & Complete"}
                   </SubmitButton>
                 </form>
+                </FormDraftGuard>
 
                 <form action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
@@ -3399,6 +3420,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               )
             ) : (
               <>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runDL?.id)}
+                  serverStateToken={runDL?.updated_at ?? null}
+                >
                 <form
                   id={ductSaveFormId}
                   action={saveDuctLeakageDataFromForm}
@@ -3469,6 +3494,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                   </DuctLeakageEntryFields>
                 </form>
+                </FormDraftGuard>
 
                 <Disclosure title="Calculated / Result" className="hidden text-sm text-muted-foreground">
                   <div className="space-y-1">
@@ -3573,6 +3599,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               )
             ) : (
               <>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runAF?.id)}
+                  serverStateToken={runAF?.updated_at ?? null}
+                >
                 <form
                   id={airflowSaveFormId}
                   action={saveAirflowDataFromForm}
@@ -3639,6 +3669,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                   </AirflowEntryFields>
                 </form>
+                </FormDraftGuard>
 
                 <div className={eccActionRowClass}>
                   <div className="mr-auto text-sm">
@@ -3761,6 +3792,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </form>
             ) : (
               <>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runFan?.id)}
+                  serverStateToken={runFan?.updated_at ?? null}
+                >
                 <form id={fanSaveFormId} action={saveFanWattDrawDataFromForm} className="grid gap-3 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
@@ -3896,6 +3931,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </Disclosure>
                 </form>
+                </FormDraftGuard>
 
                 <Disclosure title="Calculated / Result" className="text-sm text-slate-700">
                   <div className="space-y-1">
@@ -3985,6 +4021,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </form>
             ) : (
               <>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runFilter?.id)}
+                  serverStateToken={runFilter?.updated_at ?? null}
+                >
                 <form id={filterSaveFormId} action={saveAirFilterDeviceDataFromForm} className="grid gap-3 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
@@ -4119,6 +4159,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </Disclosure>
                 </form>
+                </FormDraftGuard>
 
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -4276,6 +4317,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     <div className="mt-2 text-emerald-700">All tracked model fields are captured.</div>
                   )}
                 </div>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runAhri?.id)}
+                  serverStateToken={runAhri?.updated_at ?? null}
+                >
                 <form id={ahriSaveFormId} action={saveAhriVerificationDataFromForm} className="grid gap-3 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
@@ -4425,6 +4470,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
                 </form>
+                </FormDraftGuard>
 
                 <div className="text-sm font-semibold text-slate-900">Office Summary</div>
                 <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
@@ -4507,6 +4553,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Structured Documentation Inputs</div>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runLocalExhaust?.id)}
+                  serverStateToken={runLocalExhaust?.updated_at ?? null}
+                >
                 <form id={localExhaustSaveFormId} action={saveLocalMechanicalExhaustDataFromForm} className="grid gap-4 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
@@ -4584,6 +4634,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
                 </form>
+                </FormDraftGuard>
 
                 <div className="text-sm font-semibold text-slate-900">Summary</div>
                 <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
@@ -4677,6 +4728,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             ) : (
               <>
                 <div className="text-sm font-semibold text-slate-900">Top-Level Verification Inputs</div>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runQiiInsulation?.id)}
+                  serverStateToken={runQiiInsulation?.updated_at ?? null}
+                >
                 <form id={qiiSaveFormId} action={saveQiiEnv22InsulationDataFromForm} className="grid gap-3 border-t border-slate-200 pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
@@ -4818,6 +4873,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     />
                   </div>
                 </form>
+                </FormDraftGuard>
 
                 <div className="text-sm font-semibold text-slate-900">QII Summary</div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700 space-y-1">
@@ -4932,6 +4988,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               )
             ) : (
               <>
+                <FormDraftGuard
+                  draftKey={buildTestFormDraftKey("test-run", runRC?.id)}
+                  serverStateToken={runRC?.updated_at ?? null}
+                >
                 <form
                   id={rcSaveFormId}
                   action={saveRefrigerantChargeDataFromForm}
@@ -5175,6 +5235,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
 
                 </form>
+                </FormDraftGuard>
 
                 <div className={eccActionRowClass}>
                   <div className="mr-auto text-sm">
