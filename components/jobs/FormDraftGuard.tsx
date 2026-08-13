@@ -2,10 +2,16 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { deleteDraft, readDraft, writeDraft } from "@/lib/field-drafts/form-draft-storage";
+import {
+  deleteDraft,
+  pruneDrafts,
+  readDraft,
+  writeDraft,
+} from "@/lib/field-drafts/form-draft-storage";
 import {
   draftDiffersFromCurrent,
   formatDraftAge,
+  isDraftableFieldType,
   isDraftEmpty,
   serializeDraftFields,
   serverStateChangedSinceDraft,
@@ -15,6 +21,15 @@ import {
 } from "@/lib/field-drafts/form-drafts";
 
 const WRITE_DEBOUNCE_MS = 500;
+/**
+ * Gap before the second restore pass. Several field components mount their
+ * dependent inputs in response to the first pass — pick an exception and the
+ * reason box appears — so a single pass would drop exactly the values a tech
+ * most needs back.
+ */
+const SECOND_PASS_DELAY_MS = 150;
+
+const FIELD_SELECTOR = "input[name], select[name], textarea[name]";
 
 /**
  * Keeps typed field values on the device as they are entered, and offers them
@@ -45,28 +60,67 @@ export function FormDraftGuard({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const writeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const secondPassTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [draft, setDraft] = useState<FieldDraft | null>(null);
-  const [restored, setRestored] = useState(false);
+  const [unrestoredCount, setUnrestoredCount] = useState(0);
+  const [restoredCount, setRestoredCount] = useState<number | null>(null);
   const [now, setNow] = useState<number>(() => Date.now());
 
   const token = String(serverStateToken ?? "").trim() || null;
 
-  const readCurrentFields = useCallback((): FieldDraftSnapshot[] => {
-    const container = containerRef.current;
+  const fieldNodes = useCallback((from?: HTMLElement | null): Array<
+    HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+  > => {
+    const container = from ?? containerRef.current;
     if (!container) return [];
-    const nodes = container.querySelectorAll<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >("input[name], select[name], textarea[name]");
-    return [...nodes].map((node) => ({
-      name: node.name,
-      value: node.value,
-      type: (node as HTMLInputElement).type,
-      checked: (node as HTMLInputElement).checked,
-    }));
+    return [
+      ...container.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+        FIELD_SELECTOR,
+      ),
+      // Fields associated by the `form` attribute can live outside this
+      // subtree; they still belong to the reading the tech is entering.
+    ].filter((node) => isDraftableFieldType((node as HTMLInputElement).type));
   }, []);
 
-  // On mount: decide whether there is anything worth offering.
+  const readCurrentFields = useCallback(
+    (from?: HTMLElement | null): FieldDraftSnapshot[] =>
+      fieldNodes(from).map((node) => ({
+        name: node.name,
+        value: node.value,
+        type: (node as HTMLInputElement).type,
+        checked: (node as HTMLInputElement).checked,
+      })),
+    [fieldNodes],
+  );
+
+  /**
+   * Write buffered values NOW, cancelling any pending debounce.
+   *
+   * Takes the container explicitly because React detaches refs BEFORE running
+   * effect cleanups: by unmount time `containerRef.current` is already null, so
+   * a flush that relied on it would silently discard the last keystrokes — the
+   * exact loss this guard exists to prevent.
+   */
+  const flushWrite = useCallback((from?: HTMLElement | null) => {
+    if (writeTimerRef.current) {
+      clearTimeout(writeTimerRef.current);
+      writeTimerRef.current = null;
+    }
+    const container = from ?? containerRef.current;
+    if (!container) return;
+    const values: FieldDraftValues = serializeDraftFields(readCurrentFields(container));
+    if (isDraftEmpty(values)) {
+      deleteDraft(draftKey);
+      return;
+    }
+    writeDraft({ key: draftKey, values, serverStateToken: token });
+  }, [draftKey, readCurrentFields, token]);
+
+  // On mount: prune old drafts once, then decide whether there is anything
+  // worth offering back.
   useEffect(() => {
+    pruneDrafts({ keepKey: draftKey });
+
     const stored = readDraft(draftKey);
     if (!stored) return;
 
@@ -82,85 +136,124 @@ export function FormDraftGuard({
     setDraft(stored);
   }, [draftKey, readCurrentFields]);
 
-  // Capture typing. Debounced so a fast typist writes once per pause, not per
-  // keystroke, and `capture: false` so the events have already bubbled from the
-  // real field components.
+  // Capture typing, debounced so a fast typist writes once per pause.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
 
     const schedule = () => {
       if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
-      writeTimerRef.current = setTimeout(() => {
-        const values: FieldDraftValues = serializeDraftFields(readCurrentFields());
-        // Never store an all-empty form — it would offer a restore that does
-        // nothing and hide the fact that there is no backup yet.
-        if (isDraftEmpty(values)) {
-          deleteDraft(draftKey);
-          return;
-        }
-        writeDraft({ key: draftKey, values, serverStateToken: token });
-      }, WRITE_DEBOUNCE_MS);
+      writeTimerRef.current = setTimeout(() => flushWrite(container), WRITE_DEBOUNCE_MS);
+    };
+
+    // A phone backgrounding the tab is the single most likely moment to lose
+    // buffered keystrokes, and it may never fire another event. Both of these
+    // write synchronously; localStorage is sync, so the value lands even if the
+    // tab is killed immediately after.
+    const flushNow = () => flushWrite(container);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flushNow();
     };
 
     container.addEventListener("input", schedule);
     container.addEventListener("change", schedule);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flushNow);
+
     return () => {
       container.removeEventListener("input", schedule);
       container.removeEventListener("change", schedule);
-      if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flushNow);
+      // Unmount must not discard buffered values either — hence the captured
+      // container rather than the (already detached) ref.
+      if (writeTimerRef.current) flushWrite(container);
+      if (secondPassTimerRef.current) clearTimeout(secondPassTimerRef.current);
     };
-  }, [draftKey, readCurrentFields, token]);
+  }, [flushWrite]);
+
+  /**
+   * Write one pass of values into the DOM. Returns the names that had no field
+   * to write into.
+   */
+  const applyValues = useCallback(
+    (values: FieldDraftValues): { missing: string[]; applied: number; firstNode: HTMLElement | null } => {
+      const container = containerRef.current;
+      if (!container) return { missing: Object.keys(values), applied: 0, firstNode: null };
+
+      const missing: string[] = [];
+      let applied = 0;
+      let firstNode: HTMLElement | null = null;
+
+      for (const [name, value] of Object.entries(values)) {
+        const nodes = [
+          ...container.querySelectorAll<
+            HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+          >(`[name="${CSS.escape(name)}"]`),
+        ].filter((node) => isDraftableFieldType((node as HTMLInputElement).type));
+
+        if (nodes.length === 0) {
+          missing.push(name);
+          continue;
+        }
+
+        for (const node of nodes) {
+          const type = String((node as HTMLInputElement).type ?? "").toLowerCase();
+          if (type === "checkbox") {
+            (node as HTMLInputElement).checked = Boolean(value);
+          } else if (type === "radio") {
+            (node as HTMLInputElement).checked = (node as HTMLInputElement).value === String(value);
+          } else {
+            setNativeValue(node, String(value));
+          }
+          // React tracks value internally; a dispatched input event is what
+          // makes controlled field components and their live previews
+          // recompute — and what mounts fields that depend on this one.
+          node.dispatchEvent(new Event("input", { bubbles: true }));
+          node.dispatchEvent(new Event("change", { bubbles: true }));
+          if (!firstNode) firstNode = node as HTMLElement;
+        }
+        applied += 1;
+      }
+
+      return { missing, applied, firstNode };
+    },
+    [],
+  );
 
   const handleRestore = useCallback(() => {
-    const container = containerRef.current;
-    if (!container || !draft) return;
+    if (!draft) return;
 
-    let firstRestored: HTMLElement | null = null;
-    const missing: string[] = [];
-
-    for (const [name, value] of Object.entries(draft.values)) {
-      const nodes = container.querySelectorAll<
-        HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-      >(`[name="${CSS.escape(name)}"]`);
-      if (nodes.length === 0) {
-        // The form changed shape since the draft was taken. Skip silently and
-        // drop the field rather than failing the whole restore.
-        missing.push(name);
-        continue;
-      }
-
-      for (const node of nodes) {
-        const type = String((node as HTMLInputElement).type ?? "").toLowerCase();
-        if (type === "checkbox") {
-          (node as HTMLInputElement).checked = Boolean(value);
-        } else if (type === "radio") {
-          (node as HTMLInputElement).checked = (node as HTMLInputElement).value === String(value);
-        } else {
-          setNativeValue(node, String(value));
-        }
-        // React tracks value internally; a dispatched input event is what makes
-        // controlled field components and their live previews recompute.
-        node.dispatchEvent(new Event("input", { bubbles: true }));
-        node.dispatchEvent(new Event("change", { bubbles: true }));
-        if (!firstRestored) firstRestored = node as HTMLElement;
-      }
-    }
-
-    if (missing.length > 0) {
-      const remaining: FieldDraftValues = { ...draft.values };
-      for (const name of missing) delete remaining[name];
-      writeDraft({ key: draftKey, values: remaining, serverStateToken: token });
-    }
-
+    const first = applyValues(draft.values);
+    const total = Object.keys(draft.values).length;
     setDraft(null);
-    setRestored(true);
-    firstRestored?.focus?.();
-  }, [draft, draftKey, token]);
+    setRestoredCount(total - first.missing.length);
+    setUnrestoredCount(first.missing.length);
+    first.firstNode?.focus?.();
+
+    if (first.missing.length === 0) return;
+
+    // Second pass: fields that appear only in response to the first pass (an
+    // exception reason box unlocked by picking an exception) are not in the DOM
+    // until React has re-rendered.
+    const pending: FieldDraftValues = {};
+    for (const name of first.missing) pending[name] = draft.values[name];
+
+    secondPassTimerRef.current = setTimeout(() => {
+      const second = applyValues(pending);
+      setRestoredCount(total - second.missing.length);
+      setUnrestoredCount(second.missing.length);
+      // Whatever is still unrestorable STAYS in the draft. Dropping it would
+      // destroy a reading the tech typed just because its field is not on
+      // screen right now.
+    }, SECOND_PASS_DELAY_MS);
+  }, [applyValues, draft]);
 
   const handleDiscard = useCallback(() => {
     deleteDraft(draftKey);
     setDraft(null);
+    setRestoredCount(null);
+    setUnrestoredCount(0);
   }, [draftKey]);
 
   const serverChanged = serverStateChangedSinceDraft(draft, token);
@@ -199,10 +292,24 @@ export function FormDraftGuard({
         </div>
       ) : null}
 
-      {restored ? (
-        <div role="status" className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900">
-          Readings restored from this device. Save to send them in.
-        </div>
+      {restoredCount !== null ? (
+        unrestoredCount > 0 ? (
+          <div
+            role="status"
+            className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900"
+          >
+            Restored {restoredCount} value{restoredCount === 1 ? "" : "s"}.{" "}
+            <span className="font-semibold">
+              {unrestoredCount} saved value{unrestoredCount === 1 ? "" : "s"} couldn&rsquo;t be
+              restored because their fields aren&rsquo;t currently shown.
+            </span>{" "}
+            They are still saved on this device — open the matching option and restore again.
+          </div>
+        ) : (
+          <div role="status" className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-900">
+            Readings restored from this device. Save to send them in.
+          </div>
+        )
       ) : null}
 
       {children}

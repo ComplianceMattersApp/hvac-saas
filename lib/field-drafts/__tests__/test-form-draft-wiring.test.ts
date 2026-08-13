@@ -101,3 +101,47 @@ describe("the guard never submits anything", () => {
     expect(guard).toContain("readings on file changed since this draft");
   });
 });
+
+describe("review follow-ups", () => {
+  const storage = read("lib/field-drafts/form-draft-storage.ts");
+  const pure = read("lib/field-drafts/form-drafts.ts");
+
+  it("restores in two passes and keeps what it could not place", () => {
+    expect(guard).toContain("SECOND_PASS_DELAY_MS");
+    expect(guard).toContain("secondPassTimerRef.current = setTimeout(");
+    expect(guard).toContain("couldn&rsquo;t be");
+    // No pruning of the stored draft on restore: an unrestorable reading stays.
+    expect(guard).not.toContain("delete remaining[name]");
+  });
+
+  it("flushes buffered values on hide, pagehide, and unmount", () => {
+    expect(guard).toContain('document.addEventListener("visibilitychange"');
+    expect(guard).toContain('window.addEventListener("pagehide"');
+    expect(guard).toContain("if (writeTimerRef.current) flushWrite(container);");
+  });
+
+  it("excludes hidden inputs from capture and restore", () => {
+    expect(pure).toContain("NON_DRAFTABLE_FIELD_TYPES");
+    expect(pure).toContain('"hidden"');
+    // Both the capture path and the restore path filter through it.
+    expect(guard.split("isDraftableFieldType").length - 1).toBeGreaterThanOrEqual(2);
+  });
+
+  it("probes whether storage actually works before promising safety", () => {
+    expect(storage).toContain("export function draftStorageWorks");
+    expect(connectivity).toContain("draftStorageWorks()");
+    expect(connectivity).toContain("Readings can&rsquo;t be saved on this device.");
+  });
+
+  it("preserves the token a draft was first captured against", () => {
+    expect(storage).toContain("existing ? existing.serverStateToken : params.serverStateToken");
+  });
+
+  it("keeps eviction off the typing path", () => {
+    expect(storage).toContain("export function pruneDrafts");
+    expect(guard).toContain("pruneDrafts({ keepKey: draftKey })");
+    // The steady-state write is a setItem, not a full-store scan.
+    const writeBody = storage.slice(storage.indexOf("export function writeDraft"));
+    expect(writeBody.slice(0, writeBody.indexOf("catch"))).not.toContain("selectDraftKeysToEvict");
+  });
+});

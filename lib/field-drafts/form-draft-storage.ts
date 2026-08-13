@@ -13,6 +13,7 @@
  */
 
 import {
+  FIELD_DRAFT_KEY_PREFIX,
   buildFieldDraft,
   isFieldDraftKey,
   parseStoredDraft,
@@ -65,6 +66,47 @@ function readDraftIndex(store: Storage): StoredDraftIndexEntry[] {
   return entries;
 }
 
+/**
+ * Age and cap eviction. Called once per form mount and again if a write hits
+ * the quota — deliberately NOT on the typing path, where enumerating the whole
+ * store on every keystroke pause would put an O(all drafts) scan between the
+ * tech and their next reading.
+ */
+export function pruneDrafts(options: { now?: number; keepKey?: string } = {}): void {
+  const store = storage();
+  if (!store) return;
+  const now = options.now ?? Date.now();
+  try {
+    for (const key of selectDraftKeysToEvict(readDraftIndex(store), { now, keepKey: options.keepKey })) {
+      store.removeItem(key);
+    }
+  } catch {
+    /* hygiene only — never worth surfacing */
+  }
+}
+
+/**
+ * True when this device can actually hold a draft.
+ *
+ * A round-trip test write, because the failure modes are silent: Safari private
+ * mode throws only on write, and a full store accepts nothing. The connectivity
+ * banner uses this so it never tells a tech their readings are safe when
+ * nothing is being saved.
+ */
+export function draftStorageWorks(): boolean {
+  const store = storage();
+  if (!store) return false;
+  const probeKey = `${FIELD_DRAFT_KEY_PREFIX}:__probe__`;
+  try {
+    store.setItem(probeKey, "1");
+    const readBack = store.getItem(probeKey) === "1";
+    store.removeItem(probeKey);
+    return readBack;
+  } catch {
+    return false;
+  }
+}
+
 export function writeDraft(params: {
   key: string;
   values: FieldDraftValues;
@@ -74,26 +116,29 @@ export function writeDraft(params: {
   const store = storage();
   if (!store) return;
   const now = params.now ?? Date.now();
+
+  // Preserve the token the draft was FIRST captured against. Restamping it on
+  // every keystroke would erase the evidence that the office changed the row
+  // underneath — the conflict warning has to survive a restore-without-save.
+  const existing = readDraft(params.key);
   const draft = buildFieldDraft({
     values: params.values,
-    serverStateToken: params.serverStateToken,
+    serverStateToken: existing ? existing.serverStateToken : params.serverStateToken,
     savedAt: new Date(now).toISOString(),
   });
 
   try {
-    // Evict before writing so a device at the cap still accepts the new draft.
-    for (const key of selectDraftKeysToEvict(readDraftIndex(store), { now, keepKey: params.key })) {
-      store.removeItem(key);
-    }
-  } catch {
-    /* eviction is hygiene, never a reason to lose the write below */
-  }
-
-  try {
     store.setItem(params.key, JSON.stringify(draft));
   } catch {
-    // Quota or private mode. Drop the oldest and try once more: losing the
-    // newest reading is worse than losing the oldest draft.
+    // Quota or private mode. Prune, then drop the oldest and try once more:
+    // losing the newest reading is worse than losing the oldest draft.
+    try {
+      pruneDrafts({ now, keepKey: params.key });
+      store.setItem(params.key, JSON.stringify(draft));
+      return;
+    } catch {
+      /* fall through to the sacrifice below */
+    }
     try {
       const index = readDraftIndex(store).filter((entry) => entry.key !== params.key);
       const oldest = index.sort(

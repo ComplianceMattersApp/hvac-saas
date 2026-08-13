@@ -78,12 +78,35 @@ function isCheckableType(type: unknown): boolean {
 }
 
 /**
+ * Field types a draft must never capture or restore.
+ *
+ * Hidden inputs are the important one: they carry server-issued identity
+ * (job_id, test_run_id, system_id, CSRF-ish tokens) that the tech never typed.
+ * Capturing them means a stale draft could later write an old run id back into
+ * the form and post readings against the wrong row. The rest cannot be
+ * meaningfully restored (file) or are not data (submit/button/password).
+ */
+export const NON_DRAFTABLE_FIELD_TYPES = new Set([
+  "hidden",
+  "file",
+  "submit",
+  "button",
+  "reset",
+  "image",
+  "password",
+]);
+
+export function isDraftableFieldType(type: unknown): boolean {
+  return !NON_DRAFTABLE_FIELD_TYPES.has(String(type ?? "").toLowerCase());
+}
+
+/**
  * Collapse captured fields into storable values.
  *
- * Unnamed fields, submit buttons, and file inputs are skipped — a draft is for
- * typed readings, not for the act of submitting, and file inputs cannot be
- * restored from storage anyway. Unchecked radios are skipped so the last
- * checked one in a group wins rather than the last rendered.
+ * Unnamed fields and the non-draftable types above are skipped — a draft is for
+ * typed readings, not for identity or the act of submitting. Unchecked radios
+ * are skipped so the last checked one in a group wins rather than the last
+ * rendered.
  */
 export function serializeDraftFields(fields: FieldDraftSnapshot[]): FieldDraftValues {
   const values: FieldDraftValues = {};
@@ -91,7 +114,7 @@ export function serializeDraftFields(fields: FieldDraftSnapshot[]): FieldDraftVa
     const name = String(field?.name ?? "").trim();
     if (!name) continue;
     const type = String(field?.type ?? "").toLowerCase();
-    if (type === "file" || type === "submit" || type === "button" || type === "password") continue;
+    if (!isDraftableFieldType(type)) continue;
     if (isCheckableType(type)) {
       if (type === "radio" && !field.checked) continue;
       values[name] = type === "radio" ? String(field.value ?? "") : Boolean(field.checked);
