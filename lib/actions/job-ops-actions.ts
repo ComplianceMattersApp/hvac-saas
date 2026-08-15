@@ -2352,7 +2352,7 @@ async function markServiceFollowUpProgressFromForm(
       buildJobOpsRedirectPath({
         jobId,
         returnToRaw,
-        fallbackPath: `/jobs/${jobId}?tab=ops#next-service-action`,
+        fallbackPath: `/jobs/${jobId}?tab=ops#followup`,
         banner,
       }),
     );
@@ -2749,7 +2749,7 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
       buildJobOpsRedirectPath({
         jobId,
         returnToRaw,
-        fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
+        fallbackPath: `/jobs/${jobId}?tab=${tab}#field`,
         banner,
       }),
     );
@@ -2922,7 +2922,7 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
       buildJobOpsRedirectPath({
         jobId,
         returnToRaw,
-        fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
+        fallbackPath: `/jobs/${jobId}?tab=${tab}#field`,
         banner,
       }),
     );
@@ -3095,7 +3095,7 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
       buildJobOpsRedirectPath({
         jobId,
         returnToRaw,
-        fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
+        fallbackPath: `/jobs/${jobId}?tab=${tab}#field`,
         banner,
       }),
     );
@@ -3266,7 +3266,7 @@ export async function markJobDifferentIssueFoundFromForm(formData: FormData): Pr
     redirect(
       buildJobOpsRedirectPath({
         jobId,
-        fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
+        fallbackPath: `/jobs/${jobId}?tab=${tab}#field`,
         banner,
       }),
     );

@@ -113,6 +113,6 @@ describe("office return visit entry points", () => {
   it("adds optional waiting deep-link into the job detail return-visit section", () => {
     expect(waitingQueuePageSource).toContain('followUpProgress.bridgeActionLabel ?? "Create Return Visit"');
     expect(waitingQueuePageSource).toContain("followUpProgress.bridgeActionLabel");
-    expect(waitingQueuePageSource).toContain("#next-service-action");
+    expect(waitingQueuePageSource).toContain("#followup");
   });
 });

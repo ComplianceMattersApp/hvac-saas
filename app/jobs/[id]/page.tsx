@@ -1370,17 +1370,6 @@ export default async function JobDetailPage({
 
   // Only consumed at render time — joins the grouped parallel await below
   // instead of blocking the promise-creation section behind a round-trip.
-  const equipmentSystemsPromise = timedPhase("equipmentSystemsRead", async () => {
-    const { data, error } = await supabase
-      .from("job_systems")
-      .select("id, name")
-      .eq("job_id", jobId)
-      .order("name", { ascending: true });
-
-    if (error) throw error;
-    return data as Array<{ id: string; name: string | null }> | null;
-  });
-
   const parentJobId = (job as any).parent_job_id as string | null;
   const retestRootId = parentJobId ?? jobId;
   const serviceCaseId = (job as any).service_case_id as string | null;
@@ -2114,40 +2103,6 @@ export default async function JobDetailPage({
   });
 
   // Checklist items (Phase 1, desktop/admin only, gated on feature flag + isInternalUser)
-  type JobChecklistItem = {
-    id: string;
-    item_label: string;
-    sort_order: number;
-    is_completed: boolean;
-    notes: string | null;
-    completed_by_user_id: string | null;
-    completed_at: string | null;
-  };
-  const jobChecklistItemsPromise = timedPhase("jobChecklistItemsRead", async (): Promise<JobChecklistItem[]> => {
-    if (!(isMaintenanceAgreementsEnabled() && isInternalUser)) return [];
-    try {
-      const { data: checklistRows } = await supabase
-        .from("job_checklist_item_completions")
-        .select("id, item_label, sort_order, is_completed, notes, completed_by_user_id, completed_at")
-        .eq("job_id", String(job.id ?? ""))
-        .order("sort_order", { ascending: true })
-        .order("created_at", { ascending: true })
-        .limit(50);
-      if (!Array.isArray(checklistRows)) return [];
-      return checklistRows.map((row: any) => ({
-        id: String(row.id ?? ""),
-        item_label: String(row.item_label ?? ""),
-        sort_order: Number(row.sort_order ?? 0),
-        is_completed: Boolean(row.is_completed),
-        notes: row.notes ? String(row.notes) : null,
-        completed_by_user_id: row.completed_by_user_id ? String(row.completed_by_user_id) : null,
-        completed_at: row.completed_at ? String(row.completed_at) : null,
-      }));
-    } catch {
-      return [];
-    }
-  });
-
   const savedCustomerServiceLocationsPromise = timedPhase("savedCustomerServiceLocationsRead", async () => {
     if (!(isInternalUser && customerId)) {
       return [] as Array<{
@@ -2199,9 +2154,7 @@ export default async function JobDetailPage({
     serviceFollowUpProgressEvents,
     activeRetestChild,
     maintenanceAgreementResult,
-    equipmentSystems,
     { internalInvoiceTruth, internalInvoicePaymentSummaryTruth, internalInvoicePaymentRowsTruth },
-    jobChecklistItems,
     savedCustomerServiceLocations,
   ] = await Promise.all([
     assignmentDisplayPromise,
@@ -2221,9 +2174,7 @@ export default async function JobDetailPage({
     serviceFollowUpProgressEventsPromise,
     activeRetestChildPromise,
     maintenanceAgreementPromise,
-    equipmentSystemsPromise,
     immediateInvoiceTruthPromise,
-    jobChecklistItemsPromise,
     savedCustomerServiceLocationsPromise,
   ]);
 

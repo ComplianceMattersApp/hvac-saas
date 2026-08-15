@@ -52,15 +52,19 @@ components, computed values, and one now-unnecessary Supabase read for
 Tests asserting the *existence* of those computations were asserting dead code,
 and are included in the listing below.
 
-Two unused bindings were deliberately left in place:
-`equipmentSystems` and `jobChecklistItems` are positional elements of the
-`await Promise.all([...])` destructure. Removing a binding without removing its
-matching promise at the same index silently rebinds every value after it, so
-these need a paired edit and are not safe to sweep mechanically. Their queries
-still run.
+`equipmentSystems` and `jobChecklistItems` were initially left in place. They
+are positional elements of the `await Promise.all([...])` destructure, where
+removing a binding without removing its matching promise at the same index
+silently rebinds every value after it — a mechanical sweep produced exactly
+that, binding `internalInvoiceTruth` to a customer-name array. They have since
+been removed properly, in a paired edit that deletes the binding, the promise,
+and the `timedPhase` read behind it, with the two arrays asserted equal in
+length and checked pairwise afterwards. That drops two Supabase reads
+(`job_systems` and `job_checklist_item_completions`) from every job detail
+render.
 
-`page.tsx` is now 3,322 lines, down from 8,058. Unused-symbol warnings in the
-file are at 39, below the 44 present before this work began.
+`page.tsx` is now 3,273 lines, down from 8,058. Unused-symbol warnings in the
+file are at 37, below the 44 present before this work began.
 
 ## Removed assertions by file
 
