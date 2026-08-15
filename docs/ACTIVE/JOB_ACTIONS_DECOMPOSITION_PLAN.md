@@ -114,10 +114,63 @@ and filters is a genuine leaf; the remaining clusters sit on a shared trunk that
 has to be named and extracted deliberately, as its own slice, before any of them
 move.
 
-**Revised order:** extract the job event / assignment / service-case core first,
-resolving the `insertJobEvent` question explicitly. Only then do notes, retest,
-service visits, and assignment — and expect each to be a separate reviewed
-change, not a batch.
+**Revised order:** extract the shared core first, in cohesive pieces, then do
+notes, retest, service visits, and assignment — each a separate reviewed change,
+not a batch.
+
+## Declarations are resolved with the compiler, not regex
+
+`scripts/dev/list-top-level-decls.js` walks the file with the TypeScript compiler
+API and reports every top-level declaration — functions, consts, types,
+interfaces, classes — with its exact line range, export status, and the set of
+other top-level names it references.
+
+This exists because regex got it wrong in a way that type checking only caught
+three steps downstream. Anything that decides what to move should use this, not
+pattern matching. Its output also gives the reference graph the fan-in analysis
+below depends on.
+
+## Slice 2 — shared access and navigation primitives (done)
+
+Rather than guessing at the core, fan-in was measured: for each of the 63
+exported actions, the transitive set of internals it reaches, counted per
+internal. The clear winners were small, high-traffic primitives:
+
+| fan-in | lines | name |
+|---|---|---|
+| 23 | 44 | `requireInternalEccTestsAccess` |
+| 22 | 27 | `requireInternalScopedJobAccessOrRedirect` |
+| 22 | 22 | `redirectToTests` |
+| 19 | 8 | `revalidateEccProjectionConsumers` |
+| 18 | 21 | `resolveSystemIdForRun` |
+| 15 | 5 | `normalizeJobTab` |
+| 14 | 23 | `redirectToJobWithBanner` |
+| 6 | 24 | `getSafeErrorDetails` |
+
+Their transitive closure is exactly those eight — no cascade, and nothing
+exported, so the action surface is unchanged. 174 lines moved to the neutral
+module, which more than half the file's actions now reach through a real import
+rather than file-local scope.
+
+This deliberately does **not** touch `insertJobEvent`. It is an exported server
+action that eight other modules import, so relocating it changes a public
+surface, and that decision deserves its own change rather than riding along with
+a helper move.
+
+## Remaining core: service case and assignment
+
+The next cohesive group is the service case / visit family — `ensureServiceCaseForJob`,
+`createServiceCaseForRootJob`, `resolveServiceCaseIdForNewJob`,
+`normalizeServiceVisitType`, `normalizeServiceVisitOutcome`,
+`normalizeServiceCaseKind`, `deriveInitialServiceVisitReason`,
+`buildInitialProblemSummary`, and the `SERVICE_*` const sets — at fan-in 9, plus
+the assignment primitives (`addJobAssignment`, `JobAssignment`) at 6.
+
+Both are entangled with `insertJobEvent`, so that question has to be settled
+first. The options are to move it to the neutral module and re-export it from
+`job-actions.ts` to preserve the action endpoint, or to leave it in place and
+have the neutral module take an injected writer. Deciding that is the next
+slice's real work; the code movement afterwards is mechanical.
 
 ## Remaining slices
 

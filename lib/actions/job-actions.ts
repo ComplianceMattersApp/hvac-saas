@@ -61,8 +61,16 @@ import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import {
   cleanupOrphanSystem,
+  getSafeErrorDetails,
+  normalizeJobTab,
+  redirectToJobWithBanner,
+  redirectToTests,
+  requireInternalEccTestsAccess,
   requireInternalEquipmentMutationAccess,
+  requireInternalScopedJobAccessOrRedirect,
   requireOperationalScopedJobMutationAccessOrRedirect,
+  resolveSystemIdForRun,
+  revalidateEccProjectionConsumers,
   type FieldActionTimingRecorder,
 } from "@/lib/actions/job-actions-shared";
 import { renderSystemEmailLayout, escapeHtml, resolveAppUrl } from "@/lib/email/layout";
@@ -131,30 +139,6 @@ type OnTheWayUndoEligibility = {
   onMyWayEventId: string | null;
 };
 
-function getSafeErrorDetails(error: unknown): { error_code: string | null; error_message: string | null } {
-  if (!error) {
-    return { error_code: null, error_message: null };
-  }
-
-  const maybeRecord = error as Record<string, unknown>;
-  const errorCode =
-    typeof maybeRecord.code === "string"
-      ? maybeRecord.code
-      : typeof maybeRecord.error_code === "string"
-        ? maybeRecord.error_code
-        : null;
-  const errorMessage =
-    typeof maybeRecord.message === "string"
-      ? maybeRecord.message
-      : error instanceof Error
-        ? error.message
-        : String(error);
-
-  return {
-    error_code: errorCode,
-    error_message: errorMessage,
-  };
-}
 
 type CreateJobInput = {
   ops_status?: string | null;
@@ -2351,28 +2335,6 @@ function buildOpsChanges(before: OpsSnapshot, after: OpsSnapshot) {
 }
 
 /** ✅ Single source of truth for redirects back to /tests (NEVER writes s= when empty) */
-function redirectToTests(opts: {
-  jobId: string;
-  testType?: string | null;
-  systemId?: string | null;
-  testRunId?: string | null;
-  notice?: string | null;
-}) {
-  const { jobId } = opts;
-  const testType = String(opts.testType ?? "").trim();
-  const systemId = String(opts.systemId ?? "").trim();
-  const testRunId = String(opts.testRunId ?? "").trim();
-  const notice = String(opts.notice ?? "").trim();
-
-  const q = new URLSearchParams();
-  if (testType) q.set("t", testType);
-  if (systemId) q.set("s", systemId);
-  if (testRunId) q.set("r", testRunId);
-  if (notice) q.set("notice", notice);
-
-  const qs = q.toString();
-  redirect(qs ? `/jobs/${jobId}/tests?${qs}` : `/jobs/${jobId}/tests`);
-}
 
 const DUCT_LEAKAGE_EXCEPTION_LABELS: Record<string, string> = {
   asbestos: "Asbestos",
@@ -2450,83 +2412,10 @@ function ensureMeasuredAirflowPresentForCompletion(formData: FormData) {
   }
 }
 
-function revalidateEccProjectionConsumers(jobId: string) {
-  revalidatePath(`/jobs/${jobId}`);
-  revalidatePath(`/jobs/${jobId}/tests`);
-  revalidatePath("/ops");
-  revalidatePath("/portal");
-  revalidatePath("/portal/jobs");
-  revalidatePath(`/portal/jobs/${jobId}`);
-}
 
-async function requireInternalEccTestsAccess(params: {
-  supabase: any;
-  jobId: string;
-  testRunId?: string | null;
-}) {
-  const { supabase, jobId } = params;
-
-  const { internalUser } = await requireInternalUser({ supabase });
-
-  const testRunId = String(params.testRunId ?? "").trim();
-
-  if (testRunId) {
-    const scopedRun = await loadScopedInternalEccTestRunForMutation({
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      jobId,
-      testRunId,
-      testRunSelect: "is_completed",
-    });
-
-    if (!scopedRun?.job?.id || !scopedRun?.testRun?.id) {
-      redirect(`/jobs/${jobId}?notice=not_authorized`);
-    }
-
-    return {
-      ...scopedRun,
-      internalUser,
-    };
-  }
-
-  const scopedJob = await loadScopedInternalEccJobForMutation({
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    jobId,
-  });
-
-  if (!scopedJob?.id) {
-    redirect(`/jobs/${jobId}?notice=not_authorized`);
-  }
-
-  return {
-    job: scopedJob,
-    testRun: null,
-    internalUser,
-  };
-}
 
 
 /** ✅ Defensive resolver: if form is missing system_id, fall back to run.system_id */
-async function resolveSystemIdForRun(params: {
-  supabase: any;
-  jobId: string;
-  testRunId: string;
-  systemIdFromForm?: string | null;
-}): Promise<string | null> {
-  const fromForm = String(params.systemIdFromForm ?? "").trim();
-  if (fromForm) return fromForm;
-
-  const { data, error } = await params.supabase
-    .from("ecc_test_runs")
-    .select("system_id")
-    .eq("id", params.testRunId)
-    .eq("job_id", params.jobId)
-    .maybeSingle();
-
-  if (error) throw error;
-
-  const fromRun = String(data?.system_id ?? "").trim();
-  return fromRun || null;
-}
 
 export async function updateJobTypeFromForm(formData: FormData) {
   const supabase = await createClient();
@@ -4905,63 +4794,8 @@ export async function updateJobContractorFromForm(formData: FormData) {
   });
 }
 
-function normalizeJobTab(raw: string): "info" | "ops" | "tests" {
-  const value = String(raw ?? "").trim().toLowerCase();
-  if (value === "ops" || value === "tests") return value;
-  return "info";
-}
 
-function redirectToJobWithBanner(params: {
-  jobId: string;
-  banner: string;
-  tabRaw?: string;
-  returnToRaw?: string;
-  cacheBust?: boolean;
-}) {
-  const tab = normalizeJobTab(String(params.tabRaw ?? ""));
-  const returnToRaw = String(params.returnToRaw ?? "").trim();
 
-  if (returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")) {
-    const target = new URL(returnToRaw, "https://app.local");
-    target.searchParams.set("banner", params.banner);
-    if (params.cacheBust) target.searchParams.set("rv", Date.now().toString());
-    redirect(`${target.pathname}?${target.searchParams.toString()}${target.hash}`);
-  }
-
-  const q = new URLSearchParams();
-  q.set("tab", tab);
-  q.set("banner", params.banner);
-  if (params.cacheBust) q.set("rv", Date.now().toString());
-  redirect(`/jobs/${params.jobId}?${q.toString()}`);
-}
-
-async function requireInternalScopedJobAccessOrRedirect(params: {
-  supabase: any;
-  jobId: string;
-  onUnauthorized?: () => void;
-  timing?: FieldActionTimingRecorder;
-}) {
-  const jobId = String(params.jobId ?? "").trim();
-  const { userId, internalUser } = await requireInternalUser({
-    supabase: params.supabase,
-    timing: params.timing,
-  });
-  const scopedJob = await loadScopedInternalJobForMutation({
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    jobId,
-    select: "id",
-    timing: params.timing,
-  });
-
-  if (!scopedJob?.id) {
-    if (params.onUnauthorized) {
-      params.onUnauthorized();
-    }
-    redirect(`/jobs/${jobId}?notice=not_authorized`);
-  }
-
-  return { userId, internalUser, scopedJob };
-}
 
 
 async function requireInternalAdminScopedJobAccessOrRedirect(params: {
