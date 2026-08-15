@@ -47,6 +47,10 @@ vi.mock("@/lib/actions/notification-actions", () => ({
   insertInternalNotificationForEvent: vi.fn(async () => undefined),
 }));
 
+vi.mock("@/lib/notifications/contractor-shared-job-update", () => ({
+  notifyContractorOfSharedJobUpdate: vi.fn(async () => undefined),
+}));
+
 type FixtureOptions = {
   attachments?: Array<Record<string, unknown>>;
 };
@@ -143,9 +147,17 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
 
       if (table === "job_events") {
         return {
-          insert: vi.fn(async (values: unknown) => {
+          // Callers use both shapes: `await ...insert(...)` and
+          // `await ...insert(...).select("id").single()` when the inserted
+          // event id is needed (e.g. contractor share notifications).
+          insert: vi.fn((values: unknown) => {
             writes.push({ table, op: "insert", payload: values });
-            return { error: null };
+            const result = Promise.resolve({ error: null });
+            return Object.assign(result, {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "job-event-1" }, error: null })),
+              })),
+            });
           }),
         };
       }

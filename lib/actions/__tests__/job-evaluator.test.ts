@@ -204,7 +204,12 @@ describe("evaluateJobOpsStatus", () => {
       })
     );
 
-    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "scheduled");
+    // pending_info is an active primary responsibility (see
+    // ACTIVE_PRIMARY_RESPONSIBILITY_OPS_STATUSES): having a schedule does not
+    // resolve the missing information, so resolveOpsStatus preserves it rather
+    // than advancing to "scheduled". The point of this test is that the write
+    // still routes through setOpsStatusIfNotManual instead of writing directly.
+    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "pending_info");
     expect(setOpsStatusIfNotManualMock).toHaveBeenCalledTimes(1);
   });
 
