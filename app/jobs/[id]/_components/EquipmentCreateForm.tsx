@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import EquipmentCreateFormFields, { FILTER_ROLE_VALUE } from "@/components/jobs/EquipmentCreateFormFields";
 import EquipmentLabelPhotoEvidencePanel from "@/components/jobs/EquipmentLabelPhotoEvidencePanel";
-import { addJobEquipmentFromForm, addSystemFilterFromForm } from "@/lib/actions/job-actions";
+import { addJobEquipmentFromForm, addSystemFilterFromForm } from "@/lib/actions/job-equipment-actions";
 import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
 
 type SystemRow = { id: string; name: string | null };

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
-import { updateJobEquipmentFromForm, deleteJobEquipmentFromForm } from "@/lib/actions/job-actions";
+import { updateJobEquipmentFromForm, deleteJobEquipmentFromForm } from "@/lib/actions/job-equipment-actions";
 import SubmitButton from "@/components/SubmitButton";
 import EquipmentLabelPhotoEvidencePanel from "@/components/jobs/EquipmentLabelPhotoEvidencePanel";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";

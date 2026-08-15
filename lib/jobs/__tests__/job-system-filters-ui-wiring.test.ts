@@ -42,10 +42,14 @@ const systemLocationPickerSource = readFileSync(
   "utf8",
 );
 
-const jobActionsSource = readFileSync(
+// Equipment and system filter actions were split out of job-actions.ts into
+// job-equipment-actions.ts; the job action surface now spans both files.
+const jobActionsSource = [
   resolve(__dirname, "../../actions/job-actions.ts"),
-  "utf8",
-);
+  resolve(__dirname, "../../actions/job-equipment-actions.ts"),
+]
+  .map((path) => readFileSync(path, "utf8"))
+  .join("\n");
 
 describe("job equipment system filter management wiring", () => {
   it("loads active filters for visible job systems in the equipment workspace", () => {
@@ -131,9 +135,11 @@ describe("job equipment system filter management wiring", () => {
     expect(jobActionsSource).toContain("updateSystemFilterFromForm");
     expect(jobActionsSource).toContain("archiveSystemFilterFromForm");
 
+    // The filter actions close out job-equipment-actions.ts, which is
+    // concatenated last, so the slice runs to the end of the source.
     const filterActionsSlice =
-      jobActionsSource.match(/export async function addSystemFilterFromForm[\s\S]*?export async function saveEccTestOverrideFromForm/)?.[0] ??
-      "";
+      jobActionsSource.match(/export async function addSystemFilterFromForm[\s\S]*$/)?.[0] ?? "";
+    expect(filterActionsSlice).not.toBe("");
 
     expect(filterActionsSlice).toContain("requireInternalEquipmentMutationAccess");
     expect(filterActionsSlice).toContain("requireOperationalScopedJobMutationAccessOrRedirect");

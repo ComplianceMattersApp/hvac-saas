@@ -36,10 +36,14 @@ const refrigerantEvidenceImageSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/RefrigerantEvidenceImage.tsx"),
   "utf8",
 );
-const jobActionsSource = readFileSync(
+// Equipment and system filter actions were split out of job-actions.ts into
+// job-equipment-actions.ts; the job action surface now spans both files.
+const jobActionsSource = [
   resolve(__dirname, "../../actions/job-actions.ts"),
-  "utf8",
-);
+  resolve(__dirname, "../../actions/job-equipment-actions.ts"),
+]
+  .map((path) => readFileSync(path, "utf8"))
+  .join("\n");
 
 describe("equipment label photo evidence", () => {
   it("tags and parses equipment label photo captions with equipment and system context", () => {
