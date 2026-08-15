@@ -54,7 +54,7 @@ import {
   applyExternalBillingCompletionMutation,
   type JobBillingDisposition,
 } from '@/lib/actions/external-billing-completion';
-import { insertJobEvent } from '@/lib/actions/job-actions';
+import { insertJobEvent } from '@/lib/actions/job-actions-shared';
 import { reconcileServiceCaseStatusAfterJobChange } from '@/lib/actions/service-case-reconciliation';
 import { escapeHtml } from '@/lib/email/layout';
 import { sendEmail } from '@/lib/email/sendEmail';

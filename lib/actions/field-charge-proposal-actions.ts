@@ -11,7 +11,7 @@ import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-busi
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { normalizeInternalInvoiceItemType, resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
 import { normalizeFieldChargeProposalRow, type FieldChargeProposalRecord } from '@/lib/business/field-charge-proposals';
-import { insertJobEvent } from '@/lib/actions/job-actions';
+import { insertJobEvent } from '@/lib/actions/job-actions-shared';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
 import { recalculateInvoiceTotals } from '@/lib/invoices/invoice-totals';
 

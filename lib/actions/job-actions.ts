@@ -61,6 +61,7 @@ import { resolveProductModeForAccountOwnerId } from "@/lib/business/product-mode
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import {
   cleanupOrphanSystem,
+  insertJobEvent,
   getSafeErrorDetails,
   normalizeJobTab,
   redirectToJobWithBanner,
@@ -452,36 +453,6 @@ async function applyRetestResolution(params: {
   }
 }
 
-export async function insertJobEvent(params: {
-  supabase: any;
-  jobId: string;
-  event_type: string;
-  meta?: Record<string, any> | null;
-  userId?: string | null;
-}): Promise<string> {
-  const { supabase, jobId, event_type } = params;
-  const meta = params.meta ?? null;
-  const userId = params.userId ?? null;
-
-  const { data, error } = await supabase
-    .from("job_events")
-    .insert({
-      job_id: jobId,
-      event_type,
-      meta,
-      user_id: userId,
-    })
-    .select("id")
-    .single();
-
-  if (error) throw error;
-
-  if (!data?.id) {
-    throw new Error("Failed to retrieve inserted event id");
-  }
-
-  return data.id;
-}
 
 
 async function getOnTheWayUndoEligibilityInternal(params: {

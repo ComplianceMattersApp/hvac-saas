@@ -25,7 +25,7 @@ import {
 import { upsertInvoicePaymentAllocationForPaymentRow } from '@/lib/business/payment-allocations';
 import { autoSyncRecordedPaymentToQbo } from '@/lib/qbo/qbo-payment-auto-sync';
 import { deliverInternalPaymentReceivedEmail } from '@/lib/payments/payment-received-email';
-import { insertJobEvent } from '@/lib/actions/job-actions';
+import { insertJobEvent } from '@/lib/actions/job-actions-shared';
 import {
   claimInvoiceCollectionReservation,
   releaseInvoiceCollectionReservation,

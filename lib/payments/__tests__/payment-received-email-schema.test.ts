@@ -121,7 +121,7 @@ vi.mock("@/lib/qbo/qbo-payment-auto-sync", () => ({
   autoSyncRecordedPaymentToQbo: (...args: unknown[]) => autoSyncRecordedPaymentToQboMock(...args),
 }));
 
-vi.mock("@/lib/actions/job-actions", () => ({
+vi.mock("@/lib/actions/job-actions-shared", () => ({
   insertJobEvent: (...args: unknown[]) => insertJobEventMock(...args),
 }));
 

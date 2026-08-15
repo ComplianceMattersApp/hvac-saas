@@ -41,7 +41,7 @@ vi.mock('@/lib/business/platform-entitlement', () => ({
     resolveOperationalMutationEntitlementAccessMock(...args),
 }));
 
-vi.mock('@/lib/actions/job-actions', () => ({
+vi.mock('@/lib/actions/job-actions-shared', () => ({
   insertJobEvent: (...args: unknown[]) => insertJobEventMock(...args),
 }));
 

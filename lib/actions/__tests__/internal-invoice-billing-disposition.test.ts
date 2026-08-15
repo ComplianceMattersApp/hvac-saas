@@ -73,7 +73,7 @@ vi.mock("@/lib/actions/job-evaluator", () => ({
     healStalePaperworkOpsStatusMock(...args),
 }));
 
-vi.mock("@/lib/actions/job-actions", () => ({
+vi.mock("@/lib/actions/job-actions-shared", () => ({
   insertJobEvent: (...args: unknown[]) => insertJobEventMock(...args),
 }));
 

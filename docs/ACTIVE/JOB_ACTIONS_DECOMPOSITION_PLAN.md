@@ -166,11 +166,42 @@ The next cohesive group is the service case / visit family — `ensureServiceCas
 `buildInitialProblemSummary`, and the `SERVICE_*` const sets — at fan-in 9, plus
 the assignment primitives (`addJobAssignment`, `JobAssignment`) at 6.
 
-Both are entangled with `insertJobEvent`, so that question has to be settled
-first. The options are to move it to the neutral module and re-export it from
-`job-actions.ts` to preserve the action endpoint, or to leave it in place and
-have the neutral module take an injected writer. Deciding that is the next
-slice's real work; the code movement afterwards is mechanical.
+Both are entangled with `insertJobEvent`, which is now resolved — see below.
+
+## Slice 3 — `insertJobEvent` is a helper, not an endpoint (done)
+
+The plan was to move `insertJobEvent` to the neutral module and re-export it from
+`job-actions.ts` so the existing server action endpoint kept working. Checking who
+actually calls it showed the re-export was unnecessary and actively undesirable:
+
+- Its callers are five server-side modules — `field-charge-proposal-actions`,
+  `internal-invoice-actions`, `internal-invoice-payment-actions`,
+  `tenant-invoice-stripe-webhooks`, and `job-actions` itself.
+- **No reference to it exists anywhere under `app/`.** No route, no page, no
+  component.
+- No client component imports it, and it is never passed as a form `action`.
+
+So nothing invoked it over the network. Because it was exported from a
+`"use server"` file, Next.js was still publishing a callable POST endpoint for
+it — a public entry point that writes job events, reachable by anyone who could
+guess the action id, existing purely as an artifact of where the function
+happened to live.
+
+Re-exporting would have faithfully preserved that endpoint. Instead the function
+moved to the neutral module and all five callers import it directly, so the
+endpoint stops being generated. This is a small reduction in attack surface, not
+just a tidy-up.
+
+Ten test files mocked `@/lib/actions/job-actions` solely to stub
+`insertJobEvent`; each now mocks the neutral module. Every one stubbed that
+single export, so no mock had to be split.
+
+**Rule this establishes:** before preserving a server action's public surface,
+check whether anything actually calls it over the wire. In a `"use server"`
+module, a helper-shaped export is an endpoint whether or not anyone wanted one.
+
+With this settled, the service-case and assignment groups are unblocked; both
+depended on it.
 
 ## Remaining slices
 
