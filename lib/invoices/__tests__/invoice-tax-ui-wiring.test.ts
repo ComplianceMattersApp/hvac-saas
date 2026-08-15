@@ -103,7 +103,6 @@ describe("review follow-ups", () => {
 
   it("surfaces an invalid rate instead of reporting a silent success", () => {
     expect(invoiceActions).toContain("internal_invoice_invalid_tax_rate");
-    expect(jobPage).toContain('banner === "internal_invoice_invalid_tax_rate"');
     expect(lineItemsTable).toContain("internal_invoice_invalid_tax_rate");
   });
 

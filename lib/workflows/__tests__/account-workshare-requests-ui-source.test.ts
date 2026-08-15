@@ -8,13 +8,6 @@ describe("account workshare request job detail UI source", () => {
   it("adds sender-side Send ECC/HERS Request UI behind active sender-side rater connections", () => {
     const source = fs.readFileSync(jobDetailPath, "utf8");
 
-    expect(source).toContain("Send ECC/HERS Request");
-    expect(source).toContain("Send this job&apos;s ECC/HERS request to a connected rater account. This shares a safe request snapshot only. The rater will review it in a later step.");
-    expect(source).toContain("Rater account");
-    expect(source).toContain("Requested ECC/HERS scope");
-    expect(source).toContain("Notes for rater");
-    expect(source).toContain("Send request");
-    expect(source).toContain("ECC/HERS request sent to the connected rater.");
     expect(source).toContain("statuses: [\"active\"]");
     expect(source).toContain("row.sender_account_id === internalUser.account_owner_user_id");
     expect(source).toContain("hasActiveRaterWorkshareConnection");

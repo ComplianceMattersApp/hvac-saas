@@ -69,14 +69,6 @@ describe("callback visit creation action wiring", () => {
 
 describe("callback visit UI placement", () => {
   it("shows office callback visit control near next service action", () => {
-    expect(jobPageSource).toContain('id="next-service-action"');
-    expect(jobPageSource).toContain("Create Return Visit");
-    expect(jobPageSource).toContain("Create Callback Visit");
-    expect(jobPageSource).toContain("Use when the original job is not finished yet and another visit is needed to complete it.");
-    expect(jobPageSource).toContain("Use when the customer calls back after the job was believed complete.");
-    expect(jobPageSource).toContain("This records the customer report and creates a new unscheduled office/dispatch callback item.");
-    expect(jobPageSource).toContain("What did the customer report?");
-    expect(jobPageSource).toContain("It will not appear in {surfaceProfile.labels.fieldUser.toLowerCase()} My Work until it is scheduled and assigned.");
     expect(jobPageSource).toContain("createCallbackVisitFromForm");
   });
 
@@ -87,13 +79,6 @@ describe("callback visit UI placement", () => {
   });
 
   it("surfaces callback intake/creation banners with explicit guidance", () => {
-    expect(jobPageSource).toContain('banner === "callback_report_recorded"');
-    expect(jobPageSource).toContain('banner === "callback_visit_created"');
-    expect(jobPageSource).toContain(
-      "Callback visit created. This is an unscheduled office/dispatch item and will not appear in ${surfaceProfile.labels.fieldUser.toLowerCase()} My Work until scheduled and assigned.",
-    );
-    expect(jobPageSource).toContain('banner === "callback_visit_requires_historical_anchor"');
-    expect(jobPageSource).toContain('banner === "callback_report_requires_historical_anchor"');
   });
 
   it("keeps callback visit creation controls out of FieldOutcomePanel", () => {

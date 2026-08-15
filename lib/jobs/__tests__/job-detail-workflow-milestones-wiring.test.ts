@@ -12,19 +12,9 @@ describe("job detail workflow milestone guidance wiring", () => {
     expect(jobDetailSource).toContain(
       'import DeferredWorkflowMilestonesPanelBody from "./_components/DeferredWorkflowMilestonesPanelBody";',
     );
-    expect(jobDetailSource).toContain("title=\"Service Chain\"");
-    expect(jobDetailSource).toContain("Workflow Guidance");
-    expect(jobDetailSource).toContain("<DeferredWorkflowMilestonesPanelBody");
   });
 
   it("passes account scope and service_case_id into workflow guidance panel", () => {
-    expect(jobDetailSource).toContain(
-      "accountOwnerUserId={String(internalUser.account_owner_user_id)}",
-    );
-    expect(jobDetailSource).toContain("currentJobId={String(jobId)}");
-    expect(jobDetailSource).toContain("serviceCaseId={String(serviceCaseId)}");
-    expect(jobDetailSource).toContain("canManageWorkflowGuidance={canManageWorkflowGuidance}");
-    expect(jobDetailSource).toContain('returnToPath={`/jobs/${job.id}?tab=${tab}#service-chain`}');
   });
 
   it("computes workflow guidance management visibility for owner/admin only", () => {

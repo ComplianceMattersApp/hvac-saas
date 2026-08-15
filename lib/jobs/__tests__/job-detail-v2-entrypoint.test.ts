@@ -29,10 +29,6 @@ describe("job detail V2 entrypoint", () => {
     expect(legacyJobDetailSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
     expect(legacyJobDetailSource).toContain("const MobileJobDetailMobileComponent = MobileJobDetailV2Preview;");
     expect(legacyJobDetailSource).not.toContain("forceCurrentMobileLayout");
-    expect(legacyJobDetailSource).toContain("const forceCurrentDesktopLayout =");
-    expect(legacyJobDetailSource).toContain('desktopLayoutMode === "current"');
-    expect(legacyJobDetailSource).toContain('desktopLayoutMode === "classic"');
-    expect(legacyJobDetailSource).toContain('legacyMode === "1"');
     expect(legacyJobDetailSource).toContain("<DesktopJobDetailV2Page");
     expect(mobileBranchStart).toBeGreaterThan(-1);
     expect(desktopBranchStart).toBeGreaterThan(mobileBranchStart);

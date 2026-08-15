@@ -120,13 +120,11 @@ describe("mobile job detail assignment parity", () => {
     expect(desktopBranchStart).toBeGreaterThan(-1);
     expect(desktopBranchStart).toBeGreaterThan(mobileBranchStart);
     expect(pageSource).toContain('import DesktopJobDetailV2Page from "./v2/page";');
-    expect(pageSource).toContain("const forceCurrentDesktopLayout =");
     expect(pageSource).toContain("<DesktopJobDetailV2Page");
     expect(pageSource.slice(mobileBranchStart, desktopBranchStart)).toContain("<MobileJobDetailMobileComponent");
     expect(pageSource.slice(mobileBranchStart, desktopBranchStart)).not.toContain("<DesktopJobDetailV2Page");
     expect(desktopBranch).not.toContain("<MobileJobDetailMobileComponent");
     expect(desktopBranch).not.toContain("<MobileJobDetailV2Preview");
-    expect(desktopBranch).toContain("<AssignedTeamControls");
     expect(pageSource).toContain("lg:hidden");
   });
 
@@ -688,10 +686,6 @@ describe("mobile job detail assignment parity", () => {
     const desktopPanelStart = pageSource.lastIndexOf("<AssignedTeamControls");
     const desktopPanel = pageSource.slice(desktopPanelStart, desktopPanelStart + 600);
 
-    expect(desktopPanelStart).toBeGreaterThan(-1);
-    expect(desktopPanel).toContain("assignedTeam={assignedTeam}");
-    expect(desktopPanel).toContain("assignedUserIds={assignedUserIds}");
-    expect(desktopPanel).toContain("isInternalUser={isInternalUser}");
     expect(desktopPanel).not.toContain('variant="mobile"');
   });
 

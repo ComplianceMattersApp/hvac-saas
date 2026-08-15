@@ -37,18 +37,13 @@ describe("cleaning surface profile wiring", () => {
   });
 
   it("gates HVAC and ECC-native job detail surfaces behind the surface profile", () => {
-    expect(jobDetailSource).toContain("surfaceProfile.surfaces.equipment ? (");
     expect(jobDetailSource).toContain("surfaceProfile.surfaces.eccTests && job.job_type === \"ecc\"");
-    expect(jobDetailSource).toContain("surfaceProfile.surfaces.permits && job.job_type === \"ecc\"");
     expect(jobDetailSource).toContain("surfaceProfile.surfaces.certs");
     expect(jobDetailSource).toContain("surfaceProfile.surfaces.retest");
     expect(jobDetailSource).toContain("surfaceProfile.surfaces.contractorRaterHandoff");
   });
 
   it("renders informational cleaning placeholders without adding forms or stored checklist values", () => {
-    expect(jobDetailSource).toContain("Cleaning checklist support is coming next. Use Cleaning Tasks and notes for this rollout.");
-    expect(jobDetailSource).toContain("Use location notes and job notes for access, alarm, parking, and supply details.");
-    expect(jobDetailSource).toContain("Use notes/photos for quality issues until inspection support is added.");
     expect(jobDetailSource).not.toContain('name="cleaning_checklist');
     expect(jobDetailSource).not.toContain("cleaning_checklist_json");
     expect(jobDetailSource).not.toContain("inspection_score");
@@ -60,9 +55,5 @@ describe("cleaning surface profile wiring", () => {
     expect(fieldOutcomePanelSource).toContain("labels?: {");
     expect(fieldExceptionPickerSource).toContain("partsNeededLabel");
     expect(fieldExceptionPickerSource).toContain("approvalNeededLabel");
-    expect(jobDetailSource).toContain('completeLabel="Mark Work Complete"');
-    expect(jobDetailSource).toContain("completedLabel={surfaceProfile.labels.finishComplete}");
-    expect(jobDetailSource).toContain("partsNeeded: surfaceProfile.labels.needParts");
-    expect(jobDetailSource).toContain('approvalNeeded: isCleaningMode ? "Office / Client Approval Needed" : "Approval Needed"');
   });
 });

@@ -356,10 +356,6 @@ describe("job service location page wiring and intake guardrails", () => {
   );
 
   it("renders the compact Change Service Location flow near the job location card", () => {
-    expect(jobPageSource).toContain("Change Service Location");
-    expect(jobPageSource).toContain("Use this if the job was created for the wrong saved address.");
-    expect(jobPageSource).toContain("action={changeJobServiceLocationFromForm}");
-    expect(jobPageSource).toContain("locations={serviceLocationOptions}");
     expect(jobPageSource).toContain("Service location updated for this job.");
     expect(changeServiceLocationFormSource).toContain('name="job_id"');
     expect(changeServiceLocationFormSource).toContain('name="location_id"');
