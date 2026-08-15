@@ -389,7 +389,7 @@ export async function cancelAccountWorkshareRequest(input: {
   return { success: true, request };
 }
 
-export async function declineAccountWorkshareRequest(input: {
+async function declineAccountWorkshareRequest(input: {
   requestId: string;
   reason: string;
 }): Promise<ActionResult> {
@@ -438,7 +438,7 @@ type AcceptActionResult =
   | { success: true; request: AccountWorkshareRequestRow; jobId: string }
   | { success: false; error: string };
 
-export async function acceptAccountWorkshareRequest(input: {
+async function acceptAccountWorkshareRequest(input: {
   requestId: string;
 }): Promise<AcceptActionResult> {
   const authz = await resolveInternalContext();
@@ -511,7 +511,7 @@ export async function acceptAccountWorkshareRequest(input: {
   return { success: true, request, jobId };
 }
 
-export async function requestAccountWorkshareRetest(input: {
+async function requestAccountWorkshareRetest(input: {
   requestId: string;
   note: string;
 }): Promise<ActionResult> {
@@ -565,7 +565,7 @@ function deriveEccOutcome(opsStatus: unknown): "passed" | "failed" | null {
 // Rater-controlled send: the ECC result is NOT auto-sent to the contractor. The
 // rater reviews it and calls this when ready. Records the outcome (+ optional
 // note) and returns the request so the caller can notify.
-export async function sendWorkshareOutcomeToContractor(input: {
+async function sendWorkshareOutcomeToContractor(input: {
   receivingJobId: string;
   note?: string | null;
 }): Promise<ActionResult> {
@@ -608,7 +608,7 @@ export async function sendWorkshareOutcomeToContractor(input: {
   return { success: true, request: updated ?? request };
 }
 
-export async function addWorkshareOutcomeNote(input: {
+async function addWorkshareOutcomeNote(input: {
   receivingJobId: string;
   note: string;
 }): Promise<ActionResult> {
@@ -642,7 +642,7 @@ export async function addWorkshareOutcomeNote(input: {
   return { success: true, request: updated };
 }
 
-export async function acknowledgeWorkshareOutcome(input: {
+async function acknowledgeWorkshareOutcome(input: {
   requestId: string;
 }): Promise<ActionResult> {
   const authz = await resolveInternalContext();

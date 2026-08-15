@@ -841,7 +841,7 @@ export async function updateEstimateLineItem(
 // Recompute estimate option totals (option-only)
 // ---------------------------------------------------------------------------
 
-export async function recomputeEstimateOptionTotals(params: {
+async function recomputeEstimateOptionTotals(params: {
   estimateId: string;
   estimateOptionId: string;
   updatedByUserId: string;
