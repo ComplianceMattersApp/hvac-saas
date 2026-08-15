@@ -25,6 +25,17 @@ and one `"use server"` module per domain holding the actions.
 no `"use server"` directive. Helpers move there as slices need them, rather than
 all at once.
 
+## How slices are numbered
+
+Slice numbers record the order work was **actually completed**, which is not the
+order originally planned. The plan opened by ordering the domain clusters and
+calling them slices 2–5; when that batch was abandoned, the core extractions that
+replaced it took the numbers 2 and 3, and the clusters lost theirs.
+
+To stop that colliding again: completed slices are numbered, and work not yet
+done is referred to **by cluster name only**. None of the domain clusters have
+been extracted — everything below the completed slices is still outstanding.
+
 ## Choosing slice order
 
 Each candidate cluster was measured by how many helpers it shares with the rest of
@@ -79,11 +90,12 @@ contract. Every slice must clear all four:
 4. Exports in the new module are all `async function`, and the neutral module has
    no `"use server"` directive
 
-## Why slices 2–5 cannot be done the way slice 1 was
+## Why the domain clusters cannot be done the way slice 1 was
 
 Slice 1 was safe because its three shared helpers were identified by regex and
-then **read individually** before being moved. Attempting slices 2–5 in one pass,
-trusting the same regex to find helpers unread, failed in two distinct ways. Both
+then **read individually** before being moved. Attempting the notes, retest,
+service visit, and assignment clusters in one pass, trusting the same regex to
+find helpers unread, failed in two distinct ways. Both
 are recorded here because either one would have shipped silently broken code.
 
 **1. The helper-detection regex has false positives.** Matching
@@ -203,10 +215,22 @@ module, a helper-shaped export is an endpoint whether or not anyone wanted one.
 With this settled, the service-case and assignment groups are unblocked; both
 depended on it.
 
-## Remaining slices
+## Remaining work
 
-In intended order: notes + data entry, retest, service visits, assignment / team,
-then ECC test entry. Job creation (`createJobFromForm`, 1,822 lines) and
+**No domain cluster has been extracted yet.** Slices 1–3 moved equipment and
+filters out, then built the neutral module the rest depend on. Everything in the
+cluster table above except equipment + filters is still in `job-actions.ts`:
+notes + data entry, retest, service visits, assignment / team, and ECC test
+entry.
+
+Remaining order: notes + data entry, retest, service visits, assignment / team,
+then ECC test entry. The shared-helper counts in that table were measured before
+slices 2 and 3 moved the access, navigation, and event-writing internals out, so
+each cluster now needs fewer helpers extracted than listed — re-measure with
+`scripts/dev/list-top-level-decls.js` before starting one rather than trusting
+those numbers.
+
+Job creation (`createJobFromForm`, 1,822 lines) and
 `advanceJobStatusFromForm` (902 lines) are single oversized functions rather than
 clusters, and want internal decomposition rather than relocation — a separate
 exercise from this one.
