@@ -33,8 +33,11 @@ calling them slices 2–5; when that batch was abandoned, the core extractions t
 replaced it took the numbers 2 and 3, and the clusters lost theirs.
 
 To stop that colliding again: completed slices are numbered, and work not yet
-done is referred to **by cluster name only**. None of the domain clusters have
-been extracted — everything below the completed slices is still outstanding.
+done is referred to **by cluster name only**.
+
+Completed so far: equipment + filters (slice 1), the access and navigation
+primitives (2), `insertJobEvent` (3), notes + data entry (4), and assignment /
+team (5). Still outstanding: retest, service visits, and ECC test entry.
 
 ## Choosing slice order
 
