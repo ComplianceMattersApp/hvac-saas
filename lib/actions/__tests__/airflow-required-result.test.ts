@@ -130,7 +130,7 @@ describe("airflow required measured result hardening", () => {
   });
 
   it("completion fails without measured airflow when no exception is selected", async () => {
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(
       saveAndCompleteAirflowFromForm(buildSaveAndCompleteAirflowFormData())
@@ -147,7 +147,7 @@ describe("airflow required measured result hardening", () => {
     const fd = buildSaveAndCompleteAirflowFormData();
     fd.set("measured_total_cfm", "950");
 
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=test_completed",
@@ -164,7 +164,7 @@ describe("airflow required measured result hardening", () => {
     const fd = buildSaveAndCompleteAirflowFormData();
     fd.set("airflow_exception", "best_obtainable");
 
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=override_reason_required",
@@ -182,7 +182,7 @@ describe("airflow required measured result hardening", () => {
     fd.set("airflow_exception", "best_obtainable");
     fd.set("airflow_exception_reason", "Registers balanced to best obtainable field condition.");
 
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=test_completed",
@@ -204,7 +204,7 @@ describe("airflow required measured result hardening", () => {
     fd.set("airflow_exception", "other");
     fd.set("airflow_exception_reason", "Measurement location inaccessible.");
 
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=test_completed",

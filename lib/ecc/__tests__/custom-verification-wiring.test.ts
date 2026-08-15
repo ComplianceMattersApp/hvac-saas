@@ -8,7 +8,13 @@ const testsPage = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/tests/page.tsx"),
   "utf8",
 );
-const jobActions = readFileSync(resolve(__dirname, "../../actions/job-actions.ts"), "utf8");
+// ECC test data entry actions moved to ecc-test-entry-actions.ts.
+const jobActions = [
+  resolve(__dirname, "../../actions/job-actions.ts"),
+  resolve(__dirname, "../../actions/ecc-test-entry-actions.ts"),
+]
+  .map((filePath) => readFileSync(filePath, "utf8"))
+  .join("\n");
 
 /** Body of one exported action, so an assertion cannot be satisfied elsewhere. */
 function actionBody(source: string, name: string): string {

@@ -358,14 +358,37 @@ carry a redundant function-level `"use server"` inside the file-level
 `"use server"` module. It is legal and the build accepts it; it is simply
 belt-and-braces from the original authors, and moving the functions preserved it.
 
+## Slice 8 — ECC test entry (done)
+
+`lib/actions/ecc-test-entry-actions.ts`, 24 actions, 2,601 lines: the per-test
+save and save-and-complete flows (refrigerant charge, airflow, fan watt draw, air
+filter, custom verification, AHRI, local mechanical exhaust, QII env22, duct
+leakage), test run management, override handling, and retest readiness. Eleven
+private helpers and two label const maps moved with it.
+
+**This is the payoff from doing the core first.** The original table put this
+cluster at 27 shared helpers, which is why it was scheduled last. Measured after
+six slices of core extraction, it needed **one** — `notifyInternalNextActionChanged`.
+The largest cluster in the file extracted as a near-leaf.
+
+Cluster boundary note: `markRefrigerantChargeExemptFromForm` stayed in
+`job-actions.ts`. It marks a test as exempt rather than entering test data, so it
+sits outside the data-entry boundary even though it shares the refrigerant charge
+subject. One test dispatches over both and merges the namespaces.
+
+Three dispatch-by-name tests needed the same treatment, one of them now spanning
+four modules. That shape is now the most common breakage in this work: any test
+that resolves an action from a module by string name has to merge every module
+the union spans.
+
+**Result:** `job-actions.ts` 8,919 → 6,378 lines, 48 → 24 exports.
+
 ## Remaining work
 
-Still in `job-actions.ts`: **ECC test entry** — the last and largest cluster, 30
-actions and roughly 3,200 lines, about a third of what remains. Its original
-count was 27 shared helpers; measure it again before starting, since six slices
-have moved internals to the neutral module in the meantime.
+All planned domain clusters are extracted. `job-actions.ts` is **6,378 lines with
+24 exported actions**, down from 12,985 and 69 — a little over half removed.
 
-After that, what is left of `job-actions.ts` is job creation
+What remains is job creation
 (`createJobFromForm`, 1,822 lines) and `advanceJobStatusFromForm` (902 lines) —
 single oversized functions rather than clusters, wanting internal decomposition
 rather than relocation.

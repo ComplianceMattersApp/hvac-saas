@@ -194,7 +194,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal saveRefrigerantChargeDataFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildSaveRefrigerantFormData())).rejects.toThrow(
       "ALLOW_PATH_REACHED",
     );
@@ -202,13 +202,13 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal saveAirflowDataFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAirflowDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAirflowDataFromForm(buildSaveAirflowFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
   });
 
   it("allows same-account internal saveFanWattDrawDataFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveFanWattDrawDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveFanWattDrawDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     const formData = buildSaveAirflowFormData();
     formData.set("actual_tested_watts", "346");
     formData.set("actual_tested_airflow_cfm", "788");
@@ -218,13 +218,13 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal completeEccTestRunFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { completeEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { completeEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(completeEccTestRunFromForm(buildCompleteRunFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
   });
 
   it("allows same-account internal saveAndCompleteDuctLeakageFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteDuctLeakageFromForm(buildSaveAndCompleteDuctFormData())).rejects.toThrow(
       "ALLOW_PATH_REACHED",
     );
@@ -232,7 +232,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal saveAndCompleteAirflowFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteAirflowFromForm(buildSaveAndCompleteAirflowFormData())).rejects.toThrow(
       "ALLOW_PATH_REACHED",
     );
@@ -240,7 +240,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal saveAndCompleteFanWattDrawFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveAndCompleteFanWattDrawFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteFanWattDrawFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     const formData = buildSaveAndCompleteAirflowFormData();
     formData.set("actual_tested_watts", "346");
     formData.set("actual_tested_airflow_cfm", "788");
@@ -250,7 +250,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal saveAirFilterDeviceDataFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAirFilterDeviceDataFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "ALLOW_PATH_REACHED",
     );
@@ -258,7 +258,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal saveAndCompleteAirFilterDeviceFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteAirFilterDeviceFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "ALLOW_PATH_REACHED",
     );
@@ -266,7 +266,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
 
   it("allows same-account internal saveAndCompleteRefrigerantChargeFromForm past scoped ECC preflight", async () => {
     createClientMock.mockResolvedValue(makeAllowSupabaseFixture());
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(
       saveAndCompleteRefrigerantChargeFromForm(buildSaveAndCompleteRefrigerantFormData()),
     ).rejects.toThrow("ALLOW_PATH_REACHED");
@@ -277,7 +277,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveRefrigerantChargeDataFromForm(buildSaveRefrigerantFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -290,7 +290,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAirflowDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAirflowDataFromForm(buildSaveAirflowFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -303,7 +303,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAirFilterDeviceDataFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -316,7 +316,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { completeEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { completeEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(completeEccTestRunFromForm(buildCompleteRunFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -331,7 +331,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(buildSaveAndCompleteDuctFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -344,7 +344,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirflowFromForm(buildSaveAndCompleteAirflowFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -357,7 +357,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirFilterDeviceFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -370,7 +370,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(
       saveAndCompleteRefrigerantChargeFromForm(buildSaveAndCompleteRefrigerantFormData()),
@@ -383,7 +383,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveRefrigerantChargeDataFromForm(buildSaveRefrigerantFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -396,7 +396,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAirflowDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAirflowDataFromForm(buildSaveAirflowFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -409,7 +409,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAirFilterDeviceDataFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -422,7 +422,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { completeEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { completeEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(completeEccTestRunFromForm(buildCompleteRunFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -437,7 +437,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(buildSaveAndCompleteDuctFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -450,7 +450,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirflowFromForm(buildSaveAndCompleteAirflowFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -463,7 +463,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteAirFilterDeviceFromForm(buildSaveAirFilterFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -476,7 +476,7 @@ describe("internal ECC save/save-complete same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(
       saveAndCompleteRefrigerantChargeFromForm(buildSaveAndCompleteRefrigerantFormData()),

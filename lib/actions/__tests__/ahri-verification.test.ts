@@ -125,7 +125,7 @@ describe("ahri verification actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAhriVerificationDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAhriVerificationDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAhriVerificationDataFromForm(buildAhriFormData(true))).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -144,7 +144,7 @@ describe("ahri verification actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteAhriVerificationFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAhriVerificationFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteAhriVerificationFromForm(buildAhriFormData(false))).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -164,7 +164,7 @@ describe("ahri verification actions", () => {
     formData.set("test_run_id", "run-1");
     formData.set("system_id", "system-1");
 
-    const { saveAndCompleteAhriVerificationFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAhriVerificationFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteAhriVerificationFromForm(formData)).rejects.toThrow(
       "Select AHRI verification status before completing this test.",
     );
@@ -181,7 +181,7 @@ describe("ahri verification actions", () => {
     formData.set("ahri_status", "needs_model_correction");
     formData.set("verification_notes", "Model mismatch");
 
-    const { saveAndCompleteAhriVerificationFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAhriVerificationFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteAhriVerificationFromForm(formData)).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");

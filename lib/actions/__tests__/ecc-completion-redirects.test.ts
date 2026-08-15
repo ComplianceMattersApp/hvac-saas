@@ -343,7 +343,11 @@ describe("ECC completion redirects", () => {
   ])("%s returns to the ECC tests workspace", async (actionName, testType, formData, redirectUrl) => {
     createClientMock.mockResolvedValue(makeEccCompletionSupabase(testType));
 
-    const actions = await import("@/lib/actions/job-actions");
+    const [jobActions, eccActions] = await Promise.all([
+      import("@/lib/actions/job-actions"),
+      import("@/lib/actions/ecc-test-entry-actions"),
+    ]);
+    const actions = { ...jobActions, ...eccActions };
     const action = actions[actionName as keyof typeof actions] as (data: FormData) => Promise<unknown>;
 
     await expect(action(formData)).rejects.toThrow(`REDIRECT:${redirectUrl}`);
@@ -361,7 +365,11 @@ describe("ECC completion redirects", () => {
   ])("%s stays on the focused test page with saved feedback", async (actionName, testType, formData, redirectUrl) => {
     createClientMock.mockResolvedValue(makeEccCompletionSupabase(testType));
 
-    const actions = await import("@/lib/actions/job-actions");
+    const [jobActions, eccActions] = await Promise.all([
+      import("@/lib/actions/job-actions"),
+      import("@/lib/actions/ecc-test-entry-actions"),
+    ]);
+    const actions = { ...jobActions, ...eccActions };
     const action = actions[actionName as keyof typeof actions] as (data: FormData) => Promise<unknown>;
 
     await expect(action(formData)).rejects.toThrow(`REDIRECT:${redirectUrl}`);
@@ -378,7 +386,7 @@ describe("ECC completion redirects", () => {
     formData.set("system_id", "system-1");
     formData.set("test_type", "airflow");
 
-    const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(addEccTestRunFromForm(formData)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",

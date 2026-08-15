@@ -202,15 +202,17 @@ async function invokeAction(actionName: TargetAction, formData: FormData) {
   // These actions now span three modules: the retest and service visit clusters
   // were split out, while the callback report, ECC retest confirm, archive and
   // cancel actions stayed in job-actions.ts.
-  const [jobActions, retestActions, serviceVisitActions] = await Promise.all([
+  const [jobActions, retestActions, serviceVisitActions, eccActions] = await Promise.all([
     import("@/lib/actions/job-actions"),
     import("@/lib/actions/job-retest-actions"),
     import("@/lib/actions/job-service-visit-actions"),
+    import("@/lib/actions/ecc-test-entry-actions"),
   ]);
   const mod = {
     ...jobActions,
     ...retestActions,
     ...serviceVisitActions,
+    ...eccActions,
   } as unknown as Record<TargetAction, (fd: FormData) => Promise<unknown>>;
   return mod[actionName](formData);
 }

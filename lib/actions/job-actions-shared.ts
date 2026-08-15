@@ -1608,3 +1608,13 @@ export async function createJob(
     job_display_number: jobDisplayNumber,
   };
 }
+
+export async function notifyInternalNextActionChanged(params: {
+  supabase: any;
+  jobId: string;
+  eventType: string;
+  meta?: Record<string, any> | null;
+}) {
+  const { jobId } = params;
+  return { jobId };
+}

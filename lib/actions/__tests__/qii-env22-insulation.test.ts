@@ -140,7 +140,7 @@ describe("qii env-22 insulation actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveQiiEnv22InsulationDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveQiiEnv22InsulationDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveQiiEnv22InsulationDataFromForm(buildFormData())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -162,7 +162,7 @@ describe("qii env-22 insulation actions", () => {
     formData.set("test_run_id", "run-1");
     formData.set("system_id", "system-1");
 
-    const { saveAndCompleteQiiEnv22InsulationFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteQiiEnv22InsulationFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteQiiEnv22InsulationFromForm(formData)).rejects.toThrow(
       "Add at least one insulation verification row before completing this test.",
     );
@@ -172,7 +172,7 @@ describe("qii env-22 insulation actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteQiiEnv22InsulationFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteQiiEnv22InsulationFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteQiiEnv22InsulationFromForm(buildFormData())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");

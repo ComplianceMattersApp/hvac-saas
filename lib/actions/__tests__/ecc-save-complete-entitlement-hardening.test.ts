@@ -192,8 +192,14 @@ const actions: Array<{ name: ActionName; buildFormData: () => FormData }> = [
 ];
 
 async function invokeAction(actionName: ActionName, formData: FormData) {
-  const mod = await import("@/lib/actions/job-actions");
-  return (mod as Record<ActionName, (fd: FormData) => Promise<unknown>>)[actionName](formData);
+  // The test data entry actions moved to ecc-test-entry-actions.ts;
+  // markRefrigerantChargeExemptFromForm is an exemption action and stayed put.
+  const [jobActions, eccActions] = await Promise.all([
+    import("@/lib/actions/job-actions"),
+    import("@/lib/actions/ecc-test-entry-actions"),
+  ]);
+  const mod = { ...jobActions, ...eccActions };
+  return (mod as unknown as Record<ActionName, (fd: FormData) => Promise<unknown>>)[actionName](formData);
 }
 
 describe("ECC data-save/save-complete entitlement hardening", () => {

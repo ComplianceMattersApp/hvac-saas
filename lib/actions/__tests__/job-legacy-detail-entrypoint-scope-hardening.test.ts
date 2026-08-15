@@ -377,7 +377,7 @@ describe("legacy job-detail entrypoint same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { confirmEccRetestReadyFromForm } = await import("@/lib/actions/job-actions");
+    const { confirmEccRetestReadyFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(confirmEccRetestReadyFromForm(buildConfirmRetestReadyFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=retest_ready_confirmed#followup",
