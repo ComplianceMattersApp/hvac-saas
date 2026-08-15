@@ -98,7 +98,7 @@ vi.mock('@/lib/business/internal-invoice-payments', () => ({
   })),
 }));
 
-vi.mock('@/lib/actions/job-actions', () => ({
+vi.mock('@/lib/actions/job-actions-shared', () => ({
   insertJobEvent: vi.fn(async () => undefined),
 }));
 

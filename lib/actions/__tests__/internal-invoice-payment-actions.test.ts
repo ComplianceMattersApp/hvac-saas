@@ -98,7 +98,7 @@ vi.mock('@/lib/business/internal-invoice-payments', () => ({
     expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock(...args),
 }));
 
-vi.mock('@/lib/actions/job-actions', () => ({
+vi.mock('@/lib/actions/job-actions-shared', () => ({
   insertJobEvent: (...args: unknown[]) => insertJobEventMock(...args),
 }));
 

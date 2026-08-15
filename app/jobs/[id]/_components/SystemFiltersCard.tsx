@@ -3,11 +3,7 @@
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import SubmitButton from "@/components/SubmitButton";
-import {
-  addSystemFilterFromForm,
-  archiveSystemFilterFromForm,
-  updateSystemFilterFromForm,
-} from "@/lib/actions/job-actions";
+import { addSystemFilterFromForm, archiveSystemFilterFromForm, updateSystemFilterFromForm } from "@/lib/actions/job-equipment-actions";
 import type { JobSystemFilterRow } from "@/lib/customers/system-filters-read-model";
 
 type SystemRow = { id: string; name: string | null };

@@ -362,7 +362,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase, jobEventInserts } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addPublicNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addPublicNoteFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(addPublicNoteFromForm(buildAddPublicNoteFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=note_added",
@@ -383,7 +383,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase, jobEventInserts } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(addInternalNoteFromForm(buildAddInternalNoteFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=follow_up_note_added",
@@ -409,7 +409,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData();
     formData.set("return_to", "/jobs/job-1?tab=ops#internal-notes");
 
@@ -422,7 +422,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData();
     formData.append("tagged_user_ids", "internal-user-2");
 
@@ -451,7 +451,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData("Please review @Eddie before the visit.");
 
     await expect(addInternalNoteFromForm(formData)).rejects.toThrow(
@@ -466,7 +466,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     assertAssignableInternalUserMock.mockRejectedValueOnce(new Error("ASSIGNABLE_INTERNAL_USER_REQUIRED"));
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData();
     formData.append("tagged_user_ids", "other-account-user");
 
@@ -482,7 +482,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     assertAssignableInternalUserMock.mockRejectedValueOnce(new Error("INACTIVE_INTERNAL_USER_REQUIRED"));
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData();
     formData.append("tagged_user_ids", "inactive-user-1");
 
@@ -497,7 +497,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData();
     formData.append("tagged_user_ids", "internal-user-1");
     formData.append("tagged_user_ids", "internal-user-2");
@@ -517,7 +517,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData();
     formData.append("tagged_user_ids", "internal-user-2");
     formData.append("tagged_user_ids", "internal-user-3");
@@ -534,7 +534,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     insertTargetedInternalNotificationMock.mockRejectedValueOnce(new Error("notification_insert_failed"));
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
     const formData = buildAddInternalNoteFormData();
     formData.append("tagged_user_ids", "internal-user-2");
 
@@ -547,7 +547,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     const { supabase, jobUpdates, jobEventInserts } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1",
@@ -597,7 +597,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       reason: "allowed_trial",
     });
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1",
@@ -612,7 +612,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       reason: "blocked_trial_expired",
     });
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -633,7 +633,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       reason: "blocked_trial_missing_end",
     });
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -654,7 +654,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       reason: "allowed_internal_comped",
     });
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1",
@@ -669,7 +669,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       reason: "blocked_missing_entitlement",
     });
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
@@ -701,7 +701,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { addPublicNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addPublicNoteFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(addPublicNoteFromForm(buildAddPublicNoteFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -715,7 +715,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(addInternalNoteFromForm(buildAddInternalNoteFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -729,7 +729,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -761,7 +761,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { addPublicNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addPublicNoteFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(addPublicNoteFromForm(buildAddPublicNoteFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -775,7 +775,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { addInternalNoteFromForm } = await import("@/lib/actions/job-actions");
+    const { addInternalNoteFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(addInternalNoteFromForm(buildAddInternalNoteFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -789,7 +789,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { completeDataEntryFromForm } = await import("@/lib/actions/job-actions");
+    const { completeDataEntryFromForm } = await import("@/lib/actions/job-note-actions");
 
     await expect(completeDataEntryFromForm(buildCompleteDataEntryFormData())).rejects.toThrow(
       "Active internal user required.",

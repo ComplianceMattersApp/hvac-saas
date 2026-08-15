@@ -36,7 +36,7 @@ vi.mock('@/lib/business/tenant-stripe-connect-readiness', () => ({
     mockResolveTenantStripeConnectReadiness(...args),
 }));
 
-vi.mock('@/lib/actions/job-actions', () => ({
+vi.mock('@/lib/actions/job-actions-shared', () => ({
   insertJobEvent: mockInsertJobEvent,
 }));
 

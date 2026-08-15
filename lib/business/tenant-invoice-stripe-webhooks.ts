@@ -18,7 +18,7 @@ import {
 import { resolveTenantStripeConnectReadiness } from '@/lib/business/tenant-stripe-connect-readiness';
 import { closeVerifiedAbandonedStripeSession } from '@/lib/business/stripe-abandoned-session-cleanup';
 import { VOIDED_INVOICE_CHARGE_MARKER } from '@/lib/business/voided-invoice-charge-marker';
-import { insertJobEvent } from '@/lib/actions/job-actions';
+import { insertJobEvent } from '@/lib/actions/job-actions-shared';
 
 function toCleanString(value: unknown): string {
   return String(value ?? '').trim();

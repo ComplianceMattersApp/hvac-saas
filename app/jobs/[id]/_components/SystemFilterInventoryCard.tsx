@@ -5,10 +5,7 @@ import { useFormStatus } from "react-dom";
 import SubmitButton from "@/components/SubmitButton";
 import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
 import { Disclosure } from "@/components/ui/Disclosure";
-import {
-  archiveSystemFilterFromForm,
-  updateSystemFilterFromForm,
-} from "@/lib/actions/job-actions";
+import { archiveSystemFilterFromForm, updateSystemFilterFromForm } from "@/lib/actions/job-equipment-actions";
 import type { JobSystemFilterRow } from "@/lib/customers/system-filters-read-model";
 
 function formatDimension(value: number) {

@@ -296,7 +296,7 @@ describe("equipment action entitlement hardening", () => {
       createClientMock.mockResolvedValue(fixture.supabase);
       createAdminClientMock.mockReturnValue({});
 
-      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(addJobEquipmentFromForm(buildFormData())).rejects.toThrow("REDIRECT:/jobs/job-1/info?f=equipment");
 
       expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
@@ -314,7 +314,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_trial" });
 
-      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(addJobEquipmentFromForm(buildFormData())).rejects.toThrow("REDIRECT:/jobs/job-1/info?f=equipment");
 
       expect(fixture.equipmentInsertCalls).toHaveLength(1);
@@ -326,7 +326,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_expired" });
 
-      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(addJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
       );
@@ -342,7 +342,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_missing_end" });
 
-      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(addJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
       );
@@ -360,7 +360,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_internal_comped" });
 
-      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(addJobEquipmentFromForm(buildFormData())).rejects.toThrow("REDIRECT:/jobs/job-1/info?f=equipment");
 
       expect(fixture.equipmentInsertCalls).toHaveLength(1);
@@ -372,7 +372,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_missing_entitlement" });
 
-      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(addJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
       );
@@ -408,7 +408,7 @@ describe("equipment action entitlement hardening", () => {
       createClientMock.mockResolvedValue(fixture.supabase);
       createAdminClientMock.mockReturnValue({});
 
-      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(updateJobEquipmentFromForm(buildFormData())).rejects.toThrow("REDIRECT:/jobs/job-1/info?f=equipment");
 
       expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
@@ -434,7 +434,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_trial" });
 
-      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(updateJobEquipmentFromForm(buildFormData())).rejects.toThrow("REDIRECT:/jobs/job-1/info?f=equipment");
 
       expect(fixture.equipmentUpdateCalls).toHaveLength(1);
@@ -446,7 +446,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_expired" });
 
-      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(updateJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
       );
@@ -463,7 +463,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_missing_end" });
 
-      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(updateJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
       );
@@ -490,7 +490,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_internal_comped" });
 
-      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(updateJobEquipmentFromForm(buildFormData())).rejects.toThrow("REDIRECT:/jobs/job-1/info?f=equipment");
 
       expect(fixture.equipmentUpdateCalls).toHaveLength(1);
@@ -502,7 +502,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_missing_entitlement" });
 
-      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(updateJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
       );
@@ -537,7 +537,7 @@ describe("equipment action entitlement hardening", () => {
       createClientMock.mockResolvedValue(fixture.supabase);
       createAdminClientMock.mockReturnValue({});
 
-      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(deleteJobEquipmentFromForm(buildFormData())).resolves.toBeUndefined();
 
       expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
@@ -563,7 +563,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_trial" });
 
-      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(deleteJobEquipmentFromForm(buildFormData())).resolves.toBeUndefined();
 
       expect(fixture.equipmentDeleteCalls).toHaveLength(1);
@@ -575,7 +575,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_expired" });
 
-      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(deleteJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
       );
@@ -591,7 +591,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_missing_end" });
 
-      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(deleteJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
       );
@@ -617,7 +617,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_internal_comped" });
 
-      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(deleteJobEquipmentFromForm(buildFormData())).resolves.toBeUndefined();
 
       expect(fixture.equipmentDeleteCalls).toHaveLength(1);
@@ -629,7 +629,7 @@ describe("equipment action entitlement hardening", () => {
       createAdminClientMock.mockReturnValue({});
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_missing_entitlement" });
 
-      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
       await expect(deleteJobEquipmentFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
       );

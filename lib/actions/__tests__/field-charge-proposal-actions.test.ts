@@ -72,7 +72,7 @@ vi.mock('@/lib/business/internal-invoice', async () => {
   };
 });
 
-vi.mock('@/lib/actions/job-actions', () => ({
+vi.mock('@/lib/actions/job-actions-shared', () => ({
   insertJobEvent: (...args: unknown[]) => insertJobEventMock(...args),
 }));
 

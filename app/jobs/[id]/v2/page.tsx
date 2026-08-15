@@ -8,22 +8,8 @@ import {
   resolveJobDetailActor,
   loadScopedInternalJobDetailReadBoundaryOutcome,
 } from "@/lib/actions/internal-job-detail-read-boundary";
-import {
-  getContractors,
-  archiveJobFromForm,
-  createNextServiceVisitFromForm,
-  createCallbackVisitFromForm,
-  updateJobScheduleFromForm,
-  addInternalNoteFromForm,
-  addPublicNoteFromForm,
-  updateJobVisitScopeFromForm,
-  updateJobTitleFromForm,
-  updateServiceVisitReasonFromForm,
-  changeJobServiceLocationFromForm,
-  confirmEccRetestReadyFromForm,
-  scheduleRetestNowFromForm,
-  createRetestJobFromForm,
-} from "@/lib/actions/job-actions";
+import { getContractors, archiveJobFromForm, createNextServiceVisitFromForm, createCallbackVisitFromForm, updateJobScheduleFromForm, updateJobVisitScopeFromForm, updateJobTitleFromForm, updateServiceVisitReasonFromForm, changeJobServiceLocationFromForm, confirmEccRetestReadyFromForm, scheduleRetestNowFromForm, createRetestJobFromForm } from "@/lib/actions/job-actions";
+import { addInternalNoteFromForm, addPublicNoteFromForm } from "@/lib/actions/job-note-actions";
 import {
   markJobFieldCompleteFromForm,
   markJobPartsNeededFromForm,

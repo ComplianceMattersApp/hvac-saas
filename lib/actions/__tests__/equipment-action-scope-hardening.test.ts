@@ -263,7 +263,7 @@ describe("internal equipment/system same-account hardening", () => {
     createAdminClientMock.mockReturnValue({});
     loadScopedInternalEquipmentJobForMutationMock.mockResolvedValue({ id: "job-1", customer_id: "cust-1" });
 
-    const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+    const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-1");
@@ -291,7 +291,7 @@ describe("internal equipment/system same-account hardening", () => {
     createAdminClientMock.mockReturnValue({});
     loadScopedInternalEquipmentJobForMutationMock.mockResolvedValue({ id: "job-2", customer_id: "cust-2" });
 
-    const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+    const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-2");
@@ -319,7 +319,7 @@ describe("internal equipment/system same-account hardening", () => {
     createAdminClientMock.mockReturnValue({});
     loadScopedInternalEquipmentJobForMutationMock.mockResolvedValue(null);
 
-    const { addJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+    const { addJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-3");
@@ -353,7 +353,7 @@ describe("internal equipment/system same-account hardening", () => {
       equipment: { id: "equipment-1", job_id: "job-4", system_id: "system-old" },
     });
 
-    const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-4");
@@ -386,7 +386,7 @@ describe("internal equipment/system same-account hardening", () => {
     createAdminClientMock.mockReturnValue({});
     loadScopedInternalJobEquipmentForMutationMock.mockResolvedValue(null);
 
-    const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-5");
@@ -422,7 +422,7 @@ describe("internal equipment/system same-account hardening", () => {
       equipment: { id: "equipment-3", job_id: "job-6", system_id: "system-6" },
     });
 
-    const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+    const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-6");
@@ -444,7 +444,7 @@ describe("internal equipment/system same-account hardening", () => {
     createAdminClientMock.mockReturnValue({});
     loadScopedInternalJobEquipmentForMutationMock.mockResolvedValue(null);
 
-    const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-actions");
+    const { deleteJobEquipmentFromForm } = await import("@/lib/actions/job-equipment-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-7");

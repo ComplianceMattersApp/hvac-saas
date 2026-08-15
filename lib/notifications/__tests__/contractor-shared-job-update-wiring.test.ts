@@ -4,7 +4,13 @@ import { describe, expect, it } from "vitest";
 
 const notificationSource = readFileSync(resolve(__dirname, "../contractor-shared-job-update.ts"), "utf8");
 const attachmentActionsSource = readFileSync(resolve(__dirname, "../../actions/attachment-actions.ts"), "utf8");
-const jobActionsSource = readFileSync(resolve(__dirname, "../../actions/job-actions.ts"), "utf8");
+// Note actions moved to job-note-actions.ts; the job action surface spans both.
+const jobActionsSource = [
+  resolve(__dirname, "../../actions/job-actions.ts"),
+  resolve(__dirname, "../../actions/job-note-actions.ts"),
+]
+  .map((path) => readFileSync(path, "utf8"))
+  .join("\n");
 
 describe("contractor shared job update email wiring", () => {
   it("emails contractor portal recipients and records a deduplicated delivery", () => {

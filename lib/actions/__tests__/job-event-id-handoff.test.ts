@@ -22,7 +22,7 @@ describe("insertJobEvent - event id handoff (F5C-C)", () => {
     mockSupabase.from.mockReturnValue(mockInsertChain);
 
     // We import inside the test to avoid top-level server component issues
-    const { insertJobEvent } = await import("../job-actions");
+    const { insertJobEvent } = await import("../job-actions-shared");
 
     const eventId = await insertJobEvent({
       supabase: mockSupabase,
@@ -56,7 +56,7 @@ describe("insertJobEvent - event id handoff (F5C-C)", () => {
 
     mockSupabase.from.mockReturnValue(mockInsertChain);
 
-    const { insertJobEvent } = await import("../job-actions");
+    const { insertJobEvent } = await import("../job-actions-shared");
 
     await expect(
       insertJobEvent({
@@ -79,7 +79,7 @@ describe("insertJobEvent - event id handoff (F5C-C)", () => {
 
     mockSupabase.from.mockReturnValue(mockInsertChain);
 
-    const { insertJobEvent } = await import("../job-actions");
+    const { insertJobEvent } = await import("../job-actions-shared");
 
     await expect(
       insertJobEvent({
@@ -102,7 +102,7 @@ describe("insertJobEvent - event id handoff (F5C-C)", () => {
 
     mockSupabase.from.mockReturnValue(mockInsertChain);
 
-    const { insertJobEvent } = await import("../job-actions");
+    const { insertJobEvent } = await import("../job-actions-shared");
 
     const eventId = await insertJobEvent({
       supabase: mockSupabase,

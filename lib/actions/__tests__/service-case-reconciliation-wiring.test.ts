@@ -67,7 +67,7 @@ vi.mock("@/lib/actions/job-evaluator", () => ({
   healStalePaperworkOpsStatus: vi.fn(async () => undefined),
 }));
 
-vi.mock("@/lib/actions/job-actions", () => ({
+vi.mock("@/lib/actions/job-actions-shared", () => ({
   insertJobEvent: (...args: unknown[]) => insertJobEventMock(...args),
 }));
 

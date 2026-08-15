@@ -2,10 +2,14 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { describe, expect, it } from "vitest";
 
-const jobActionsSource = readFileSync(
+// Data entry completion moved to job-note-actions.ts; the job action surface
+// spans both files.
+const jobActionsSource = [
   resolve(__dirname, "../job-actions.ts"),
-  "utf-8",
-);
+  resolve(__dirname, "../job-note-actions.ts"),
+]
+  .map((path) => readFileSync(path, "utf-8"))
+  .join("\n");
 
 const eccDataEntryBranchStart = jobActionsSource.indexOf("// ECC: data entry completion should NOT close the job");
 const eccDataEntryBranchEnd = jobActionsSource.indexOf("redirect(`/jobs/${id}`);", eccDataEntryBranchStart);
