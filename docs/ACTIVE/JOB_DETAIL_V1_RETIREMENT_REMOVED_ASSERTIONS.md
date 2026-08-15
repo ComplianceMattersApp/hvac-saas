@@ -18,7 +18,13 @@ if it still matters.
 Capabilities present in the classic desktop layout with no V2 equivalent found:
 
 - `Tech ID` header label — V2 never renders the raw job UUID (intentional; stronger than the old 'demote' behaviour).
-- Service address edit affordance — present on mobile V2, **absent from V2 desktop**.
+- ~~Service address edit affordance — present on mobile V2, **absent from V2 desktop**.~~
+  **Fixed.** Desktop V2's location card now links to `/locations/{id}` with an
+  `aria-label` naming the address, matching what the classic layout offered.
+  Note this is distinct from `ChangeServiceLocationForm`, which V2 already had:
+  that switches the job to a *different* saved location and is not a way to
+  correct the current one. Covered by
+  `lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts`.
 - `Change Service Location` compact flow — not found on any live surface.
 - `Send ECC/HERS Request` sender-side UI — not found on any live surface.
 - **`#next-service-action` is a dead deep-link target (pre-existing).** Six live
