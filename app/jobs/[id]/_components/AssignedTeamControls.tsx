@@ -1,9 +1,6 @@
 import { Suspense } from "react";
 import SubmitButton from "@/components/SubmitButton";
-import {
-  removeJobAssigneeFromForm,
-  setPrimaryJobAssigneeFromForm,
-} from "@/lib/actions/job-actions";
+import { removeJobAssigneeFromForm, setPrimaryJobAssigneeFromForm } from "@/lib/actions/job-assignment-actions";
 import type { ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import DeferredAddAssigneeForm from "./DeferredAddAssigneeForm";

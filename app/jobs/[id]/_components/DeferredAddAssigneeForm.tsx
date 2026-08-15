@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { updateJobTeamAssignmentsFromForm } from "@/lib/actions/job-actions";
+import { updateJobTeamAssignmentsFromForm } from "@/lib/actions/job-assignment-actions";
 import { getAssignableInternalUsers } from "@/lib/staffing/human-layer";
 import type { ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
 import TeamAssignmentSelector from "./TeamAssignmentSelector";

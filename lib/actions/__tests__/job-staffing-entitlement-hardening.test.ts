@@ -259,7 +259,7 @@ describe("job staffing entitlement hardening", () => {
       const fixture = makeStaffingFixture();
       createClientMock.mockResolvedValue(fixture.supabase);
 
-      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_added",
@@ -277,7 +277,7 @@ describe("job staffing entitlement hardening", () => {
       const fixture = makeStaffingFixture();
       createClientMock.mockResolvedValue(fixture.supabase);
 
-      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(
         assignJobAssigneeFromForm(
@@ -296,7 +296,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "allowed_trial",
       });
 
-      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_added",
@@ -313,7 +313,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_trial_expired",
       });
 
-      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -331,7 +331,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_trial_missing_end",
       });
 
-      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -349,7 +349,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "allowed_internal_comped",
       });
 
-      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_added",
@@ -366,7 +366,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_missing_entitlement",
       });
 
-      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
@@ -382,7 +382,7 @@ describe("job staffing entitlement hardening", () => {
       const fixture = makeStaffingFixture();
       createClientMock.mockResolvedValue(fixture.supabase);
 
-      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_primary_set",
@@ -404,7 +404,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "allowed_trial",
       });
 
-      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_primary_set",
@@ -421,7 +421,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_trial_expired",
       });
 
-      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -439,7 +439,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_trial_missing_end",
       });
 
-      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -457,7 +457,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "allowed_internal_comped",
       });
 
-      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_primary_set",
@@ -474,7 +474,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_missing_entitlement",
       });
 
-      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
@@ -490,7 +490,7 @@ describe("job staffing entitlement hardening", () => {
       const fixture = makeStaffingFixture();
       createClientMock.mockResolvedValue(fixture.supabase);
 
-      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_removed",
@@ -512,7 +512,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "allowed_trial",
       });
 
-      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_removed",
@@ -529,7 +529,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_trial_expired",
       });
 
-      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -547,7 +547,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_trial_missing_end",
       });
 
-      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -565,7 +565,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "allowed_internal_comped",
       });
 
-      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_removed",
@@ -582,7 +582,7 @@ describe("job staffing entitlement hardening", () => {
         reason: "blocked_missing_entitlement",
       });
 
-      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+      const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
       await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",

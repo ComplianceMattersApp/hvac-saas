@@ -336,7 +336,7 @@ describe("legacy job-detail entrypoint same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { createRetestJobFromForm } = await import("@/lib/actions/job-actions");
+    const { createRetestJobFromForm } = await import("@/lib/actions/job-retest-actions");
 
     await expect(createRetestJobFromForm(buildCreateRetestFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -350,7 +350,7 @@ describe("legacy job-detail entrypoint same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { createRetestJobFromForm } = await import("@/lib/actions/job-actions");
+    const { createRetestJobFromForm } = await import("@/lib/actions/job-retest-actions");
 
     await expect(createRetestJobFromForm(buildCreateRetestFormData())).rejects.toThrow("ALLOW_PATH_REACHED");
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
@@ -363,7 +363,7 @@ describe("legacy job-detail entrypoint same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockRejectedValue(new Error("Active internal user required."));
 
-    const { createRetestJobFromForm } = await import("@/lib/actions/job-actions");
+    const { createRetestJobFromForm } = await import("@/lib/actions/job-retest-actions");
 
     await expect(createRetestJobFromForm(buildCreateRetestFormData())).rejects.toThrow(
       "Active internal user required.",
@@ -377,7 +377,7 @@ describe("legacy job-detail entrypoint same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { confirmEccRetestReadyFromForm } = await import("@/lib/actions/job-actions");
+    const { confirmEccRetestReadyFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(confirmEccRetestReadyFromForm(buildConfirmRetestReadyFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=retest_ready_confirmed#followup",

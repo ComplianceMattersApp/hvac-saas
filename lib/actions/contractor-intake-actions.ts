@@ -7,7 +7,8 @@ import {
   isInternalAccessError,
   requireInternalRole,
 } from "@/lib/auth/internal-user";
-import { createJob, ensureActiveAssignmentAndNotify } from "@/lib/actions/job-actions";
+import { createJob } from "@/lib/actions/job-actions-shared";
+import { ensureActiveAssignmentAndNotify } from "@/lib/actions/job-actions-shared";
 import { provisionCustomerSmsRecipientAndConsent } from "@/lib/communications/sms-consent-provisioning";
 import { markInternalNewWorkNotificationsResolved } from "@/lib/actions/notification-actions";
 import {

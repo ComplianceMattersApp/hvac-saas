@@ -124,7 +124,7 @@ describe("air filter device actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAirFilterDeviceDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAirFilterDeviceDataFromForm(buildAirFilterFormData(true))).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -145,7 +145,7 @@ describe("air filter device actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteAirFilterDeviceFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteAirFilterDeviceFromForm(buildAirFilterFormData(false))).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");

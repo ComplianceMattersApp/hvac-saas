@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const jobActionsSource = readFileSync(
-  resolve(__dirname, "../job-actions.ts"),
+  resolve(__dirname, "../job-service-visit-actions.ts"),
   "utf-8",
 );
 

@@ -268,7 +268,7 @@ describe("ECC management entitlement hardening", () => {
       const { supabase, updateCalls } = makeSessionClientFixture();
       createClientMock.mockResolvedValue(supabase);
 
-      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(saveEccTestOverrideFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
@@ -285,7 +285,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_trial" });
 
-      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(saveEccTestOverrideFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
@@ -299,7 +299,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_expired" });
 
-      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(saveEccTestOverrideFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -317,7 +317,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_missing_end" });
 
-      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(saveEccTestOverrideFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -335,7 +335,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_internal_comped" });
 
-      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(saveEccTestOverrideFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
@@ -349,7 +349,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_missing_entitlement" });
 
-      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+      const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(saveEccTestOverrideFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
@@ -376,7 +376,7 @@ describe("ECC management entitlement hardening", () => {
       const { supabase, insertCalls } = makeSessionClientFixture();
       createClientMock.mockResolvedValue(supabase);
 
-      const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(addEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
@@ -394,7 +394,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_trial" });
 
-      const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(addEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
@@ -408,7 +408,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_expired" });
 
-      const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(addEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -425,7 +425,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_missing_end" });
 
-      const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(addEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -442,7 +442,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_internal_comped" });
 
-      const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(addEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
@@ -456,7 +456,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_missing_entitlement" });
 
-      const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(addEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",
@@ -481,7 +481,7 @@ describe("ECC management entitlement hardening", () => {
       const { supabase, deleteCalls } = makeSessionClientFixture();
       createClientMock.mockResolvedValue(supabase);
 
-      const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(deleteEccTestRunFromForm(buildFormData())).resolves.toBeUndefined();
 
@@ -499,7 +499,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_trial" });
 
-      const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(deleteEccTestRunFromForm(buildFormData())).resolves.toBeUndefined();
 
@@ -511,7 +511,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_expired" });
 
-      const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(deleteEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -529,7 +529,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_trial_missing_end" });
 
-      const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(deleteEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -547,7 +547,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: true, reason: "allowed_internal_comped" });
 
-      const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(deleteEccTestRunFromForm(buildFormData())).resolves.toBeUndefined();
 
@@ -559,7 +559,7 @@ describe("ECC management entitlement hardening", () => {
       createClientMock.mockResolvedValue(supabase);
       resolveOperationalMutationEntitlementAccessMock.mockResolvedValueOnce({ authorized: false, reason: "blocked_missing_entitlement" });
 
-      const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+      const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
       await expect(deleteEccTestRunFromForm(buildFormData())).rejects.toThrow(
         "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",

@@ -258,7 +258,7 @@ describe("duct leakage override reason — Asbestos", () => {
       testRun: { id: "run-a1", job_id: "job-a1", system_id: "sys-1", test_type: "duct_leakage" },
     });
 
-    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-a1");
@@ -291,7 +291,7 @@ describe("duct leakage override reason — Asbestos", () => {
       testRun: { id: "run-a2", job_id: "job-a2", system_id: "sys-1", test_type: "duct_leakage" },
     });
 
-    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-a2");
@@ -324,7 +324,7 @@ describe("duct leakage override reason — Asbestos", () => {
       testRun: { id: "run-a3", job_id: "job-a3", system_id: "sys-1", test_type: "duct_leakage" },
     });
 
-    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-a3");
@@ -379,7 +379,7 @@ describe("internal ECC same-account hardening", () => {
       testRun: { id: "run-1", job_id: "job-1", system_id: "system-1", test_type: "duct_leakage" },
     });
 
-    const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+    const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-1");
@@ -409,7 +409,7 @@ describe("internal ECC same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccTestRunForMutationMock.mockResolvedValue(null);
 
-    const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
+    const { saveEccTestOverrideFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-2");
@@ -429,7 +429,7 @@ describe("internal ECC same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue({ id: "job-3", job_type: "ecc" });
 
-    const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-3");
@@ -458,7 +458,7 @@ describe("internal ECC same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccJobForMutationMock.mockResolvedValue(null);
 
-    const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { addEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-4");
@@ -480,7 +480,7 @@ describe("internal ECC same-account hardening", () => {
       testRun: { id: "run-5", job_id: "job-5", system_id: "system-1", test_type: "duct_leakage" },
     });
 
-    const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-5");
@@ -499,7 +499,7 @@ describe("internal ECC same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccTestRunForMutationMock.mockResolvedValue(null);
 
-    const { deleteEccTestRunFromForm } = await import("@/lib/actions/job-actions");
+    const { deleteEccTestRunFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-6");
@@ -520,7 +520,7 @@ describe("internal ECC same-account hardening", () => {
       testRun: { id: "run-7", job_id: "job-7", system_id: "system-1", test_type: "duct_leakage" },
     });
 
-    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-7");
@@ -552,7 +552,7 @@ describe("internal ECC same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalEccTestRunForMutationMock.mockResolvedValue(null);
 
-    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     const formData = new FormData();
     formData.set("job_id", "job-8");

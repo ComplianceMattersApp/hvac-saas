@@ -122,7 +122,7 @@ describe("fan watt draw actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveFanWattDrawDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveFanWattDrawDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveFanWattDrawDataFromForm(buildFanFormData(true))).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -142,7 +142,7 @@ describe("fan watt draw actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteFanWattDrawFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteFanWattDrawFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteFanWattDrawFromForm(buildFanFormData(false))).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");

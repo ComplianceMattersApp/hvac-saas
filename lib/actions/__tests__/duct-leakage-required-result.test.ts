@@ -141,7 +141,7 @@ describe("duct leakage required measured result hardening", () => {
   });
 
   it("completion fails without measured duct leakage value", async () => {
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(
       saveAndCompleteDuctLeakageFromForm(buildSaveAndCompleteDuctFormData())
@@ -158,7 +158,7 @@ describe("duct leakage required measured result hardening", () => {
     const fd = buildSaveAndCompleteDuctFormData();
     fd.set("measured_duct_leakage_cfm", "80");
 
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
@@ -177,7 +177,7 @@ describe("duct leakage required measured result hardening", () => {
     const fd = buildSaveAndCompleteDuctFormData();
     fd.set("duct_exception", "asbestos");
 
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
@@ -196,7 +196,7 @@ describe("duct leakage required measured result hardening", () => {
     fd.set("duct_exception", "asbestos");
     fd.set("override_reason", "Duct test area contains suspect material.");
 
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
@@ -219,7 +219,7 @@ describe("duct leakage required measured result hardening", () => {
     fd.set("duct_exception", "under_40_ft_ducting");
     fd.set("override_reason", "Less than 40 feet of ducting present.");
 
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
@@ -238,7 +238,7 @@ describe("duct leakage required measured result hardening", () => {
     const fd = buildSaveAndCompleteDuctFormData();
     fd.set("duct_exception", "under_40_ft_ducting");
 
-    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
@@ -253,7 +253,7 @@ describe("duct leakage required measured result hardening", () => {
     const { supabase, updates } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveDuctLeakageDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(saveDuctLeakageDataFromForm(buildSaveDuctDraftFormData())).rejects.toThrow("REDIRECT:");
 

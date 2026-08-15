@@ -27,7 +27,10 @@ describe("job action speed instrumentation wiring", () => {
 
   it("keeps revert on-the-way timing env-gated and label-only", () => {
     const revertStart = jobActionsSource.indexOf("export async function revertOnTheWayFromForm");
-    const revertEnd = jobActionsSource.indexOf("async function applyJobScheduleUpdate", revertStart);
+    // applyJobScheduleUpdate moved to job-actions-shared.ts; bound the slice with
+    // the next declaration that is still in this file.
+    const revertEnd = jobActionsSource.indexOf("export async function updateJobScheduleFromForm", revertStart);
+    expect(revertEnd).toBeGreaterThan(revertStart);
     const revertSource = jobActionsSource.slice(revertStart, revertEnd);
 
     expect(revertSource).toContain('process.env.FIELD_ACTION_TIMING_DEBUG === "true"');

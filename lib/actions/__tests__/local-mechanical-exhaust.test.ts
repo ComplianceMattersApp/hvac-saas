@@ -130,7 +130,7 @@ describe("local mechanical exhaust actions", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveLocalMechanicalExhaustDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveLocalMechanicalExhaustDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveLocalMechanicalExhaustDataFromForm(buildFormData())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -154,7 +154,7 @@ describe("local mechanical exhaust actions", () => {
     formData.set("test_run_id", "run-1");
     formData.set("system_id", "system-1");
 
-    const { saveAndCompleteLocalMechanicalExhaustFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteLocalMechanicalExhaustFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteLocalMechanicalExhaustFromForm(formData)).rejects.toThrow(
       "Enter system name or location before completing this test.",
     );

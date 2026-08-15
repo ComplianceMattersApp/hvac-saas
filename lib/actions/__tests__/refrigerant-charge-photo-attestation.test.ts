@@ -190,7 +190,7 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPhotoAttestation())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -206,7 +206,7 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPhotoAttestation("needs_review"))).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -219,7 +219,7 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPhotoAttestation())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -230,7 +230,7 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPhotoAttestation())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -241,7 +241,7 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPhotoAttestation())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -252,7 +252,7 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPhotoAttestation())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -294,7 +294,7 @@ describe("saveRefrigerantChargeDataFromForm — existing numeric path still work
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildNumericReading())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -305,7 +305,7 @@ describe("saveRefrigerantChargeDataFromForm — existing numeric path still work
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildNumericReading())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -316,7 +316,7 @@ describe("saveRefrigerantChargeDataFromForm — existing numeric path still work
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildNumericReading())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -357,7 +357,7 @@ describe("saveRefrigerantChargeDataFromForm — existing exemption path still wo
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPackageUnitExemption())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -370,7 +370,7 @@ describe("saveRefrigerantChargeDataFromForm — existing exemption path still wo
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPackageUnitExemption())).rejects.toThrow("REDIRECT:");
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -382,7 +382,7 @@ describe("saveRefrigerantChargeDataFromForm — existing exemption path still wo
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveRefrigerantChargeDataFromForm(buildPackageUnitExemptionWithoutReason())).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=override_reason_required",
     );
@@ -424,7 +424,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation())).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=photo_result_required",
     );
@@ -436,7 +436,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("needs_review"))).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=test_completed"
     );
@@ -455,7 +455,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("pass"))).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=test_completed"
     );
@@ -470,7 +470,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("fail"))).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=test_completed"
     );
@@ -485,7 +485,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     const { supabase } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("needs_review"))).rejects.toThrow(
       "REDIRECT:"
     );
@@ -497,7 +497,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
-    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPackageUnitExemptionWithoutReason())).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=override_reason_required",
     );

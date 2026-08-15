@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requestRetestReadyFromPortal } from "@/lib/actions/job-actions";
+import { requestRetestReadyFromPortal } from "@/lib/actions/ecc-test-entry-actions";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import { createClient } from "@/lib/supabase/server";
 import PortalAccessIssue from "@/components/portal/PortalAccessIssue";

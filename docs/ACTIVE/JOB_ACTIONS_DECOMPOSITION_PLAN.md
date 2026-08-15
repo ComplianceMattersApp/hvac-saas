@@ -33,8 +33,11 @@ calling them slices 2–5; when that batch was abandoned, the core extractions t
 replaced it took the numbers 2 and 3, and the clusters lost theirs.
 
 To stop that colliding again: completed slices are numbered, and work not yet
-done is referred to **by cluster name only**. None of the domain clusters have
-been extracted — everything below the completed slices is still outstanding.
+done is referred to **by cluster name only**.
+
+Completed so far: equipment + filters (slice 1), the access and navigation
+primitives (2), `insertJobEvent` (3), notes + data entry (4), and assignment /
+team (5). Still outstanding: retest, service visits, and ECC test entry.
 
 ## Choosing slice order
 
@@ -243,16 +246,156 @@ Two call-site shapes worth noting for the remaining clusters:
 
 **Result:** `job-actions.ts` 12,238 → 11,675 lines, 62 → 59 exports.
 
+## Slice 5 — assignment and team (done)
+
+`lib/actions/job-assignment-actions.ts`, 5 actions, 694 lines. Nine internals
+went to the neutral module and four private helpers plus a result type moved with
+the cluster.
+
+Re-measuring changed which cluster went next. The stale table ordered assignment
+last of the cheap three at 11 shared helpers; measured against the current file
+it needed **7**, while retest and service visits had risen to **18 each**:
+
+| cluster | table said | actually |
+|---|---|---|
+| assignment / team | 11 | **7** |
+| retest | 4 | 18 |
+| service visits | 5 | 18 |
+
+So the earlier note that remaining clusters were "likely cheaper than listed" was
+wrong — it held for notes + data entry and inverted for the other two. Measure
+each one; do not extrapolate from the last.
+
+Two findings from this slice:
+
+- **`ensureActiveAssignmentAndNotify` was a second unwanted endpoint.** Exported
+  from `job-actions.ts`, imported only by `contractor-intake-actions.ts` and test
+  files, never referenced under `app/`, never a form action. Same shape as
+  `insertJobEvent`; it moved to the neutral module as a plain function and the
+  endpoint is no longer generated. That is now two found in one file, which is
+  why the wider audit is worth doing.
+- **Cluster exclusivity must account for external importers.** The first pass
+  called this function "exclusive to the cluster" because nothing else *inside*
+  `job-actions.ts` referenced it. Five files outside did. Exclusivity means
+  nothing else in the repo uses it, not nothing else in the file.
+
+A circularity check also caught `ensureActiveAssignmentForUser` (neutral side)
+referencing the `JobAssignmentCreatedCallback` type (cluster side); the type
+moved to the neutral module. Run that check on every slice — neutral must never
+import from a cluster module.
+
+**Result:** `job-actions.ts` 11,675 → 10,666 lines, 59 → 53 exports.
+
+## Slice 6 — service case and operational email core (done)
+
+Retest and service visits were each measured at 18 shared helpers. Comparing
+their dependency closures showed something stronger than "overlapping": the two
+sets are **identical**. All 27 internals, and neither cluster has a single
+exclusive dependency. So one extraction unblocks both entirely.
+
+870 lines moved to the neutral module in two families:
+
+- **Service case / visit** — `ensureServiceCaseForJob`,
+  `createServiceCaseForRootJob`, `resolveServiceCaseIdForNewJob`,
+  `deriveInitialServiceVisitReason`, `buildInitialProblemSummary`, the
+  `normalize*` trio, and the `SERVICE_*` const sets.
+- **Operational email** — `sendCustomerScheduledEmailForJob`,
+  `sendContractorScheduledEmailForJob`, the delivery-notification helpers, and
+  the `OperationalEmail*` types.
+
+Two of the 27 were exported actions, and they resolved differently:
+
+- **`createJob` was a third unwanted endpoint.** No `app/` references, never a
+  form action — the new-job form uses `createJobFromForm`, a different function.
+  Its only importers are `contractor-intake-actions` and
+  `receiver-job-from-workshare`, both server modules. Moved to the neutral module
+  as a plain function; the endpoint stops being generated.
+- **`updateJobScheduleFromForm` is a genuine form action.** It appears in
+  `<form action={...}>` in the mobile detail preview, the mobile schedule panel,
+  and the V2 desktop page. It stays in `job-actions.ts` as an action; the cluster
+  modules will import it across module boundaries, which is ordinary.
+
+That distinction is the whole point of checking rather than assuming: two exports
+of identical shape, one safe to demote and one that must not be.
+
+**Three unwanted endpoints found in this file so far** — `insertJobEvent`,
+`ensureActiveAssignmentAndNotify`, `createJob`. That is a pattern, not a
+coincidence, and the wider audit of other `"use server"` modules is overdue.
+
+**Result:** `job-actions.ts` 10,666 → 9,822 lines, 53 → 52 exports. Below 10,000
+for the first time.
+
+## Slice 7 — retest and service visits (done)
+
+Taken together because slice 6 had already reduced both to leaves. Measured
+before starting: their combined remaining internal dependency was a single
+declaration, `updateJobScheduleFromForm`, which stays an action in
+`job-actions.ts` and is imported across module boundaries.
+
+Two modules rather than one, since they are distinct domains:
+
+- `lib/actions/job-retest-actions.ts` — `createRetestJobFromForm`,
+  `scheduleRetestNowFromForm`
+- `lib/actions/job-service-visit-actions.ts` — `createNextServiceVisitFromForm`,
+  `createCallbackVisitFromForm`
+
+Batching was safe here in a way the earlier four-cluster attempt was not: these
+two had *identical* dependency sets, both were leaves, and each was verified
+independently. The earlier failure came from batching clusters whose
+dependencies had never been measured.
+
+**Source-scraping tests that slice by boundary need care when a cluster splits.**
+Three tests bounded a slice with `indexOf("export async function <next>")`, where
+the next declaration stayed in `job-actions.ts` while the sliced action moved.
+`indexOf` returned -1 and the tests threw rather than silently passing, which is
+the good failure mode — but any such boundary must be re-pointed at a declaration
+in the same file, or at end-of-file when the action closes the module.
+
+**Result:** `job-actions.ts` 9,822 → 8,919 lines, 52 → 48 exports.
+
+Note on a pre-existing oddity carried along by these moves: 23 of the actions
+carry a redundant function-level `"use server"` inside the file-level
+`"use server"` module. It is legal and the build accepts it; it is simply
+belt-and-braces from the original authors, and moving the functions preserved it.
+
+## Slice 8 — ECC test entry (done)
+
+`lib/actions/ecc-test-entry-actions.ts`, 24 actions, 2,601 lines: the per-test
+save and save-and-complete flows (refrigerant charge, airflow, fan watt draw, air
+filter, custom verification, AHRI, local mechanical exhaust, QII env22, duct
+leakage), test run management, override handling, and retest readiness. Eleven
+private helpers and two label const maps moved with it.
+
+**This is the payoff from doing the core first.** The original table put this
+cluster at 27 shared helpers, which is why it was scheduled last. Measured after
+six slices of core extraction, it needed **one** — `notifyInternalNextActionChanged`.
+The largest cluster in the file extracted as a near-leaf.
+
+Cluster boundary note: `markRefrigerantChargeExemptFromForm` stayed in
+`job-actions.ts`. It marks a test as exempt rather than entering test data, so it
+sits outside the data-entry boundary even though it shares the refrigerant charge
+subject. One test dispatches over both and merges the namespaces.
+
+Three dispatch-by-name tests needed the same treatment, one of them now spanning
+four modules. That shape is now the most common breakage in this work: any test
+that resolves an action from a module by string name has to merge every module
+the union spans.
+
+**Result:** `job-actions.ts` 8,919 → 6,378 lines, 48 → 24 exports.
+
 ## Remaining work
 
-Still in `job-actions.ts`: retest, service visits, assignment / team, and ECC test
-entry, in that order.
+All planned domain clusters are extracted. `job-actions.ts` is **6,378 lines with
+24 exported actions**, down from 12,985 and 69 — a little over half removed.
 
-The shared-helper counts in the cluster table are stale — they were measured
-before the core extractions, and notes + data entry proved the error is large
-(3 predicted, 0 actual). Re-measure with `scripts/dev/list-top-level-decls.js`
-before starting a cluster rather than trusting them; the remaining ones are
-likely cheaper than listed too.
+What remains is job creation
+(`createJobFromForm`, 1,822 lines) and `advanceJobStatusFromForm` (902 lines) —
+single oversized functions rather than clusters, wanting internal decomposition
+rather than relocation.
+
+Re-measure with `scripts/dev/list-top-level-decls.js` before starting any of
+them. Every count in the original table has since proved wrong in one direction
+or the other.
 
 Job creation (`createJobFromForm`, 1,822 lines) and
 `advanceJobStatusFromForm` (902 lines) are single oversized functions rather than

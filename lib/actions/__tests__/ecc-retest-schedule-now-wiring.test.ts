@@ -3,13 +3,14 @@ import { resolve } from "path";
 import { describe, expect, it } from "vitest";
 
 const jobActionsSource = readFileSync(
-  resolve(__dirname, "../job-actions.ts"),
+  resolve(__dirname, "../job-retest-actions.ts"),
   "utf-8",
 );
 
 function extractScheduleRetestNowBlock() {
   const start = jobActionsSource.indexOf("export async function scheduleRetestNowFromForm");
-  const end = jobActionsSource.indexOf("export async function cancelJobFromForm", start);
+  // cancelJobFromForm stayed in job-actions.ts; this action closes the module.
+  const end = jobActionsSource.length;
   if (start < 0 || end < 0 || end <= start) {
     throw new Error("Could not find scheduleRetestNowFromForm block boundaries.");
   }

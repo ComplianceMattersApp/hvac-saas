@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { createJob } from "@/lib/actions/job-actions";
+import { createJob } from "@/lib/actions/job-actions-shared";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import type { AccountWorkshareRequestRow } from "@/lib/workflows/account-workshare-requests-read";
 import { recreateJobEquipmentFromSnapshot } from "@/lib/workflows/workshare-equipment-snapshot";

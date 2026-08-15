@@ -134,7 +134,7 @@ describe("ECC core-test seed entitlement hardening", () => {
     const { supabase, insertCalls } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
-    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/job-actions");
+    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(addAlterationCoreTestsFromForm(buildFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?s=system-1",
@@ -155,7 +155,7 @@ describe("ECC core-test seed entitlement hardening", () => {
       reason: "allowed_trial",
     });
 
-    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/job-actions");
+    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(addAlterationCoreTestsFromForm(buildFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?s=system-1",
@@ -172,7 +172,7 @@ describe("ECC core-test seed entitlement hardening", () => {
       reason: "blocked_trial_expired",
     });
 
-    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/job-actions");
+    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(addAlterationCoreTestsFromForm(buildFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_expired",
@@ -190,7 +190,7 @@ describe("ECC core-test seed entitlement hardening", () => {
       reason: "blocked_trial_missing_end",
     });
 
-    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/job-actions");
+    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(addAlterationCoreTestsFromForm(buildFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_trial_missing_end",
@@ -208,7 +208,7 @@ describe("ECC core-test seed entitlement hardening", () => {
       reason: "allowed_internal_comped",
     });
 
-    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/job-actions");
+    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(addAlterationCoreTestsFromForm(buildFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?s=system-1",
@@ -225,7 +225,7 @@ describe("ECC core-test seed entitlement hardening", () => {
       reason: "blocked_missing_entitlement",
     });
 
-    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/job-actions");
+    const { addAlterationCoreTestsFromForm } = await import("@/lib/actions/ecc-test-entry-actions");
 
     await expect(addAlterationCoreTestsFromForm(buildFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/company-profile?err=entitlement_blocked&reason=blocked_missing_entitlement",

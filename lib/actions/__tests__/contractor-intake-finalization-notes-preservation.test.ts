@@ -27,8 +27,8 @@ vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalRole: (...args: unknown[]) => requireInternalRoleMock(...args),
 }));
 
-vi.mock("@/lib/actions/job-actions", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/actions/job-actions")>("@/lib/actions/job-actions");
+vi.mock("@/lib/actions/job-actions-shared", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>("@/lib/actions/job-actions-shared");
   return {
     ...actual,
     createJob: (...args: unknown[]) => createJobMock(...args),

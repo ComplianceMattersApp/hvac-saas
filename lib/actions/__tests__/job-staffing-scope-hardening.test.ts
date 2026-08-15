@@ -667,7 +667,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -682,7 +682,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       setPrimaryJobAssigneeFromForm(buildAssignFormData()),
@@ -697,7 +697,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?notice=not_authorized",
@@ -712,7 +712,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -729,7 +729,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_added",
@@ -760,7 +760,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { assignJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(assignJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_added",
@@ -775,7 +775,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_primary_set",
@@ -799,7 +799,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -836,7 +836,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -868,7 +868,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -897,7 +897,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -928,7 +928,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -954,7 +954,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -993,7 +993,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -1028,7 +1028,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -1066,7 +1066,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -1097,7 +1097,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(
       updateJobTeamAssignmentsFromForm(
@@ -1117,7 +1117,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_primary_set",
@@ -1145,7 +1145,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_primary_target_invalid",
@@ -1171,7 +1171,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(fixture.supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { setPrimaryJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(setPrimaryJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_primary_target_invalid",
@@ -1186,7 +1186,7 @@ describe("internal staffing same-account hardening", () => {
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-actions");
+    const { removeJobAssigneeFromForm } = await import("@/lib/actions/job-assignment-actions");
 
     await expect(removeJobAssigneeFromForm(buildAssignFormData())).rejects.toThrow(
       "REDIRECT:/jobs/job-1?tab=ops&banner=assignment_removed",
