@@ -243,7 +243,7 @@ describe("changeJobServiceLocationFromForm", () => {
     const fixture = makeFixture();
 
     await expect(invoke()).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?banner=service_location_updated#job-location",
+      "REDIRECT:/jobs/job-1?banner=service_location_updated#people",
     );
 
     expect(fixture.jobUpdates).toHaveLength(1);
@@ -268,7 +268,7 @@ describe("changeJobServiceLocationFromForm", () => {
     const fixture = makeFixture({ location: null });
 
     await expect(invoke()).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?banner=service_location_change_invalid#job-location",
+      "REDIRECT:/jobs/job-1?banner=service_location_change_invalid#people",
     );
 
     expect(fixture.jobUpdates).toHaveLength(0);
@@ -285,7 +285,7 @@ describe("changeJobServiceLocationFromForm", () => {
     });
 
     await expect(invoke()).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?banner=service_location_change_invalid#job-location",
+      "REDIRECT:/jobs/job-1?banner=service_location_change_invalid#people",
     );
 
     expect(fixture.jobUpdates).toHaveLength(0);
@@ -296,7 +296,7 @@ describe("changeJobServiceLocationFromForm", () => {
     const fixture = makeFixture();
 
     await expect(invoke("loc-1")).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?banner=service_location_already_selected#job-location",
+      "REDIRECT:/jobs/job-1?banner=service_location_already_selected#people",
     );
 
     expect(fixture.jobUpdates).toHaveLength(0);
@@ -307,7 +307,7 @@ describe("changeJobServiceLocationFromForm", () => {
     const fixture = makeFixture();
 
     await expect(invoke()).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?banner=service_location_updated#job-location",
+      "REDIRECT:/jobs/job-1?banner=service_location_updated#people",
     );
 
     expect(fixture.touchedTables).not.toContain("service_cases");
@@ -322,7 +322,7 @@ describe("changeJobServiceLocationFromForm", () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     await expect(invoke()).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?banner=service_location_updated#job-location",
+      "REDIRECT:/jobs/job-1?banner=service_location_updated#people",
     );
 
     expect(fixture.jobUpdates).toHaveLength(1);

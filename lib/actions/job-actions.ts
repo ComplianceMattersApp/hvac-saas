@@ -4315,7 +4315,7 @@ export async function confirmEccRetestReadyFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
 
-  redirect(`/jobs/${jobId}?tab=ops&banner=retest_ready_confirmed#next-service-action`);
+  redirect(`/jobs/${jobId}?tab=ops&banner=retest_ready_confirmed#followup`);
 }
 
 export async function archiveJobFromForm(formData: FormData) {
@@ -11872,7 +11872,7 @@ export async function changeJobServiceLocationFromForm(formData: FormData) {
       target.searchParams.set("banner", banner);
       return `${target.pathname}?${target.searchParams.toString()}`;
     }
-    return `/jobs/${id}?banner=${banner}#job-location`;
+    return `/jobs/${id}?banner=${banner}#people`;
   }
 
   if (!id) throw new Error("Job ID is required");
@@ -12839,11 +12839,11 @@ export async function scheduleRetestNowFromForm(formData: FormData) {
   try {
     scheduleFields = deriveScheduleAndOps(formData);
   } catch {
-    redirect(`/jobs/${parentJobId}?tab=ops&banner=schedule_window_invalid#next-service-action`);
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=schedule_window_invalid#followup`);
   }
 
   if (!scheduleFields.scheduled_date) {
-    redirect(`/jobs/${parentJobId}?tab=ops&banner=schedule_date_required#next-service-action`);
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=schedule_date_required#followup`);
   }
 
   const createFormData = new FormData();
@@ -12857,7 +12857,7 @@ export async function scheduleRetestNowFromForm(formData: FormData) {
   const child = await createRetestJobFromForm(createFormData);
   const childJobId = String((child as any)?.id ?? "").trim();
   if (!childJobId) {
-    redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_create_failed#next-service-action`);
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_create_failed#followup`);
   }
   if ((child as any)?.alreadyExists) {
     redirect(`/jobs/${childJobId}?tab=ops&banner=retest_already_exists`);
