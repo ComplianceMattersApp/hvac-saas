@@ -286,16 +286,52 @@ import from a cluster module.
 
 **Result:** `job-actions.ts` 11,675 → 10,666 lines, 59 → 53 exports.
 
+## Slice 6 — service case and operational email core (done)
+
+Retest and service visits were each measured at 18 shared helpers. Comparing
+their dependency closures showed something stronger than "overlapping": the two
+sets are **identical**. All 27 internals, and neither cluster has a single
+exclusive dependency. So one extraction unblocks both entirely.
+
+870 lines moved to the neutral module in two families:
+
+- **Service case / visit** — `ensureServiceCaseForJob`,
+  `createServiceCaseForRootJob`, `resolveServiceCaseIdForNewJob`,
+  `deriveInitialServiceVisitReason`, `buildInitialProblemSummary`, the
+  `normalize*` trio, and the `SERVICE_*` const sets.
+- **Operational email** — `sendCustomerScheduledEmailForJob`,
+  `sendContractorScheduledEmailForJob`, the delivery-notification helpers, and
+  the `OperationalEmail*` types.
+
+Two of the 27 were exported actions, and they resolved differently:
+
+- **`createJob` was a third unwanted endpoint.** No `app/` references, never a
+  form action — the new-job form uses `createJobFromForm`, a different function.
+  Its only importers are `contractor-intake-actions` and
+  `receiver-job-from-workshare`, both server modules. Moved to the neutral module
+  as a plain function; the endpoint stops being generated.
+- **`updateJobScheduleFromForm` is a genuine form action.** It appears in
+  `<form action={...}>` in the mobile detail preview, the mobile schedule panel,
+  and the V2 desktop page. It stays in `job-actions.ts` as an action; the cluster
+  modules will import it across module boundaries, which is ordinary.
+
+That distinction is the whole point of checking rather than assuming: two exports
+of identical shape, one safe to demote and one that must not be.
+
+**Three unwanted endpoints found in this file so far** — `insertJobEvent`,
+`ensureActiveAssignmentAndNotify`, `createJob`. That is a pattern, not a
+coincidence, and the wider audit of other `"use server"` modules is overdue.
+
+**Result:** `job-actions.ts` 10,666 → 9,822 lines, 53 → 52 exports. Below 10,000
+for the first time.
+
 ## Remaining work
 
 Still in `job-actions.ts`: retest, service visits, and ECC test entry.
 
-Retest and service visits both sit at 18 shared helpers and overlap heavily, both
-pulling the service-case family (`ensureServiceCaseForJob`,
-`createServiceCaseForRootJob`, `resolveServiceCaseIdForNewJob`, the `SERVICE_*`
-const sets) and the operational-email family. Extract that shared core as its own
-slice first, exactly as was done for the access primitives; both clusters should
-then fall to near-leaf cost, the way notes + data entry did.
+Retest and service visits should now be close to leaves — slice 6 moved every
+internal they depended on, so their remaining cost is the actions themselves plus
+whatever they import across module boundaries.
 
 Re-measure with `scripts/dev/list-top-level-decls.js` before starting any of
 them. Every count in the original table has since proved wrong in one direction

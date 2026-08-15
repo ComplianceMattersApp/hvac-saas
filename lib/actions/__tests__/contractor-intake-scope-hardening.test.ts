@@ -62,7 +62,7 @@ vi.mock("@/lib/auth/internal-user", () => ({
   isInternalAccessError: (...args: unknown[]) => isInternalAccessErrorMock(...args),
 }));
 
-vi.mock("@/lib/actions/job-actions", () => ({
+vi.mock("@/lib/actions/job-actions-shared", () => ({
   createJob: (...args: unknown[]) => createJobMock(...args),
 }));
 
