@@ -136,8 +136,17 @@ function makeBlockedSupabaseFixture() {
 }
 
 async function invokeAction(actionName: TargetAction, formData: FormData) {
-  const mod = await import("@/lib/actions/job-actions");
-  return (mod as Record<TargetAction, (fd: FormData) => Promise<unknown>>)[actionName](formData);
+  // The note actions moved to job-note-actions.ts; the contractor and customer
+  // actions stayed in job-actions.ts, so this dispatch spans both modules.
+  const [jobActions, noteActions] = await Promise.all([
+    import("@/lib/actions/job-actions"),
+    import("@/lib/actions/job-note-actions"),
+  ]);
+  const mod = { ...jobActions, ...noteActions } as unknown as Record<
+    TargetAction,
+    (fd: FormData) => Promise<unknown>
+  >;
+  return mod[actionName](formData);
 }
 
 describe("job-detail relink + notes entitlement hardening", () => {

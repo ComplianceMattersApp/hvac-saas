@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { addInternalNoteFromForm } from "@/lib/actions/job-actions";
+import { addInternalNoteFromForm } from "@/lib/actions/job-note-actions";
 import { getAssignableInternalUsers } from "@/lib/staffing/human-layer";
 import InternalNoteMentionComposer from "./InternalNoteMentionComposer";
 

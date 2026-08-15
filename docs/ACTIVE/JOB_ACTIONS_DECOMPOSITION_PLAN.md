@@ -215,20 +215,44 @@ module, a helper-shaped export is an endpoint whether or not anyone wanted one.
 With this settled, the service-case and assignment groups are unblocked; both
 depended on it.
 
+## Slice 4 — notes and data entry (done)
+
+`lib/actions/job-note-actions.ts`, 3 actions, 587 lines: `addPublicNoteFromForm`,
+`addInternalNoteFromForm`, `completeDataEntryFromForm`, with
+`buildPublicNoteRedirectPath` and `buildInternalNoteRedirectPath` carried along
+as private helpers — unexported, since exporting them from a `"use server"` file
+would publish two more endpoints.
+
+Re-measuring first paid off. The cluster table above, written before the core
+extractions, put this cluster at **3 shared helpers**. Measured against the
+current file it needs **none**: everything it used —`getSafeErrorDetails`,
+`requireInternalScopedJobAccessOrRedirect`,
+`requireOperationalScopedJobMutationAccessOrRedirect`, `insertJobEvent` — already
+lives in the neutral module, and its only remaining internals are exclusive to it.
+It extracted as a pure leaf.
+
+Two call-site shapes worth noting for the remaining clusters:
+
+- `job-detail-relink-notes-entitlement-hardening` dispatches dynamically over a
+  union of four action names, two of which moved and two of which did not. It now
+  imports both modules and merges the namespaces. Any test that dispatches by name
+  rather than by import will need the same treatment.
+- Two source-scraping tests read `job-actions.ts` for note code and now read both
+  files. This is the same pattern the job detail retirement hit: tests that assert
+  on file contents need their source list widened whenever code moves.
+
+**Result:** `job-actions.ts` 12,238 → 11,675 lines, 62 → 59 exports.
+
 ## Remaining work
 
-**No domain cluster has been extracted yet.** Slices 1–3 moved equipment and
-filters out, then built the neutral module the rest depend on. Everything in the
-cluster table above except equipment + filters is still in `job-actions.ts`:
-notes + data entry, retest, service visits, assignment / team, and ECC test
-entry.
+Still in `job-actions.ts`: retest, service visits, assignment / team, and ECC test
+entry, in that order.
 
-Remaining order: notes + data entry, retest, service visits, assignment / team,
-then ECC test entry. The shared-helper counts in that table were measured before
-slices 2 and 3 moved the access, navigation, and event-writing internals out, so
-each cluster now needs fewer helpers extracted than listed — re-measure with
-`scripts/dev/list-top-level-decls.js` before starting one rather than trusting
-those numbers.
+The shared-helper counts in the cluster table are stale — they were measured
+before the core extractions, and notes + data entry proved the error is large
+(3 predicted, 0 actual). Re-measure with `scripts/dev/list-top-level-decls.js`
+before starting a cluster rather than trusting them; the remaining ones are
+likely cheaper than listed too.
 
 Job creation (`createJobFromForm`, 1,822 lines) and
 `advanceJobStatusFromForm` (902 lines) are single oversized functions rather than

@@ -8,20 +8,8 @@ import SubmitButton from "@/components/SubmitButton";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
-import {
-  getContractors,
-  updateJobScheduleFromForm,
-  updateJobVisitScopeFromForm,
-  updateJobTitleFromForm,
-  createNextServiceVisitFromForm,
-  completeDataEntryFromForm,
-  confirmEccRetestReadyFromForm,
-  createRetestJobFromForm,
-  scheduleRetestNowFromForm,
-  getOnTheWayUndoEligibility,
-  addPublicNoteFromForm,
-  revertOnTheWayFromForm,
-} from "@/lib/actions/job-actions";
+import { getContractors, updateJobScheduleFromForm, updateJobVisitScopeFromForm, updateJobTitleFromForm, createNextServiceVisitFromForm, confirmEccRetestReadyFromForm, createRetestJobFromForm, scheduleRetestNowFromForm, getOnTheWayUndoEligibility, revertOnTheWayFromForm } from "@/lib/actions/job-actions";
+import { completeDataEntryFromForm, addPublicNoteFromForm } from "@/lib/actions/job-note-actions";
 
 import {
   updateJobOpsFromForm,
