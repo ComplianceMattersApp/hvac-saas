@@ -2,10 +2,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const jobActionsSource = readFileSync(
+// Retest and service visit actions were split into their own modules; the job
+// action surface spans all three files.
+const jobActionsSource = [
   path.join(process.cwd(), "lib", "actions", "job-actions.ts"),
-  "utf8",
-);
+  path.join(process.cwd(), "lib", "actions", "job-retest-actions.ts"),
+  path.join(process.cwd(), "lib", "actions", "job-service-visit-actions.ts"),
+]
+  .map((filePath) => readFileSync(filePath, "utf8"))
+  .join("\n");
 const estimateActionsSource = readFileSync(
   path.join(process.cwd(), "lib", "estimates", "estimate-actions.ts"),
   "utf8",

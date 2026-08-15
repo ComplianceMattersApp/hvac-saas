@@ -325,13 +325,50 @@ coincidence, and the wider audit of other `"use server"` modules is overdue.
 **Result:** `job-actions.ts` 10,666 → 9,822 lines, 53 → 52 exports. Below 10,000
 for the first time.
 
+## Slice 7 — retest and service visits (done)
+
+Taken together because slice 6 had already reduced both to leaves. Measured
+before starting: their combined remaining internal dependency was a single
+declaration, `updateJobScheduleFromForm`, which stays an action in
+`job-actions.ts` and is imported across module boundaries.
+
+Two modules rather than one, since they are distinct domains:
+
+- `lib/actions/job-retest-actions.ts` — `createRetestJobFromForm`,
+  `scheduleRetestNowFromForm`
+- `lib/actions/job-service-visit-actions.ts` — `createNextServiceVisitFromForm`,
+  `createCallbackVisitFromForm`
+
+Batching was safe here in a way the earlier four-cluster attempt was not: these
+two had *identical* dependency sets, both were leaves, and each was verified
+independently. The earlier failure came from batching clusters whose
+dependencies had never been measured.
+
+**Source-scraping tests that slice by boundary need care when a cluster splits.**
+Three tests bounded a slice with `indexOf("export async function <next>")`, where
+the next declaration stayed in `job-actions.ts` while the sliced action moved.
+`indexOf` returned -1 and the tests threw rather than silently passing, which is
+the good failure mode — but any such boundary must be re-pointed at a declaration
+in the same file, or at end-of-file when the action closes the module.
+
+**Result:** `job-actions.ts` 9,822 → 8,919 lines, 52 → 48 exports.
+
+Note on a pre-existing oddity carried along by these moves: 23 of the actions
+carry a redundant function-level `"use server"` inside the file-level
+`"use server"` module. It is legal and the build accepts it; it is simply
+belt-and-braces from the original authors, and moving the functions preserved it.
+
 ## Remaining work
 
-Still in `job-actions.ts`: retest, service visits, and ECC test entry.
+Still in `job-actions.ts`: **ECC test entry** — the last and largest cluster, 30
+actions and roughly 3,200 lines, about a third of what remains. Its original
+count was 27 shared helpers; measure it again before starting, since six slices
+have moved internals to the neutral module in the meantime.
 
-Retest and service visits should now be close to leaves — slice 6 moved every
-internal they depended on, so their remaining cost is the actions themselves plus
-whatever they import across module boundaries.
+After that, what is left of `job-actions.ts` is job creation
+(`createJobFromForm`, 1,822 lines) and `advanceJobStatusFromForm` (902 lines) —
+single oversized functions rather than clusters, wanting internal decomposition
+rather than relocation.
 
 Re-measure with `scripts/dev/list-top-level-decls.js` before starting any of
 them. Every count in the original table has since proved wrong in one direction

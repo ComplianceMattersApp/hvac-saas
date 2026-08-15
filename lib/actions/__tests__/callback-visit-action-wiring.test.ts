@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const jobActionsSource = readFileSync(
-  resolve(__dirname, "../job-actions.ts"),
+  resolve(__dirname, "../job-service-visit-actions.ts"),
   "utf-8",
 );
 
@@ -19,7 +19,8 @@ const fieldOutcomePanelSource = readFileSync(
 
 function extractCreateCallbackVisitActionBlock() {
   const start = jobActionsSource.indexOf("export async function createCallbackVisitFromForm");
-  const end = jobActionsSource.indexOf("export async function getContractors", start);
+  // getContractors stayed in job-actions.ts; this action closes the module.
+  const end = jobActionsSource.length;
   if (start < 0 || end < 0 || end <= start) {
     throw new Error("Could not find createCallbackVisitFromForm block boundaries.");
   }

@@ -199,8 +199,20 @@ function makeBlockedSupabaseFixture() {
 }
 
 async function invokeAction(actionName: TargetAction, formData: FormData) {
-  const mod = await import("@/lib/actions/job-actions");
-  return (mod as Record<TargetAction, (fd: FormData) => Promise<unknown>>)[actionName](formData);
+  // These actions now span three modules: the retest and service visit clusters
+  // were split out, while the callback report, ECC retest confirm, archive and
+  // cancel actions stayed in job-actions.ts.
+  const [jobActions, retestActions, serviceVisitActions] = await Promise.all([
+    import("@/lib/actions/job-actions"),
+    import("@/lib/actions/job-retest-actions"),
+    import("@/lib/actions/job-service-visit-actions"),
+  ]);
+  const mod = {
+    ...jobActions,
+    ...retestActions,
+    ...serviceVisitActions,
+  } as unknown as Record<TargetAction, (fd: FormData) => Promise<unknown>>;
+  return mod[actionName](formData);
 }
 
 describe("job-detail operational entitlement hardening", () => {
