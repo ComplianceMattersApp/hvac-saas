@@ -380,7 +380,7 @@ describe("legacy job-detail entrypoint same-account hardening", () => {
     const { confirmEccRetestReadyFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(confirmEccRetestReadyFromForm(buildConfirmRetestReadyFormData())).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=retest_ready_confirmed#next-service-action",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=retest_ready_confirmed#followup",
     );
 
     expect(jobUpdates).toContainEqual({ ops_status: "retest_needed" });

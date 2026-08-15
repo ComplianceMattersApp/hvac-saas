@@ -622,7 +622,7 @@ describe("focused ops queue pages", () => {
     expect(waitingQueuePageSource).toContain("buildServiceFollowUpProgressState");
     expect(waitingQueuePageSource).toContain("followUpProgress.progressLabel");
     expect(waitingQueuePageSource).toContain("Next step:");
-    expect(waitingQueuePageSource).toContain("#next-service-action");
+    expect(waitingQueuePageSource).toContain("#followup");
     expect(waitingQueuePageSource).toContain("Create Return Visit");
     expect(exceptionsQueuePageSource).toContain("getExceptionQueueDisplayLabel");
   });

@@ -89,7 +89,7 @@ function buildFormData(overrides?: {
     overrides?.callback_report_text ?? "Customer reported same issue after prior completion",
   );
   formData.set("tab", overrides?.tab ?? "ops");
-  formData.set("return_to", overrides?.return_to ?? "/jobs/job-1?tab=ops#next-service-action");
+  formData.set("return_to", overrides?.return_to ?? "/jobs/job-1?tab=ops#followup");
   return formData;
 }
 
@@ -235,7 +235,7 @@ describe("callback intake action", () => {
     await expect(
       recordCallbackReportFromForm(buildFormData({ callback_report_text: "  " })),
     ).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=callback_report_reason_required#next-service-action",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=callback_report_reason_required#followup",
     );
 
     expect(eventInsertValues).toHaveLength(0);
@@ -258,7 +258,7 @@ describe("callback intake action", () => {
     const { recordCallbackReportFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(recordCallbackReportFromForm(buildFormData())).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=callback_report_not_service#next-service-action",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=callback_report_not_service#followup",
     );
 
     expect(eventInsertValues).toHaveLength(0);
@@ -281,7 +281,7 @@ describe("callback intake action", () => {
     const { recordCallbackReportFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(recordCallbackReportFromForm(buildFormData())).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=callback_report_requires_historical_anchor#next-service-action",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=callback_report_requires_historical_anchor#followup",
     );
 
     expect(eventInsertValues).toHaveLength(0);
@@ -306,7 +306,7 @@ describe("callback intake action", () => {
     const { recordCallbackReportFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(recordCallbackReportFromForm(buildFormData())).rejects.toThrow(
-      "REDIRECT:/jobs/job-1?tab=ops&banner=not_authorized#next-service-action",
+      "REDIRECT:/jobs/job-1?tab=ops&banner=not_authorized#followup",
     );
 
     expect(eventInsertValues).toHaveLength(0);

@@ -150,7 +150,7 @@ function buildDifferentIssueFoundFormData(note: string) {
 function buildServiceFollowUpProgressFormData() {
   const formData = new FormData();
   formData.set("job_id", "job-1");
-  formData.set("return_to", "/jobs/job-1?tab=ops#next-service-action");
+  formData.set("return_to", "/jobs/job-1?tab=ops#followup");
   return formData;
 }
 
@@ -264,7 +264,7 @@ describe("markJobPartsNeededFromForm", () => {
 
     await expect(
       markJobPartsNeededFromForm(buildPartsNeededFormData("Need condenser fan motor")),
-    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=parts_needed_saved#field-outcome");
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=parts_needed_saved#field");
 
     expect(jobUpdates).toHaveLength(1);
     expect(jobUpdates[0]).toEqual(
@@ -575,7 +575,7 @@ describe("markJobApprovalNeededFromForm", () => {
       markJobApprovalNeededFromForm(
         buildApprovalNeededFormData("Customer approval required before proceeding"),
       ),
-    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=approval_needed_saved#field-outcome");
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=approval_needed_saved#field");
 
     expect(jobUpdates).toHaveLength(1);
     expect(jobUpdates[0]).toEqual(
@@ -723,7 +723,7 @@ describe("markJobUnableToCompleteFromForm", () => {
       markJobUnableToCompleteFromForm(
         buildUnableToCompleteFormData("Customer not home and no access to equipment room"),
       ),
-    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=unable_to_complete_saved#field-outcome");
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=unable_to_complete_saved#field");
 
     expect(jobUpdates).toHaveLength(1);
     expect(jobUpdates[0]).toEqual(
@@ -874,7 +874,7 @@ describe("markJobDifferentIssueFoundFromForm", () => {
       markJobDifferentIssueFoundFromForm(
         buildDifferentIssueFoundFormData("Original complaint resolved, found separate zone damper issue"),
       ),
-    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=different_issue_found_saved#field-outcome");
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=different_issue_found_saved#field");
 
     expect(jobUpdates).toHaveLength(1);
     expect(jobUpdates[0]).toEqual(
