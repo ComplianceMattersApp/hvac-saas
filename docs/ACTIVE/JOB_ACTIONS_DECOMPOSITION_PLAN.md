@@ -79,6 +79,46 @@ contract. Every slice must clear all four:
 4. Exports in the new module are all `async function`, and the neutral module has
    no `"use server"` directive
 
+## Why slices 2–5 cannot be done the way slice 1 was
+
+Slice 1 was safe because its three shared helpers were identified by regex and
+then **read individually** before being moved. Attempting slices 2–5 in one pass,
+trusting the same regex to find helpers unread, failed in two distinct ways. Both
+are recorded here because either one would have shipped silently broken code.
+
+**1. The helper-detection regex has false positives.** Matching
+`^const (\w+) = (?:async )?\(` treats any declaration whose value starts with a
+parenthesis as an arrow function. In this file that includes
+
+```ts
+const parentJobId = (childBefore?.parent_job_id ?? null) as string | null;
+```
+
+which is a **local variable inside a function body**, not a top-level helper.
+The extraction dutifully relocated that single line into the shared module,
+cutting it out of the middle of the function that owns it. Type checking caught
+it only indirectly, via `Cannot find name 'childBefore'` — the symptom, not the
+cause. Any future extraction must resolve declarations structurally (an AST or
+the TypeScript compiler API), or hand-verify every helper it intends to move.
+
+**2. These four clusters are not independent of each other.** They share an
+event-writing and assignment core — `insertJobEvent`, the assignment primitives,
+the service-case primitives, and several types and const arrays
+(`JobAssignment`, `SERVICE_CASE_KINDS`, `SERVICE_VISIT_TYPES`). `insertJobEvent`
+is itself an exported server action that eight other modules import, so it cannot
+simply be relocated into the neutral module without deciding what it is: a shared
+internal, an action, or both.
+
+Slice 1 gave a misleading impression of how mechanical this work is. Equipment
+and filters is a genuine leaf; the remaining clusters sit on a shared trunk that
+has to be named and extracted deliberately, as its own slice, before any of them
+move.
+
+**Revised order:** extract the job event / assignment / service-case core first,
+resolving the `insertJobEvent` question explicitly. Only then do notes, retest,
+service visits, and assignment — and expect each to be a separate reviewed
+change, not a batch.
+
 ## Remaining slices
 
 In intended order: notes + data entry, retest, service visits, assignment / team,
