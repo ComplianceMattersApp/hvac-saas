@@ -13,10 +13,6 @@ const desktopV2JobDetailSource = readFileSync(
   "utf-8",
 );
 
-const mobileJobDetailCurrentSource = readFileSync(
-  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
-  "utf-8",
-);
 
 const mobileJobStatusActionSurfaceSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
@@ -33,7 +29,7 @@ const serviceChainSource = readFileSync(
   "utf-8",
 );
 
-const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
+const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobStatusActionSurfaceSource}`;
 
 describe("job detail ECC retest bridge wiring", () => {
   it("wires confirmed Retest Ready before moving a linked retest to scheduling", () => {

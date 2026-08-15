@@ -7,32 +7,21 @@ import { Suspense, type ReactNode } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
-import { SectionEyebrow } from "@/components/ui/SectionEyebrow";
-import { Disclosure } from "@/components/ui/Disclosure";
-import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
   getContractors,
-  changeJobServiceLocationFromForm,
-  updateJobCustomerFromForm,
-  updateJobContractorFromForm,
   updateJobScheduleFromForm,
-  advanceJobStatusFromForm,
-  updateJobServiceContractFromForm,
   updateJobVisitScopeFromForm,
   updateJobTitleFromForm,
   createNextServiceVisitFromForm,
-  createCallbackVisitFromForm,
   completeDataEntryFromForm,
   confirmEccRetestReadyFromForm,
   createRetestJobFromForm,
   scheduleRetestNowFromForm,
   getOnTheWayUndoEligibility,
-  promoteCompanionScopeToServiceJobFromForm,
   addPublicNoteFromForm,
   revertOnTheWayFromForm,
 } from "@/lib/actions/job-actions";
-import CancelJobButton from "@/components/jobs/CancelJobButton";
 
 import {
   updateJobOpsFromForm,
@@ -51,8 +40,6 @@ import {
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 
 import ServiceStatusActions from "./_components/ServiceStatusActions";
-import EquipmentEditCard from "./_components/EquipmentEditCard";
-import EquipmentCreateForm from "./_components/EquipmentCreateForm";
 import { displayDateLA, formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA, formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
@@ -84,8 +71,6 @@ import { isEccPermitNeededBlocker, isValidEccPermitNumber } from "@/lib/ecc/perm
 import { buildComplianceWorkSummary } from "@/lib/jobs/compliance-work-summary";
 import { formatEccOpsStatusLabel, isEccJobType as isEccWorkflowJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
-  resolveInternalInvoiceEmailDeliveries,
-  type InternalInvoiceEmailDeliveryRecord,
 } from "@/lib/business/internal-invoice-delivery";
 import {
   normalizeInternalInvoiceStatus,
@@ -119,23 +104,10 @@ import { buildReviewAskLinks } from "@/lib/utils/review-ask-links";
 import { listAccountWorkshareConnectionsForAccount } from "@/lib/workflows/account-workshare-connections-read";
 import { listAccountWorkshareRequestsForSourceJob } from "@/lib/workflows/account-workshare-requests-read";
 import {
-  cancelAccountWorkshareRequestFromForm,
-  createAccountWorkshareRequestFromJobForm,
 } from "@/lib/workflows/account-workshare-requests-actions";
 import {
-  addInternalInvoiceLineItemFromForm,
-  addInternalInvoiceLineItemFromPricebookForm,
-  addInternalInvoiceLineItemsFromVisitScopeForm,
   createInternalInvoiceDraftFromForm,
-  issueInternalInvoiceFromForm,
-  markInternalInvoiceExternallyBilledFromForm,
-  markInternalInvoiceNoChargeFromForm,
-  removeInternalInvoiceLineItemFromForm,
-  saveInternalInvoiceDraftFromForm,
-  updateInternalInvoiceLineItemFromForm,
-  voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
-import { recordInternalInvoicePaymentFromForm } from "@/lib/actions/internal-invoice-payment-actions";
 import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
 import {
   loadScopedInternalJobDetailReadBoundaryOutcome,
@@ -149,12 +121,7 @@ import {
   projectMaintenanceAgreementSuggestedNextDue,
   projectMaintenanceAgreementVisitCountReview,
 } from "@/lib/maintenance-agreements/read-model";
-import { updateJobChecklistItemCompletionFromForm } from "@/lib/maintenance-agreements/agreement-actions";
 
-import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
-import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
-import DeferredServiceChainPanelBody from "./_components/DeferredServiceChainPanelBody";
-import DeferredWorkflowMilestonesPanelBody from "./_components/DeferredWorkflowMilestonesPanelBody";
 import AssignedTeamControls from "./_components/AssignedTeamControls";
 import ContactLoggingQuickActions from "./_components/ContactLoggingQuickActions";
 import DeferredTimelineBody from "./_components/DeferredTimelineBody";
@@ -162,12 +129,6 @@ import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
 import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
 import DeferredInternalNoteMentionComposer from "./_components/DeferredInternalNoteMentionComposer";
 import FieldOutcomePanel from "./_components/FieldOutcomePanel";
-import FieldBillingSummary from "./_components/FieldBillingSummary";
-import InternalInvoiceLineItemsTable, {
-  InternalInvoiceDraftSaveForm,
-} from "./_components/InternalInvoiceLineItemsTable";
-import ChangeServiceLocationForm from "./_components/ChangeServiceLocationForm";
-import ActiveRescheduleWarning from "@/components/jobs/ActiveRescheduleWarning";
 import {
   hasDirectInvoiceDraftMutationAccess,
   hasInvoiceIssueAccess,
@@ -179,7 +140,6 @@ import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
   buildVisitScopeReadModel,
   formatVisitScopeItemKindLabel,
-  isVisitScopeItemPromoted,
   sanitizeVisitScopeItemId,
   sanitizeVisitScopeItems,
   sanitizeVisitScopeSummary,
@@ -196,54 +156,16 @@ import {
   type ContactRecipientRow,
 } from "@/lib/communications/contact-recipients-read";
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
-import RoleContactsCard from "@/components/RoleContactsCard";
-// Slice B: MobileJobDetailCurrent is retired (no longer rendered). The file is
-// intentionally left in place but unreferenced pending later removal.
 import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";
 import DesktopJobDetailV2Page from "./v2/page";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 import { isMissingJobsBillingDispositionColumnError } from "@/lib/supabase/jobs-billing-disposition-compat";
 import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 
-function dateToDateInput(value?: string | null) {
-  if (!value) return "";
 
-  const s = String(value).trim();
-  if (!s) return "";
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
 
-  const d = new Date(s);
-  if (!Number.isFinite(d.getTime())) return "";
-  return d.toISOString().slice(0, 10);
-}
 
-function formatDateLAFromIso(iso: string) {
-  return formatTimestampDateDisplayLA(iso);
-}
-
-function formatDateTimeLAFromIso(iso: string) {
-  return formatTimestampDateTimeDisplayLA(iso);
-}
-
-function formatDateDisplay(date?: string | null) {
-  if (!date) return "";
-  return date;
-}
-
-function formatYmdDisplay(value?: string | null) {
-  const ymd = String(value ?? "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return "";
-  try {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(new Date(`${ymd}T00:00:00Z`));
-  } catch {
-    return ymd;
-  }
-}
 
 function formatDateOnlyUs(value?: string | null) {
   return formatDateOnlyDisplay(value);
@@ -282,45 +204,11 @@ function stripePaymentReceivedCopy(payment: InternalInvoicePaymentRow, invoiceRe
   };
 }
 
-function formatCentsForInput(cents?: number | null) {
-  const amount = Number(cents ?? 0);
-  if (!Number.isFinite(amount)) return "0.00";
-  return (amount / 100).toFixed(2);
-}
 
-function formatCurrencyFromAmount(amount?: number | null) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(Number(amount ?? 0) || 0);
-}
 
-function formatDecimalInput(value?: number | null) {
-  const normalized = Number(value ?? 0);
-  if (!Number.isFinite(normalized)) return "0.00";
-  return normalized.toFixed(2);
-}
 
-function formatInternalInvoiceStatus(status?: InternalInvoiceStatus | null) {
-  if (status === "issued") return "Issued";
-  if (status === "void") return "Void";
-  return "Draft";
-}
 
-function formatInternalInvoiceItemType(type?: InternalInvoiceItemType | string | null) {
-  const normalized = String(type ?? "").trim().toLowerCase();
-  if (!normalized) return "Service";
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
 
-function finalRunPass(run: any): boolean | null {
-  if (!run) return null;
-  // Photo attestation is pending human review — it is not a pass or a fail
-  if (run.computed?.status === "photo_evidence") return null;
-  if (run.override_pass != null) return Boolean(run.override_pass);
-  if (run.computed_pass != null) return Boolean(run.computed_pass);
-  return null;
-}
 
 function formatLatestEccRunResultLabel(run: any): string {
   if (!run) return "";
@@ -346,15 +234,6 @@ function isFailedFamilyOpsStatus(value?: string | null) {
   );
 }
 
-function serviceChainVisitLabel(visit: any, idx: number) {
-  if (idx === 0 && !visit?.parent_job_id) return "Original visit";
-  const visitType = String(visit?.service_visit_type ?? "").trim().toLowerCase();
-  if (visit?.parent_job_id && visitType === "callback") return "Callback visit";
-  if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";
-  if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Linked service visit";
-  if (visit?.parent_job_id) return "Retest visit";
-  return `Visit ${idx + 1}`;
-}
 
 function timeToTimeInput(value?: string | null) {
   if (!value) return "";
@@ -587,57 +466,9 @@ const MAIN_JOB_SELECT_COMPAT = `
       )
     `;
 
-function JobAttachmentsSectionFallback() {
-  return (
-    <div className="space-y-2" aria-busy="true" aria-live="polite">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-14 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
-        />
-      ))}
-    </div>
-  );
-}
 
-function FollowUpHistorySectionFallback() {
-  return (
-    <div className="space-y-2" aria-busy="true" aria-live="polite">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
-        />
-      ))}
-    </div>
-  );
-}
 
-function ServiceChainPanelBodyFallback() {
-  return (
-    <div className="space-y-2" aria-busy="true" aria-live="polite">
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-24 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
-        />
-      ))}
-    </div>
-  );
-}
 
-function WorkflowMilestonesPanelBodyFallback() {
-  return (
-    <div className="space-y-2" aria-busy="true" aria-live="polite">
-      {Array.from({ length: 2 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
-        />
-      ))}
-    </div>
-  );
-}
 
 function NarrativeNotesBodyFallback() {
   return (
@@ -677,101 +508,7 @@ function summarizePlainText(value?: string | null, maxLength = 140) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
-function formatSharedHistoryHeading(type?: string | null, meta?: any) {
-  const attachmentLabel = getEventAttachmentLabel(meta);
 
-  if (type === "public_note") {
-    return attachmentLabel ? "Update shared with contractor" : "Note shared with contractor";
-  }
-  if (type === "contractor_note") {
-    return attachmentLabel ? "Contractor response received" : "Contractor note received";
-  }
-  if (type === "contractor_correction_submission") {
-    return "Correction submission received";
-  }
-
-  return formatTimelineEvent(type, meta);
-}
-
-function formatTimelineDetail(type?: string | null, meta?: any, message?: string | null) {
-  const noteSummary = summarizePlainText(getEventNoteText(meta), 160);
-  const attachmentLabel = getEventAttachmentLabel(meta);
-  const cleanMessage = summarizePlainText(message, 160);
-
-  if (type === "customer_attempt") {
-    const method = summarizePlainText(String(meta?.method ?? "").replace(/_/g, " "), 40);
-    const result = summarizePlainText(String(meta?.result ?? "").replace(/_/g, " "), 60);
-    return [method, result].filter(Boolean).join(" - ");
-  }
-
-  if (type === "status_changed") {
-    const from = summarizePlainText(String(meta?.from ?? "").replace(/_/g, " "), 40);
-    const to = summarizePlainText(String(meta?.to ?? "").replace(/_/g, " "), 40);
-    if (from && to) return `${from} -> ${to}`;
-    return to || from || cleanMessage;
-  }
-
-  if (type === "attachment_added") {
-    const actor =
-      meta?.source === "internal"
-        ? "Internal upload"
-        : meta?.source === "contractor"
-        ? "Contractor upload"
-        : "Upload";
-    if (attachmentLabel && noteSummary) return `${actor} - ${attachmentLabel} - ${noteSummary}`;
-    if (attachmentLabel) return `${actor} - ${attachmentLabel}`;
-    return noteSummary || cleanMessage;
-  }
-
-  if (["public_note", "contractor_note", "internal_note", "contractor_correction_submission"].includes(String(type ?? ""))) {
-    if (noteSummary && attachmentLabel) return `${noteSummary} - ${attachmentLabel}`;
-    if (noteSummary) return noteSummary;
-    if (attachmentLabel) return `Included ${attachmentLabel}`;
-    return "";
-  }
-
-  if (["internal_invoice_drafted", "internal_invoice_issued", "internal_invoice_voided"].includes(String(type ?? ""))) {
-    const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
-    const totalDisplay = summarizePlainText(String(meta?.total_display ?? ""), 24);
-    const voidReason = summarizePlainText(String(meta?.void_reason ?? ""), 120);
-    return [invoiceNumber, totalDisplay, voidReason].filter(Boolean).join(" - ");
-  }
-
-  if (["internal_invoice_email_sent", "internal_invoice_email_resent", "internal_invoice_email_failed"].includes(String(type ?? ""))) {
-    const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
-    const recipientEmail = summarizePlainText(String(meta?.recipient_email ?? ""), 72);
-    const errorDetail = summarizePlainText(String(meta?.error_detail ?? ""), 120);
-    return [invoiceNumber, recipientEmail, errorDetail].filter(Boolean).join(" - ");
-  }
-
-  if (type === "payment_recorded") {
-    const amountDisplay = summarizePlainText(String(meta?.amount_display ?? ""), 24);
-    const paymentMethod = summarizePlainText(String(meta?.payment_method ?? "").replace(/_/g, " "), 48);
-    const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
-    const paymentStatus = String(meta?.payment_status ?? "").trim().toLowerCase();
-    const source = String(meta?.source ?? "").trim().toLowerCase();
-    const isStripeReceived =
-      paymentStatus === "recorded" &&
-      (paymentMethod === "card stripe online" || source.includes("stripe"));
-    const parts = [amountDisplay ? `$${amountDisplay}` : "", paymentMethod, invoiceNumber].filter(Boolean);
-    if (isStripeReceived) {
-      parts.push("Stripe confirmed this payment. Payout timing is handled by Stripe.");
-    }
-    return parts.join(" - ");
-  }
-
-  if (type === "companion_scope_promoted") {
-    const itemTitle = summarizePlainText(String(meta?.source_item_title ?? ""), 80);
-    return itemTitle ? `${itemTitle} - promoted into its own Service job` : "Companion scope promoted into its own Service job";
-  }
-
-  if (type === "created_from_companion_scope") {
-    const itemTitle = summarizePlainText(String(meta?.source_item_title ?? ""), 80);
-    return itemTitle ? `${itemTitle} - created from ECC companion scope` : "Created from ECC companion scope";
-  }
-
-  return cleanMessage;
-}
 
 function formatTimelineEvent(type?: string | null, meta?: any, message?: string | null) {
   const eventType = String(type ?? "");
@@ -874,18 +611,6 @@ function formatStatus(status?: string | null) {
   return (map as any)[s] ?? (s ? s : "—");
 }
 
-function nextStatusLabel(status?: string | null) {
-  const s = (status ?? "open") as JobStatus;
-  const nextMap: Record<JobStatus, string> = {
-    open: "On The Way",
-    on_the_way: "In Process",
-    in_process: "Completed",
-    completed: "Completed",
-    failed: "Failed",
-    cancelled: "Cancelled",
-  };
-  return nextMap[s] ?? "—";
-}
 
 function MobileLineIcon(props: { children: ReactNode; className?: string }) {
   const { children, className } = props;
@@ -914,14 +639,6 @@ function MapPinIcon(props: { className?: string }) {
   );
 }
 
-function UserIcon(props: { className?: string }) {
-  return (
-    <MobileLineIcon className={props.className}>
-      <path d="M20 21a8 8 0 0 0-16 0" />
-      <circle cx="12" cy="7" r="4" />
-    </MobileLineIcon>
-  );
-}
 
 function PhoneIcon(props: { className?: string }) {
   return (
@@ -1036,21 +753,7 @@ function FolderIcon(props: { className?: string }) {
   );
 }
 
-function PaperclipIcon(props: { className?: string }) {
-  return (
-    <MobileLineIcon className={props.className}>
-      <path d="M21 11.5 11.8 20.7a5 5 0 0 1-7.1-7.1l9.2-9.2a3.5 3.5 0 1 1 5 5l-9.2 9.2a2 2 0 1 1-2.8-2.8l8.5-8.5" />
-    </MobileLineIcon>
-  );
-}
 
-function NavigateIcon(props: { className?: string }) {
-  return (
-    <MobileLineIcon className={props.className}>
-      <path d="m3 11 18-8-8 18-2.5-7.5L3 11Z" />
-    </MobileLineIcon>
-  );
-}
 
 function ChevronRightIcon(props: { className?: string }) {
   return (
@@ -1060,43 +763,6 @@ function ChevronRightIcon(props: { className?: string }) {
   );
 }
 
-function CollapsibleHeader(props: {
-  title: string;
-  subtitle?: string;
-  meta?: string;
-  metaTone?: "default" | "note-highlight";
-  compactOnMobile?: boolean;
-  icon?: ReactNode;
-}) {
-  const { title, subtitle, meta, metaTone = "default", compactOnMobile = false, icon } = props;
-  const metaClassName = compactOnMobile
-    ? metaTone === "note-highlight"
-      ? "mt-0.5 shrink-0 rounded-md border border-amber-200/80 bg-amber-50/85 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)] sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
-      : "mt-0.5 shrink-0 rounded-md border border-slate-200/70 bg-slate-50/72 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
-    : metaTone === "note-highlight"
-      ? "mt-0.5 shrink-0 rounded-lg border border-amber-200/80 bg-amber-50/85 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)]"
-      : "mt-0.5 shrink-0 rounded-lg border border-slate-200/70 bg-slate-50/72 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
-  return (
-    <div className={compactOnMobile ? "flex min-h-8 min-w-0 items-start justify-between gap-2 py-0 sm:min-h-9 sm:gap-4 sm:py-0.5" : "flex min-w-0 items-start justify-between gap-4 py-0.5"}>
-      <div className={compactOnMobile ? "flex min-w-0 items-start gap-1.5" : "flex min-w-0 items-start gap-2.5"}>
-        <span
-          aria-hidden
-          className={compactOnMobile ? "disclosure-icon mt-0.5 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[7px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90 sm:h-4.5 sm:w-4.5 sm:text-[9px]" : "disclosure-icon mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[9px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90"}
-        >
-          ▶
-        </span>
-        <div className={compactOnMobile ? "min-w-0 pt-0" : "min-w-0 pt-0.5"}>
-          <div className={compactOnMobile ? "header-title inline-flex items-center gap-1.5 text-[13px] font-semibold tracking-[-0.015em] text-slate-950 sm:text-[14.5px]" : "header-title inline-flex items-center gap-1.5 text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>
-            {icon ? <span className={compactOnMobile ? "header-icon-badge inline-flex h-4 w-4 items-center justify-center text-slate-500" : "header-icon-badge inline-flex h-4.5 w-4.5 items-center justify-center text-slate-500"}>{icon}</span> : null}
-            <span>{title}</span>
-          </div>
-          {subtitle ? <div className={compactOnMobile ? "header-subtitle mt-0.5 hidden max-w-[42rem] text-[11px] leading-[1.4] text-slate-500 sm:mt-1 sm:block sm:text-[11.5px] sm:leading-[1.45]" : "header-subtitle mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500"}>{subtitle}</div> : null}
-        </div>
-      </div>
-      {meta ? <div className={`header-meta ${metaClassName}`}>{meta}</div> : null}
-    </div>
-  );
-}
 
 function truncateSummaryText(value: string, maxLength = 84) {
   const normalized = value.trim().replace(/\s+/g, " ");
@@ -1104,12 +770,6 @@ function truncateSummaryText(value: string, maxLength = 84) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
-type JobSearchParams = {
-  tab?: "info" | "ops" | "tests";
-  banner?: string;
-  notice?: string;
-  schedule_required?: string;
-};
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -1266,10 +926,6 @@ function TimedServiceStatusActions({
 const workspacePanelClass =
   "rounded-3xl border border-slate-200/90 bg-white shadow-[0_18px_42px_-32px_rgba(15,23,42,0.3)]";
 const workspaceSectionClass = `${workspacePanelClass} p-5 sm:p-6`;
-const workspaceInsetClass =
-  "rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3";
-const workspaceSubtleCardClass =
-  "rounded-xl border border-slate-200/80 bg-white/88 px-4 py-3";
 const workspaceFieldLabelClass =
   "mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const workspaceInputClass =
@@ -1283,32 +939,11 @@ const compactSecondaryButtonClass =
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:min-h-10 sm:px-4";
 const darkButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,23,42,0.55)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
-const infoChipClass =
-  "inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700 sm:px-2.5 sm:py-1 sm:text-xs";
-const compactUtilityButtonClass =
-  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-200/90 bg-white/78 px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-300 hover:bg-white hover:shadow-[0_8px_18px_-18px_rgba(15,23,42,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:min-h-9 sm:w-auto";
 const compactWorkspaceActionButtonClass =
   "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-blue-200/90 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 shadow-[0_10px_22px_-20px_rgba(37,99,235,0.35)] transition-[border-color,background-color,box-shadow,transform,color] hover:border-blue-300 hover:bg-blue-100 hover:text-blue-950 hover:shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] sm:min-h-9 sm:w-auto";
-const workspaceDetailsClass =
-  `${workspaceSectionClass} group text-slate-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
-const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const jobRecordsDetailsClass =
   `${workspacePanelClass} group rounded-2xl border-slate-200/80 bg-white p-2.5 text-slate-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-white hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] sm:rounded-2xl sm:p-4 [&[open]_.disclosure-icon]:rotate-90 [&[open]]:border-blue-200/80 [&[open]]:xl:col-span-2 [&[open]]:2xl:col-span-3`;
-const jobRecordsDetailsDividerClass = "mt-2 border-t border-slate-200/80 pt-2.5 sm:mt-3 sm:pt-4";
-const recordLauncherClass =
-  `${workspacePanelClass} group block rounded-2xl border-slate-200/80 bg-white p-2.5 text-left text-slate-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-blue-50/20 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:rounded-2xl sm:p-4`;
-const recordPanelClass =
-  "scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.3)] ring-1 ring-blue-100/40 sm:rounded-2xl sm:p-5";
 const recordActionRowClass = "flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center";
-const recordActionRowEndClass = `${recordActionRowClass} sm:justify-end`;
-const recordPrimaryButtonClass = `${primaryButtonClass} w-full sm:w-auto`;
-const recordSecondaryButtonClass = `${secondaryButtonClass} w-full sm:w-auto`;
-const recordDarkButtonClass = `${darkButtonClass} w-full sm:w-auto`;
-const recordCloseButtonClass = `${compactSecondaryButtonClass} w-full sm:w-auto`;
-const recordDestructiveButtonClass =
-  "inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px] sm:w-auto";
-const workspaceSoftCardClass =
-  "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
 const workspaceEmptyStateClass =
   "rounded-lg border border-dashed border-slate-300 bg-slate-50/72 px-4 py-4 text-sm text-slate-600";
 
@@ -1326,7 +961,6 @@ export default async function JobDetailPage({
   }
 
   const sp: SearchParams = (searchParams ? await searchParams : {}) ?? {};
-  // Slice B: the classic mobile surface (MobileJobDetailCurrent) is retired.
   // V2Preview is the only mobile surface; ?mobileLayout=current|classic no longer
   // switches components (the param is now inert for mobile selection).
 
@@ -1390,40 +1024,6 @@ export default async function JobDetailPage({
       : banner === "internal_note_mention_alert_failed"
       ? "warning"
       : "success";
-  const assignmentBannerMessage =
-    banner === "assignment_added"
-      ? "Team member assigned to this job."
-      : banner === "assignment_added_primary"
-      ? "Team member assigned and set as primary."
-      : banner === "assignment_team_updated"
-      ? "Assigned team updated."
-      : banner === "assignment_team_unchanged"
-      ? "Assigned team was unchanged."
-      : banner === "assignment_team_target_invalid"
-      ? "One or more selected team members cannot be assigned to this job."
-      : banner === "assignment_team_update_failed"
-      ? "Could not update the assigned team."
-      : banner === "assignment_primary_set"
-      ? "Primary assignee updated."
-      : banner === "assignment_primary_target_invalid"
-      ? "That team member is not currently assigned to this job."
-      : banner === "assignment_primary_failed"
-      ? "Could not update the primary assignee."
-      : banner === "assignment_removed"
-      ? "Assignee removed from this job."
-      : banner === "assignment_user_required"
-      ? "Select a team member to assign."
-      : "";
-  const assignmentBannerType =
-    banner === "assignment_primary_failed"
-      ? "error"
-      : banner === "assignment_user_required" ||
-        banner === "assignment_primary_target_invalid" ||
-        banner === "assignment_team_target_invalid" ||
-        banner === "assignment_team_update_failed" ||
-        banner === "assignment_team_unchanged"
-      ? "warning"
-      : "success";
   const noteScopeRaw = sp.note_scope;
   const noteScope =
     Array.isArray(noteScopeRaw)
@@ -1441,24 +1041,6 @@ export default async function JobDetailPage({
       ? "Could not add shared note."
       : "";
   const sharedNoteBannerType = banner === "note_add_failed" ? "error" : "success";
-  const workflowGuidanceBannerMessage =
-    banner === "workflow_guidance_added"
-      ? "Workflow guidance attached to this service case."
-      : banner === "workflow_guidance_already_attached"
-      ? "Workflow guidance is already attached to this service case."
-      : banner === "workflow_guidance_service_case_required"
-      ? "Workflow guidance requires a job attached to a service case."
-      : banner === "workflow_guidance_permission_required"
-      ? "Only owner/admin can attach workflow guidance."
-      : banner === "workflow_guidance_add_failed"
-      ? "Could not attach workflow guidance."
-      : "";
-  const workflowGuidanceBannerType =
-    banner === "workflow_guidance_add_failed"
-      ? "error"
-      : banner === "workflow_guidance_permission_required" || banner === "workflow_guidance_service_case_required"
-      ? "warning"
-      : "success";
 
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const renderStartMs = Date.now();
@@ -1631,7 +1213,6 @@ export default async function JobDetailPage({
     String(contractorShadowMembership?.contractor_id ?? "").trim().length > 0;
 
   const internalRole = String(internalUser.role ?? "").trim().toLowerCase();
-  const canManageWorkflowGuidance = internalRole === "owner" || internalRole === "admin";
 
   let isInternalUser = true;
   let isInternalAdmin = false;
@@ -1639,7 +1220,6 @@ export default async function JobDetailPage({
   let billingMode: BillingMode = "external_billing";
   let productMode: ProductMode = "hybrid";
 
-  isInternalAdmin = internalUser.role === "admin";
 
   // Same-account scoped-job preflight, fail-closed. Wrapped so a thrown error
   // resolves to null instead of rejecting the parallel group below.
@@ -2650,34 +2230,12 @@ export default async function JobDetailPage({
   const {
     markVisitCountedLinkId,
     markVisitCountedAgreementName,
-    planLinkContext,
     suggestedNextDueProjection,
     confirmedNextDueContext,
   } = maintenanceAgreementResult;
 
   const contractorBilling = billingPartyReads.contractorBilling;
   const customerBilling = billingPartyReads.customerBilling;
-  const fieldBillingInvoiceSnapshot = internalInvoiceTruth
-    ? {
-        id: internalInvoiceTruth.id,
-        status: internalInvoiceTruth.status as "draft" | "issued" | "void",
-        invoiceNumber: internalInvoiceTruth.invoice_number,
-        invoiceDisplayNumber: internalInvoiceTruth.invoice_display_number,
-        totalCents: Number(internalInvoiceTruth.total_cents ?? 0) || 0,
-        lineItemCount: Number(internalInvoiceTruth.line_item_count ?? 0) || 0,
-        billingName: internalInvoiceTruth.billing_name,
-      }
-    : null;
-  const fieldBillingLatestVoidedInvoiceSnapshot = fieldBillingSummaryData.latestVoidedInternalInvoice
-    ? {
-        id: fieldBillingSummaryData.latestVoidedInternalInvoice.id,
-        status: "void" as const,
-        invoiceNumber: fieldBillingSummaryData.latestVoidedInternalInvoice.invoice_number,
-        invoiceDisplayNumber: fieldBillingSummaryData.latestVoidedInternalInvoice.invoice_display_number,
-        totalCents: Number(fieldBillingSummaryData.latestVoidedInternalInvoice.total_cents ?? 0) || 0,
-        lineItemCount: fieldBillingSummaryData.latestVoidedInternalInvoice.line_items?.length ?? 0,
-      }
-    : null;
   const fieldBillingSupplementalInvoiceSnapshots = fieldBillingSummaryData.supplementalInvoices.map((invoice) => ({
     id: invoice.id,
     invoiceDisplayNumber: invoice.invoice_display_number,
@@ -2690,21 +2248,6 @@ export default async function JobDetailPage({
     billToKind: invoice.bill_to_kind,
     workspaceHref: `/jobs/${job.id}/invoice?invoice_id=${encodeURIComponent(invoice.id)}#invoice-workspace`,
   }));
-  const fieldChargeProposalPricebookItems = visitScopePricebookTemplates
-    .filter((item) => {
-      const itemType = String(item.item_type ?? "").trim().toLowerCase();
-      const unitPrice = Number(item.default_unit_price ?? 0);
-      return ["service", "material", "diagnostic"].includes(itemType) && Number.isFinite(unitPrice) && unitPrice >= 0;
-    })
-    .map((item) => ({
-      id: item.id,
-      item_name: item.item_name,
-      item_type: item.item_type,
-      category: item.category,
-      default_description: item.default_description,
-      default_unit_price: item.default_unit_price,
-      unit_label: item.unit_label,
-    }));
   const compositionPrepStartedAt = Date.now();
 
   const assignedTeam =
@@ -2714,9 +2257,8 @@ export default async function JobDetailPage({
     .map((row) => String(row.user_id ?? "").trim())
     .filter(Boolean);
 
-  const { serviceCase, serviceCaseVisitCountRaw } = serviceCaseSummary;
+  const { serviceCaseVisitCountRaw } = serviceCaseSummary;
   const {
-    timelineJobIds,
     hasDirectNarrativeChain,
     narrativeScopeJobIds,
   } = timelineSummary;
@@ -2751,10 +2293,6 @@ export default async function JobDetailPage({
     return null;
   };
 
-  const roleContactSections = buildInternalJobRoleContactSections({
-    customerLinkedContacts: customerRoleContacts,
-    jobLinkedContacts: jobRoleContacts,
-  });
 
   const allRoleContacts = [...jobRoleContacts, ...locationRoleContacts, ...customerRoleContacts];
   const siteAccessRolePriority = new Map<string, number>([
@@ -2815,7 +2353,6 @@ export default async function JobDetailPage({
     (!primarySiteAccessPhone ||
       normalizeComparePhone(primarySiteAccessPhone) === normalizeComparePhone(accountPhoneForCompare)) &&
     (!primarySiteAccessEmail || normalizeCompareText(primarySiteAccessEmail) === normalizeCompareText(accountEmailForCompare));
-  const showSiteAccessCard = hasSeparateSiteAccessContact && !siteAccessMatchesAccount;
 
   const billingRecipientType = String((job as any).billing_recipient ?? "").trim().toLowerCase();
   const isContractorBillingRecipient = billingRecipientType === "contractor";
@@ -2876,12 +2413,6 @@ export default async function JobDetailPage({
     billingRecipientNameForCompare &&
     contractorNameForCompare === billingRecipientNameForCompare,
   );
-  const showCombinedContractorBillingCard = Boolean(
-    contractorId &&
-    showBillingRecipientCard &&
-    hasJobBillingRecipient &&
-    contractorBillingSameEntity,
-  );
 
   const serviceLocation = Array.isArray((job as any).locations)
     ? (job as any).locations.find((location: any) => location) ?? null
@@ -2927,34 +2458,11 @@ export default async function JobDetailPage({
   const serviceAddressDisplay =
     serviceAddressParts.length > 0 ? serviceAddressParts.join(", ") : "No address set";
 
-  const serviceLocationOptions = savedCustomerServiceLocations.map((loc) => {
-    const locAddress = [
-      loc.address_line1,
-      loc.address_line2,
-      [loc.city, loc.state, loc.zip ?? loc.postal_code].filter(Boolean).join(" "),
-    ]
-      .map((value) => String(value ?? "").trim())
-      .filter(Boolean)
-      .join(", ");
-    const locName = String(loc.nickname ?? loc.label ?? "").trim();
-    const label =
-      [locName, locAddress].filter(Boolean).join(" - ") ||
-      `Location ${loc.id.slice(0, 8)}`;
-
-    return {
-      id: loc.id,
-      label,
-    };
-  });
 
   const mobilePrimaryPhone = customerPhone !== "—" ? customerPhone : primarySiteAccessPhone || "";
   const mobilePrimaryPhoneDigits = mobilePrimaryPhone.replace(/\D/g, "");
   const mobileCallHref = mobilePrimaryPhoneDigits ? `tel:${mobilePrimaryPhoneDigits}` : null;
   const mobileTextHref = mobilePrimaryPhoneDigits ? `sms:${mobilePrimaryPhoneDigits}` : null;
-  const mobileNavigateHref =
-    serviceAddressDisplay !== "No address set"
-      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddressDisplay)}`
-      : null;
 
     const hasFullSchedule =
     !!job.scheduled_date &&
@@ -3008,35 +2516,6 @@ function formatOpsStatusLabel(value?: string | null, jobType?: string | null) {
     .join(" ");
 }
 
-function serviceChainBadgeClass(opsStatus?: string | null, isCurrent?: boolean) {
-  const v = String(opsStatus ?? "").toLowerCase();
-
-  if (isCurrent) {
-    return "bg-black text-white";
-  }
-
-  if (v === "failed" || v === "retest_needed" || v === "pending_office_review") {
-    return "bg-red-100 text-red-800";
-  }
-
-  if (v === "pending_info") {
-    return "bg-amber-100 text-amber-800";
-  }
-
-  if (v === "scheduled" || v === "ready") {
-    return "bg-emerald-100 text-emerald-800";
-  }
-
-  if (v === "paperwork_required" || v === "invoice_required" || v === "field_complete") {
-    return "bg-blue-100 text-blue-800";
-  }
-
-  if (v === "closed") {
-    return "bg-slate-200 text-slate-800";
-  }
-
-  return "bg-slate-100 text-slate-700";
-}
 
 function formatBillingAddress(a: {
   billing_address_line1?: string | null;
@@ -3094,10 +2573,6 @@ const showFieldOutcomePanel =
   !isJobArchived &&
   !isFieldComplete &&
   normalizedJobStatus === "in_process";
-const callbackIntakeHistoricalAnchorEligible =
-  isFieldComplete ||
-  normalizedJobStatus === "completed" ||
-  normalizedOpsStatus === "closed";
 const normalizedServiceVisitType = String(job.service_visit_type ?? "").trim().toLowerCase();
 const showDifferentIssueFoundOutcome =
   normalizedServiceVisitType === "callback" || normalizedServiceVisitType === "return_visit";
@@ -3117,14 +2592,6 @@ const isServiceFieldFollowUpPendingInfo =
   hasServiceFieldFollowUpPendingInfo && !isServiceFollowUpContinued;
 const isHistoricalServiceFollowUpContinued =
   hasServiceFieldFollowUpPendingInfo && isServiceFollowUpContinued;
-const workflowChipLabel =
-  isHistoricalServiceFollowUpContinued
-    ? serviceFollowUpProgressState.continuedScheduledDate
-      ? "Return Scheduled"
-      : "Follow-Up Continued"
-  : normalizedJobStatus === "in_process" && !isFieldComplete
-    ? "In Process"
-    : formatOpsStatusLabel(job.ops_status, job.job_type);
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(
@@ -3165,9 +2632,6 @@ const closeoutProjectionJob = {
   certs_complete: job.certs_complete,
 };
 
-const isAdminComplete =
-  (job.job_type === "service" && billingState.billedTruthSatisfied) ||
-  (job.job_type === "ecc" && billingState.billedTruthSatisfied && (!surfaceProfile.surfaces.certs || job.certs_complete));
 
 const closeoutNeeds = getCloseoutNeeds(closeoutProjectionJob);
 const isCloseoutPending = isInCloseoutQueue(closeoutProjectionJob);
@@ -3212,15 +2676,6 @@ const showCertsPermitRequiredBlocker =
   !isFailedUnresolved &&
   !hasValidEccPermitNumber;
 
-const hasActionHeavyPrimaryNextAction =
-  showPrimaryCloseoutBlockers ||
-  isEccPermitNeededActive ||
-  (surfaceProfile.surfaces.retest &&
-    job.job_type === "ecc" &&
-    !parentJobId &&
-    !Boolean((activeRetestChild as any)?.id) &&
-    ["failed", "pending_office_review", "retest_needed"].includes(String(job.ops_status ?? "").trim().toLowerCase())) ||
-  (isServiceFieldFollowUpPendingInfo && Boolean(serviceFollowUpProgressState.reason));
 
 const primaryCloseoutMessage =
   getJobDetailCloseoutReadinessMessage(closeoutProjectionJob);
@@ -3234,17 +2689,7 @@ const showInternalInvoicePanel =
   billingState.internalInvoicePanelEnabled;
 
 const hasDirectInvoiceWorkflowAccess = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities);
-const canIssueInvoiceLifecycleAccess = hasInvoiceIssueAccess(fieldBillingCapabilities);
-const canSendInvoiceLifecycleAccess = hasInvoiceSendAccess(fieldBillingCapabilities);
-const hasProposalEntryWorkflowAccess =
-  !hasDirectInvoiceWorkflowAccess
-  && (fieldBillingCapabilities.can_select_pricebook_lines || fieldBillingCapabilities.can_convert_visit_scope_to_invoice_line);
 
-const canManageFinancialInvoiceLifecycleOnJobDetail = canManageInvoiceLifecycle({
-  actorUserId: user.id,
-  internalUser,
-  resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-});
 
 const visitScopeSummary = sanitizeVisitScopeSummary((job as any).visit_scope_summary);
 let visitScopeItems = [] as Array<{
@@ -3266,11 +2711,6 @@ try {
 } catch {
   visitScopeItems = [];
 }
-const fieldChargeProposalVisitScopeItems = visitScopeItems.map((item) => ({
-  id: item.id,
-  title: item.title,
-  details: item.details,
-}));
 const visitScopeItemsJsonForInlineEdit = JSON.stringify(visitScopeItems);
   setPhaseValue("compositionPrep", Date.now() - compositionPrepStartedAt);
 const visitScopeCount = visitScopeItems.length;
@@ -3281,7 +2721,6 @@ const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visi
   previewItemMaxLength: 34,
 });
 const primaryVisitScopeItems = visitScopeItems.filter((item) => item.kind === "primary");
-const companionVisitScopeItems = visitScopeItems.filter((item) => item.kind === "companion_service");
 const activeRaterWorkshareConnections = isInternalUser
   ? await listAccountWorkshareConnectionsForAccount(supabase as any, internalUser.account_owner_user_id, {
       serviceType: "ecc_hers",
@@ -3289,19 +2728,6 @@ const activeRaterWorkshareConnections = isInternalUser
       limit: 100,
     }).then((rows) => rows.filter((row) => row.sender_account_id === internalUser.account_owner_user_id))
   : [];
-const sourceJobWorkshareRequests = isInternalUser
-  ? await listAccountWorkshareRequestsForSourceJob(
-      supabase as any,
-      internalUser.account_owner_user_id,
-      String(job.id),
-    )
-  : [];
-const hasActiveRaterWorkshareConnection = activeRaterWorkshareConnections.length > 0;
-const visitScopeReadyTotalCents = visitScopeItems.reduce((sum, item) => {
-  const unitPrice = Number(item.expected_unit_price ?? 0);
-  if (!Number.isFinite(unitPrice) || unitPrice <= 0) return sum;
-  return sum + Math.round(unitPrice * 100);
-}, 0);
 const invoiceVisitScopeSourceIds = new Set(internalInvoiceTruth?.visit_scope_source_ids ?? []);
 const visitScopeBilledLines = internalInvoiceTruth?.visit_scope_billed_lines ?? {};
 const unlinkedInvoiceCharges = internalInvoiceTruth?.unlinked_invoice_charges ?? [];
@@ -3339,9 +2765,6 @@ const visitScopeLeadText = visitScopeSummary || visitScopeHeaderPreview.lead;
 const visitScopeBadgeItems = primaryVisitScopeItems.length > 0 ? primaryVisitScopeItems : visitScopeItems;
 const visitScopeBadgeItemCount = visitScopeBadgeItems.length;
 const visitScopeBadgeFirstTitle = visitScopeBadgeItems[0]?.title ?? "";
-const visitScopeBadgeMainText = visitScopeBadgeItemCount > 0
-  ? `${visitScopeBadgeItemCount} item${visitScopeBadgeItemCount === 1 ? "" : "s"} · ${visitScopeBadgeFirstTitle}${visitScopeBadgeItemCount > 1 ? ` + ${visitScopeBadgeItemCount - 1} more` : ""}`
-  : "No work items yet";
 
 const jobPageInvoiceDisplayReference = internalInvoiceTruth
   ? formatInvoiceDisplayReference({
@@ -3427,17 +2850,6 @@ const recordedInternalInvoicePaymentRows = internalInvoicePaymentRowsTruth.filte
 );
 const latestStripeReceivedPayment =
   recordedInternalInvoicePaymentRows.find((payment) => isStripeSourcedPayment(payment)) ?? null;
-const latestStripeReceivedCopy =
-  latestStripeReceivedPayment && internalInvoiceTruth
-    ? stripePaymentReceivedCopy(latestStripeReceivedPayment, jobPageInvoiceDisplayReference ?? "Internal Invoice")
-    : null;
-const showSeparateFieldBillingDetails =
-  showInternalInvoicePanel &&
-  (
-    !hasDirectInvoiceWorkflowAccess ||
-    fieldBillingSummaryData.fieldChargeProposals.length > 0 ||
-    fieldBillingSupplementalInvoiceSnapshots.length > 0
-  );
 
 const canShowReleaseAndReevaluate = !hasServiceFieldFollowUpPendingInfo && [
   "pending_info",
@@ -3456,22 +2868,10 @@ const activeWaitingState = isHistoricalServiceFollowUpContinued ? null : getActi
   pending_info_reason: (job as any).pending_info_reason ?? null,
   on_hold_reason: (job as any).on_hold_reason ?? null,
 });
-const canShowWaitingReleaseQuickAction = Boolean(activeWaitingState) && canShowReleaseAndReevaluate;
-const actionablePendingInfo = explicitPendingInfoActive;
 const hasFollowUpReminder =
   Boolean((job as any).follow_up_date) ||
   Boolean(String((job as any).next_action_note ?? "").trim()) ||
   Boolean(String((job as any).action_required_by ?? "").trim());
-const currentStatusReasonLabel = explicitPendingInfoActive
-  ? "Pending Info blocker"
-  : onHoldActive
-  ? "On Hold reason"
-  : null;
-const currentStatusReasonText = explicitPendingInfoActive
-  ? pendingInfoReasonText
-  : onHoldActive
-  ? onHoldReasonText
-  : "";
 const currentInterruptState = activeWaitingState
   ? "waiting"
   : explicitPendingInfoActive
@@ -3479,11 +2879,6 @@ const currentInterruptState = activeWaitingState
   : onHoldActive
   ? "on_hold"
   : "";
-const currentInterruptReasonText = activeWaitingState
-  ? activeWaitingState.blockerReason
-  : explicitPendingInfoActive
-  ? pendingInfoReasonText
-  : onHoldReasonText;
 const interruptReleaseActionLabel = currentInterruptState
   ? getInterruptClearActionLabel(currentInterruptState)
   : "Release & Re-evaluate";
@@ -3506,17 +2901,8 @@ const accountPhoneDigits = customerPhone !== "—" ? digitsOnly(customerPhone) :
 const accessPhoneDigits = primarySiteAccessPhone ? digitsOnly(primarySiteAccessPhone) : "";
 const hasSeparateAccessPhone = Boolean(accessPhoneDigits && accessPhoneDigits !== accountPhoneDigits);
 
-const telLink =
-  customerPhone !== "—" && accountPhoneDigits
-    ? `tel:${accountPhoneDigits}`
-    : "";
 
-const accountEmailLink =
-  customerEmail !== "—"
-    ? `mailto:${customerEmail}`
-    : "";
 
-const accessTelLink = hasSeparateAccessPhone ? `tel:${accessPhoneDigits}` : "";
 
 const permitNumber = String(job.permit_number ?? "").trim();
 const permitJurisdiction = String((job as any).jurisdiction ?? "").trim();
@@ -3528,11 +2914,9 @@ const permitSummaryLabel = hasPermitDetails
   ? `${permitDetailCount} of 3 fields`
   : "Not recorded";
 
-const serviceCaseVisitCount = serviceCaseVisitCountRaw ?? 0;
 const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : [];
 const equipmentCount = equipmentItems.length;
 const eccRuns = Array.isArray(job.ecc_test_runs) ? job.ecc_test_runs : [];
-const eccRunCount = eccRuns.length;
 const complianceWorkSummary = buildComplianceWorkSummary({
   equipmentCount,
   eccRuns,
@@ -3545,10 +2929,6 @@ const latestEccRun = eccRuns.reduce((latest: any | null, run: any) => {
   const runMs = toTimestampMs(String(run?.updated_at ?? run?.created_at ?? ""));
   return runMs > latestMs ? run : latest;
 }, null);
-const latestEccRunResultLabel = latestEccRun ? formatLatestEccRunResultLabel(latestEccRun) : "";
-const latestEccRunDateLabel = latestEccRun
-  ? formatTimestampDateDisplayLA(String(latestEccRun.updated_at ?? latestEccRun.created_at ?? ""))
-  : "";
 
 
 const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
@@ -3577,43 +2957,12 @@ const completionActionAttentionBanner =
         message: <>We could not update this job status. Refresh and try again.</>,
       }
     : null;
-const rightRailNoteCount = isEccJobType ? noteCountSummary.timelineNoteEventCount : noteCountSummary.internalCount;
-const rightRailNotesTitle = isEccJobType ? "Shared Notes" : "Job Notes";
-const rightRailNotesSubtitle = isEccJobType
-  ? "Latest shared/internal note activity."
-  : "Latest job note activity.";
-const rightRailNotesEmptyText = isEccJobType ? "No shared or internal notes yet." : "No notes yet.";
-const hasAnyRightRailNotes = latestJobNotesPreview.length > 0;
-const jobStatusSummaryText = activeWaitingState
-  ? `Waiting${activeWaitingState.blockerReason ? ` • ${truncateSummaryText(activeWaitingState.blockerReason, 72)}` : ""}`
-  : explicitPendingInfoActive
-  ? `Pending Info${pendingInfoReasonText ? ` • ${truncateSummaryText(pendingInfoReasonText, 72)}` : ""}`
-  : onHoldActive
-  ? `On Hold${onHoldReasonText ? ` • ${truncateSummaryText(onHoldReasonText, 72)}` : ""}`
-  : `Current lifecycle: ${formatOpsStatusLabel(job.ops_status, job.job_type)}`;
-const followUpSummaryText = hasFollowUpReminder
-  ? [
-      followUpOwnerLabel ? `For ${followUpOwnerLabel}` : null,
-      followUpDateSummary ? `Due ${followUpDateSummary}` : null,
-      nextActionPreview || null,
-    ]
-      .filter(Boolean)
-      .join(" • ")
-  : "No follow-up reminder set yet.";
-const followUpHistorySummaryText = undefined;
-const serviceChainSummaryText = serviceCaseId
-  ? "Visit history across the linked service case."
-  : "No linked service case yet.";
 // Slice 5D: section titles still use chain metadata (cheap); counts/dates deferred.
-const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chain" : "Shared Notes";
-const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
-const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
 const isHvacServiceMode = productMode === "hvac_service";
 const isCleaningMode = productMode === "cleaning_services";
 const jobTitleText = normalizeRetestLinkedJobTitle(job.title);
 const serviceVisitReasonText = String(job.service_visit_reason ?? "").trim();
 const jobNotesText = String(job.job_notes ?? "").trim();
-const startedFromPermitWorkflow = /^Created from permit request\b/i.test(jobNotesText);
 const fieldHeaderTitle =
   firstNonEmpty(
     customerDisplayName !== "—" ? customerDisplayName : "",
@@ -3638,9 +2987,6 @@ const shouldShowWorkSummary =
   Boolean(visitScopeSummary) &&
   normalizeCompareText(visitScopeSummary) !== normalizeCompareText(visitReasonText) &&
   normalizeCompareText(visitScopeSummary) !== normalizeCompareText(jobNotesText);
-const shouldShowIntakeNotes =
-  Boolean(jobNotesText) &&
-  normalizeCompareText(jobNotesText) !== normalizeCompareText(visitReasonText);
 const headerJobTypeLabel = String(job.job_type ?? "service")
   .split("_")
   .filter(Boolean)
@@ -3656,23 +3002,15 @@ const lowerGridCardCount =
   (showEccSummaryCard ? 1 : 0) +
   (showJobRecordsPermitCard ? 1 : 0);
 const lowerGridHasOrphan = lowerGridCardCount % 2 === 1;
-const sharedNotesCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
-const serviceChainCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && !showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
 const sharedNotesMeta = noteCountSummary.sharedCount
   ? `${noteCountSummary.sharedCount} note${noteCountSummary.sharedCount === 1 ? "" : "s"}`
   : undefined;
 const internalNotesMeta = noteCountSummary.internalCount
   ? `${noteCountSummary.internalCount} note${noteCountSummary.internalCount === 1 ? "" : "s"}`
   : undefined;
-const timelineNotesMeta = noteCountSummary.timelineNoteEventCount
-  ? `${noteCountSummary.timelineNoteEventCount} note${noteCountSummary.timelineNoteEventCount === 1 ? "" : "s"}`
-  : undefined;
 const attachmentCountMeta = attachmentCount === null
   ? undefined
   : `${attachmentCount} file${attachmentCount === 1 ? "" : "s"}`;
-const sharedNotesSummaryText = undefined;
-const internalNotesSummaryText = undefined;
-const timelineSummaryText = undefined;
 
 const normalizedJobOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
 const hasActiveRetestChild = Boolean((activeRetestChild as any)?.id);
@@ -3695,11 +3033,6 @@ const linkedRetestPassiveCopy = linkedRetestChildClosed
   : activeRetestChildScheduled
   ? "The linked retest job is scheduled and is now the active work item."
   : "The linked retest job is now the active scheduling item.";
-const linkedRetestPassiveMeta = linkedRetestChildClosed
-  ? "Linked retest completed"
-  : activeRetestChildScheduled
-  ? "Retest scheduled"
-  : "Linked retest active";
 const showConfirmRetestReady =
   isInternalUser &&
   surfaceProfile.surfaces.retest &&
@@ -3718,15 +3051,6 @@ const showCorrectionReviewResolution =
   job.job_type === "ecc" &&
   !hasActiveRetestChild &&
   ["failed", "retest_needed", "pending_office_review"].includes(normalizedJobOpsStatus);
-  const JobDetailTimingLog = () => {
-    emitTimingLog({
-      invoicePanelActive: showInternalInvoicePanel,
-      serviceCaseExists: Boolean(serviceCaseId),
-      timelineChainExists: hasDirectNarrativeChain,
-      actorKind: "internal",
-    });
-    return null;
-  };
 
   const mobileFieldActionClass =
     "inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-200/90 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.3)] transition-[border-color,background-color,box-shadow,transform] hover:border-blue-200 hover:bg-blue-50/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
@@ -3768,8 +3092,6 @@ const showCorrectionReviewResolution =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
   const canShowContractorReportPanel =
     isInternalUser && Boolean(contractorId) && ["failed", "pending_info"].includes(String(job.ops_status ?? ""));
-  // Slice B: unconditional V2 mobile surface. MobileJobDetailCurrent remains in
-  // the tree as dead code (intentionally unreachable) pending later removal.
   const MobileJobDetailMobileComponent = MobileJobDetailV2Preview;
   const desktopV2Params = Promise.resolve({ id: jobId });
   const desktopV2SearchParams = Promise.resolve(sp);

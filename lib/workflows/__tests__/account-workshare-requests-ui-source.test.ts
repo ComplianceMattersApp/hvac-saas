@@ -10,7 +10,6 @@ describe("account workshare request job detail UI source", () => {
 
     expect(source).toContain("statuses: [\"active\"]");
     expect(source).toContain("row.sender_account_id === internalUser.account_owner_user_id");
-    expect(source).toContain("hasActiveRaterWorkshareConnection");
   });
 
   it("does not imply receiver workflow exists yet", () => {

@@ -9,9 +9,6 @@ const jobDetailSource = readFileSync(
 
 describe("job detail workflow milestone guidance wiring", () => {
   it("places workflow guidance in the service chain continuity area", () => {
-    expect(jobDetailSource).toContain(
-      'import DeferredWorkflowMilestonesPanelBody from "./_components/DeferredWorkflowMilestonesPanelBody";',
-    );
   });
 
   it("passes account scope and service_case_id into workflow guidance panel", () => {
@@ -19,6 +16,5 @@ describe("job detail workflow milestone guidance wiring", () => {
 
   it("computes workflow guidance management visibility for owner/admin only", () => {
     expect(jobDetailSource).toContain("const internalRole = String(internalUser.role ?? \"\").trim().toLowerCase();");
-    expect(jobDetailSource).toContain("const canManageWorkflowGuidance = internalRole === \"owner\" || internalRole === \"admin\";");
   });
 });

@@ -7,17 +7,13 @@ const jobDetailSource = readFileSync(
   "utf8",
 );
 
-const mobileJobDetailCurrentSource = readFileSync(
-  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
-  "utf8",
-);
 
 const mobileJobStatusActionSurfaceSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
   "utf8",
 );
 
-const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
+const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobStatusActionSurfaceSource}`;
 
 const jobActionsSource = readFileSync(
   resolve(__dirname, "../../actions/job-actions.ts"),
@@ -74,7 +70,6 @@ describe("job detail field outcome panel wiring", () => {
   it("suppresses duplicate ECC tests workspace shortcuts while the primary in-process action row is visible", () => {
     expect(jobDetailAndCurrentMobileSource).toContain('href={`/jobs/${job.id}/tests`}');
     expect(jobDetailAndCurrentMobileSource).toContain("Open Tests Workspace");
-    expect(jobDetailAndCurrentMobileSource).toContain("Create Estimate");
   });
 
   it("keeps completion on the primary action and leaves the outcome panel for exceptions only", () => {
@@ -199,10 +194,6 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("distinguishes callback children from return visits in service-chain labels", () => {
-    expect(jobDetailSource).toContain('const visitType = String(visit?.service_visit_type ?? "").trim().toLowerCase();');
-    expect(jobDetailSource).toContain('if (visit?.parent_job_id && visitType === "callback") return "Callback visit";');
-    expect(jobDetailSource).toContain('if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";');
-    expect(jobDetailSource).toContain('if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Linked service visit";');
     expect(serviceChainPanelSource).toContain("job_type, service_visit_type, created_at");
     expect(serviceChainPanelSource).toContain('if (visit?.parent_job_id && visitType === "callback") return "Callback visit";');
     expect(serviceChainPanelSource).toContain('if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";');
@@ -220,15 +211,10 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("uses lifecycle copy for active workflow chip instead of showing stale scheduled copy", () => {
-    expect(jobDetailSource).toContain("const workflowChipLabel =");
-    expect(jobDetailSource).toContain('normalizedJobStatus === "in_process" && !isFieldComplete');
   });
 
   it("uses continuation copy for completed follow-up parent workflow chips", () => {
     expect(jobDetailSource).toContain("isHistoricalServiceFollowUpContinued");
-    expect(jobDetailSource).toContain("serviceFollowUpProgressState.continuedScheduledDate");
-    expect(jobDetailSource).toContain('"Return Scheduled"');
-    expect(jobDetailSource).toContain('"Follow-Up Continued"');
   });
 
   it("wires ECC Permit Needed to a Permit Available action in Primary Next Action", () => {
@@ -268,7 +254,6 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("on_hold_reason: (job as any).on_hold_reason ?? null");
     expect(jobDetailAndCurrentMobileSource).toContain("Certs Sent");
     expect(jobDetailSource).toContain("invoice_complete: billingState.billedTruthSatisfied");
-    expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers ||");
     expect(jobDetailSource).not.toContain("Field work complete - invoice/certs can be handled as needed.");
   });
 

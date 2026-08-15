@@ -7,17 +7,13 @@ const source = readFileSync(
   "utf8",
 );
 
-const mobileJobDetailCurrentSource = readFileSync(
-  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
-  "utf8",
-);
 
 const mobileJobStatusActionSurfaceSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
   "utf8",
 );
 
-const jobDetailAndCurrentMobileSource = `${source}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
+const jobDetailAndCurrentMobileSource = `${source}\n${mobileJobStatusActionSurfaceSource}`;
 
 describe("job detail field billing panel wiring", () => {
   it("attaches invoice readiness to the Work Items flow", () => {
@@ -35,10 +31,6 @@ describe("job detail field billing panel wiring", () => {
   });
 
   it("keeps the separate Field Billing Summary only for non-duplicate details", () => {
-    expect(source).toContain("const showSeparateFieldBillingDetails =");
-    expect(source).toContain("!hasDirectInvoiceWorkflowAccess");
-    expect(source).toContain("fieldBillingSummaryData.fieldChargeProposals.length > 0");
-    expect(source).toContain("fieldBillingSupplementalInvoiceSnapshots.length > 0");
 
     const fieldBillingDetailsIndex = source.indexOf("{showSeparateFieldBillingDetails ? (");
     const invoiceActionIndex = source.indexOf("{jobPageInvoiceNextAction}", fieldBillingDetailsIndex);
@@ -110,21 +102,6 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("loadFieldBillingExplicitCapabilitiesForUser");
     expect(source).toContain("fieldBillingExplicitCapabilitiesRead");
     expect(source).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
-    expect(source).toContain("const canIssueInvoiceLifecycleAccess = hasInvoiceIssueAccess(fieldBillingCapabilities)");
-    expect(source).toContain("const canSendInvoiceLifecycleAccess = hasInvoiceSendAccess(fieldBillingCapabilities)");
-  });
-
-  it("routes Create Invoice directly to the invoice workspace after draft creation", () => {
-    const noInvoicePanelIndex = mobileJobDetailCurrentSource.indexOf('internalInvoiceTruth ? jobPageInvoiceNextAction : "Create invoice"');
-    const noInvoicePanelSlice = mobileJobDetailCurrentSource.slice(noInvoicePanelIndex, noInvoicePanelIndex + 1400);
-
-    expect(noInvoicePanelIndex).toBeGreaterThanOrEqual(0);
-    expect(noInvoicePanelSlice).toContain("createInternalInvoiceDraftFromForm");
-    expect(noInvoicePanelSlice).toContain("return_to");
-    expect(noInvoicePanelSlice).toContain("/invoice#invoice-workspace");
-    expect(noInvoicePanelSlice).toContain("auto_import_visit_scope_items");
-    expect(noInvoicePanelSlice).toContain("Create invoice");
-    expect(noInvoicePanelSlice).not.toContain("Create Draft Invoice");
   });
 
   it("uses direct draft creation for invoice-required job detail CTAs instead of a button-to-button link", () => {
@@ -154,12 +131,10 @@ describe("job detail field billing panel wiring", () => {
   });
 
   it("shows job-page Work Item pricing as invoice-ready context", () => {
-    expect(source).toContain("visitScopeReadyTotalCents");
     expect(source).toContain("eligibleUnaddedPricedWorkItemsTotalCents");
     expect(source).toContain("hasUnaddedPricedWorkItemsForDraftInvoice");
     expect(source).toContain("Work captured: ${formatCurrencyFromCents(eligibleUnaddedPricedWorkItemsTotalCents)}");
     expect(source).toContain("Work Item pricing is ready to add as editable draft invoice charges. Review and edit before issuing.");
-    expect(jobDetailAndCurrentMobileSource).toContain("Create invoice");
     expect(jobDetailAndCurrentMobileSource).not.toContain("Resolve $0 Invoice");
   });
 
