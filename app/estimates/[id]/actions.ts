@@ -309,7 +309,7 @@ export async function transitionEstimateStatusFromForm(formData: FormData) {
 /**
  * Parameter-based transition action for status buttons in server components.
  */
-export async function transitionEstimateStatusAction(params: {
+async function transitionEstimateStatusAction(params: {
   estimateId: string;
   nextStatus: TransitionTargetStatus;
 }): Promise<void> {
