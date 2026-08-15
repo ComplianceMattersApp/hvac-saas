@@ -23,12 +23,8 @@ import {
 import SubmitButton from '@/components/SubmitButton';
 import ActiveRescheduleWarning from '@/components/jobs/ActiveRescheduleWarning';
 import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm, updateCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
-import {
-  assignJobAssigneeFromForm,
-  reassignAndRescheduleJobFromForm,
-  removeJobAssigneeFromForm,
-  updateJobScheduleFromForm,
-} from '@/lib/actions/job-actions';
+import { updateJobScheduleFromForm } from '@/lib/actions/job-actions';
+import { assignJobAssigneeFromForm, reassignAndRescheduleJobFromForm, removeJobAssigneeFromForm } from '@/lib/actions/job-assignment-actions';
 import { logCustomerContactAttemptFromForm } from '@/lib/actions/job-contact-actions';
 import {
   getDispatchCalendarBoardData,

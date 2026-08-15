@@ -243,16 +243,60 @@ Two call-site shapes worth noting for the remaining clusters:
 
 **Result:** `job-actions.ts` 12,238 → 11,675 lines, 62 → 59 exports.
 
+## Slice 5 — assignment and team (done)
+
+`lib/actions/job-assignment-actions.ts`, 5 actions, 694 lines. Nine internals
+went to the neutral module and four private helpers plus a result type moved with
+the cluster.
+
+Re-measuring changed which cluster went next. The stale table ordered assignment
+last of the cheap three at 11 shared helpers; measured against the current file
+it needed **7**, while retest and service visits had risen to **18 each**:
+
+| cluster | table said | actually |
+|---|---|---|
+| assignment / team | 11 | **7** |
+| retest | 4 | 18 |
+| service visits | 5 | 18 |
+
+So the earlier note that remaining clusters were "likely cheaper than listed" was
+wrong — it held for notes + data entry and inverted for the other two. Measure
+each one; do not extrapolate from the last.
+
+Two findings from this slice:
+
+- **`ensureActiveAssignmentAndNotify` was a second unwanted endpoint.** Exported
+  from `job-actions.ts`, imported only by `contractor-intake-actions.ts` and test
+  files, never referenced under `app/`, never a form action. Same shape as
+  `insertJobEvent`; it moved to the neutral module as a plain function and the
+  endpoint is no longer generated. That is now two found in one file, which is
+  why the wider audit is worth doing.
+- **Cluster exclusivity must account for external importers.** The first pass
+  called this function "exclusive to the cluster" because nothing else *inside*
+  `job-actions.ts` referenced it. Five files outside did. Exclusivity means
+  nothing else in the repo uses it, not nothing else in the file.
+
+A circularity check also caught `ensureActiveAssignmentForUser` (neutral side)
+referencing the `JobAssignmentCreatedCallback` type (cluster side); the type
+moved to the neutral module. Run that check on every slice — neutral must never
+import from a cluster module.
+
+**Result:** `job-actions.ts` 11,675 → 10,666 lines, 59 → 53 exports.
+
 ## Remaining work
 
-Still in `job-actions.ts`: retest, service visits, assignment / team, and ECC test
-entry, in that order.
+Still in `job-actions.ts`: retest, service visits, and ECC test entry.
 
-The shared-helper counts in the cluster table are stale — they were measured
-before the core extractions, and notes + data entry proved the error is large
-(3 predicted, 0 actual). Re-measure with `scripts/dev/list-top-level-decls.js`
-before starting a cluster rather than trusting them; the remaining ones are
-likely cheaper than listed too.
+Retest and service visits both sit at 18 shared helpers and overlap heavily, both
+pulling the service-case family (`ensureServiceCaseForJob`,
+`createServiceCaseForRootJob`, `resolveServiceCaseIdForNewJob`, the `SERVICE_*`
+const sets) and the operational-email family. Extract that shared core as its own
+slice first, exactly as was done for the access primitives; both clusters should
+then fall to near-leaf cost, the way notes + data entry did.
+
+Re-measure with `scripts/dev/list-top-level-decls.js` before starting any of
+them. Every count in the original table has since proved wrong in one direction
+or the other.
 
 Job creation (`createJobFromForm`, 1,822 lines) and
 `advanceJobStatusFromForm` (902 lines) are single oversized functions rather than
