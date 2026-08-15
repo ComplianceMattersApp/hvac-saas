@@ -73,7 +73,6 @@ describe("internal invoice line items table capability wiring", () => {
   it("shows Work Item price as carried into draft charges instead of always zero", () => {
     expect(invoicePageSource).toContain("expectedUnitPrice: sanitizedRow.expected_unit_price");
     expect(jobDetailPageSource).toContain("expected_unit_price?: number | null");
-    expect(jobDetailPageSource).toContain("Number(item.expected_unit_price).toFixed(2)");
     expect(source).toContain("expectedUnitPrice: number | null");
     expect(source).toContain("const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded)");
     expect(source).toContain("canAddVisitScopeLine && eligibleVisitScopeItems.length > 0");

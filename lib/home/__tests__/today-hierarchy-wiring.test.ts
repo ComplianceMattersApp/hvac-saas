@@ -7,7 +7,9 @@ const readModelSource = readFileSync(resolve(__dirname, "../today-read-model.ts"
 
 describe("Today page hierarchy", () => {
   it("uses an independent desktop main column and right rail", () => {
-    expect(source).toContain("xl:grid-cols-[minmax(0,1fr)_minmax(19rem,22rem)]");
+    // Asserts the shape — a fluid main column beside a bounded right rail —
+    // without pinning the rail's exact rem values, which are tuned by width passes.
+    expect(source).toMatch(/xl:grid-cols-\[minmax\(0,1fr\)_minmax\([^\]]+\)\]/);
     expect(source).toContain('<main className="min-w-0 space-y-5">');
     expect(source).toContain('<aside className="space-y-5" aria-label="Today summaries">');
     expect(source).not.toContain("rounded-[28px]");
@@ -50,13 +52,28 @@ describe("Today page hierarchy", () => {
     expect(source).not.toContain("min-h-16");
   });
 
-  it("expands Team Coverage in the desktop main column", () => {
-    expect(source).toContain("wide");
-    expect(source).toContain("sm:grid-cols-[minmax(8rem,0.75fr)_minmax(0,1.6fr)_auto_auto]");
+  it("renders Team Coverage in both the mobile stream and the desktop main column", () => {
+    const mobileColumn = source.slice(
+      source.indexOf('<div className="space-y-4 xl:hidden">'),
+      source.indexOf("{/* WIDE DESKTOP MAIN COLUMN"),
+    );
+    const desktopColumn = source.slice(source.indexOf("{/* WIDE DESKTOP MAIN COLUMN"));
+
+    expect(mobileColumn).toContain("<TeamCoverageSection");
+    expect(desktopColumn).toContain("<TeamCoverageSection");
   });
 
-  it("stacks Team Coverage identity and location details on narrow screens", () => {
-    expect(source).toContain(': "grid gap-1.5"');
-    expect(source).toContain('wide ? "" : "justify-self-start"');
+  it("keeps Team Coverage identity and location readable without overflow", () => {
+    // The section adapts to either column via flex + min-w-0 + truncate rather
+    // than a `wide` prop switching grid templates, so assert that contract:
+    // the identity block may shrink and ellipsize, the job count never does.
+    const section = source.slice(
+      source.indexOf("function TeamCoverageSection("),
+      source.indexOf("function RoleAwarePulseSection("),
+    );
+
+    expect(section).toContain("min-w-0");
+    expect(section).toContain("truncate");
+    expect(section).toContain("shrink-0");
   });
 });

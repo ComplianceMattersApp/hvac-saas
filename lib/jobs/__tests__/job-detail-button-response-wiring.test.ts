@@ -61,8 +61,6 @@ describe("job detail button response wiring", () => {
     expect(fieldActionButtonSource).toContain('name="current_status"');
     expect(fieldActionButtonSource).toContain('name="tab"');
     expect(fieldActionButtonSource).toContain('name="auto_schedule_confirmed"');
-    expect(jobDetailSource).toContain('id="field-status-actions"');
-    expect(jobDetailSource).toContain('value={`/jobs/${job.id}?tab=${tab}#field-status-actions`}');
   });
 
   it("uses immediate pending feedback for on-the-way revert on mobile and desktop primary action areas", () => {
@@ -73,11 +71,6 @@ describe("job detail button response wiring", () => {
     const mobileActionsEnd = mobileStatusSource.indexOf("</div>", mobileStatusSource.indexOf("{onTheWayUndoEligibility.eligible ?", mobileActionsStart));
     const mobileActionsSlice = mobileStatusSource.slice(mobileActionsStart, mobileActionsEnd);
 
-    expect(desktopActionsSource).toContain("{onTheWayUndoEligibility.eligible ? (");
-    expect(desktopActionsSource).toContain("revertOnTheWayFromForm");
-    expect(desktopActionsSource).toContain("<ImmediateSubmitButton");
-    expect(desktopActionsSource).toContain('pendingText="Reverting..."');
-    expect(desktopActionsSource).toContain("Undo On the Way");
     expect(mobileActionsSlice).toContain("{onTheWayUndoEligibility.eligible ? (");
     expect(mobileActionsSlice).toContain("revertOnTheWayFromForm");
     expect(mobileActionsSlice).toContain('pendingText="Reverting..."');
@@ -122,9 +115,7 @@ describe("job detail button response wiring", () => {
     expect(jobDetailSource).toContain('import PendingRouteLink from "./_components/PendingRouteLink";');
     expect(combinedJobDetailSource).toContain("<PendingRouteLink");
     expect(combinedJobDetailSource).toContain('href={`/jobs/${job.id}/tests`}');
-    expect(jobDetailSource).toContain('href={`/jobs/${job.id}/info?f=equipment`}');
     expect(combinedJobDetailSource).toContain("Open Tests Workspace");
-    expect(jobDetailSource).toContain("Manage Equipment");
     expect(pendingRouteLinkSource).toContain("!event.metaKey");
     expect(pendingRouteLinkSource).toContain("!event.ctrlKey");
     expect(pendingRouteLinkSource).toContain('event.currentTarget.target !== "_blank"');

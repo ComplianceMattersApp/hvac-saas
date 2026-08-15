@@ -7,10 +7,14 @@ const reportPageSource = readFileSync(
   "utf8",
 );
 
-const jobDetailSource = readFileSync(
+// Desktop job detail is rendered by the V2 surface, so the job detail page
+// spans the route shell and the V2 page it delegates to.
+const jobDetailSource = [
   resolve(__dirname, "../../../app/jobs/[id]/page.tsx"),
-  "utf8",
-);
+  resolve(__dirname, "../../../app/jobs/[id]/v2/page.tsx"),
+]
+  .map((path) => readFileSync(path, "utf8"))
+  .join("\n");
 
 describe("invoice ledger send action wiring", () => {
   it("uses the canonical invoice email action from issued invoice report rows", () => {

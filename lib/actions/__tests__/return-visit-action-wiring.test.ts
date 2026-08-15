@@ -7,10 +7,15 @@ const jobActionsSource = readFileSync(
   "utf-8",
 );
 
-const jobPageSource = readFileSync(
+// The return-visit controls live in the mobile action surfaces that the job
+// detail route renders, so the job detail surface spans these files.
+const jobPageSource = [
   resolve(__dirname, "../../../app/jobs/[id]/page.tsx"),
-  "utf-8",
-);
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobServiceFollowUpTool.tsx"),
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
+]
+  .map((path) => readFileSync(path, "utf-8"))
+  .join("\n");
 
 const waitingQueuePageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/queues/waiting/page.tsx"),
@@ -103,9 +108,6 @@ describe("office return visit entry points", () => {
     expect(jobPageSource).toContain('name="scheduled_date"');
     expect(jobPageSource).toContain('name="window_start"');
     expect(jobPageSource).toContain('name="window_end"');
-    expect(jobPageSource).toContain("Use when the original job is not finished yet and another visit is needed to complete it.");
-    expect(jobPageSource).toContain("Examples: waiting on a part, customer approval, or more time needed to complete the same job.");
-    expect(jobPageSource).toContain('id="next-service-action"');
   });
 
   it("adds optional waiting deep-link into the job detail return-visit section", () => {

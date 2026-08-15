@@ -1658,6 +1658,32 @@ export default async function JobDetailV2Page({
                   </span>
                 </div>
               )}
+              {location?.id ? (
+                <div style={{ marginTop: "10px" }}>
+                  <Link
+                    href={`/locations/${location.id}`}
+                    aria-label={`Edit service address: ${[
+                      location.address_line1,
+                      location.city,
+                      location.state,
+                      location.zip,
+                    ]
+                      .filter(Boolean)
+                      .join(", ")}`}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "oklch(0.5 0.13 255)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    Edit service address →
+                  </Link>
+                </div>
+              ) : null}
               {customerLocations.length > 1 ? (
                 <div style={{ marginTop: "10px" }}>
                   <ChangeServiceLocationForm

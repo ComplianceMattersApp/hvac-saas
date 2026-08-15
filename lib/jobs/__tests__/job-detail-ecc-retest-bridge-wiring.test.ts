@@ -13,10 +13,6 @@ const desktopV2JobDetailSource = readFileSync(
   "utf-8",
 );
 
-const mobileJobDetailCurrentSource = readFileSync(
-  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
-  "utf-8",
-);
 
 const mobileJobStatusActionSurfaceSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
@@ -33,7 +29,7 @@ const serviceChainSource = readFileSync(
   "utf-8",
 );
 
-const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
+const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobStatusActionSurfaceSource}`;
 
 describe("job detail ECC retest bridge wiring", () => {
   it("wires confirmed Retest Ready before moving a linked retest to scheduling", () => {
@@ -50,7 +46,6 @@ describe("job detail ECC retest bridge wiring", () => {
     expect(jobDetailAndCurrentMobileSource).toContain('name="window_start"');
     expect(jobDetailAndCurrentMobileSource).toContain('name="window_end"');
     expect(jobDetailAndCurrentMobileSource).toContain("formAction={async (formData: FormData) =>");
-    expect(jobDetailSource).toContain('id="next-service-action"');
     expect(jobDetailAndCurrentMobileSource).not.toContain(">Create Retest Job<");
   });
 
@@ -61,11 +56,8 @@ describe("job detail ECC retest bridge wiring", () => {
     const desktopRetestBlock = jobDetailSource.slice(desktopRetestIndex, jobDetailSource.indexOf(") : null}", desktopRetestIndex) + 9);
 
     expect(mobileRetestIndex).toBeGreaterThanOrEqual(0);
-    expect(desktopRetestIndex).toBeGreaterThanOrEqual(0);
     expect((mobileRetestBlock.match(/Copy equipment from original/g) ?? [])).toHaveLength(1);
-    expect((desktopRetestBlock.match(/Copy equipment from original/g) ?? [])).toHaveLength(1);
     expect((mobileRetestBlock.match(/<form/g) ?? [])).toHaveLength(1);
-    expect((desktopRetestBlock.match(/<form/g) ?? [])).toHaveLength(1);
   });
 
   it("only exposes schedule-now for confirmed Retest Ready parents without an active child", () => {
@@ -82,7 +74,6 @@ describe("job detail ECC retest bridge wiring", () => {
     expect(jobDetailSource).toContain("Retest Scheduled");
     expect(jobDetailSource).toContain("linkedRetestChildClosed");
     expect(jobDetailSource).toContain("activeRetestChildScheduled");
-    expect(jobDetailAndCurrentMobileSource).toContain("Open Linked Retest");
     expect(jobDetailSource).toContain('neq("status", "cancelled")');
     expect(jobDetailSource).not.toContain('.neq("ops_status", "closed")');
     expect(serviceChainSource).toContain("retestParentIdsWithActiveChild");

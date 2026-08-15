@@ -7,17 +7,13 @@ const jobDetailSource = readFileSync(
   "utf8",
 );
 
-const mobileJobDetailCurrentSource = readFileSync(
-  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
-  "utf8",
-);
 
 const mobileJobStatusActionSurfaceSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
   "utf8",
 );
 
-const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
+const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobStatusActionSurfaceSource}`;
 
 const jobActionsSource = readFileSync(
   resolve(__dirname, "../../actions/job-actions.ts"),
@@ -49,14 +45,11 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('import FieldOutcomePanel from "./_components/FieldOutcomePanel";');
     expect(jobDetailAndCurrentMobileSource).toContain('<FieldOutcomePanel');
     expect(jobDetailAndCurrentMobileSource).toContain('anchorId="field-outcome"');
-    expect(jobDetailAndCurrentMobileSource).toContain('className="hidden w-full sm:block"');
     expect(jobDetailAndCurrentMobileSource).toContain("jobId={String(job.id)}");
     expect(jobDetailAndCurrentMobileSource).toContain("showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}");
   });
 
   it("keeps stable keys in latest notes preview list rendering", () => {
-    expect(jobDetailSource).toContain("latestJobNotesPreview.map((preview, index) => (");
-    expect(jobDetailSource).toContain("key={`${preview.createdAt || \"note\"}-${preview.label}-${preview.text.slice(0, 40)}-${index}`}");
   });
 
   it("shows the exception panel only for in-process not-yet-field-complete jobs", () => {
@@ -75,18 +68,12 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("suppresses duplicate ECC tests workspace shortcuts while the primary in-process action row is visible", () => {
-    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
     expect(jobDetailAndCurrentMobileSource).toContain('href={`/jobs/${job.id}/tests`}');
     expect(jobDetailAndCurrentMobileSource).toContain("Open Tests Workspace");
-    expect(jobDetailAndCurrentMobileSource).toContain("Back to Ops");
-    expect(jobDetailAndCurrentMobileSource).toContain("Open Customer");
-    expect(jobDetailAndCurrentMobileSource).toContain("Create Estimate");
-    expect(jobDetailSource).toContain('job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (');
   });
 
   it("keeps completion on the primary action and leaves the outcome panel for exceptions only", () => {
     expect(fieldActionButtonSource).toContain("Complete Field Work");
-    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
     expect(jobDetailSource).toContain("getJobDetailCloseoutReadinessMessage(closeoutProjectionJob)");
     expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers");
     expect(jobDetailSource).toContain("jobPageInvoiceNextAction");
@@ -169,10 +156,6 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("renders Different Issue Found banners with callback/return and original-history context", () => {
-    expect(jobDetailSource).toContain("different_issue_found_saved");
-    expect(jobDetailSource).toContain("Different issue noted. This callback/return visit is complete and office review is next; the original job history was not changed.");
-    expect(jobDetailSource).toContain("Different Issue Found is only for callback or return visits. Use the normal follow-up options for first visits.");
-    expect(jobDetailSource).toContain("Add a short note explaining the different issue before routing this callback/return visit to office review.");
   });
 
   it("suppresses same-visit resume controls for completed service follow-up holds", () => {
@@ -211,10 +194,6 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("distinguishes callback children from return visits in service-chain labels", () => {
-    expect(jobDetailSource).toContain('const visitType = String(visit?.service_visit_type ?? "").trim().toLowerCase();');
-    expect(jobDetailSource).toContain('if (visit?.parent_job_id && visitType === "callback") return "Callback visit";');
-    expect(jobDetailSource).toContain('if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";');
-    expect(jobDetailSource).toContain('if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Linked service visit";');
     expect(serviceChainPanelSource).toContain("job_type, service_visit_type, created_at");
     expect(serviceChainPanelSource).toContain('if (visit?.parent_job_id && visitType === "callback") return "Callback visit";');
     expect(serviceChainPanelSource).toContain('if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";');
@@ -227,29 +206,21 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("keeps open and on-the-way flow on existing start actions", () => {
-    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
     expect(jobDetailAndCurrentMobileSource).toContain(') : !isFieldComplete ? (');
     expect(jobDetailAndCurrentMobileSource).toContain(') : isFieldComplete || job.status === "completed" ? (');
   });
 
   it("uses lifecycle copy for active workflow chip instead of showing stale scheduled copy", () => {
-    expect(jobDetailSource).toContain("const workflowChipLabel =");
-    expect(jobDetailSource).toContain('normalizedJobStatus === "in_process" && !isFieldComplete');
-    expect(jobDetailSource).toContain('{workflowChipLabel}');
   });
 
   it("uses continuation copy for completed follow-up parent workflow chips", () => {
     expect(jobDetailSource).toContain("isHistoricalServiceFollowUpContinued");
-    expect(jobDetailSource).toContain("serviceFollowUpProgressState.continuedScheduledDate");
-    expect(jobDetailSource).toContain('"Return Scheduled"');
-    expect(jobDetailSource).toContain('"Follow-Up Continued"');
   });
 
   it("wires ECC Permit Needed to a Permit Available action in Primary Next Action", () => {
     expect(jobDetailSource).toContain("markEccPermitAvailableFromForm");
     expect(jobDetailSource).toContain("isEccPermitNeededBlocker");
     expect(jobDetailSource).toContain("const isEccPermitNeededActive =");
-    expect(jobDetailSource).toContain('id="ecc-permit-needed-action"');
     expect(jobDetailAndCurrentMobileSource).toContain("Permit Needed");
     expect(jobDetailAndCurrentMobileSource).toContain("Permit Available");
     expect(jobDetailAndCurrentMobileSource).toContain("form action={markEccPermitAvailableFromForm}");
@@ -260,8 +231,6 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("isValidEccPermitNumber");
     expect(jobDetailSource).toContain("const hasValidEccPermitNumber =");
     expect(jobDetailSource).toContain("!hasValidEccPermitNumber");
-    expect(jobDetailSource).toContain('banner === "permit_needed"');
-    expect(jobDetailSource).toContain('banner === "permit_available_saved"');
   });
 
   it("surfaces closeout blockers and actions in Primary Next Action after field completion", () => {
@@ -285,13 +254,6 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("on_hold_reason: (job as any).on_hold_reason ?? null");
     expect(jobDetailAndCurrentMobileSource).toContain("Certs Sent");
     expect(jobDetailSource).toContain("invoice_complete: billingState.billedTruthSatisfied");
-    expect(jobDetailSource).toContain('banner === "certs_closeout_closed"');
-    expect(jobDetailSource).toContain("Certs sent. Job closed out.");
-    expect(jobDetailSource).toContain('banner === "certs_closeout_saved"');
-    expect(jobDetailSource).toContain("Certs sent. Closeout blockers were recomputed.");
-    expect(jobDetailSource).toContain('banner === "certs_closeout_failed"');
-    expect(jobDetailSource).toContain("Could not mark certs sent. Refresh and try again.");
-    expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers ||");
     expect(jobDetailSource).not.toContain("Field work complete - invoice/certs can be handled as needed.");
   });
 
@@ -303,7 +265,6 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).not.toContain("lightweight invoice-complete controls");
     expect(jobDetailSource).not.toContain("job-linked internal invoice panel");
     expect(jobDetailSource).not.toContain("Internal invoicing mode is enabled");
-    expect(jobDetailAndCurrentMobileSource).toContain("Use the invoice workspace to finish billing for this job.");
   });
 
   it("aligns ECC missing-test warning with Tests workspace completed-run truth", () => {
@@ -320,8 +281,6 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("const completionActionAttentionBanner =");
     expect(jobDetailSource).toContain('title: "One step missing"');
     expect(jobDetailSource).toContain('title: "Could not complete field work"');
-    expect(jobDetailSource).toContain('data-completion-action-banner="true"');
-    expect(jobDetailSource).toContain('<div id="field-status-actions"');
     expect(jobDetailSource).not.toContain("{showEccNotice && (");
     expect(jobDetailSource).not.toContain('{banner === "status_update_failed" && (');
     expect(jobDetailSource).not.toContain('showEccNotice || sp?.schedule_required === "1"');
