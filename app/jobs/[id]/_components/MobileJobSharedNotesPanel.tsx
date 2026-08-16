@@ -1,8 +1,9 @@
+import InPlaceSharedNoteForm from "./InPlaceSharedNoteForm";
+
 type MobileJobSharedNotesPanelProps = Record<string, any>;
 
 export default function MobileJobSharedNotesPanel(props: MobileJobSharedNotesPanelProps) {
   const {
-    addPublicNoteFromForm,
     ChatIcon,
     DeferredSharedNotesBody,
     FlashBanner,
@@ -14,7 +15,6 @@ export default function MobileJobSharedNotesPanel(props: MobileJobSharedNotesPan
     sharedNoteBannerMessage,
     sharedNoteBannerType,
     sharedNotesMeta,
-    SubmitButton,
     Suspense,
     tab,
     workspaceEmptyStateClass,
@@ -41,21 +41,14 @@ export default function MobileJobSharedNotesPanel(props: MobileJobSharedNotesPan
           message={sharedNoteBannerMessage}
         />
       ) : null}
-      <form action={addPublicNoteFromForm} className="space-y-3">
-        <input type="hidden" name="note_scope" value="shared" />
-        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-shared-notes`} />
-        <input type="hidden" name="job_id" value={job.id} />
-        <input type="hidden" name="tab" value={tab} />
-        <textarea
-          name="note"
-          rows={3}
-          placeholder="Add a shared note..."
-          className={`${workspaceTextareaClass} text-base`}
-        />
-        <SubmitButton loadingText="Adding note..." className={secondaryButtonClass}>
-          Save shared note
-        </SubmitButton>
-      </form>
+      {/* Piloted in-place surface: saves without a navigation and renders its
+          own feedback, so no ?banner= round trip is needed. */}
+      <InPlaceSharedNoteForm
+        jobId={String(job.id)}
+        tab={String(tab)}
+        textareaClassName={workspaceTextareaClass}
+        buttonClassName={secondaryButtonClass}
+      />
       {sharedNotesList}
     </div>
   );

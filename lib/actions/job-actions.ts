@@ -5747,7 +5747,48 @@ export async function revertOnTheWayFromForm(formData: FormData) {
  * updateJobScheduleFromForm) is not disturbed.
  */
 
-export async function updateJobScheduleFromForm(formData: FormData) {
+/**
+ * Result returned by updateJobScheduleFromForm when the caller passes
+ * no_redirect=1. `code` is the same banner string the redirect path would have
+ * put in the query string, so both paths speak one vocabulary.
+ */
+export type UpdateJobScheduleResult = {
+  ok: boolean;
+  code: string;
+};
+
+/** Banner codes that represent a refused or failed save rather than a success. */
+const SCHEDULE_FAILURE_BANNERS = new Set([
+  "not_authorized",
+  "active_reschedule_confirmation_required",
+  "schedule_date_required",
+  "schedule_window_invalid",
+  "schedule_update_failed",
+]);
+
+/**
+ * Redirect-path entry point. Bound directly to <form action={...}> in the ops
+ * call list, calendar and route plan, which require a void-returning action.
+ */
+export async function updateJobScheduleFromForm(formData: FormData): Promise<void> {
+  await updateJobScheduleCore(formData);
+}
+
+/**
+ * In-place entry point. Forces no_redirect and hands the caller a typed result
+ * so a client transition can render feedback without a navigation.
+ */
+export async function updateJobScheduleInPlace(
+  formData: FormData,
+): Promise<UpdateJobScheduleResult> {
+  formData.set("no_redirect", "1");
+  const result = await updateJobScheduleCore(formData);
+  return result ?? { ok: true, code: "schedule_saved" };
+}
+
+async function updateJobScheduleCore(
+  formData: FormData,
+): Promise<UpdateJobScheduleResult | void> {
   const id =
     String(formData.get("id") || "").trim() ||
     String(formData.get("job_id") || "").trim();
@@ -5776,9 +5817,11 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     redirect(`/jobs/${id}?banner=${banner}`);
   }
 
-  function finishScheduleTarget(banner: string) {
+  function finishScheduleTarget(banner: string): UpdateJobScheduleResult | void {
     if (noRedirect) {
-      return;
+      // In-place callers get the banner code back as a result instead of a
+      // navigation, so the client can render feedback without a page load.
+      return { ok: !SCHEDULE_FAILURE_BANNERS.has(banner), code: banner };
     }
     redirectToScheduleTarget(banner);
   }
@@ -6115,12 +6158,17 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     }
   }
 
-  revalidatePath(`/jobs/${id}`);
-  revalidatePath(`/jobs/${id}/v2`, "page");
-  revalidatePath(`/ops`);
-  revalidatePath(`/calendar`);
-  revalidatePath(`/portal`);
-  revalidatePath(`/portal/jobs/${id}`);
+  if (!noRedirect) {
+    // Any revalidatePath here pulls a full current-page re-render into this POST
+    // response and the caller waits on it. In-place callers reconcile with their
+    // own router.refresh() once the result lands, so skip it for them.
+    revalidatePath(`/jobs/${id}`);
+    revalidatePath(`/jobs/${id}/v2`, "page");
+    revalidatePath(`/ops`);
+    revalidatePath(`/calendar`);
+    revalidatePath(`/portal`);
+    revalidatePath(`/portal/jobs/${id}`);
+  }
 
   return finishScheduleTarget("schedule_saved");
 }
