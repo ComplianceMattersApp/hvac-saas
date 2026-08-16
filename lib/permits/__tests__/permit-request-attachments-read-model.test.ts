@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
@@ -31,6 +32,10 @@ function makeFixture(options?: {
   attachmentRows?: AttachmentRow[];
   schemaUnavailable?: boolean;
   internalUser?: boolean;
+  createSignedUrl?: (path: string) => Promise<{
+    data: { signedUrl: string } | null;
+    error: unknown;
+  }>;
 }) {
   const calls = {
     signedUrlPaths: [] as string[],
@@ -55,15 +60,19 @@ function makeFixture(options?: {
   ];
 
   function makeQuery(table: string) {
-    let rows: any[] = table === "permit_requests" ? permitRows.slice() : attachmentRows.slice();
-    const query: any = {
+    let rows: Array<PermitRow | AttachmentRow> = table === "permit_requests"
+      ? permitRows.slice()
+      : attachmentRows.slice();
+    const rowValue = (row: PermitRow | AttachmentRow, column: string) =>
+      (row as unknown as Record<string, unknown>)[column];
+    const query: Record<string, unknown> = {
       select: vi.fn(() => query),
       eq: vi.fn((column: string, value: string) => {
-        rows = rows.filter((row) => String(row[column] ?? "") === String(value));
+        rows = rows.filter((row) => String(rowValue(row, column) ?? "") === String(value));
         return query;
       }),
       in: vi.fn((column: string, values: string[]) => {
-        rows = rows.filter((row) => values.includes(String(row[column] ?? "")));
+        rows = rows.filter((row) => values.includes(String(rowValue(row, column) ?? "")));
         return query;
       }),
       order: vi.fn(() => query),
@@ -102,6 +111,7 @@ function makeFixture(options?: {
       from: vi.fn(() => ({
         createSignedUrl: vi.fn(async (path: string) => {
           calls.signedUrlPaths.push(path);
+          if (options?.createSignedUrl) return options.createSignedUrl(path);
           return { data: { signedUrl: `https://signed.example/${path}` }, error: null };
         }),
       })),
@@ -142,8 +152,8 @@ function makeFixture(options?: {
   };
 
   return {
-    admin,
-    supabase,
+    admin: admin as unknown as SupabaseClient,
+    supabase: supabase as unknown as SupabaseClient,
     calls,
   };
 }
@@ -235,6 +245,46 @@ describe("permit request attachment read model", () => {
 
     expect(Object.keys(result.attachmentsByPermitRequestId)).toEqual(["permit-1"]);
     expect(result.attachmentsByPermitRequestId["permit-1"].map((attachment) => attachment.id)).toEqual(["att-1"]);
+  });
+
+  it("requests independent signed URLs in parallel while preserving attachment order", async () => {
+    const pendingResolvers: Array<(value: {
+      data: { signedUrl: string };
+      error: null;
+    }) => void> = [];
+    const attachmentRows: AttachmentRow[] = ["first.pdf", "second.pdf"].map((fileName, index) => ({
+      id: `att-${index + 1}`,
+      entity_type: "permit_request",
+      entity_id: "permit-1",
+      bucket: "attachments",
+      storage_path: `permit-requests/${fileName}`,
+      file_name: fileName,
+      content_type: "application/pdf",
+      file_size: 100,
+      caption: null,
+      created_at: `2026-06-16T12:0${index}:00.000Z`,
+    }));
+    const fixture = makeFixture({
+      attachmentRows,
+      createSignedUrl: () => new Promise((resolve) => pendingResolvers.push(resolve)),
+    });
+    const { listInternalPermitRequestAttachmentsForAccount } = await import("../permit-request-attachments-read-model");
+
+    const resultPromise = listInternalPermitRequestAttachmentsForAccount({
+      accountOwnerUserId: "owner-1",
+      permitRequestIds: ["permit-1"],
+      admin: fixture.admin,
+    });
+
+    await vi.waitFor(() => expect(pendingResolvers).toHaveLength(2));
+    pendingResolvers[1]({ data: { signedUrl: "https://signed.example/second.pdf" }, error: null });
+    pendingResolvers[0]({ data: { signedUrl: "https://signed.example/first.pdf" }, error: null });
+
+    const result = await resultPromise;
+    expect(result.attachmentsByPermitRequestId["permit-1"].map((attachment) => attachment.fileName)).toEqual([
+      "first.pdf",
+      "second.pdf",
+    ]);
   });
 
   it("fails closed when permit or attachment schema is unavailable", async () => {

@@ -46,7 +46,7 @@ function normalizeStoragePath(value: unknown) {
 export async function listInternalPermitRequestAttachmentsForAccount(params: {
   accountOwnerUserId: string;
   permitRequestIds: string[];
-  admin?: any;
+  admin?: ReturnType<typeof createAdminClient>;
   expiresInSeconds?: number;
 }): Promise<PermitRequestAttachmentReadResult> {
   const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
@@ -82,34 +82,44 @@ export async function listInternalPermitRequestAttachmentsForAccount(params: {
 
     if (attachmentErr) throw attachmentErr;
 
+    const scopedAttachmentRows = ((attachmentRows ?? []) as RawAttachmentRow[]).filter(
+      (row) => row.entity_type === "permit_request" && scopedIds.includes(String(row.entity_id)),
+    );
+    const attachmentLinks = await Promise.all(
+      scopedAttachmentRows.map(async (row): Promise<PermitRequestAttachmentLink> => {
+        const bucket = String(row.bucket ?? "").trim();
+        const storagePath = normalizeStoragePath(row.storage_path);
+        let signedUrl: string | null = null;
+
+        if (bucket && storagePath) {
+          const { data: signedData, error: signedErr } = await admin.storage
+            .from(bucket)
+            .createSignedUrl(storagePath, params.expiresInSeconds ?? 60 * 60);
+
+          signedUrl = signedErr
+            ? null
+            : String((signedData as { signedUrl?: unknown } | null)?.signedUrl ?? "").trim() || null;
+        }
+
+        return {
+          id: String(row.id),
+          permitRequestId: String(row.entity_id),
+          fileName: String(row.file_name ?? "").trim() || "Attachment",
+          contentType: String(row.content_type ?? "").trim() || null,
+          fileSize: typeof row.file_size === "number" ? row.file_size : null,
+          caption: String(row.caption ?? "").trim() || null,
+          createdAt: String(row.created_at ?? "").trim() || null,
+          signedUrl,
+        };
+      }),
+    );
+
     const attachmentsByPermitRequestId: Record<string, PermitRequestAttachmentLink[]> = {};
-    for (const row of (attachmentRows ?? []) as RawAttachmentRow[]) {
-      if (row.entity_type !== "permit_request" || !scopedIds.includes(String(row.entity_id))) continue;
-
-      const bucket = String(row.bucket ?? "").trim();
-      const storagePath = normalizeStoragePath(row.storage_path);
-      let signedUrl: string | null = null;
-
-      if (bucket && storagePath) {
-        const { data: signedData, error: signedErr } = await admin.storage
-          .from(bucket)
-          .createSignedUrl(storagePath, params.expiresInSeconds ?? 60 * 60);
-
-        signedUrl = signedErr ? null : String((signedData as { signedUrl?: unknown } | null)?.signedUrl ?? "").trim() || null;
+    for (const attachment of attachmentLinks) {
+      if (!attachmentsByPermitRequestId[attachment.permitRequestId]) {
+        attachmentsByPermitRequestId[attachment.permitRequestId] = [];
       }
-
-      const permitRequestId = String(row.entity_id);
-      if (!attachmentsByPermitRequestId[permitRequestId]) attachmentsByPermitRequestId[permitRequestId] = [];
-      attachmentsByPermitRequestId[permitRequestId].push({
-        id: String(row.id),
-        permitRequestId,
-        fileName: String(row.file_name ?? "").trim() || "Attachment",
-        contentType: String(row.content_type ?? "").trim() || null,
-        fileSize: typeof row.file_size === "number" ? row.file_size : null,
-        caption: String(row.caption ?? "").trim() || null,
-        createdAt: String(row.created_at ?? "").trim() || null,
-        signedUrl,
-      });
+      attachmentsByPermitRequestId[attachment.permitRequestId].push(attachment);
     }
 
     return {
@@ -127,8 +137,8 @@ export async function listInternalPermitRequestAttachmentsForAccount(params: {
 
 export async function listCurrentInternalPermitRequestAttachments(params: {
   permitRequestIds: string[];
-  supabase?: any;
-  admin?: any;
+  supabase?: Awaited<ReturnType<typeof createClient>>;
+  admin?: ReturnType<typeof createAdminClient>;
   expiresInSeconds?: number;
 }) {
   const supabase = params.supabase ?? (await createClient());

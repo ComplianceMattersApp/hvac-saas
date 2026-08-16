@@ -22,15 +22,15 @@ import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import {
-  acceptInternalPermitRequest,
-  createJobFromPermitRequestAndMarkCreated,
-  createInternalManualPermitRequest,
-  holdInternalPermitRequest,
-  markInternalPermitCreated,
-  markInternalPermitRequestNotNeeded,
-  resumeInternalPermitRequest,
-  updateInternalPermitRequestIntake,
-} from "@/lib/actions/internal-permit-request-actions";
+  acceptPermitRequestFromOps,
+  createJobAndMarkPermitCreatedFromOps,
+  createManualPermitRequestFromOps,
+  holdPermitRequestFromOps,
+  markPermitCreatedFromOps,
+  markPermitRequestNotNeededFromOps,
+  resumePermitRequestFromOps,
+  updatePermitRequestIntakeFromOps,
+} from "./_actions/permit-workspace-actions";
 import { type OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
 import {
   getCachedAccountTimeZone,
@@ -80,9 +80,8 @@ import {
   type ContractorFocusRow,
 } from "@/lib/ops/ops-workspace-contractor-facets";
 import { startOpsServerTimer } from "@/lib/ops/ops-server-timing";
-import { type PermitRequestQueueRow } from "@/lib/permits/permit-requests-read-model";
 import { type ContractorIntakeQueueRow } from "@/lib/ops/contractor-intake-queue";
-import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/permit-request-attachments-read-model";
+import { loadOpsPermitWorkspaceSnapshot } from "@/lib/ops/ops-permit-workspace-loader";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -681,133 +680,11 @@ export default async function OpsPage({
     );
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
-    const selectedPermitAttachmentResult = selectedPermitRows.length
-      ? await listInternalPermitRequestAttachmentsForAccount({
-          accountOwnerUserId: internalUser.account_owner_user_id,
-          permitRequestIds: selectedPermitRows.map((row) => row.id),
-        })
-      : { schemaAvailable: true, attachmentsByPermitRequestId: {} };
-    const permitAttachmentsByRequestId = selectedPermitAttachmentResult.attachmentsByPermitRequestId;
-
-    function formatPermitQueueTimestamp(value: string | null | undefined) {
-      return formatTimestampInAccountTimeZone(value, accountTimeZone, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        timeZoneName: "short",
-      }, "Not available");
-    }
-
-    function permitQueueContext(row: PermitRequestQueueRow) {
-      const parts = [
-        row.jobContext?.title,
-        row.jobContext?.customerName,
-        row.jobContext?.location,
-      ]
-        .map((part) => String(part ?? "").trim())
-        .filter(Boolean);
-
-      return parts.length ? parts.join(" · ") : "Permit paperwork request";
-    }
-
-    function formatPermitAttachmentType(contentType: string | null | undefined, fileName: string | null | undefined) {
-      const normalizedType = String(contentType ?? "").trim();
-      if (normalizedType) return normalizedType;
-      const normalizedName = String(fileName ?? "").trim();
-      const extension = normalizedName.includes(".") ? normalizedName.split(".").pop() : "";
-      return extension ? extension.toUpperCase() : "File";
-    }
-
-    function formatPermitAttachmentSize(fileSize: number | null | undefined) {
-      if (!Number.isFinite(fileSize ?? NaN) || !fileSize) return null;
-      if (fileSize < 1024) return `${fileSize} B`;
-      if (fileSize < 1024 * 1024) return `${Math.round(fileSize / 1024)} KB`;
-      return `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
-    }
-
-    async function createManualPermitRequestFromOps(formData: FormData) {
-      "use server";
-
-      await createInternalManualPermitRequest(formData);
-      redirect("/ops?bucket=permits#ops-workspace");
-    }
-
-    async function acceptPermitRequestFromOps(formData: FormData) {
-      "use server";
-
-      await acceptInternalPermitRequest(formData);
-      redirect("/ops?bucket=permits#ops-workspace");
-    }
-
-    async function holdPermitRequestFromOps(formData: FormData) {
-      "use server";
-
-      await holdInternalPermitRequest(formData);
-      redirect("/ops?bucket=permits#ops-workspace");
-    }
-
-    async function resumePermitRequestFromOps(formData: FormData) {
-      "use server";
-
-      await resumeInternalPermitRequest(formData);
-      redirect("/ops?bucket=permits#ops-workspace");
-    }
-
-    async function markPermitRequestNotNeededFromOps(formData: FormData) {
-      "use server";
-
-      try {
-        await markInternalPermitRequestNotNeeded(formData);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Permit request could not be marked not needed.";
-        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
-      }
-
-      redirect("/ops?bucket=permits#ops-workspace");
-    }
-
-    async function updatePermitRequestIntakeFromOps(formData: FormData) {
-      "use server";
-
-      try {
-        await updateInternalPermitRequestIntake(formData);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Permit intake details could not be saved.";
-        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
-      }
-      redirect("/ops?bucket=permits#ops-workspace");
-    }
-
-    async function markPermitCreatedFromOps(formData: FormData) {
-      "use server";
-
-      let jobId = "";
-      try {
-        const result = await markInternalPermitCreated(formData);
-        jobId = result.jobId;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Permit could not be marked created.";
-        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
-      }
-
-      redirect(`/jobs/${jobId}`);
-    }
-
-    async function createJobAndMarkPermitCreatedFromOps(formData: FormData) {
-      "use server";
-
-      let jobId = "";
-      try {
-        const result = await createJobFromPermitRequestAndMarkCreated(formData);
-        jobId = result.jobId;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Permit job could not be created.";
-        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
-      }
-
-      redirect(`/jobs/${jobId}`);
-    }
+    const permitWorkspaceSnapshot = await loadOpsPermitWorkspaceSnapshot({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      accountTimeZone,
+      rows: selectedPermitRows,
+    });
 
     return (
       <div
@@ -1062,7 +939,7 @@ export default async function OpsPage({
             ) : null}
 
             {selectedWorkspaceKey === "permits" ? (
-              selectedPermitRows.length === 0 ? (
+              permitWorkspaceSnapshot.rows.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                   <div>No active permit requests.</div>
                 </div>
@@ -1073,29 +950,24 @@ export default async function OpsPage({
                       {permitActionError}
                     </div>
                   ) : null}
-                  {selectedPermitRows.map((permitRequest) => {
-                    const permitAttachments = permitAttachmentsByRequestId[permitRequest.id] ?? [];
-
-                    return (
+                  {permitWorkspaceSnapshot.rows.map(({ attachments: permitAttachments, display, permitRequest }) => (
                     <QueueCard
                       key={permitRequest.id}
-                      title={permitRequest.requestLabel || "Permit Request"}
-                      subtitle={permitQueueContext(permitRequest)}
+                      title={display.title}
+                      subtitle={display.context}
                       tagsColumns={2}
                       tags={[
                         { label: "Status", value: permitRequest.internalStatusLabel },
                         { label: "Contractor", value: permitRequest.contractorName || permitRequest.contractorId },
                         {
                           label: "Submitted",
-                          value: `${permitRequest.submittedAgeDays} days ago · ${formatPermitQueueTimestamp(permitRequest.createdAt)}`,
+                          value: display.submitted,
                         },
-                        ...(permitRequest.customerFirstNameSnapshot || permitRequest.customerLastNameSnapshot
+                        ...(display.customerName
                           ? [
                               {
                                 label: "Customer",
-                                value: [permitRequest.customerFirstNameSnapshot, permitRequest.customerLastNameSnapshot]
-                                  .filter(Boolean)
-                                  .join(" "),
+                                value: display.customerName,
                               },
                             ]
                           : []),
@@ -1105,11 +977,11 @@ export default async function OpsPage({
                         ...(permitRequest.customerPhoneSnapshot
                           ? [{ label: "Phone", value: permitRequest.customerPhoneSnapshot }]
                           : []),
-                        ...(permitRequest.addressLine1Snapshot || permitRequest.addressLine2Snapshot
-                          ? [{ label: "Address", value: [permitRequest.addressLine1Snapshot, permitRequest.addressLine2Snapshot, permitRequest.citySnapshot, permitRequest.stateSnapshot, permitRequest.zipSnapshot].filter(Boolean).join(", ") }]
+                        ...(display.address
+                          ? [{ label: "Address", value: display.address }]
                           : []),
-                        ...(permitRequest.totalValueCents !== null
-                          ? [{ label: "Total value", value: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(permitRequest.totalValueCents / 100) }]
+                        ...(display.totalValue
+                          ? [{ label: "Total value", value: display.totalValue }]
                           : []),
                         ...(permitRequest.jurisdiction
                           ? [{ label: "Jurisdiction", value: permitRequest.jurisdiction }]
@@ -1328,8 +1200,6 @@ export default async function OpsPage({
                           ) : (
                             <div className="mt-1 space-y-1.5">
                               {permitAttachments.map((attachment) => {
-                                const sizeLabel = formatPermitAttachmentSize(attachment.fileSize);
-                                const typeLabel = formatPermitAttachmentType(attachment.contentType, attachment.fileName);
                                 return (
                                   <div
                                     key={attachment.id}
@@ -1340,7 +1210,7 @@ export default async function OpsPage({
                                         {attachment.fileName}
                                       </div>
                                       <div className="mt-0.5 text-slate-500">
-                                        {[typeLabel, sizeLabel, formatPermitQueueTimestamp(attachment.createdAt)].filter(Boolean).join(" · ")}
+                                        {[attachment.typeLabel, attachment.sizeLabel, attachment.createdAtDisplay].filter(Boolean).join(" · ")}
                                       </div>
                                     </div>
                                     {attachment.signedUrl ? (
@@ -1580,7 +1450,7 @@ export default async function OpsPage({
                         ) : null}
                         <div>
                           <span className="font-medium text-slate-500">Updated:</span>{" "}
-                          {formatPermitQueueTimestamp(permitRequest.updatedAt)}
+                          {display.updatedAt}
                         </div>
                         {permitRequest.contractorNote ? (
                           <div className="sm:col-span-2">
@@ -1596,8 +1466,7 @@ export default async function OpsPage({
                         ) : null}
                       </div>
                     </QueueCard>
-                    );
-                  })}
+                  ))}
                 </div>
               )
             ) : selectedWorkspaceKey === "contractor_intake" ? (

@@ -65,6 +65,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const opsPermitWorkspaceLoaderSource = readFileSync(
+  resolve(__dirname, "../ops-permit-workspace-loader.ts"),
+  "utf-8",
+);
 const waitingExceptionLoaderSource = readFileSync(
   resolve(__dirname, "../waiting-exception-loader.ts"),
   "utf-8",
@@ -627,7 +631,7 @@ describe("focused queue display labels", () => {
     expect(opsWorkspaceRowViewsSource).toContain("queueAgeChipLabel");
     expect(opsWorkspaceRowViewsSource).toContain("lastActionTag");
     expect(opsWorkspaceRowViewsSource).toContain("queueEnteredAt");
-    expect(opsPageSource).toContain("Not available");
+    expect(opsPermitWorkspaceLoaderSource).toContain('"Not available"');
     expect(opsWorkspaceRowViewsSource).not.toContain("Age/Time:");
     expect(opsWorkspaceRowViewsSource).not.toContain('?? "-"');
   });

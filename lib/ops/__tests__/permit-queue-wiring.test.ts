@@ -11,9 +11,17 @@ const opsWorkspaceOverviewLoaderSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-overview-loader.ts"),
   "utf8",
 );
+const opsPermitWorkspaceLoaderSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-permit-workspace-loader.ts"),
+  "utf8",
+);
+const permitWorkspaceActionsSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_actions/permit-workspace-actions.ts"),
+  "utf8",
+);
 
 function permitRenderBranch() {
-  const selectedRowsIndex = opsPageSource.indexOf("selectedPermitRows.length === 0");
+  const selectedRowsIndex = opsPageSource.indexOf("permitWorkspaceSnapshot.rows.length === 0");
   const start = opsPageSource.lastIndexOf('{selectedWorkspaceKey === "permits" ? (', selectedRowsIndex);
   const end = opsPageSource.indexOf(') : selectedWorkspaceKey === "contractor_intake"', start);
   expect(selectedRowsIndex).toBeGreaterThanOrEqual(0);
@@ -55,12 +63,12 @@ describe("Ops workspace permit queue wiring", () => {
   it("selecting bucket=permits renders the active permit queue", () => {
     const branch = permitRenderBranch();
 
-    expect(branch).toContain("selectedPermitRows");
+    expect(branch).toContain("permitWorkspaceSnapshot.rows");
     expect(branch).toContain("No active permit requests.");
     expect(branch).toContain("permitRequest.internalStatusLabel");
-    expect(branch).toContain("permitQueueContext(permitRequest)");
+    expect(branch).toContain("subtitle={display.context}");
     expect(branch).toContain("permitRequest.contractorName || permitRequest.contractorId");
-    expect(branch).toContain("permitRequest.submittedAgeDays");
+    expect(branch).toContain("value: display.submitted");
     expect(branch).toContain("permitRequest.addressLine1Snapshot");
     expect(branch).toContain("permitRequest.citySnapshot");
     expect(branch).toContain("permitRequest.stateSnapshot");
@@ -69,7 +77,7 @@ describe("Ops workspace permit queue wiring", () => {
   });
 
   it("renders a small internal manual intake entry point for permits", () => {
-    expect(opsPageSource).toContain("createInternalManualPermitRequest");
+    expect(permitWorkspaceActionsSource).toContain("createInternalManualPermitRequest");
     expect(opsPageSource).toContain("createManualPermitRequestFromOps");
     expect(opsPageSource).toContain("+ New Permit Request");
     expect(opsPageSource).toContain("Create one from a text, phone call, email, or photo request.");
@@ -92,11 +100,11 @@ describe("Ops workspace permit queue wiring", () => {
   it("renders active-state permit controls with the mark-created completion entry point", () => {
     const branch = permitRenderBranch();
 
-    expect(opsPageSource).toContain("acceptInternalPermitRequest");
-    expect(opsPageSource).toContain("holdInternalPermitRequest");
-    expect(opsPageSource).toContain("resumeInternalPermitRequest");
-    expect(opsPageSource).toContain("markInternalPermitCreated");
-    expect(opsPageSource).toContain("markInternalPermitRequestNotNeeded");
+    expect(permitWorkspaceActionsSource).toContain("acceptInternalPermitRequest");
+    expect(permitWorkspaceActionsSource).toContain("holdInternalPermitRequest");
+    expect(permitWorkspaceActionsSource).toContain("resumeInternalPermitRequest");
+    expect(permitWorkspaceActionsSource).toContain("markInternalPermitCreated");
+    expect(permitWorkspaceActionsSource).toContain("markInternalPermitRequestNotNeeded");
     expect(opsPageSource).toContain("markPermitCreatedFromOps");
     expect(branch).toContain("Accept / Start Permit");
     expect(branch).toContain("Put On Hold");
@@ -108,13 +116,13 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain("preserves its history");
     expect(branch).toContain('name="internal_note"');
     expect(branch).toContain("Add or correct the internal note that should appear on the job.");
-    expect(opsPageSource).toContain("redirect(`/jobs/${jobId}`)");
+    expect(permitWorkspaceActionsSource).toContain("redirect(`/jobs/${jobId}`)");
   });
 
   it("renders create-job-and-mark-created UI for unlinked active permit requests", () => {
     const branch = permitRenderBranch();
 
-    expect(opsPageSource).toContain("createJobFromPermitRequestAndMarkCreated");
+    expect(permitWorkspaceActionsSource).toContain("createJobFromPermitRequestAndMarkCreated");
     expect(opsPageSource).toContain("createJobAndMarkPermitCreatedFromOps");
     expect(branch).toContain("No job is linked yet. This will start the customer/job record from the permit intake below.");
     expect(branch).toContain("Permit intake draft");
@@ -160,7 +168,7 @@ describe("Ops workspace permit queue wiring", () => {
   it("renders an internal permit intake review panel alongside route completion controls", () => {
     const branch = permitRenderBranch();
 
-    expect(opsPageSource).toContain("updateInternalPermitRequestIntake");
+    expect(permitWorkspaceActionsSource).toContain("updateInternalPermitRequestIntake");
     expect(opsPageSource).toContain("updatePermitRequestIntakeFromOps");
     expect(branch).toContain("Edit Permit Intake");
     expect(branch).toContain("Save Intake Details");
@@ -186,7 +194,8 @@ describe("Ops workspace permit queue wiring", () => {
   it("renders read-only submitted permit files without upload controls", () => {
     const branch = permitRenderBranch();
 
-    expect(opsPageSource).toContain("listInternalPermitRequestAttachmentsForAccount");
+    expect(opsPermitWorkspaceLoaderSource).toContain("listInternalPermitRequestAttachmentsForAccount");
+    expect(opsPageSource).toContain("loadOpsPermitWorkspaceSnapshot");
     expect(branch).toContain("Submitted files");
     expect(branch).toContain("No files attached.");
     expect(branch).toContain("attachment.signedUrl");
@@ -204,9 +213,9 @@ describe("Ops workspace permit queue wiring", () => {
   it("surfaces mark-created action errors back on the Permits bucket", () => {
     expect(opsPageSource).toContain("permit_error");
     expect(opsPageSource).toContain("permitActionError");
-    expect(opsPageSource).toContain("encodeURIComponent(message)");
-    expect(opsPageSource).toContain("redirect(`/ops?bucket=permits&permit_error=");
-    expect(opsPageSource).toContain('redirect("/ops?bucket=permits#ops-workspace")');
+    expect(permitWorkspaceActionsSource).toContain("encodeURIComponent(message)");
+    expect(permitWorkspaceActionsSource).toContain("/ops?bucket=permits&permit_error=");
+    expect(permitWorkspaceActionsSource).toContain('const PERMIT_WORKSPACE_HREF = "/ops?bucket=permits#ops-workspace"');
   });
 
   it("keeps existing Ops workbench chips and job queues in place", () => {
@@ -224,11 +233,11 @@ describe("Ops workspace permit queue wiring", () => {
   });
 
   it("keeps permit UI mutations routed through server actions instead of inline lifecycle SQL", () => {
-    const source = opsPageSource.toLowerCase();
+    const source = `${opsPageSource}\n${permitWorkspaceActionsSource}`.toLowerCase();
 
     expect(source).not.toContain("insert into public.job_events");
     expect(source).not.toContain("update public.jobs set ops_status");
     expect(source).not.toContain("permit_request_events");
-    expect(opsPageSource).toContain("createJobFromPermitRequestAndMarkCreated(formData)");
+    expect(permitWorkspaceActionsSource).toContain("createJobFromPermitRequestAndMarkCreated(formData)");
   });
 });
