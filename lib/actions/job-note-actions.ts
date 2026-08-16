@@ -18,8 +18,36 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { refresh, revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-export async function addPublicNoteFromForm(formData: FormData) {
+/**
+ * Result returned by the in-place note entry points. `code` reuses the banner
+ * string the redirect path would have carried, so both paths speak one
+ * vocabulary and the client can map codes to copy in one place.
+ */
+export type AddNoteResult = {
+  ok: boolean;
+  code: string;
+};
+
+/**
+ * Redirect-path entry point, bound directly to <form action={...}>.
+ */
+export async function addPublicNoteFromForm(formData: FormData): Promise<void> {
+  await addPublicNoteCore(formData);
+}
+
+/**
+ * In-place entry point: skips the redirect and the revalidation, and returns a
+ * typed result the caller renders without a navigation.
+ */
+export async function addPublicNoteInPlace(formData: FormData): Promise<AddNoteResult> {
+  formData.set("no_redirect", "1");
+  const result = await addPublicNoteCore(formData);
+  return result ?? { ok: true, code: "note_added" };
+}
+
+async function addPublicNoteCore(formData: FormData): Promise<AddNoteResult | void> {
   const jobId = String(formData.get("job_id") || "").trim();
+  const noRedirect = String(formData.get("no_redirect") || "").trim() === "1";
   const note = String(formData.get("note") || "").trim();
   const tab = String(formData.get("tab") || "ops").trim() || "ops";
   const noteScope = String(formData.get("note_scope") || "").trim().toLowerCase();
@@ -100,6 +128,13 @@ export async function addPublicNoteFromForm(formData: FormData) {
     });
   }
 
+  if (noRedirect) {
+    // Any revalidatePath here pulls a full current-page re-render into this POST
+    // response and the caller waits on it. In-place callers reconcile with their
+    // own router.refresh() once the result lands.
+    return { ok: true, code: "note_added" };
+  }
+
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
@@ -163,8 +198,23 @@ function buildInternalNoteRedirectPath(params: {
   return `${target.pathname}?${target.searchParams.toString()}${target.hash}`;
 }
 
-export async function addInternalNoteFromForm(formData: FormData) {
+/**
+ * Redirect-path entry point, bound directly to <form action={...}>.
+ */
+export async function addInternalNoteFromForm(formData: FormData): Promise<void> {
+  await addInternalNoteCore(formData);
+}
+
+/** In-place entry point. See addPublicNoteInPlace. */
+export async function addInternalNoteInPlace(formData: FormData): Promise<AddNoteResult> {
+  formData.set("no_redirect", "1");
+  const result = await addInternalNoteCore(formData);
+  return result ?? { ok: true, code: "follow_up_note_added" };
+}
+
+async function addInternalNoteCore(formData: FormData): Promise<AddNoteResult | void> {
   const jobId = String(formData.get("job_id") || "").trim();
+  const noRedirect = String(formData.get("no_redirect") || "").trim() === "1";
   const note = String(formData.get("note") || "").trim();
   const tab = String(formData.get("tab") || "ops").trim() || "ops";
   const returnToRaw = String(formData.get("return_to") || "").trim();
@@ -407,6 +457,10 @@ export async function addInternalNoteFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/v2`, "page");
   revalidatePath(`/ops`);
+  if (noRedirect) {
+    return { ok: true, code: "follow_up_note_added" };
+  }
+
   redirect(
     buildInternalNoteRedirectPath({
       jobId,
