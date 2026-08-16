@@ -1,3 +1,10 @@
+import {
+  getOpsWorkspaceQueueDefinition,
+  opsWorkspaceQueueHref,
+  type OpsWorkspaceQueueBucket,
+  type OpsWorkspaceQueueKey,
+} from "@/lib/ops/ops-workspace-queues";
+
 // Canonical Operations workspace queue destinations.
 //
 // The /ops board renders every queue as a bucket of the single Operations
@@ -5,62 +12,27 @@
 // surface that links into an ops queue — shell nav, Today's operations
 // snapshot — must route through here so the destinations cannot drift.
 
-export type OpsWorkspaceQueueBucket =
-  | "pending"
-  | "field_work"
-  | "without_tech"
-  | "waiting"
-  | "exceptions"
-  | "closeout"
-  | "follow_ups"
-  | "contractor_intake"
-  | "permits";
+export { opsWorkspaceQueueHref };
+export type { OpsWorkspaceQueueBucket };
 
-export function opsWorkspaceQueueHref(bucket: OpsWorkspaceQueueBucket): string {
-  return `/ops?bucket=${bucket}#ops-workspace`;
-}
+const OPS_NAV_QUEUE_KEYS = [
+  "need_to_schedule",
+  "field_work",
+  "contractor_intake",
+  "waiting",
+  "exceptions",
+  "closeout",
+  "follow_ups",
+  "permits",
+] as const satisfies readonly OpsWorkspaceQueueKey[];
 
-export const OPS_NAV_QUEUE_LINKS = [
-  {
-    label: "Needs Scheduling",
-    bucket: "pending",
-    href: opsWorkspaceQueueHref("pending"),
-  },
-  {
-    label: "Field Work",
-    bucket: "field_work",
-    href: opsWorkspaceQueueHref("field_work"),
-  },
-  {
-    label: "Contractor Intake",
-    bucket: "contractor_intake",
-    href: opsWorkspaceQueueHref("contractor_intake"),
-  },
-  {
-    label: "Waiting / Pending Info",
-    bucket: "waiting",
-    href: opsWorkspaceQueueHref("waiting"),
-  },
-  {
-    label: "Exceptions",
-    bucket: "exceptions",
-    href: opsWorkspaceQueueHref("exceptions"),
-  },
-  {
-    label: "Closeout & Review",
-    bucket: "closeout",
-    href: opsWorkspaceQueueHref("closeout"),
-  },
-  {
-    label: "Follow Ups",
-    bucket: "follow_ups",
-    href: opsWorkspaceQueueHref("follow_ups"),
-  },
-  {
-    label: "Permits",
-    bucket: "permits",
-    href: opsWorkspaceQueueHref("permits"),
-  },
-] as const;
+export const OPS_NAV_QUEUE_LINKS = OPS_NAV_QUEUE_KEYS.map((key) => {
+  const definition = getOpsWorkspaceQueueDefinition(key);
+  return {
+    label: definition.label,
+    bucket: definition.bucket,
+    href: opsWorkspaceQueueHref(definition.bucket),
+  };
+});
 
 export type OpsNavQueueLink = (typeof OPS_NAV_QUEUE_LINKS)[number];

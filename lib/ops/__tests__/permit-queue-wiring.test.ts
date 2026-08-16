@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const opsPageSource = readFileSync(resolve(__dirname, "../../../app/ops/page.tsx"), "utf8");
+const opsWorkspaceQueuesSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
+  "utf8",
+);
 
 function permitRenderBranch() {
   const selectedRowsIndex = opsPageSource.indexOf("selectedPermitRows.length === 0");
@@ -38,9 +42,10 @@ describe("Ops workspace permit queue wiring", () => {
     expect(opsPageSource).toContain("permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable");
     expect(opsPageSource).toContain("resolveEffectiveOpsBoardBucketFilter");
     expect(opsPageSource).toContain("permitRequestsSchemaAvailable,");
-    expect(opsPageSource).toContain('key: "permits"');
-    expect(opsPageSource).toContain('label: "Permits"');
-    expect(opsPageSource).toContain('bucket: "permits"');
+    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsWorkspaceQueuesSource).toContain('key: "permits"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Permits"');
+    expect(opsWorkspaceQueuesSource).toContain('bucket: "permits"');
   });
 
   it("selecting bucket=permits renders the active permit queue", () => {
@@ -201,16 +206,17 @@ describe("Ops workspace permit queue wiring", () => {
   });
 
   it("keeps existing Ops workbench chips and job queues in place", () => {
-    expect(opsPageSource).toContain('key: "need_to_schedule"');
-    expect(opsPageSource).toContain('label: "Needs Scheduling"');
-    expect(opsPageSource).toContain('key: "field_work"');
-    expect(opsPageSource).toContain('label: "Field Work"');
-    expect(opsPageSource).toContain('key: "waiting"');
-    expect(opsPageSource).toContain('label: "Waiting / Pending Info"');
-    expect(opsPageSource).toContain('key: "exceptions"');
-    expect(opsPageSource).toContain('label: "Exceptions"');
-    expect(opsPageSource).toContain('key: "closeout"');
-    expect(opsPageSource).toContain('label: "Closeout & Review"');
+    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsWorkspaceQueuesSource).toContain('key: "need_to_schedule"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Needs Scheduling"');
+    expect(opsWorkspaceQueuesSource).toContain('key: "field_work"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Field Work"');
+    expect(opsWorkspaceQueuesSource).toContain('key: "waiting"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Waiting / Pending Info"');
+    expect(opsWorkspaceQueuesSource).toContain('key: "exceptions"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Exceptions"');
+    expect(opsWorkspaceQueuesSource).toContain('key: "closeout"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Closeout & Review"');
   });
 
   it("keeps permit UI mutations routed through server actions instead of inline lifecycle SQL", () => {

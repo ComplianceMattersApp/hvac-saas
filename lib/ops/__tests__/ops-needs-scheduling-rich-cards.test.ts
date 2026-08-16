@@ -6,6 +6,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const opsWorkspaceQueuesSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
+  "utf-8",
+);
 const rowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
   "utf-8",
@@ -65,8 +69,8 @@ const loadWorkspaceRowsSource =
 
 describe("/ops Needs Scheduling rich cards", () => {
   it("renders rich action cards in the actual visible workspace Needs Scheduling queue", () => {
-    expect(opsPageSource).toContain('pending: "need_to_schedule"');
-    expect(opsPageSource).toContain('label: "Needs Scheduling"');
+    expect(opsWorkspaceQueuesSource).toContain('pending: "need_to_schedule"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Needs Scheduling"');
     expect(needsSchedulingCardSource).toContain("<MobileOpsCard");
     expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "need_to_schedule"');
     expect(activeQueueRowsSource).toContain("buildNeedsSchedulingRowView(job, visibleReason)");
@@ -106,7 +110,7 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(needsSchedulingCardSource).not.toContain("Save Schedule");
     expect(buildNeedsSchedulingSource).toContain("returnToHref: activeWorkspaceHref");
     expect(opsPageSource).toContain("const activeWorkspaceHref");
-    expect(opsPageSource).toContain("contractor: contractorScopeFilter");
+    expect(opsPageSource).toContain("contractor: contractorFocusFilter ?? \"\"");
     expect(opsPageSource).toContain("reason: effectiveBoardReasonFilter");
   });
 
@@ -131,8 +135,8 @@ describe("/ops Needs Scheduling rich cards", () => {
 
 describe("/ops Closeout rich cards", () => {
   it("renders rich closeout cards only from the actual visible closeout workspace key", () => {
-    expect(opsPageSource).toContain('closeout: "closeout"');
-    expect(opsPageSource).toContain('label: "Closeout & Review"');
+    expect(opsWorkspaceQueuesSource).toContain('closeout: "closeout"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Closeout & Review"');
     expect(closeoutCardSource).toContain("<MobileOpsCard");
     expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "closeout"');
     expect(activeQueueRowsSource).toContain("buildCloseoutRowView(job, visibleReason)");

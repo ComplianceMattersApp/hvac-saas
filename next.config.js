@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {
+    // Keep dependency resolution inside this app when a parent directory also
+    // contains a lockfile (common in local multi-project workspaces).
+    root: __dirname,
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [

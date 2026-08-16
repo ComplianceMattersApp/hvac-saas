@@ -1,11 +1,94 @@
 import { describe, expect, it } from "vitest";
 import {
+  OPS_WORKSPACE_QUEUE_DEFINITIONS,
+  buildOpsWorkspaceTabs,
+  opsWorkspaceQueueHref,
+  resolveOpsWorkspaceQueueKey,
   isContractorIntakeQueueAvailableForProductMode,
   resolveEffectiveOpsBoardBucketFilter,
   resolveVisibleOpsWorkspaceQueueKeys,
 } from "@/lib/ops/ops-workspace-queues";
 
 describe("Ops workspace queue product-mode gating", () => {
+  it("keeps every bucket mapped to one canonical queue definition", () => {
+    const definitions = Object.values(OPS_WORKSPACE_QUEUE_DEFINITIONS);
+
+    expect(new Set(definitions.map((item) => item.key)).size).toBe(definitions.length);
+    expect(new Set(definitions.map((item) => item.bucket)).size).toBe(definitions.length);
+    for (const definition of definitions) {
+      expect(resolveOpsWorkspaceQueueKey(definition.bucket)).toBe(definition.key);
+      expect(definition.label).not.toBe("");
+      expect(definition.mobileLabel).not.toBe("");
+    }
+  });
+
+  it("builds queue tabs from canonical labels, counts, gates, and destinations", () => {
+    const tabs = buildOpsWorkspaceTabs({
+      counts: {
+        need_to_schedule: 2,
+        field_work: 3,
+        without_tech: 4,
+        waiting: 5,
+        exceptions: 6,
+        closeout: 7,
+        follow_ups: 8,
+        contractor_intake: 9,
+        permits: 10,
+        updates: 11,
+      },
+      contractorScopeFilter: "contractor-1,contractor-2",
+      contractorIntakeQueueAvailable: true,
+      permitRequestsSchemaAvailable: true,
+    });
+
+    expect(tabs.map((tab) => [tab.key, tab.label, tab.count])).toEqual([
+      ["need_to_schedule", "Needs Scheduling", 2],
+      ["field_work", "Field Work", 3],
+      ["without_tech", "Needs Assignment", 4],
+      ["waiting", "Waiting / Pending Info", 5],
+      ["exceptions", "Exceptions", 6],
+      ["closeout", "Closeout & Review", 7],
+      ["follow_ups", "Follow Ups", 8],
+      ["contractor_intake", "Contractor Intake", 9],
+      ["permits", "Permits", 10],
+      ["updates", "Updates", 11],
+    ]);
+    expect(tabs.find((tab) => tab.key === "waiting")?.href).toBe(
+      "/ops?bucket=waiting&contractor=contractor-1%2Ccontractor-2#ops-workspace",
+    );
+    expect(tabs.find((tab) => tab.key === "need_to_schedule")?.href).toBe(
+      "/ops/call-list?contractor=contractor-1%2Ccontractor-2",
+    );
+  });
+
+  it("omits unavailable optional tabs and normalizes invalid counts", () => {
+    const tabs = buildOpsWorkspaceTabs({
+      counts: { waiting: -2, exceptions: Number.NaN },
+      contractorIntakeQueueAvailable: false,
+      permitRequestsSchemaAvailable: false,
+    });
+
+    expect(tabs.some((tab) => tab.key === "contractor_intake")).toBe(false);
+    expect(tabs.some((tab) => tab.key === "permits")).toBe(false);
+    expect(tabs.find((tab) => tab.key === "waiting")?.count).toBe(0);
+    expect(tabs.find((tab) => tab.key === "exceptions")?.count).toBe(0);
+  });
+
+  it("builds stable queue URLs with optional contractor and sort filters", () => {
+    expect(opsWorkspaceQueueHref("exceptions")).toBe(
+      "/ops?bucket=exceptions#ops-workspace",
+    );
+    expect(opsWorkspaceQueueHref("exceptions", {
+      contractor: "contractor-1,contractor-2",
+      sort: "newest",
+    })).toBe(
+      "/ops?bucket=exceptions&contractor=contractor-1%2Ccontractor-2&sort=newest#ops-workspace",
+    );
+    expect(opsWorkspaceQueueHref("exceptions", { sort: "oldest" })).toBe(
+      "/ops?bucket=exceptions#ops-workspace",
+    );
+  });
+
   it("keeps the Intake chip visible for ECC/HERS and Hybrid modes", () => {
     expect(isContractorIntakeQueueAvailableForProductMode("ecc_hers")).toBe(true);
     expect(isContractorIntakeQueueAvailableForProductMode("hybrid")).toBe(true);

@@ -73,6 +73,10 @@ const opsWorkspaceJobContractSource = readFileSync(
   resolve(__dirname, "../ops-workspace-job-contract.ts"),
   "utf-8",
 );
+const opsWorkspaceEvidenceSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-evidence.ts"),
+  "utf-8",
+);
 const serviceFollowUpQueueStateSource = readFileSync(
   resolve(__dirname, "../service-follow-up-queue-state.ts"),
   "utf-8",
@@ -588,10 +592,11 @@ describe("focused queue display labels", () => {
   });
 
   it("Operations Workspace failed rows use specific ECC failure evidence and fall back safely", () => {
-    expect(opsPageSource).toContain("formatFailedEccQueueReasonFromRun");
-    expect(opsPageSource).toContain("primaryFailureReasonByJob.get(jobId)");
+    expect(opsWorkspaceEvidenceSource).toContain("formatFailedEccQueueReasonFromRun");
+    expect(opsWorkspaceEvidenceSource).toContain("primaryFailureReasonByJob");
+    expect(opsPageSource).toContain("workspaceEvidence.primaryFailureReasonByJob.get(jobId)");
     expect(opsPageSource).toContain('|| "Failed"');
-    expect(opsPageSource).toContain('"Correction Required"');
+    expect(opsWorkspaceEvidenceSource).toContain('"Correction Required"');
     expect(opsPageSource).toContain('"Retest Needed"');
   });
 

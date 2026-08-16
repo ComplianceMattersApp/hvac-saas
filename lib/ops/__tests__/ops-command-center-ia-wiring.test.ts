@@ -40,6 +40,10 @@ const opsWorkspaceQueuesSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
   "utf-8",
 );
+const opsWorkspaceEvidenceSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-evidence.ts"),
+  "utf-8",
+);
 
 const queueCardSource = readFileSync(
   resolve(__dirname, "../../../components/ops/QueueCard.tsx"),
@@ -87,7 +91,9 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("keeps focused queue and filter wiring query-parameter driven", () => {
     expect(opsPageSource).toContain("function buildQueryString(");
-    expect(opsPageSource).toContain("contractor: contractorScopeFilter ?? \"\"");
+    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsPageSource).toContain("contractorScopeFilter,");
+    expect(opsWorkspaceQueuesSource).toContain("opsWorkspaceQueueHref(definition.bucket, { contractor })");
     expect(opsPageSource).toContain("q: q ?? \"\"");
   });
 
@@ -145,22 +151,23 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("maps bucket filters to existing Ops board queue categories", () => {
     expect(opsPageSource).toContain('const activeBoardBucketFilter = boardBucketFilter === "all" ? "pending" : boardBucketFilter;');
-    expect(opsPageSource).toContain("boardBucketWorkspaceKeyMap");
-    expect(opsPageSource).toContain('pending: "need_to_schedule"');
-    expect(opsPageSource).toContain('field_work: "field_work"');
-    expect(opsPageSource).toContain('waiting: "waiting"');
-    expect(opsPageSource).toContain('exceptions: "exceptions"');
-    expect(opsPageSource).toContain('closeout: "closeout"');
-    expect(opsPageSource).toContain('follow_ups: "follow_ups"');
-    expect(opsPageSource).toContain('contractor_intake: "contractor_intake"');
+    expect(opsPageSource).toContain("resolveOpsWorkspaceQueueKey");
+    expect(opsWorkspaceQueuesSource).toContain("OPS_WORKSPACE_KEY_BY_BUCKET");
+    expect(opsWorkspaceQueuesSource).toContain('pending: "need_to_schedule"');
+    expect(opsWorkspaceQueuesSource).toContain('field_work: "field_work"');
+    expect(opsWorkspaceQueuesSource).toContain('waiting: "waiting"');
+    expect(opsWorkspaceQueuesSource).toContain('exceptions: "exceptions"');
+    expect(opsWorkspaceQueuesSource).toContain('closeout: "closeout"');
+    expect(opsWorkspaceQueuesSource).toContain('follow_ups: "follow_ups"');
+    expect(opsWorkspaceQueuesSource).toContain('contractor_intake: "contractor_intake"');
     expect(opsPageSource).toContain("resolveVisibleOpsWorkspaceQueueKeys");
     expect(opsPageSource).toContain("const coreBoardWorkspaceKeys = resolveVisibleOpsWorkspaceQueueKeys({");
-    expect(opsPageSource).toContain("const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter]];");
+    expect(opsPageSource).toContain("const requestedWorkspaceKeys = [resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter)];");
   });
 
   it("keeps follow-up reminders always visible with date urgency styling", () => {
-    expect(opsPageSource).toContain('key: "follow_ups"');
-    expect(opsPageSource).toContain('label: "Follow Ups"');
+    expect(opsWorkspaceQueuesSource).toContain('key: "follow_ups"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Follow Ups"');
     expect(opsPageSource).toContain('.or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")');
     expect(opsPageSource).toContain("function followUpUrgency(dueDate: string)");
     expect(opsPageSource).toContain('variant: "follow-up-overdue"');
@@ -185,11 +192,12 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(mobileQueueSwitcherSource).toContain('aria-current={queue.active ? "page" : undefined}');
     expect(opsPageSource).toContain("workspaceQueueChips.map");
     expect(opsPageSource).toContain("coreBoardWorkspaceKeys.map");
-    expect(opsPageSource).toContain("bucket: chipBucket");
-    expect(opsPageSource).toContain('key: "field_work"');
-    expect(opsPageSource).toContain('label: "Field Work"');
-    expect(opsPageSource).toContain('label: "Contractor Intake"');
-    expect(opsPageSource).toContain('? "Intake"');
+    expect(opsPageSource).toContain("bucket: definition.bucket");
+    expect(opsPageSource).toContain("mobileLabel: definition.mobileLabel");
+    expect(opsWorkspaceQueuesSource).toContain('key: "field_work"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Field Work"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Contractor Intake"');
+    expect(opsWorkspaceQueuesSource).toContain('mobileLabel: "Intake"');
     expect(mobileQueueSwitcherSource).toContain("queue.label");
     expect(mobileQueueSwitcherSource).toContain("queue.count");
   });
@@ -223,7 +231,7 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("assembles exception failure evidence before queue-age sorting", () => {
     const failedEvidenceIndex = opsPageSource.indexOf(
-      "latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);",
+      "workspaceEvidence = buildOpsWorkspaceEvidenceIndex({",
     );
     const queueSortIndex = opsPageSource.indexOf(
       "const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows, boardSort",
@@ -243,7 +251,8 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("shows failed-report delivery awareness without changing exception routing", () => {
-    expect(opsPageSource).toContain('event?.event_type ?? "").trim() !== "contractor_report_sent"');
+    expect(opsWorkspaceEvidenceSource).toContain('event.event_type ?? "").trim() !== "contractor_report_sent"');
+    expect(opsPageSource).toContain("workspaceEvidence.latestContractorReportSentAtByJob.has(jobId)");
     expect(opsPageSource).toContain('label: "Failure report sent", tone: "green"');
     expect(opsPageSource).toContain('label: "Failure report not sent", tone: "amber"');
     expect(opsPageSource).toContain('queueKey === "exceptions"');
@@ -388,7 +397,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('if (normalized === "intake") return "contractor_intake";');
     expect(opsPageSource).toContain('normalized === "contractor_intake"');
     expect(opsPageSource).toContain('selectedWorkspaceKey === "contractor_intake"');
-    expect(opsPageSource).toContain('bucket: "contractor_intake"');
+    expect(opsWorkspaceQueuesSource).toContain('bucket: "contractor_intake"');
     expect(opsPageSource).toContain("/ops/contractor-intake/export");
     expect(opsPageSource).toContain("No contractor-submitted work is waiting for review.");
     expect(opsPageSource).toContain("Review Intake");
@@ -396,11 +405,12 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("keeps the existing Ops workbench chips in place", () => {
-    expect(opsPageSource).toContain('label: "Needs Scheduling"');
-    expect(opsPageSource).toContain('label: "Field Work"');
-    expect(opsPageSource).toContain('label: "Waiting / Pending Info"');
-    expect(opsPageSource).toContain('label: "Exceptions"');
-    expect(opsPageSource).toContain('label: "Closeout & Review"');
-    expect(opsPageSource).toContain('label: "Permits"');
+    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsWorkspaceQueuesSource).toContain('label: "Needs Scheduling"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Field Work"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Waiting / Pending Info"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Exceptions"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Closeout & Review"');
+    expect(opsWorkspaceQueuesSource).toContain('label: "Permits"');
   });
 });

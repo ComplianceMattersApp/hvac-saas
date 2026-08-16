@@ -35,7 +35,6 @@ import {
 import { formatCityNamePart, formatPersonNamePart } from "@/lib/utils/identity-display";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { getCloseoutNeeds, getCloseoutQueueNextStepLabel } from "@/lib/utils/closeout";
-import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
@@ -86,8 +85,12 @@ import {
   sortOpsBoardRows,
 } from "@/lib/ops/ops-board-sorting";
 import {
+  buildOpsWorkspaceTabs,
+  getOpsWorkspaceQueueDefinition,
   isContractorIntakeQueueAvailableForProductMode,
+  opsWorkspaceQueueHref,
   resolveEffectiveOpsBoardBucketFilter,
+  resolveOpsWorkspaceQueueKey,
   resolveVisibleOpsWorkspaceQueueKeys,
   type OpsBoardFilterBucket,
 } from "@/lib/ops/ops-workspace-queues";
@@ -113,10 +116,13 @@ import type {
 } from "./_components/OpsQueueRowCard";
 import {
   formatAssignmentSummaryForJob,
-  formatFailedEccQueueReasonFromRun,
   getOpsQueueCardStatusReason,
 } from "@/lib/ops/focused-queues";
 import { buildFocusedQueueRowPresentation } from "@/lib/ops/focused-queue-row-presentation";
+import {
+  buildOpsWorkspaceEvidenceIndex,
+  opsWorkspaceEvidenceEpochMs,
+} from "@/lib/ops/ops-workspace-evidence";
 import {
   listActivePermitRequestQueueRowsIfAvailable,
   type PermitRequestQueueRow,
@@ -447,102 +453,10 @@ export default async function OpsPage({
 
   // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
-  let followUpEnteredAtByJob = new Map<string, string>();
-  let latestJobEventByJob = new Map<string, any>();
-  let latestContractorReportSentAtByJob = new Map<string, string>();
-  let latestFailedRunByJob = new Map<string, any>();
-  let primaryFailureReasonByJob = new Map<string, string>();
-
-  function toEpochMs(value?: string | null) {
-    const t = new Date(String(value ?? "")).getTime();
-    return Number.isFinite(t) ? t : 0;
-  }
-
-  function normalizeFailureLine(line: string, testTypeRaw: string): string {
-    const text = String(line ?? "").trim();
-    return formatFailedEccQueueReasonFromRun({ test_type: testTypeRaw }) || (text ? "Correction Required" : "");
-  }
-
-  function buildLatestFailedRunByJob(runs: any[]) {
-    const latestByJob = new Map<string, any>();
-    for (const run of runs ?? []) {
-      const jobId = String((run as any)?.job_id ?? "").trim();
-      if (!jobId) continue;
-
-      const current = latestByJob.get(jobId);
-      if (!current) {
-        latestByJob.set(jobId, run);
-        continue;
-      }
-
-      const currentMs = Math.max(toEpochMs((current as any)?.created_at));
-      const nextMs = Math.max(toEpochMs((run as any)?.created_at));
-
-      if (nextMs > currentMs) {
-        latestByJob.set(jobId, run);
-      }
-    }
-    return latestByJob;
-  }
-
-  function buildPrimaryFailureReasonByJob(latestByJob: Map<string, any>) {
-    const reasonByJob = new Map<string, string>();
-    for (const [jobId, run] of latestByJob.entries()) {
-      const reasons = extractFailureReasons(run);
-      const primaryLine = reasons[0] ?? "";
-      const formatted = normalizeFailureLine(primaryLine, String((run as any)?.test_type ?? ""));
-      if (formatted) reasonByJob.set(jobId, formatted);
-    }
-    return reasonByJob;
-  }
-
-  function buildLatestJobEventByJob(events: any[]) {
-    const latestByJob = new Map<string, any>();
-    for (const event of Array.isArray(events) ? events : []) {
-      const jobId = String(event?.job_id ?? "").trim();
-      if (!jobId) continue;
-
-      const current = latestByJob.get(jobId);
-      if (!current || toEpochMs(event?.created_at) > toEpochMs(current?.created_at)) {
-        latestByJob.set(jobId, event);
-      }
-    }
-    return latestByJob;
-  }
-
-  function buildLatestContractorReportSentAtByJob(events: any[]) {
-    const sentAtByJob = new Map<string, string>();
-    for (const event of Array.isArray(events) ? events : []) {
-      if (String(event?.event_type ?? "").trim() !== "contractor_report_sent") continue;
-      const jobId = String(event?.job_id ?? "").trim();
-      const sentAt = String(event?.meta?.sent_at_iso ?? event?.created_at ?? "").trim();
-      if (!jobId || !sentAt || sentAtByJob.has(jobId)) continue;
-      sentAtByJob.set(jobId, sentAt);
-    }
-    return sentAtByJob;
-  }
-
-  function buildFollowUpEnteredAtByJob(events: any[]) {
-    const enteredByJob = new Map<string, string>();
-    for (const event of Array.isArray(events) ? events : []) {
-      const jobId = String(event?.job_id ?? "").trim();
-      const createdAt = String(event?.created_at ?? "").trim();
-      if (!jobId || !createdAt || enteredByJob.has(jobId)) continue;
-
-      const changes = Array.isArray(event?.meta?.changes) ? event.meta.changes : [];
-      const hasReminderEntered = changes.some((change: any) => {
-        const field = String(change?.field ?? "").trim().toLowerCase();
-        if (!["follow_up_date", "next_action_note", "action_required_by"].includes(field)) return false;
-        return Boolean(String(change?.to ?? "").trim());
-      });
-
-      if (hasReminderEntered) enteredByJob.set(jobId, createdAt);
-    }
-    return enteredByJob;
-  }
+  let workspaceEvidence = buildOpsWorkspaceEvidenceIndex();
 
   function failedStatusSinceByJob(jobId: string): string | null {
-    const run = latestFailedRunByJob.get(jobId);
+    const run = workspaceEvidence.latestFailedRunByJob.get(jobId);
     if (!run) return null;
 
     const createdAt = String((run as any)?.created_at ?? "").trim();
@@ -572,7 +486,7 @@ export default async function OpsPage({
   }
 
   function compactDurationSince(value?: string | null) {
-    const startMs = toEpochMs(value);
+    const startMs = opsWorkspaceEvidenceEpochMs(value);
     if (!startMs) return "Unknown";
 
     const elapsedMs = Math.max(0, Date.now() - startMs);
@@ -599,7 +513,7 @@ export default async function OpsPage({
     const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
 
     if (queueKey === "follow_ups") {
-      return (jobId ? followUpEnteredAtByJob.get(jobId) ?? null : null) || String(job?.created_at ?? "").trim() || null;
+      return (jobId ? workspaceEvidence.followUpEnteredAtByJob.get(jobId) ?? null : null) || String(job?.created_at ?? "").trim() || null;
     }
 
     if (queueKey === "closeout") {
@@ -621,7 +535,7 @@ export default async function OpsPage({
 
   function workspaceQueueAgeDays(job: any, queueKey: string): number | null {
     const enteredAt = workspaceQueueEnteredAt(job, queueKey);
-    const startMs = toEpochMs(enteredAt);
+    const startMs = opsWorkspaceEvidenceEpochMs(enteredAt);
     if (!startMs) return null;
     return Math.floor(Math.max(0, Date.now() - startMs) / 86_400_000);
   }
@@ -665,7 +579,7 @@ export default async function OpsPage({
 
   function workspaceLastActionTag(job: any) {
     const jobId = String(job?.id ?? "").trim();
-    const latestEvent = jobId ? latestJobEventByJob.get(jobId) : null;
+    const latestEvent = jobId ? workspaceEvidence.latestJobEventByJob.get(jobId) : null;
     if (latestEvent?.created_at) {
       return `${formatJobEventLabel(latestEvent)} · ${formatWorkspaceTimestamp(String(latestEvent.created_at))}`;
     }
@@ -695,7 +609,7 @@ export default async function OpsPage({
       ...job,
       next_action_note: job?.next_action_note ?? null,
       ops_board_failure_note: job?.ops_board_failure_note ?? null,
-      ops_board_failure_detail: jobId ? primaryFailureReasonByJob.get(jobId) ?? null : null,
+      ops_board_failure_detail: jobId ? workspaceEvidence.primaryFailureReasonByJob.get(jobId) ?? null : null,
     };
   }
 
@@ -713,7 +627,7 @@ export default async function OpsPage({
     if (failedNote) return `Failed Test - ${failedNote}`;
 
     const jobId = String(job?.id ?? "").trim();
-    return (jobId ? primaryFailureReasonByJob.get(jobId) ?? "" : "") || "Failed";
+    return (jobId ? workspaceEvidence.primaryFailureReasonByJob.get(jobId) ?? "" : "") || "Failed";
   }
 
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
@@ -932,89 +846,29 @@ export default async function OpsPage({
       permitRequestsSchemaAvailable,
     });
 
-    const workspaceTabs = [
-      {
-        key: "need_to_schedule",
-        label: "Needs Scheduling",
-        count: countsWs.get("need_to_schedule") ?? 0,
-        href: `/ops/call-list${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    const workspaceTabs = buildOpsWorkspaceTabs({
+      counts: {
+        need_to_schedule: countsWs.get("need_to_schedule") ?? 0,
+        field_work: assignedFieldWorkCount,
+        without_tech: scheduledWithoutTechSnapshot.count,
+        waiting: waitingCount,
+        exceptions: exceptionCount,
+        closeout: closeoutCount,
+        follow_ups: countsWs.get("follow_ups") ?? 0,
+        contractor_intake: contractorIntakeCount,
+        permits: activePermitRequestRows.length,
+        updates: unreadContractorUpdates.length + unreadNewWorkRequests.length,
       },
-      {
-        key: "field_work",
-        label: "Field Work",
-        count: assignedFieldWorkCount,
-        href: "/ops/field",
-      },
-      {
-        key: "without_tech",
-        label: "Needs Assignment",
-        count: scheduledWithoutTechSnapshot.count,
-        href: `/ops${buildQueryString({ bucket: "without_tech", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-      },
-      {
-        key: "waiting",
-        label: "Waiting / Pending Info",
-        count: waitingCount,
-        href: `/ops${buildQueryString({ bucket: "waiting", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-      },
-      {
-        key: "exceptions",
-        label: "Exceptions",
-        count: exceptionCount,
-        href: `/ops${buildQueryString({ bucket: "exceptions", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-      },
-      {
-        key: "closeout",
-        label: "Closeout & Review",
-        count: closeoutCount,
-        href: `/ops${buildQueryString({ bucket: "closeout", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-      },
-      {
-        key: "follow_ups",
-        label: "Follow Ups",
-        count: countsWs.get("follow_ups") ?? 0,
-        href: `/ops${buildQueryString({ bucket: "follow_ups", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-      },
-      ...(contractorIntakeQueueAvailable
-        ? [{
-            key: "contractor_intake",
-            label: "Contractor Intake",
-            count: contractorIntakeCount,
-            href: `/ops${buildQueryString({ bucket: "contractor_intake", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-          }]
-        : []),
-      ...(permitRequestsSchemaAvailable
-        ? [{
-            key: "permits",
-            label: "Permits",
-            count: activePermitRequestRows.length,
-            href: `/ops${buildQueryString({ bucket: "permits", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-          }]
-        : []),
-      {
-        key: "updates",
-        label: "Updates",
-        count: unreadContractorUpdates.length + unreadNewWorkRequests.length,
-        href: "/ops/notifications?state=unread",
-      },
-    ] as const;
+      contractorScopeFilter,
+      contractorIntakeQueueAvailable,
+      permitRequestsSchemaAvailable,
+    });
 
-    const boardBucketWorkspaceKeyMap: Record<Exclude<OpsBoardFilterBucket, "all">, string> = {
-      pending: "need_to_schedule",
-      field_work: "field_work",
-      without_tech: "without_tech",
-      waiting: "waiting",
-      exceptions: "exceptions",
-      closeout: "closeout",
-      follow_ups: "follow_ups",
-      contractor_intake: "contractor_intake",
-      permits: "permits",
-    };
     const coreBoardWorkspaceKeys = resolveVisibleOpsWorkspaceQueueKeys({
       productMode,
       permitRequestsSchemaAvailable,
     });
-    const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter]];
+    const requestedWorkspaceKeys = [resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter)];
 
     async function loadWithoutTechPreviewRows() {
       const withoutTechPreviewIds = (scheduledWithoutTechSnapshot.preview ?? [])
@@ -1270,52 +1124,24 @@ export default async function OpsPage({
       count: selectedWorkspaceTotalCount,
     };
     const workspaceQueueChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
+      const definition = getOpsWorkspaceQueueDefinition(workspaceKey);
       const section =
         visibleWorkspaceSections.find((item) => item.key === workspaceKey) ??
         workspaceTabs.find((item) => item.key === workspaceKey) ??
         workspaceTabs[0];
-      const chipBucket =
-        workspaceKey === "need_to_schedule"
-          ? "pending"
-          : workspaceKey === "field_work"
-          ? "field_work"
-          : workspaceKey === "waiting"
-          ? "waiting"
-          : workspaceKey === "exceptions"
-          ? "exceptions"
-          : workspaceKey === "closeout"
-          ? "closeout"
-          : workspaceKey === "follow_ups"
-          ? "follow_ups"
-          : workspaceKey === "contractor_intake"
-          ? "contractor_intake"
-          : workspaceKey === "permits"
-          ? "permits"
-          : "all";
       const previewRows = "previewRows" in section && Array.isArray(section.previewRows) ? section.previewRows : [];
       const isSelected = workspaceKey === selectedWorkspaceSection?.key;
       return {
         ...section,
-        bucket: chipBucket,
-        mobileLabel: workspaceKey === "need_to_schedule"
-          ? "Scheduling"
-          : workspaceKey === "waiting"
-          ? "Waiting"
-          : workspaceKey === "contractor_intake"
-          ? "Intake"
-          : workspaceKey === "follow_ups"
-          ? "Follow Ups"
-          : workspaceKey === "permits"
-          ? "Permits"
-          : section.label,
+        bucket: definition.bucket,
+        mobileLabel: definition.mobileLabel,
         isSelected,
         previewRows,
         count: section.count,
-        href: `/ops${buildQueryString({
-          bucket: chipBucket,
+        href: opsWorkspaceQueueHref(definition.bucket, {
           contractor: contractorFocusFilter ?? "",
           sort: boardSort === "oldest" ? "" : boardSort,
-        })}#ops-workspace`,
+        }),
       };
     });
     const hiddenTodayWorkspaceTabs = workspaceTabs.filter(
@@ -1414,13 +1240,11 @@ export default async function OpsPage({
     opsStatusEnteredAtByJob = buildOpsStatusEnteredAtByJob(
       selectedPreviewJobEvents.filter((event: any) => String(event?.event_type ?? "") === "ops_update"),
     );
-    followUpEnteredAtByJob = buildFollowUpEnteredAtByJob(selectedPreviewJobEvents);
-    latestJobEventByJob = buildLatestJobEventByJob(selectedPreviewJobEvents);
-    latestContractorReportSentAtByJob = buildLatestContractorReportSentAtByJob(
-      selectedPreviewContractorReportEventsRes.data ?? [],
-    );
-    latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
-    primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
+    workspaceEvidence = buildOpsWorkspaceEvidenceIndex({
+      jobEvents: selectedPreviewJobEvents,
+      contractorReportEvents: selectedPreviewContractorReportEventsRes.data ?? [],
+      failedRuns: selectedPreviewFailedRunsRes.data ?? [],
+    });
 
     // Oldest/Newest describe time in the active queue, matching the "In queue"
     // badge. Assemble status and failed-test evidence before applying the
@@ -1721,10 +1545,10 @@ export default async function OpsPage({
           serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
           stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
           failedEvidenceAt: failedStatusSinceByJob(jobId),
-          primaryFailureReason: primaryFailureReasonByJob.get(jobId) ?? null,
+          primaryFailureReason: workspaceEvidence.primaryFailureReasonByJob.get(jobId) ?? null,
           assignmentSummary: fallbackAssignmentSummary,
           failureReportSent: queueKey === "exceptions"
-            ? latestContractorReportSentAtByJob.has(jobId)
+            ? workspaceEvidence.latestContractorReportSentAtByJob.has(jobId)
             : null,
           now: focusedQueuePresentationNow,
         });
@@ -1755,7 +1579,7 @@ export default async function OpsPage({
       const fallbackStateChips = deriveOpsQueueStateChips(visibleReason.label, fallbackAssignmentSummary);
       if (queueKey === "exceptions" && visibleReason.label.trim().toLowerCase().startsWith("failed ecc")) {
         fallbackStateChips.push(
-          latestContractorReportSentAtByJob.has(jobId)
+          workspaceEvidence.latestContractorReportSentAtByJob.has(jobId)
             ? { label: "Failure report sent", tone: "green" }
             : { label: "Failure report not sent", tone: "amber" },
         );
@@ -1891,7 +1715,7 @@ export default async function OpsPage({
     // server renders, so a client-only switch left them showing the wrong
     // bucket's contractor counts. Server-nav chips keep the rendered bucket and
     // those facets in sync.
-    const activeWorkspaceQueueKey = boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter];
+    const activeWorkspaceQueueKey = resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter);
     const opsRailQueueOrder = [
       "need_to_schedule",
       "exceptions",
