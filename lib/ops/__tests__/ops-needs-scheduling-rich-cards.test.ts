@@ -6,6 +6,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const rowViewsSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-row-views.ts"),
+  "utf-8",
+);
 const opsWorkspaceQueuesSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
   "utf-8",
@@ -15,26 +19,22 @@ const rowCardSource = readFileSync(
   "utf-8",
 );
 
-const buildNeedsSchedulingStart = opsPageSource.indexOf("function buildNeedsSchedulingRowView(");
-const buildNeedsSchedulingEnd = opsPageSource.indexOf("function formatWorkspaceUsdFromCents", buildNeedsSchedulingStart);
+const buildNeedsSchedulingStart = rowViewsSource.indexOf("function buildNeedsSchedulingRowView(");
+const buildNeedsSchedulingEnd = rowViewsSource.indexOf("function buildCloseoutRowView(", buildNeedsSchedulingStart);
 const buildNeedsSchedulingSource =
   buildNeedsSchedulingStart > -1 && buildNeedsSchedulingEnd > buildNeedsSchedulingStart
-    ? opsPageSource.slice(buildNeedsSchedulingStart, buildNeedsSchedulingEnd)
+    ? rowViewsSource.slice(buildNeedsSchedulingStart, buildNeedsSchedulingEnd)
     : "";
 
-const buildCloseoutStart = opsPageSource.indexOf("function buildCloseoutRowView(");
-const buildCloseoutEnd = opsPageSource.indexOf("function formatFollowUpOwner", buildCloseoutStart);
+const buildCloseoutStart = rowViewsSource.indexOf("function buildCloseoutRowView(");
+const buildCloseoutEnd = rowViewsSource.indexOf("function buildFollowUpRowView(", buildCloseoutStart);
 const buildCloseoutSource =
   buildCloseoutStart > -1 && buildCloseoutEnd > buildCloseoutStart
-    ? opsPageSource.slice(buildCloseoutStart, buildCloseoutEnd)
+    ? rowViewsSource.slice(buildCloseoutStart, buildCloseoutEnd)
     : "";
 
-const buildFieldPaymentStart = opsPageSource.indexOf("function buildFieldPaymentReviewRowView(");
-const buildFieldPaymentEnd = opsPageSource.indexOf("const selectedWorkspaceItemNoun", buildFieldPaymentStart);
-const buildFieldPaymentSource =
-  buildFieldPaymentStart > -1 && buildFieldPaymentEnd > buildFieldPaymentStart
-    ? opsPageSource.slice(buildFieldPaymentStart, buildFieldPaymentEnd)
-    : "";
+const buildFieldPaymentStart = rowViewsSource.indexOf("const buildFieldPaymentReviewRowView = (");
+const buildFieldPaymentSource = buildFieldPaymentStart > -1 ? rowViewsSource.slice(buildFieldPaymentStart) : "";
 
 const activeQueueRowsStart = opsPageSource.indexOf("const activeQueueRows: OpsBoardActiveQueueRow[]");
 const activeQueueRowsEnd = opsPageSource.indexOf("const activeQueuePinnedViews", activeQueueRowsStart);
@@ -72,8 +72,9 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(opsWorkspaceQueuesSource).toContain('pending: "need_to_schedule"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Needs Scheduling"');
     expect(needsSchedulingCardSource).toContain("<MobileOpsCard");
-    expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "need_to_schedule"');
-    expect(activeQueueRowsSource).toContain("buildNeedsSchedulingRowView(job, visibleReason)");
+    expect(rowViewsSource).toContain('if (queueKey === "need_to_schedule")');
+    expect(rowViewsSource).toContain("return buildNeedsSchedulingRowView(job, reason, formattedRecentAttempt);");
+    expect(activeQueueRowsSource).toContain("rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key)");
   });
 
   it("does not cap the selected Needs Scheduling workspace list at the generic ten-row preview limit", () => {
@@ -85,15 +86,15 @@ describe("/ops Needs Scheduling rich cards", () => {
   it("keeps contact timestamp display wired to the existing recent-attempt read model on the workspace cards", () => {
     expect(opsPageSource).toContain("buildLatestCustomerAttemptByJob");
     expect(opsPageSource).toContain('.eq("event_type", "customer_attempt")');
-    expect(buildNeedsSchedulingSource).toContain(
-      "resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null)",
-    );
+    expect(rowViewsSource).toContain("resolveRecentAttemptDisplay(");
+    expect(rowViewsSource).toContain("context.latestCustomerAttemptByJob.get(job.id) ?? null");
+    expect(buildNeedsSchedulingSource).toContain("formattedRecentAttempt");
     expect(needsSchedulingCardSource).toContain("Last Attempt");
   });
 
   it("shows contractor context without duplicating it in the action area", () => {
     expect(buildNeedsSchedulingSource).toContain(
-      "workspaceContractorName(job) || operationalTenantIdentity.displayName",
+      "workspaceContractorName(job) || context.defaultContractorName",
     );
     expect(needsSchedulingCardSource).toContain(
       '{ label: "Contractor", value: view.contractorName || "Internal work"',
@@ -103,21 +104,17 @@ describe("/ops Needs Scheduling rich cards", () => {
   });
 
   it("keeps scheduling controls out of the compact card while preserving its job destination", () => {
-    expect(opsPageSource).toContain('import { updateJobScheduleFromForm } from "@/lib/actions";');
     expect(needsSchedulingCardSource).toContain("phoneHref={phoneHref}");
     expect(needsSchedulingCardSource).not.toContain("form action={updateJobScheduleFromForm}");
     expect(needsSchedulingCardSource).not.toContain('name="scheduled_date"');
     expect(needsSchedulingCardSource).not.toContain("Save Schedule");
-    expect(buildNeedsSchedulingSource).toContain("returnToHref: activeWorkspaceHref");
+    expect(buildNeedsSchedulingSource).toContain("returnToHref: context.activeWorkspaceHref");
     expect(opsPageSource).toContain("const activeWorkspaceHref");
     expect(opsPageSource).toContain("contractor: contractorFocusFilter ?? \"\"");
     expect(opsPageSource).toContain("reason: effectiveBoardReasonFilter");
   });
 
   it("keeps direct call and text links but hides contact logging controls", () => {
-    expect(opsPageSource).toContain(
-      'import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";',
-    );
     expect(needsSchedulingCardSource).not.toContain("form action={logCustomerContactAttemptFromForm}");
     expect(needsSchedulingCardSource).not.toContain("Log Call");
     expect(needsSchedulingCardSource).not.toContain("Log Text Attempt");
@@ -125,9 +122,9 @@ describe("/ops Needs Scheduling rich cards", () => {
   });
 
   it("preserves compact workspace card rendering for queues that have not been promoted", () => {
-    expect(activeQueueRowsSource).toMatch(
-      /selectedWorkspaceSection\.key === "need_to_schedule"[\s\S]+buildNeedsSchedulingRowView\(job, visibleReason\)[\s\S]+buildGenericRowView\(job, visibleReason, selectedWorkspaceSection\.key\)/,
-    );
+    expect(rowViewsSource).toContain('if (queueKey === "need_to_schedule")');
+    expect(rowViewsSource).toContain("return buildGenericRowView(job, reason, queueKey, formattedRecentAttempt);");
+    expect(activeQueueRowsSource).toContain("rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key)");
     expect(activeQueueRowsSource).not.toContain('selectedWorkspaceSection.key === "field_work"');
     expect(activeQueueRowsSource).not.toContain('selectedWorkspaceSection.key === "waiting"');
   });
@@ -138,14 +135,15 @@ describe("/ops Closeout rich cards", () => {
     expect(opsWorkspaceQueuesSource).toContain('closeout: "closeout"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Closeout & Review"');
     expect(closeoutCardSource).toContain("<MobileOpsCard");
-    expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "closeout"');
-    expect(activeQueueRowsSource).toContain("buildCloseoutRowView(job, visibleReason)");
+    expect(rowViewsSource).toContain('if (queueKey === "closeout")');
+    expect(rowViewsSource).toContain("return buildCloseoutRowView(job, reason, formattedRecentAttempt);");
+    expect(activeQueueRowsSource).toContain("rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key)");
   });
 
   it("uses closeout projection for the compact next step without inline mutation actions", () => {
     expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
     expect(opsPageSource).toContain("const selectedWorkspaceCloseoutProjectionByJob");
-    expect(buildCloseoutSource).toContain("selectedWorkspaceCloseoutProjectionByJob.get(jobId) ?? job");
+    expect(buildCloseoutSource).toContain("context.closeoutProjectionByJob.get(jobId) ?? job");
     expect(buildCloseoutSource).toContain("getCloseoutQueueNextStepLabel(projection)");
     expect(closeoutCardSource).not.toContain("form action={markInvoiceCompleteFromForm}");
     expect(closeoutCardSource).not.toContain("External Billing Complete");
@@ -160,14 +158,14 @@ describe("/ops Closeout rich cards", () => {
   });
 
   it("wires optional confirm-payment cards through the existing verification actions", () => {
-    expect(opsPageSource).toContain("buildFieldPaymentReviewRowView(item)");
+    expect(opsPageSource).toContain("rowViewBuilders.buildFieldPaymentReviewRowView(item)");
     expect(fieldPaymentCardSource).toContain("form action={verifyFieldPaymentCollectionReportFromForm}");
     expect(fieldPaymentCardSource).toContain("form action={rejectFieldPaymentCollectionReportFromForm}");
     expect(fieldPaymentCardSource).toContain("Reporter cannot verify their own report.");
     expect(fieldPaymentCardSource).toContain("Confirm Payment");
     expect(fieldPaymentCardSource).toContain("Reject Report");
     expect(fieldPaymentCardSource).toContain('name="return_to" value={view.returnToHref}');
-    expect(buildFieldPaymentSource).toContain("returnToHref: `${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`");
+    expect(buildFieldPaymentSource).toContain("returnToHref: `${context.activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`");
     expect(
       readFileSync(resolve(__dirname, "../../actions/internal-invoice-payment-actions.ts"), "utf-8"),
     ).toContain("'/ops'");
@@ -177,6 +175,6 @@ describe("/ops Closeout rich cards", () => {
     expect(activeQueueRowsSource).not.toContain('selectedWorkspaceSection.key === "field_work"');
     expect(activeQueueRowsSource).not.toContain('selectedWorkspaceSection.key === "waiting"');
     expect(activeQueueRowsSource).not.toContain('selectedWorkspaceSection.key === "exceptions"');
-    expect(activeQueueRowsSource).toContain("buildGenericRowView");
+    expect(rowViewsSource).toContain("return buildGenericRowView(job, reason, queueKey, formattedRecentAttempt);");
   });
 });

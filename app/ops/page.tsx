@@ -2,17 +2,9 @@
 import Link from "next/link";
 import ContractorFocusSelector from "./_components/ContractorFocusSelector";
 import QueueCard from "@/components/ops/QueueCard";
-import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import ServiceLocationAddressFields from "@/components/addresses/ServiceLocationAddressFields";
 import { redirect } from "next/navigation";
-import { updateJobScheduleFromForm } from "@/lib/actions";
-import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
-import { markInvoiceCompleteFromForm } from "@/lib/actions/job-ops-actions";
-import {
-  rejectFieldPaymentCollectionReportFromForm,
-  verifyFieldPaymentCollectionReportFromForm,
-} from "@/lib/actions/internal-invoice-payment-actions";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
@@ -26,15 +18,8 @@ import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/busine
 import { listSenderWorkshareConnectionsForReceiver } from "@/lib/workflows/account-workshare-connections-read";
 import { countReturnedWorkshareRequestsForSender } from "@/lib/workflows/account-workshare-requests-read";
 
-import {
-  formatBusinessDateUS,
-  displayWindowLA,
-  startOfTodayUtcIsoLA,
-  startOfTomorrowUtcIsoLA,
-} from "@/lib/utils/schedule-la";
-import { formatCityNamePart, formatPersonNamePart } from "@/lib/utils/identity-display";
-import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
-import { getCloseoutNeeds, getCloseoutQueueNextStepLabel } from "@/lib/utils/closeout";
+import { startOfTodayUtcIsoLA, startOfTomorrowUtcIsoLA } from "@/lib/utils/schedule-la";
+import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { getActiveJobAssignmentDisplayMap, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
@@ -52,13 +37,8 @@ import {
   resumeInternalPermitRequest,
   updateInternalPermitRequestIntake,
 } from "@/lib/actions/internal-permit-request-actions";
-import {
-  buildOpsStatusEnteredAtByJob,
-  resolveLifecycleDaysAgingLabel,
-} from "@/lib/utils/lifecycle-aging";
-import {
-  listCloseoutQueueJobs,
-} from "@/lib/ops/closeout-queue";
+import { buildOpsStatusEnteredAtByJob } from "@/lib/utils/lifecycle-aging";
+import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 import { type FocusedQueueJob } from "@/lib/ops/focused-queues";
 import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
 import {
@@ -74,10 +54,7 @@ import {
 import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
 import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
-import {
-  buildLatestCustomerAttemptByJob,
-  resolveRecentAttemptDisplay,
-} from "@/lib/ops/recent-attempt-display";
+import { buildLatestCustomerAttemptByJob } from "@/lib/ops/recent-attempt-display";
 import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
 import {
   OPS_BOARD_SORT_OPTIONS,
@@ -98,31 +75,17 @@ import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
   getOpsBoardReasonLabel,
-  getOpsBoardVisibleReason,
   normalizeOpsBoardReason,
-  type OpsBoardVisibleReason,
 } from "@/lib/ops/ops-board-reasons";
 import OpsBoardActiveQueuePanel, {
   type OpsBoardActiveQueueRow,
 } from "./_components/OpsBoardActiveQueuePanel";
 import OpsMobileQueueSwitcher from "./_components/OpsMobileQueueSwitcher";
-import type {
-  CloseoutRowView,
-  FieldPaymentReviewRowView,
-  FollowUpRowView,
-  GenericRowView,
-  NeedsSchedulingRowView,
-  OpsQueueRowView,
-} from "./_components/OpsQueueRowCard";
 import {
-  formatAssignmentSummaryForJob,
-  getOpsQueueCardStatusReason,
-} from "@/lib/ops/focused-queues";
-import { buildFocusedQueueRowPresentation } from "@/lib/ops/focused-queue-row-presentation";
-import {
-  buildOpsWorkspaceEvidenceIndex,
-  opsWorkspaceEvidenceEpochMs,
-} from "@/lib/ops/ops-workspace-evidence";
+  createOpsWorkspaceRowViewBuilders,
+  type OpsWorkspaceRowJob,
+} from "@/lib/ops/ops-workspace-row-views";
+import { buildOpsWorkspaceEvidenceIndex } from "@/lib/ops/ops-workspace-evidence";
 import {
   listActivePermitRequestQueueRowsIfAvailable,
   type PermitRequestQueueRow,
@@ -386,7 +349,6 @@ export default async function OpsPage({
       };
     });
   }
-  const isHvacServiceMode = productMode === "hvac_service";
   const canCreateEccBatchInvoice =
     canViewFinancialRegisterForAccount &&
     billingMode === "internal_invoicing" &&
@@ -411,224 +373,9 @@ export default async function OpsPage({
     return result;
   });
 
-  function workspaceTitle(job: any) {
-    return normalizeRetestLinkedJobTitle(job?.title) || `Job ${String(job?.id ?? "").slice(0, 8)}`;
-  }
-
-  function workspaceCustomerLocation(job: any) {
-    const customer = [formatPersonNamePart(job?.customer_first_name), formatPersonNamePart(job?.customer_last_name)]
-      .filter(Boolean)
-      .join(" ");
-    const location = [String(job?.job_address ?? "").trim(), formatCityNamePart(job?.city)]
-      .filter(Boolean)
-      .join(", ");
-
-    if (customer && location) return `${customer} · ${location}`;
-    return customer || location || "Customer / location pending";
-  }
-
-  function workspaceCustomerName(job: any) {
-    return (
-      [formatPersonNamePart(job?.customer_first_name), formatPersonNamePart(job?.customer_last_name)]
-        .filter(Boolean)
-        .join(" ") || "Customer pending"
-    );
-  }
-
-  function workspaceLocation(job: any) {
-    return (
-      [String(job?.job_address ?? "").trim(), formatCityNamePart(job?.city)]
-        .filter(Boolean)
-        .join(", ") || "Location pending"
-    );
-  }
-
-  function workspaceJobTypeLabel(job: any) {
-    return String(job?.job_type ?? "Job").trim().replace(/[_-]+/g, " ") || "Job";
-  }
-
-  function workspaceContractorName(job: any) {
-    return String((job as any)?.contractors?.name ?? "").trim();
-  }
-
   // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
   let workspaceEvidence = buildOpsWorkspaceEvidenceIndex();
-
-  function failedStatusSinceByJob(jobId: string): string | null {
-    const run = workspaceEvidence.latestFailedRunByJob.get(jobId);
-    if (!run) return null;
-
-    const createdAt = String((run as any)?.created_at ?? "").trim();
-    return createdAt || null;
-  }
-
-  function timeToTimeInput(value?: string | null) {
-    const raw = String(value ?? "").trim();
-    if (!raw) return "";
-    const hhmm = /^\d{2}:\d{2}/.test(raw) ? raw.slice(0, 5) : "";
-    return hhmm || "";
-  }
-
-  function workspaceAgeLabel(job: any) {
-    const jobId = String(job?.id ?? "").trim();
-    return (
-      resolveLifecycleDaysAgingLabel({
-        status: String(job?.status ?? "").trim() || null,
-        opsStatus: String(job?.ops_status ?? "").trim() || null,
-        createdAt: String(job?.created_at ?? "").trim() || null,
-        scheduledDate: String(job?.scheduled_date ?? "").trim() || null,
-        fieldCompleteAt: String(job?.field_complete_at ?? "").trim() || null,
-        stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
-        failedEvidenceAt: failedStatusSinceByJob(jobId),
-      }) ?? "Not available"
-    );
-  }
-
-  function compactDurationSince(value?: string | null) {
-    const startMs = opsWorkspaceEvidenceEpochMs(value);
-    if (!startMs) return "Unknown";
-
-    const elapsedMs = Math.max(0, Date.now() - startMs);
-    const days = Math.floor(elapsedMs / 86_400_000);
-    if (days >= 1) return `${days}d`;
-
-    const hours = Math.floor(elapsedMs / 3_600_000);
-    if (hours >= 1) return `${hours}h`;
-
-    return "Today";
-  }
-
-  function formatJobEventLabel(event: any) {
-    const message = String(event?.message ?? "").replace(/\s+/g, " ").trim();
-    if (message) return message.length > 42 ? `${message.slice(0, 39)}...` : message;
-
-    const eventType = String(event?.event_type ?? "").trim();
-    if (!eventType) return "Updated";
-    return eventType.replace(/_/g, " ").replace(/\b\w/g, (match) => match.toUpperCase());
-  }
-
-  function workspaceQueueEnteredAt(job: any, queueKey: string) {
-    const jobId = String(job?.id ?? "").trim();
-    const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
-
-    if (queueKey === "follow_ups") {
-      return (jobId ? workspaceEvidence.followUpEnteredAtByJob.get(jobId) ?? null : null) || String(job?.created_at ?? "").trim() || null;
-    }
-
-    if (queueKey === "closeout") {
-      return String(job?.field_complete_at ?? "").trim() || (jobId ? opsStatusEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) || String(job?.created_at ?? "").trim() || null;
-    }
-
-    if (queueKey === "exceptions") {
-      return (jobId ? opsStatusEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) || failedStatusSinceByJob(jobId) || String(job?.created_at ?? "").trim() || null;
-    }
-
-    return (jobId ? opsStatusEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) || String(job?.created_at ?? "").trim() || null;
-  }
-
-  function workspaceQueueClockTag(job: any, queueKey: string) {
-    const enteredAt = workspaceQueueEnteredAt(job, queueKey);
-    if (!enteredAt) return workspaceAgeLabel(job);
-    return `${compactDurationSince(enteredAt)} · ${formatWorkspaceTimestamp(enteredAt)}`;
-  }
-
-  function workspaceQueueAgeDays(job: any, queueKey: string): number | null {
-    const enteredAt = workspaceQueueEnteredAt(job, queueKey);
-    const startMs = opsWorkspaceEvidenceEpochMs(enteredAt);
-    if (!startMs) return null;
-    return Math.floor(Math.max(0, Date.now() - startMs) / 86_400_000);
-  }
-
-  function workspaceQueueAgeChipLabel(job: any, queueKey: string): string {
-    const days = workspaceQueueAgeDays(job, queueKey);
-    return days === null ? "In queue" : `In queue ${days}d`;
-  }
-
-  function deriveOpsQueueStateChips(
-    reasonLabel: string,
-    assignmentSummary?: string
-  ): { label: string; tone: "rose" | "amber" | "slate" | "green" }[] {
-    const chips: { label: string; tone: "rose" | "amber" | "slate" | "green" }[] = [];
-    const normalized = reasonLabel.trim().toLowerCase();
-
-    if (normalized.startsWith("failed ecc")) {
-      chips.push({ label: "Failed ECC", tone: "rose" });
-    } else if (normalized === "needs retest") {
-      chips.push({ label: "Needs Retest", tone: "amber" });
-    } else if (normalized === "on hold") {
-      chips.push({ label: "On Hold", tone: "slate" });
-    } else if (normalized === "blocked" || normalized === "missing information") {
-      chips.push({ label: reasonLabel, tone: "amber" });
-    }
-
-    if (assignmentSummary && assignmentSummary.trim().toLowerCase() === "unassigned") {
-      chips.push({ label: "Unassigned", tone: "amber" });
-    }
-
-    return chips;
-  }
-
-  function deriveOpsQueueCardTone(
-    stateChips: { tone: "rose" | "amber" | "slate" | "green" }[]
-  ): "rose" | "amber" | "slate" | "green" {
-    if (stateChips.some((chip) => chip.tone === "rose")) return "rose";
-    if (stateChips.some((chip) => chip.tone === "amber")) return "amber";
-    return "slate";
-  }
-
-  function workspaceLastActionTag(job: any) {
-    const jobId = String(job?.id ?? "").trim();
-    const latestEvent = jobId ? workspaceEvidence.latestJobEventByJob.get(jobId) : null;
-    if (latestEvent?.created_at) {
-      return `${formatJobEventLabel(latestEvent)} · ${formatWorkspaceTimestamp(String(latestEvent.created_at))}`;
-    }
-
-    const createdAt = String(job?.created_at ?? "").trim();
-    return createdAt ? `Created · ${formatWorkspaceTimestamp(createdAt)}` : "No activity";
-  }
-
-  function wsStatusReason(job: any, queueKey: string) {
-    const lifecycle = String(job?.status ?? "").toLowerCase();
-    const specificFailureReason = workspaceFailedReason(job);
-
-    if (queueKey === "need_to_schedule") return "Awaiting scheduling";
-    if (queueKey === "field_work") {
-      if (lifecycle === "on_the_way") return "On the way";
-      if (lifecycle === "in_progress") return "In progress";
-      return "Scheduled field work";
-    }
-    if (queueKey === "without_tech") return "Scheduled without an active assignee";
-    if (specificFailureReason) return specificFailureReason;
-    return getOpsQueueCardStatusReason(job);
-  }
-
-  function workspaceReasonInput(job: any) {
-    const jobId = String(job?.id ?? "").trim();
-    return {
-      ...job,
-      next_action_note: job?.next_action_note ?? null,
-      ops_board_failure_note: job?.ops_board_failure_note ?? null,
-      ops_board_failure_detail: jobId ? workspaceEvidence.primaryFailureReasonByJob.get(jobId) ?? null : null,
-    };
-  }
-
-  function workspaceVisibleReasonDisplay(job: any, queueKey: string): OpsBoardVisibleReason {
-    return getOpsBoardVisibleReason(workspaceReasonInput(job), () => wsStatusReason(job, queueKey), { queueKey });
-  }
-
-  function workspaceFailedReason(job: any) {
-    const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
-    if (opsStatus === "retest_needed") return "Retest Needed";
-    if (opsStatus === "pending_office_review") return "Correction Required";
-    if (opsStatus !== "failed") return "";
-
-    const failedNote = String(job?.ops_board_failure_note ?? "").trim();
-    if (failedNote) return `Failed Test - ${failedNote}`;
-
-    const jobId = String(job?.id ?? "").trim();
-    return (jobId ? workspaceEvidence.primaryFailureReasonByJob.get(jobId) ?? "" : "") || "Failed";
-  }
 
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
   const wsStartTomorrowUtc = startOfTomorrowUtcIsoLA();
@@ -1246,16 +993,6 @@ export default async function OpsPage({
       failedRuns: selectedPreviewFailedRunsRes.data ?? [],
     });
 
-    // Oldest/Newest describe time in the active queue, matching the "In queue"
-    // badge. Assemble status and failed-test evidence before applying the
-    // queue-aware ordering so the sort and rendered badge use identical data.
-    if (selectedWorkspaceSection && selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake") {
-      const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows, boardSort, {
-        queueEnteredAt: (job) => workspaceQueueEnteredAt(job, selectedWorkspaceKey),
-      });
-      selectedWorkspaceSection.previewRows.splice(0, selectedWorkspaceSection.previewRows.length, ...queueSortedRows);
-    }
-
     const selectedPreviewLatestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
       (selectedPreviewCustomerAttemptEventsRes.data ?? []) as Array<{ job_id: string; created_at: string }>,
     );
@@ -1340,296 +1077,33 @@ export default async function OpsPage({
       signal,
     })}`;
     const activeWorkspaceHref = `${activeWorkspaceBaseHref}#ops-workspace`;
+    const rowViewBuilders = createOpsWorkspaceRowViewBuilders({
+      accountTimeZone,
+      activeWorkspaceBaseHref,
+      activeWorkspaceHref,
+      actorUserId: user.id,
+      assignmentDisplayMap: selectedPreviewAssignmentDisplayMap,
+      closeoutProjectionByJob: selectedWorkspaceCloseoutProjectionByJob,
+      defaultContractorName: operationalTenantIdentity.displayName,
+      followUpTodayDate,
+      latestCustomerAttemptByJob: selectedPreviewLatestCustomerAttemptByJob,
+      opsStatusEnteredAtByJob,
+      serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
+      workspaceEvidence,
+    });
+
+    // Oldest/Newest describe time in the active queue, matching the "In queue"
+    // badge. Evidence and the presentation service are assembled first so the
+    // sort and rendered age badge use the same queue-entry policy.
+    if (selectedWorkspaceSection && selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake") {
+      const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows, boardSort, {
+        queueEnteredAt: (job) => rowViewBuilders.queueEnteredAt(job as OpsWorkspaceRowJob, selectedWorkspaceKey),
+      });
+      selectedWorkspaceSection.previewRows.splice(0, selectedWorkspaceSection.previewRows.length, ...queueSortedRows);
+    }
+
     const canShowJobQueueExport = selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake";
     const canExportContractorSafeCsv = contractorFocusIds.length > 0;
-
-    function buildNeedsSchedulingRowView(job: any, visibleReason: OpsBoardVisibleReason): NeedsSchedulingRowView {
-      const jobId = String(job?.id ?? "").trim();
-      const recentAttemptDisplay = resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null);
-      const contractorName = workspaceContractorName(job) || operationalTenantIdentity.displayName;
-      const needsSchedulingStateChips = deriveOpsQueueStateChips(visibleReason.label);
-
-      return {
-        kind: "need_to_schedule",
-        jobId,
-        href: `/jobs/${jobId}?tab=ops`,
-        title: workspaceTitle(job),
-        subtitle: workspaceCustomerLocation(job),
-        jobTypeLabel: workspaceJobTypeLabel(job),
-        customerName: workspaceCustomerName(job),
-        address: workspaceLocation(job),
-        reasonLabel: visibleReason.label,
-        reasonDetail: visibleReason.detail,
-        ageLabel: workspaceQueueAgeChipLabel(job, "need_to_schedule"),
-        ageDays: workspaceQueueAgeDays(job, "need_to_schedule"),
-        stateChips: needsSchedulingStateChips,
-        tone: deriveOpsQueueCardTone(needsSchedulingStateChips),
-        lastActionText: workspaceLastActionTag(job),
-        recentAttemptText: recentAttemptDisplay,
-        contractorName,
-        phone: String(job?.customer_phone ?? "").trim(),
-        scheduleDateText: job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Not scheduled",
-        scheduleWindowText: displayWindowLA(job?.window_start, job?.window_end) || (job?.scheduled_date ? "Window TBD" : ""),
-        scheduledDateRaw: String(job?.scheduled_date ?? ""),
-        windowStartInput: timeToTimeInput(job?.window_start),
-        windowEndInput: timeToTimeInput(job?.window_end),
-        permitNumber: String(job?.permit_number ?? ""),
-        jurisdiction: String(job?.jurisdiction ?? ""),
-        permitDate: String(job?.permit_date ?? ""),
-        returnToHref: activeWorkspaceHref,
-      };
-    }
-
-    function formatWorkspaceUsdFromCents(cents: number | null | undefined) {
-      const amount = Number(cents ?? 0) / 100;
-      return new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-      }).format(Number.isFinite(amount) ? amount : 0);
-    }
-
-    function formatWorkspaceFieldPaymentMethod(method: string | null | undefined) {
-      const normalized = String(method ?? "").trim().toLowerCase();
-      if (normalized === "cash") return "Cash";
-      if (normalized === "check") return "Check";
-      return "Other";
-    }
-
-    function formatWorkspaceTimestamp(value: string | null | undefined) {
-      return formatTimestampInAccountTimeZone(value, accountTimeZone, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-        timeZoneName: "short",
-      });
-    }
-
-    function buildCloseoutRowView(job: any, visibleReason: OpsBoardVisibleReason): CloseoutRowView {
-      const jobId = String(job?.id ?? "").trim();
-      const projection = selectedWorkspaceCloseoutProjectionByJob.get(jobId) ?? job;
-      const needs = getCloseoutNeeds(projection);
-      const assignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
-      const closeoutStateChips = deriveOpsQueueStateChips(visibleReason.label, assignmentSummary);
-      const needsLabel =
-        needs.needsInvoice && needs.needsCerts
-          ? "Invoice + paperwork"
-          : needs.needsInvoice
-          ? "Invoice"
-          : needs.needsCerts
-          ? "Paperwork"
-          : "Review";
-
-      return {
-        kind: "closeout",
-        jobId,
-        cardDomId: `ops-workspace-closeout-job-${jobId}`,
-        href: `/jobs/${jobId}?tab=ops`,
-        title: workspaceTitle(job),
-        subtitle: workspaceCustomerLocation(job),
-        jobTypeLabel: workspaceJobTypeLabel(job),
-        customerName: workspaceCustomerName(job),
-        address: workspaceLocation(job),
-        reasonLabel: visibleReason.label,
-        reasonDetail: visibleReason.detail,
-        ageLabel: workspaceQueueAgeChipLabel(job, "closeout"),
-        ageDays: workspaceQueueAgeDays(job, "closeout"),
-        stateChips: closeoutStateChips,
-        tone: deriveOpsQueueCardTone(closeoutStateChips),
-        lastActionText: workspaceLastActionTag(job),
-        recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
-        needsLabel,
-        contractorName: workspaceContractorName(job),
-        scheduledText: job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "",
-        assignmentSummary,
-        nextStepText: getCloseoutQueueNextStepLabel(projection),
-      };
-    }
-
-    function formatFollowUpOwner(value: unknown) {
-      const normalized = String(value ?? "").trim().toLowerCase();
-      if (normalized === "customer") return "Customer";
-      if (normalized === "contractor") return "Contractor";
-      if (normalized === "rater") return "Rater";
-      return "Office";
-    }
-
-    function businessDateToUtcMs(value: string) {
-      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? "").trim());
-      if (!match) return null;
-      const [, year, month, day] = match;
-      return Date.UTC(Number(year), Number(month) - 1, Number(day));
-    }
-
-    function followUpUrgency(dueDate: string) {
-      const dueMs = businessDateToUtcMs(dueDate);
-      const todayMs = businessDateToUtcMs(followUpTodayDate);
-      if (dueMs === null || todayMs === null) {
-        return {
-          variant: "follow-up-unscheduled",
-          label: "Needs date",
-        };
-      }
-
-      const daysUntilDue = Math.round((dueMs - todayMs) / 86_400_000);
-      if (daysUntilDue < 0) {
-        return {
-          variant: "follow-up-overdue",
-          label: `${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) === 1 ? "" : "s"} overdue`,
-        };
-      }
-      if (daysUntilDue === 0) {
-        return {
-          variant: "follow-up-due",
-          label: "Due today",
-        };
-      }
-      if (daysUntilDue <= 2) {
-        return {
-          variant: "follow-up-soon",
-          label: `Due in ${daysUntilDue} day${daysUntilDue === 1 ? "" : "s"}`,
-        };
-      }
-      return {
-        variant: "follow-up-future",
-        label: `Due in ${daysUntilDue} days`,
-      };
-    }
-
-    function buildFollowUpRowView(job: any): FollowUpRowView {
-      const jobId = String(job?.id ?? "").trim();
-      const note = String(job?.next_action_note ?? "").trim() || "No reminder note added.";
-      const dueDate = String(job?.follow_up_date ?? "").trim();
-      const owner = formatFollowUpOwner(job?.action_required_by);
-      const statusLabel = getOpsQueueCardStatusReason(job);
-      const urgency = followUpUrgency(dueDate);
-      const urgencyTone =
-        urgency.variant === "follow-up-overdue" || urgency.variant === "follow-up-due"
-          ? "rose"
-          : urgency.variant === "follow-up-soon" || urgency.variant === "follow-up-unscheduled"
-          ? "amber"
-          : "slate";
-
-      return {
-        kind: "follow_ups",
-        jobId,
-        cardDomId: `ops-workspace-follow-up-job-${jobId}`,
-        href: `/jobs/${jobId}/v2#followup`,
-        title: workspaceTitle(job),
-        subtitle: workspaceCustomerLocation(job),
-        jobTypeLabel: workspaceJobTypeLabel(job),
-        customerName: workspaceCustomerName(job),
-        address: workspaceLocation(job),
-        dueText: dueDate ? formatBusinessDateUS(dueDate) : "No date set",
-        urgencyLabel: urgency.label,
-        urgencyTone,
-        ageLabel: workspaceQueueAgeChipLabel(job, "follow_ups"),
-        ageDays: workspaceQueueAgeDays(job, "follow_ups"),
-        lastActionText: workspaceLastActionTag(job),
-        recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
-        owner,
-        statusLabel,
-        note,
-      };
-    }
-
-    const focusedQueuePresentationNow = new Date();
-
-    function buildGenericRowView(job: any, visibleReason: OpsBoardVisibleReason, queueKey: string): GenericRowView {
-      const jobId = String(job?.id ?? "").trim();
-      const fallbackAssignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
-      if (queueKey === "waiting" || queueKey === "exceptions") {
-        const presentation = buildFocusedQueueRowPresentation({
-          job,
-          queueKey,
-          serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
-          stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
-          failedEvidenceAt: failedStatusSinceByJob(jobId),
-          primaryFailureReason: workspaceEvidence.primaryFailureReasonByJob.get(jobId) ?? null,
-          assignmentSummary: fallbackAssignmentSummary,
-          failureReportSent: queueKey === "exceptions"
-            ? workspaceEvidence.latestContractorReportSentAtByJob.has(jobId)
-            : null,
-          now: focusedQueuePresentationNow,
-        });
-
-        return {
-          kind: "generic",
-          jobId,
-          href: presentation.href,
-          title: presentation.title,
-          subtitle: presentation.customerLocation,
-          jobTypeLabel: presentation.jobTypeLabel,
-          customerName: presentation.customerName,
-          address: presentation.address,
-          reasonLabel: presentation.visibleReason.label,
-          reasonDetail: presentation.visibleReason.detail,
-          ageLabel: presentation.ageLabel,
-          ageDays: presentation.ageDays,
-          stateChips: presentation.stateChips,
-          tone: presentation.tone,
-          lastActionText: workspaceLastActionTag(job),
-          recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
-          assignmentSummary: fallbackAssignmentSummary,
-          contractorName: workspaceContractorName(job),
-          actionLabel: presentation.primaryActionLabel,
-        };
-      }
-
-      const fallbackStateChips = deriveOpsQueueStateChips(visibleReason.label, fallbackAssignmentSummary);
-      if (queueKey === "exceptions" && visibleReason.label.trim().toLowerCase().startsWith("failed ecc")) {
-        fallbackStateChips.push(
-          workspaceEvidence.latestContractorReportSentAtByJob.has(jobId)
-            ? { label: "Failure report sent", tone: "green" }
-            : { label: "Failure report not sent", tone: "amber" },
-        );
-      }
-
-      return {
-        kind: "generic",
-        jobId,
-        href: `/jobs/${jobId}?tab=ops`,
-        title: workspaceTitle(job),
-        subtitle: workspaceCustomerLocation(job),
-        jobTypeLabel: workspaceJobTypeLabel(job),
-        customerName: workspaceCustomerName(job),
-        address: workspaceLocation(job),
-        reasonLabel: visibleReason.label,
-        reasonDetail: visibleReason.detail,
-        ageLabel: workspaceQueueAgeChipLabel(job, queueKey),
-        ageDays: workspaceQueueAgeDays(job, queueKey),
-        stateChips: fallbackStateChips,
-        tone: deriveOpsQueueCardTone(fallbackStateChips),
-        lastActionText: workspaceLastActionTag(job),
-        recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
-        assignmentSummary: fallbackAssignmentSummary,
-        contractorName: workspaceContractorName(job),
-        actionLabel: "Open Job",
-      };
-    }
-
-    function buildFieldPaymentReviewRowView(
-      item: NonNullable<typeof fieldPaymentReconciliationAttention>["items"][number]
-    ): FieldPaymentReviewRowView {
-      return {
-        kind: "field_payment_review",
-        reportId: item.reportId,
-        cardDomId: `ops-workspace-field-payment-${item.reportId}`,
-        jobId: item.jobId,
-        internalInvoiceId: item.internalInvoiceId,
-        jobHref: item.links.jobHref,
-        invoiceWorkspaceHref: item.links.invoiceWorkspaceHref,
-        title: item.jobTitle || item.jobReference,
-        subtitle: item.customerDisplayName || "Customer",
-        amountText: formatWorkspaceUsdFromCents(item.amountCents),
-        methodText: formatWorkspaceFieldPaymentMethod(item.paymentMethod),
-        reportedText: formatWorkspaceTimestamp(item.reportedAt),
-        reportedDetail: item.reportedByDisplayName,
-        invoiceReference: item.invoiceReference,
-        isSelfReported: item.reportedByUserId === user.id,
-        returnToHref: `${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`,
-      };
-    }
 
     const selectedWorkspaceItemNoun =
       selectedWorkspaceKey === "permits"
@@ -1646,34 +1120,27 @@ export default async function OpsPage({
     const activeQueueRows: OpsBoardActiveQueueRow[] =
       canShowJobQueueExport && selectedWorkspaceSection
         ? selectedWorkspaceSection.previewRows.map((job: any) => {
-            const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);
-            const view: OpsQueueRowView =
-              selectedWorkspaceSection.key === "need_to_schedule"
-                ? buildNeedsSchedulingRowView(job, visibleReason)
-                : selectedWorkspaceSection.key === "closeout"
-                ? buildCloseoutRowView(job, visibleReason)
-                : selectedWorkspaceSection.key === "follow_ups"
-                ? buildFollowUpRowView(job)
-                : buildGenericRowView(job, visibleReason, selectedWorkspaceSection.key);
+            const typedJob = job as OpsWorkspaceRowJob;
+            const view = rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key);
             return {
               id: String(job?.id ?? ""),
-              reasonKey: getOpsBoardReasonLabel(workspaceReasonInput(job), { queueKey: selectedWorkspaceSection.key })?.key ?? null,
+              reasonKey: getOpsBoardReasonLabel(rowViewBuilders.reasonInput(typedJob), { queueKey: selectedWorkspaceSection.key })?.key ?? null,
               sortable: {
                 created_at: job?.created_at ?? null,
-                queue_entered_at: workspaceQueueEnteredAt(job, selectedWorkspaceSection.key),
+                queue_entered_at: rowViewBuilders.queueEnteredAt(typedJob, selectedWorkspaceSection.key),
                 scheduled_date: job?.scheduled_date ?? null,
                 window_start: job?.window_start ?? null,
                 customer_first_name: job?.customer_first_name ?? null,
                 customer_last_name: job?.customer_last_name ?? null,
-                contractors: { name: workspaceContractorName(job) || null },
+                contractors: { name: rowViewBuilders.contractorName(typedJob) || null },
               },
               view,
             };
           })
         : [];
-    const activeQueuePinnedViews: FieldPaymentReviewRowView[] =
+    const activeQueuePinnedViews =
       canShowJobQueueExport && selectedWorkspaceSection?.key === "closeout" && canViewFieldPaymentVerificationAttention
-        ? (fieldPaymentReconciliationAttention?.items ?? []).map((item) => buildFieldPaymentReviewRowView(item))
+        ? (fieldPaymentReconciliationAttention?.items ?? []).map((item) => rowViewBuilders.buildFieldPaymentReviewRowView(item))
         : [];
     const queueHealthAgingOver30 = activeQueueRows.filter((row) => (row.view as any).ageDays != null && (row.view as any).ageDays > 30).length;
     const queueHealthBreakdown = new Map<string, number>();

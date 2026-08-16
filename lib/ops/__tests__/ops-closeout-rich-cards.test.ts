@@ -6,6 +6,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const rowViewsSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-row-views.ts"),
+  "utf-8",
+);
 const rowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
   "utf-8",
@@ -29,11 +33,11 @@ const loadCloseoutWorkspaceRowsSource =
     ? opsPageSource.slice(loadCloseoutWorkspaceRowsStart, loadCloseoutWorkspaceRowsEnd)
     : "";
 
-const buildCloseoutStart = opsPageSource.indexOf("function buildCloseoutRowView(");
-const buildCloseoutEnd = opsPageSource.indexOf("function formatFollowUpOwner", buildCloseoutStart);
+const buildCloseoutStart = rowViewsSource.indexOf("function buildCloseoutRowView(");
+const buildCloseoutEnd = rowViewsSource.indexOf("function buildFollowUpRowView(", buildCloseoutStart);
 const buildCloseoutSource =
   buildCloseoutStart > -1 && buildCloseoutEnd > buildCloseoutStart
-    ? opsPageSource.slice(buildCloseoutStart, buildCloseoutEnd)
+    ? rowViewsSource.slice(buildCloseoutStart, buildCloseoutEnd)
     : "";
 
 const closeoutCardStart = rowCardSource.indexOf("function CloseoutCard(");
@@ -83,8 +87,9 @@ describe("/ops Closeout rich card contractor visibility", () => {
   });
 
   it("keeps the selected closeout workspace on the rich card path", () => {
-    expect(activeQueueRowsSource).toContain('selectedWorkspaceSection.key === "closeout"');
-    expect(activeQueueRowsSource).toContain("buildCloseoutRowView(job, visibleReason)");
+    expect(rowViewsSource).toContain('if (queueKey === "closeout")');
+    expect(rowViewsSource).toContain("return buildCloseoutRowView(job, reason, formattedRecentAttempt);");
+    expect(activeQueueRowsSource).toContain("rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key)");
   });
 
   it("preserves closeout queue inclusion and count derivation", () => {

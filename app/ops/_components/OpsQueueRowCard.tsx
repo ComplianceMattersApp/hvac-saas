@@ -1,12 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import type { QueueCardStateChip, QueueCardTone } from "@/components/ops/QueueCard";
 import {
   rejectFieldPaymentCollectionReportFromForm,
   verifyFieldPaymentCollectionReportFromForm,
 } from "@/lib/actions/internal-invoice-payment-actions";
 import { telHref, smsHref } from "@/lib/ops/phone-links";
+import type {
+  CloseoutRowView,
+  FieldPaymentReviewRowView,
+  FollowUpRowView,
+  GenericRowView,
+  NeedsSchedulingRowView,
+  OpsQueueCardTone,
+  OpsQueueRowView,
+} from "@/lib/ops/ops-workspace-row-views";
+
+export type {
+  CloseoutRowView,
+  FieldPaymentReviewRowView,
+  FollowUpRowView,
+  GenericRowView,
+  NeedsSchedulingRowView,
+  OpsQueueRowView,
+} from "@/lib/ops/ops-workspace-row-views";
 
 const utilityLabelClass = "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
 const inlineActionClass =
@@ -16,131 +33,6 @@ const compactContactActionClass =
 const primaryActionClass =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99] xl:min-h-8 xl:text-[11px]";
 const inputClass = "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900";
-
-export type NeedsSchedulingRowView = {
-  kind: "need_to_schedule";
-  jobId: string;
-  href: string;
-  title: string;
-  subtitle: string;
-  jobTypeLabel: string;
-  customerName: string;
-  address: string;
-  reasonLabel: string;
-  reasonDetail: string | null;
-  ageLabel: string;
-  ageDays: number | null;
-  stateChips: QueueCardStateChip[];
-  tone: QueueCardTone;
-  lastActionText: string;
-  recentAttemptText: string;
-  contractorName: string;
-  phone: string;
-  scheduleDateText: string;
-  scheduleWindowText: string;
-  scheduledDateRaw: string;
-  windowStartInput: string;
-  windowEndInput: string;
-  permitNumber: string;
-  jurisdiction: string;
-  permitDate: string;
-  returnToHref: string;
-};
-
-export type CloseoutRowView = {
-  kind: "closeout";
-  jobId: string;
-  cardDomId: string;
-  href: string;
-  title: string;
-  subtitle: string;
-  jobTypeLabel: string;
-  customerName: string;
-  address: string;
-  reasonLabel: string;
-  reasonDetail: string | null;
-  ageLabel: string;
-  ageDays: number | null;
-  stateChips: QueueCardStateChip[];
-  tone: QueueCardTone;
-  lastActionText: string;
-  recentAttemptText: string;
-  needsLabel: string;
-  contractorName: string;
-  scheduledText: string;
-  assignmentSummary: string;
-  nextStepText: string;
-};
-
-export type FollowUpRowView = {
-  kind: "follow_ups";
-  jobId: string;
-  cardDomId: string;
-  href: string;
-  title: string;
-  subtitle: string;
-  jobTypeLabel: string;
-  customerName: string;
-  address: string;
-  dueText: string;
-  urgencyLabel: string;
-  urgencyTone: QueueCardTone;
-  ageLabel: string;
-  ageDays: number | null;
-  lastActionText: string;
-  recentAttemptText: string;
-  owner: string;
-  statusLabel: string;
-  note: string;
-};
-
-export type GenericRowView = {
-  kind: "generic";
-  jobId: string;
-  href: string;
-  title: string;
-  subtitle: string;
-  jobTypeLabel: string;
-  customerName: string;
-  address: string;
-  reasonLabel: string;
-  reasonDetail: string | null;
-  ageLabel: string;
-  ageDays: number | null;
-  stateChips: QueueCardStateChip[];
-  tone: QueueCardTone;
-  lastActionText: string;
-  recentAttemptText: string;
-  assignmentSummary: string;
-  contractorName: string;
-  actionLabel: string;
-};
-
-export type FieldPaymentReviewRowView = {
-  kind: "field_payment_review";
-  reportId: string;
-  cardDomId: string;
-  jobId: string;
-  internalInvoiceId: string;
-  jobHref: string;
-  invoiceWorkspaceHref: string;
-  title: string;
-  subtitle: string;
-  amountText: string;
-  methodText: string;
-  reportedText: string;
-  reportedDetail: string;
-  invoiceReference: string;
-  isSelfReported: boolean;
-  returnToHref: string;
-};
-
-export type OpsQueueRowView =
-  | NeedsSchedulingRowView
-  | CloseoutRowView
-  | FollowUpRowView
-  | GenericRowView
-  | FieldPaymentReviewRowView;
 
 export default function OpsQueueRowCard({ view }: { view: OpsQueueRowView }) {
   if (view.kind === "field_payment_review") return <FieldPaymentReviewCard view={view} />;
@@ -198,7 +90,7 @@ function normalizeLedgerComparison(value: string | null | undefined) {
     .replace(/\s+/g, " ");
 }
 
-const LEDGER_CHIP_TONE_CLASS: Record<QueueCardTone, string> = {
+const LEDGER_CHIP_TONE_CLASS: Record<OpsQueueCardTone, string> = {
   rose: "border-rose-200 bg-rose-50 text-rose-700",
   amber: "border-amber-200 bg-amber-50 text-amber-800",
   slate: "border-slate-200 bg-slate-50 text-slate-600",

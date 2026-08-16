@@ -7,6 +7,10 @@ import { OPS_BOARD_SORT_OPTIONS } from "@/lib/ops/ops-board-sorting";
 const repoRoot = process.cwd();
 const globalsSource = fs.readFileSync(path.join(repoRoot, "app", "globals.css"), "utf8");
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const opsRowSource = fs.readFileSync(
+  path.join(repoRoot, "app", "ops", "_components", "OpsQueueRowCard.tsx"),
+  "utf8",
+);
 const panelSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsBoardActiveQueuePanel.tsx"),
   "utf8",
@@ -35,8 +39,8 @@ describe("ops redesign visual scope", () => {
 
   it("does not replace the operations navigation and action contract", () => {
     expect(opsPageSource).toContain("<OpsBoardActiveQueuePanel");
-    expect(opsPageSource).toContain("verifyFieldPaymentCollectionReportFromForm");
-    expect(opsPageSource).toContain("rejectFieldPaymentCollectionReportFromForm");
+    expect(opsRowSource).toContain("verifyFieldPaymentCollectionReportFromForm");
+    expect(opsRowSource).toContain("rejectFieldPaymentCollectionReportFromForm");
     expect(opsPageSource).toContain("createManualPermitRequestFromOps");
     expect(opsPageSource).toContain("createJobAndMarkPermitCreatedFromOps");
   });

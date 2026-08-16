@@ -13,6 +13,10 @@ const panelSource = fs.readFileSync(
   "utf8",
 );
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const rowViewsSource = fs.readFileSync(
+  path.join(repoRoot, "lib", "ops", "ops-workspace-row-views.ts"),
+  "utf8",
+);
 
 describe("ops redesign ledger preservation", () => {
   it("centers the desktop ledger action column and its primary action", () => {
@@ -100,6 +104,7 @@ describe("ops redesign ledger preservation", () => {
     expect(panelSource).toContain("Customer / Job");
     expect(panelSource).toContain("Last Action");
     expect(panelSource).toContain("Last Attempt");
-    expect(opsPageSource.match(/recentAttemptText:/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(rowViewsSource.match(/recentAttemptText:/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(opsPageSource).toContain("createOpsWorkspaceRowViewBuilders");
   });
 });

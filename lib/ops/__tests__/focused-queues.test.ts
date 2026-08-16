@@ -77,6 +77,10 @@ const opsWorkspaceEvidenceSource = readFileSync(
   resolve(__dirname, "../ops-workspace-evidence.ts"),
   "utf-8",
 );
+const opsWorkspaceRowViewsSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-row-views.ts"),
+  "utf-8",
+);
 const serviceFollowUpQueueStateSource = readFileSync(
   resolve(__dirname, "../service-follow-up-queue-state.ts"),
   "utf-8",
@@ -530,7 +534,8 @@ describe("focused queue display labels", () => {
   });
 
   it("Operations Workspace cards use formatted status/reason copy instead of raw Ops Status", () => {
-    expect(opsPageSource).toContain("getOpsQueueCardStatusReason");
+    expect(opsWorkspaceRowViewsSource).toContain("getOpsQueueCardStatusReason");
+    expect(opsPageSource).toContain("createOpsWorkspaceRowViewBuilders");
     expect(opsRowCardSource).toContain('>Reason</span>');
     expect(opsPageSource).not.toContain("Ops Status:");
   });
@@ -577,44 +582,46 @@ describe("focused queue display labels", () => {
 
   it("early Operations Workspace preview cards use an initialized preview assignment map", () => {
     expect(opsPageSource).toContain("selectedPreviewAssignmentDisplayMap");
-    expect(opsPageSource).toContain(
-      "formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap)",
+    expect(opsPageSource).toContain("assignmentDisplayMap: selectedPreviewAssignmentDisplayMap");
+    expect(opsWorkspaceRowViewsSource).toContain(
+      "formatAssignmentSummaryForJob(jobId, context.assignmentDisplayMap)",
     );
   });
 
   it("Operations Workspace rows include contractor context only when a job contractor exists", () => {
     expect(opsWorkspaceJobContractSource).toContain("contractors(name)");
-    expect(opsPageSource).toContain("workspaceContractorName(job)");
+    expect(opsWorkspaceRowViewsSource).toContain("workspaceContractorName(job)");
+    expect(opsPageSource).toContain("rowViewBuilders.contractorName(typedJob)");
     expect(opsRowCardSource).toContain("Contractor");
     expect(opsPageSource).not.toContain("Contractor:</span> -");
-    expect(opsPageSource).not.toContain("formatCityNamePart(workspaceContractorName");
-    expect(opsPageSource).not.toContain("formatPersonNamePart(workspaceContractorName");
+    expect(opsWorkspaceRowViewsSource).not.toContain("formatCityNamePart(workspaceContractorName");
+    expect(opsWorkspaceRowViewsSource).not.toContain("formatPersonNamePart(workspaceContractorName");
   });
 
   it("Operations Workspace failed rows use specific ECC failure evidence and fall back safely", () => {
     expect(opsWorkspaceEvidenceSource).toContain("formatFailedEccQueueReasonFromRun");
     expect(opsWorkspaceEvidenceSource).toContain("primaryFailureReasonByJob");
-    expect(opsPageSource).toContain("workspaceEvidence.primaryFailureReasonByJob.get(jobId)");
-    expect(opsPageSource).toContain('|| "Failed"');
+    expect(opsWorkspaceRowViewsSource).toContain("context.workspaceEvidence.primaryFailureReasonByJob.get(job.id)");
+    expect(opsWorkspaceRowViewsSource).toContain('|| "Failed"');
     expect(opsWorkspaceEvidenceSource).toContain('"Correction Required"');
-    expect(opsPageSource).toContain('"Retest Needed"');
+    expect(opsWorkspaceRowViewsSource).toContain('"Retest Needed"');
   });
 
   it("Operations Workspace rows normalize person and city casing without touching companies", () => {
-    expect(opsPageSource).toContain("formatPersonNamePart(job?.customer_first_name)");
-    expect(opsPageSource).toContain("formatCityNamePart(job?.city)");
-    expect(opsPageSource).toContain("contractorName: workspaceContractorName(job)");
+    expect(opsWorkspaceRowViewsSource).toContain("formatPersonNamePart(job.customer_first_name)");
+    expect(opsWorkspaceRowViewsSource).toContain("formatCityNamePart(job.city)");
+    expect(opsWorkspaceRowViewsSource).toContain("contractorName: workspaceContractorName(job)");
   });
 
   it("Operations Workspace rows keep queue/action timing and avoid dash-only metadata fallbacks", () => {
-    expect(opsPageSource).toContain("In queue");
+    expect(opsWorkspaceRowViewsSource).toContain("In queue");
     expect(opsRowCardSource).toContain("Last Action");
-    expect(opsPageSource).toContain("workspaceQueueAgeChipLabel");
-    expect(opsPageSource).toContain("workspaceLastActionTag");
-    expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
+    expect(opsWorkspaceRowViewsSource).toContain("queueAgeChipLabel");
+    expect(opsWorkspaceRowViewsSource).toContain("lastActionTag");
+    expect(opsWorkspaceRowViewsSource).toContain("queueEnteredAt");
     expect(opsPageSource).toContain("Not available");
-    expect(opsPageSource).not.toContain("Age/Time:");
-    expect(opsPageSource).not.toContain('?? "-"');
+    expect(opsWorkspaceRowViewsSource).not.toContain("Age/Time:");
+    expect(opsWorkspaceRowViewsSource).not.toContain('?? "-"');
   });
 });
 
@@ -650,7 +657,8 @@ describe("focused ops queue pages", () => {
   it("waiting and exception pages use the shared presentation model", () => {
     expect(waitingQueuePageSource).toContain("buildFocusedQueueRowPresentation");
     expect(exceptionsQueuePageSource).toContain("buildFocusedQueueRowPresentation");
-    expect(opsPageSource).toContain("buildFocusedQueueRowPresentation");
+    expect(opsWorkspaceRowViewsSource).toContain("buildFocusedQueueRowPresentation");
+    expect(opsPageSource).toContain("createOpsWorkspaceRowViewBuilders");
     expect(focusedQueueRowPresentationSource).toContain("getWaitingQueueDisplay");
     expect(focusedQueueRowPresentationSource).toContain("getWaitingQueueRecommendedNextStep");
     expect(focusedQueueRowPresentationSource).toContain("resolveServiceFollowUpQueueState");

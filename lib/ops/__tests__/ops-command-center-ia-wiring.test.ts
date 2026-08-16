@@ -44,6 +44,14 @@ const opsWorkspaceEvidenceSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-evidence.ts"),
   "utf-8",
 );
+const opsWorkspaceRowViewsSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-row-views.ts"),
+  "utf-8",
+);
+const focusedQueueRowPresentationSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/focused-queue-row-presentation.ts"),
+  "utf-8",
+);
 
 const queueCardSource = readFileSync(
   resolve(__dirname, "../../../components/ops/QueueCard.tsx"),
@@ -169,9 +177,9 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsWorkspaceQueuesSource).toContain('key: "follow_ups"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Follow Ups"');
     expect(opsPageSource).toContain('.or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")');
-    expect(opsPageSource).toContain("function followUpUrgency(dueDate: string)");
-    expect(opsPageSource).toContain('variant: "follow-up-overdue"');
-    expect(opsPageSource).toContain('variant: "follow-up-soon"');
+    expect(opsWorkspaceRowViewsSource).toContain("export function resolveFollowUpUrgency(dueDate: string, todayDate: string)");
+    expect(opsWorkspaceRowViewsSource).toContain('variant: "follow-up-overdue"');
+    expect(opsWorkspaceRowViewsSource).toContain('variant: "follow-up-soon"');
     expect(queueCardSource).toContain('variant === "follow-up-overdue" || variant === "follow-up-due"');
     expect(queueCardSource).toContain('variant === "follow-up-soon" || variant === "follow-up-unscheduled"');
   });
@@ -218,7 +226,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('.eq("field_complete", false)');
     expect(opsPageSource).toContain('.gte("scheduled_date", wsStartTodayUtc)');
     expect(opsPageSource).toContain('.lt("scheduled_date", wsStartTomorrowUtc)');
-    expect(opsPageSource).toContain('if (queueKey === "field_work")');
+    expect(opsWorkspaceRowViewsSource).toContain('if (queueKey === "field_work")');
   });
 
   it("renders one active queue section refined by filters and sort", () => {
@@ -239,8 +247,8 @@ describe("/ops Full Ops command center IA wiring", () => {
 
     expect(failedEvidenceIndex).toBeGreaterThan(-1);
     expect(queueSortIndex).toBeGreaterThan(failedEvidenceIndex);
-    expect(opsPageSource).toContain("queueEnteredAt: (job) => workspaceQueueEnteredAt(job, selectedWorkspaceKey)");
-    expect(opsPageSource).toContain("queue_entered_at: workspaceQueueEnteredAt(job, selectedWorkspaceSection.key)");
+    expect(opsPageSource).toContain("queueEnteredAt: (job) => rowViewBuilders.queueEnteredAt(job as OpsWorkspaceRowJob, selectedWorkspaceKey)");
+    expect(opsPageSource).toContain("queue_entered_at: rowViewBuilders.queueEnteredAt(typedJob, selectedWorkspaceSection.key)");
     expect(opsActiveQueuePanelSource).toContain("{ queueEnteredAt: (row) => row.queue_entered_at }");
   });
 
@@ -252,10 +260,10 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("shows failed-report delivery awareness without changing exception routing", () => {
     expect(opsWorkspaceEvidenceSource).toContain('event.event_type ?? "").trim() !== "contractor_report_sent"');
-    expect(opsPageSource).toContain("workspaceEvidence.latestContractorReportSentAtByJob.has(jobId)");
-    expect(opsPageSource).toContain('label: "Failure report sent", tone: "green"');
-    expect(opsPageSource).toContain('label: "Failure report not sent", tone: "amber"');
-    expect(opsPageSource).toContain('queueKey === "exceptions"');
+    expect(opsWorkspaceRowViewsSource).toContain("context.workspaceEvidence.latestContractorReportSentAtByJob.has(job.id)");
+    expect(focusedQueueRowPresentationSource).toContain('label: "Failure report sent", tone: "green"');
+    expect(focusedQueueRowPresentationSource).toContain('label: "Failure report not sent", tone: "amber"');
+    expect(opsWorkspaceRowViewsSource).toContain('queueKey === "exceptions"');
   });
 
   it("applies contractor filtering to visible board rows without changing row actions", () => {
@@ -263,8 +271,9 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows)");
     expect(opsPageSource).toContain("contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)");
     expect(opsPageSource).toContain("return sortOpsBoardRows(currentRows, boardSort);");
-    expect(opsPageSource).toContain("workspaceContractorName(job)");
-    expect(opsPageSource).toContain('href: `/jobs/${jobId}?tab=ops`');
+    expect(opsWorkspaceRowViewsSource).toContain("workspaceContractorName(job)");
+    expect(opsWorkspaceRowViewsSource).toContain('href: `/jobs/${jobId}?tab=ops`');
+    expect(opsPageSource).toContain("rowViewBuilders.contractorName(typedJob)");
     expect(opsRowCardSource).toContain("Open Job");
   });
 
@@ -304,12 +313,13 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("uses the same reason helper for options, filtering, and visible row reason", () => {
-    expect(opsPageSource).toContain("getOpsBoardVisibleReason");
-    expect(opsPageSource).toContain("function workspaceVisibleReasonDisplay(job: any, queueKey: string): OpsBoardVisibleReason");
-    expect(opsPageSource).toContain("return getOpsBoardVisibleReason(workspaceReasonInput(job), () => wsStatusReason(job, queueKey), { queueKey });");
-    expect(opsPageSource).toContain("const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);");
-    expect(opsPageSource).toContain("reasonLabel: visibleReason.label");
-    expect(opsPageSource).toContain("reasonDetail: visibleReason.detail");
+    expect(opsWorkspaceRowViewsSource).toContain("getOpsBoardVisibleReason(");
+    expect(opsWorkspaceRowViewsSource).toContain("reasonInput(job)");
+    expect(opsWorkspaceRowViewsSource).toContain("() => statusReason(job, queueKey)");
+    expect(opsWorkspaceRowViewsSource).toContain("const reason = visibleReason(job, queueKey);");
+    expect(opsWorkspaceRowViewsSource).toContain("reasonLabel: reason.label");
+    expect(opsWorkspaceRowViewsSource).toContain("reasonDetail: reason.detail");
+    expect(opsPageSource).toContain("rowViewBuilders.reasonInput(typedJob)");
   });
 
   it("guards Ops card reason rendering from bypassing the structured visible reason helper", () => {
@@ -320,7 +330,7 @@ describe("/ops Full Ops command center IA wiring", () => {
         ? opsPageSource.slice(fullCardRenderStart, fullCardRenderEnd)
         : "";
 
-    expect(fullCardRenderSource).toContain("workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key)");
+    expect(fullCardRenderSource).toContain("rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key)");
     expect(fullCardRenderSource).not.toContain("wsStatusReason(job");
     expect(fullCardRenderSource).not.toContain("workspaceStatusReason(job");
   });

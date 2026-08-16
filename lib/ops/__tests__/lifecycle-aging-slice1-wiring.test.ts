@@ -21,6 +21,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const opsWorkspaceRowViewsSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-row-views.ts"),
+  "utf-8",
+);
 
 const todayReadModelSource = readFileSync(
   resolve(__dirname, "../../home/today-read-model.ts"),
@@ -61,13 +65,14 @@ describe("lifecycle aging slice 1 wiring", () => {
     expect(exceptionsQueueSource).toContain("latestFailedEvidenceByJob");
   });
 
-  it("applies lifecycle-aware labels to ops workspace cards", () => {
-    expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
-    expect(opsPageSource).toContain("workspaceAgeLabel");
-    expect(opsPageSource).toContain("workspaceQueueAgeChipLabel");
-    expect(opsPageSource).toContain("In queue");
-    expect(opsPageSource).not.toContain("Age/Time:");
-    expect(opsPageSource).not.toContain('?? "-"');
+  it("applies queue-entry aging labels to ops workspace cards", () => {
+    expect(opsWorkspaceRowViewsSource).toContain("queueAgeDays");
+    expect(opsWorkspaceRowViewsSource).toContain("queueAgeChipLabel");
+    expect(opsWorkspaceRowViewsSource).toContain("opsWorkspaceEvidenceEpochMs(queueEnteredAt(job, queueKey))");
+    expect(opsWorkspaceRowViewsSource).toContain("In queue");
+    expect(opsPageSource).toContain("rowViewBuilders.queueEnteredAt");
+    expect(opsWorkspaceRowViewsSource).not.toContain("Age/Time:");
+    expect(opsWorkspaceRowViewsSource).not.toContain('?? "-"');
   });
 
   it("applies lifecycle-aware labels to today follow-up preview", () => {
