@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const selectionLoaderSource = fs.readFileSync(
+  path.join(repoRoot, "lib", "ops", "ops-workspace-selection-loader.ts"),
+  "utf8",
+);
 const opsPermitWorkspaceSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsPermitWorkspace.tsx"),
   "utf8",
@@ -37,7 +41,7 @@ const mobileResolutionSource = fs.readFileSync(
 
 describe("Ops mobile queue switcher", () => {
   it("projects the same server queue links used by the frozen desktop rail", () => {
-    expect(opsPageSource).toContain("const opsRailQueueRows = [");
+    expect(selectionLoaderSource).toContain("const opsRailQueueRows =");
     expect(opsPageSource).toContain("<OpsMobileQueueSwitcher queues={opsRailQueueRows} />");
     expect(switcherSource).toContain("href={queue.href}");
     expect(switcherSource).toContain('aria-current={queue.active ? "page" : undefined}');

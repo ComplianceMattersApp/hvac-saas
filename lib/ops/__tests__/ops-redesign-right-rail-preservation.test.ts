@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const selectionLoaderSource = fs.readFileSync(
+  path.join(repoRoot, "lib", "ops", "ops-workspace-selection-loader.ts"),
+  "utf8",
+);
 const panelSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsBoardActiveQueuePanel.tsx"),
   "utf8",
@@ -28,9 +32,9 @@ describe("ops redesign right rail preservation", () => {
   });
 
   it("builds the desktop queue index from the existing queue destinations", () => {
-    expect(opsPageSource).toContain("const opsRailQueueRows = [");
-    expect(opsPageSource).toContain("...workspaceQueueChips.map");
-    expect(opsPageSource).toContain("...hiddenTodayWorkspaceTabs.map");
+    expect(selectionLoaderSource).toContain("const opsRailQueueRows =");
+    expect(selectionLoaderSource).toContain("...workspaceQueueLinks");
+    expect(selectionLoaderSource).toContain("...hiddenTodayQueueLinks");
     expect(opsPageSource).toContain("queues={opsRailQueueRows}");
     expect(utilityRailSource).toContain("href={queue.href}");
     expect(utilityRailSource).toContain('aria-current={queue.active ? "page" : undefined}');

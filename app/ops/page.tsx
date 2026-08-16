@@ -18,14 +18,9 @@ import {
   sortOpsBoardRows,
 } from "@/lib/ops/ops-board-sorting";
 import {
-  getOpsWorkspaceQueueDefinition,
-  opsWorkspaceQueueHref,
-  resolveOpsWorkspaceQueueKey,
   type OpsBoardFilterBucket,
 } from "@/lib/ops/ops-workspace-queues";
 import {
-  buildOpsBoardReasonOptions,
-  filterOpsBoardRowsByReason,
   getOpsBoardReasonLabel,
   normalizeOpsBoardReason,
 } from "@/lib/ops/ops-board-reasons";
@@ -40,20 +35,20 @@ import {
 import {
   createOpsWorkspacePreviewLoader,
   loadOpsWorkspacePreviewEnrichment,
-  type OpsWorkspacePreviewRow,
 } from "@/lib/ops/ops-workspace-data-loader";
 import { loadOpsWorkspaceOverview } from "@/lib/ops/ops-workspace-overview-loader";
 import {
   buildContractorFocusFacet,
-  filterRowsByContractorFocus,
   INTERNAL_WORK_CONTRACTOR_FOCUS_ID,
   normalizeContractorFocusIds,
-  type ContractorFocusRow,
 } from "@/lib/ops/ops-workspace-contractor-facets";
 import { startOpsServerTimer } from "@/lib/ops/ops-server-timing";
-import { type ContractorIntakeQueueRow } from "@/lib/ops/contractor-intake-queue";
 import { loadOpsPermitWorkspaceSnapshot } from "@/lib/ops/ops-permit-workspace-loader";
 import { loadOpsWorkspaceBootstrap } from "@/lib/ops/ops-workspace-bootstrap-loader";
+import {
+  buildOpsWorkspaceQueryString,
+  loadOpsWorkspaceSelection,
+} from "@/lib/ops/ops-workspace-selection-loader";
 import OpsPermitWorkspace from "./_components/OpsPermitWorkspace";
 import OpsWorkspaceUtilityRail from "./_components/OpsWorkspaceUtilityRail";
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
@@ -75,15 +70,6 @@ function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
     return normalized;
   }
   return "all";
-}
-
-function buildQueryString(params: Record<string, string | undefined | null>) {
-  const sp = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v != null && String(v).trim() !== "") sp.set(k, String(v));
-  }
-  const s = sp.toString();
-  return s ? `?${s}` : "";
 }
 
 export default async function OpsPage({
@@ -213,8 +199,6 @@ export default async function OpsPage({
       requestedBucket: activeBoardBucketFilter,
     });
 
-    const requestedWorkspaceKeys = [resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter)];
-
     const loadWorkspacePreviewRows = createOpsWorkspacePreviewLoader({
       supabase,
       admin,
@@ -228,101 +212,35 @@ export default async function OpsPage({
       startTodayUtc: wsStartTodayUtc,
       startTomorrowUtc: wsStartTomorrowUtc,
     });
-
-    const workspacePreviewEntries = await Promise.all(
-      requestedWorkspaceKeys.map(async (workspaceKey) => [workspaceKey, await loadWorkspacePreviewRows(workspaceKey)] as const),
-    );
-    const workspacePreviewRowsByKey = new Map<string, OpsWorkspacePreviewRow[]>(workspacePreviewEntries);
-    const reasonSourceWorkspaceSections = requestedWorkspaceKeys.map((workspaceKey) => {
-      const tab = workspaceTabs.find((item) => item.key === workspaceKey) ?? workspaceTabs[0];
-      return {
-        ...tab,
-        previewRows: workspacePreviewRowsByKey.get(workspaceKey) ?? [],
-      };
+    const {
+      clearOpsBoardFiltersHref,
+      contractorFocusSourceRows,
+      effectiveBoardReasonFilter,
+      hasActiveOpsBoardFilters,
+      opsRailQueueRows,
+      selectedContractorIntakeRows,
+      selectedPermitRows,
+      selectedPreviewRows,
+      selectedWorkspaceCountText,
+      selectedWorkspaceItemNoun,
+      selectedWorkspaceKey,
+      selectedWorkspacePreviewCount,
+      selectedWorkspaceSection,
+      selectedWorkspaceTab,
+      selectedWorkspaceTotalCount,
+      workspaceReasonOptions,
+    } = await loadOpsWorkspaceSelection({
+      activePermitRequestRows,
+      boardReasonFilter,
+      boardSort,
+      closeoutQueueRowsFull,
+      contractorFocusFilter,
+      contractorFocusIdSet,
+      coreBoardWorkspaceKeys,
+      effectiveBoardBucketFilter,
+      loadWorkspacePreviewRows,
+      workspaceTabs,
     });
-    const selectedWorkspaceKey = requestedWorkspaceKeys[0];
-    const selectedWorkspaceUsesJobRows =
-      selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake";
-    const reasonSourceRows: OpsWorkspaceJob[] = selectedWorkspaceUsesJobRows
-      ? (reasonSourceWorkspaceSections.flatMap((section) => section.previewRows) as OpsWorkspaceJob[])
-      : [];
-    const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });
-    const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some((option) => option.key === boardReasonFilter)
-      ? boardReasonFilter
-      : null;
-    const reasonFilteredWorkspaceSections = reasonSourceWorkspaceSections.map((section) => ({
-      ...section,
-      previewRows: selectedWorkspaceUsesJobRows
-        ? filterOpsBoardRowsByReason(
-            section.previewRows as OpsWorkspaceJob[],
-            effectiveBoardReasonFilter,
-            { queueKey: section.key },
-          )
-        : section.previewRows,
-    }));
-
-    const visibleWorkspaceSections = reasonFilteredWorkspaceSections.map((section) => ({
-      ...section,
-      previewRows: filterRowsByContractorFocus(section.previewRows, contractorFocusIdSet),
-    }));
-    const selectedWorkspaceSection =
-      visibleWorkspaceSections.find((section) => section.key === selectedWorkspaceKey) ?? visibleWorkspaceSections[0];
-    const selectedPermitRows = selectedWorkspaceKey === "permits"
-      ? filterRowsByContractorFocus(activePermitRequestRows, contractorFocusIdSet)
-      : [];
-    const selectedContractorIntakeRows =
-      selectedWorkspaceKey === "contractor_intake"
-        ? ((selectedWorkspaceSection?.previewRows ?? []) as ContractorIntakeQueueRow[])
-        : [];
-    const selectedPreviewRows: OpsWorkspaceJob[] =
-      selectedWorkspaceKey === "permits" || selectedWorkspaceKey === "contractor_intake"
-        ? []
-        : (visibleWorkspaceSections.flatMap((section) => section.previewRows) as OpsWorkspaceJob[]);
-    const selectedWorkspacePreviewCount =
-      selectedWorkspaceKey === "permits"
-        ? selectedPermitRows.length
-        : selectedWorkspaceKey === "contractor_intake"
-        ? selectedContractorIntakeRows.length
-        : selectedWorkspaceSection?.previewRows.length ?? 0;
-    const selectedWorkspaceTotalCount =
-      selectedWorkspaceKey === "permits"
-        ? selectedPermitRows.length
-        : selectedWorkspaceKey === "contractor_intake"
-        ? selectedContractorIntakeRows.length
-        : selectedWorkspaceSection?.count ?? selectedPreviewRows.length;
-    const selectedWorkspaceTab = {
-      ...visibleWorkspaceSections[0],
-      count: selectedWorkspaceTotalCount,
-    };
-    const workspaceQueueChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
-      const definition = getOpsWorkspaceQueueDefinition(workspaceKey);
-      const section =
-        visibleWorkspaceSections.find((item) => item.key === workspaceKey) ??
-        workspaceTabs.find((item) => item.key === workspaceKey) ??
-        workspaceTabs[0];
-      const previewRows = "previewRows" in section && Array.isArray(section.previewRows) ? section.previewRows : [];
-      const isSelected = workspaceKey === selectedWorkspaceSection?.key;
-      return {
-        ...section,
-        bucket: definition.bucket,
-        mobileLabel: definition.mobileLabel,
-        isSelected,
-        previewRows,
-        count: section.count,
-        href: opsWorkspaceQueueHref(definition.bucket, {
-          contractor: contractorFocusFilter ?? "",
-          sort: boardSort === "oldest" ? "" : boardSort,
-        }),
-      };
-    });
-    const hiddenTodayWorkspaceTabs = workspaceTabs.filter(
-      (tab) => tab.key === "without_tech" || tab.key === "updates"
-    );
-    const clearOpsBoardFiltersHref = `/ops${buildQueryString({
-      bucket: effectiveBoardBucketFilter,
-      sort: boardSort === "oldest" ? "" : boardSort,
-    })}#ops-workspace`;
-    const hasActiveOpsBoardFilters = contractorFocusIds.length > 0 || Boolean(effectiveBoardReasonFilter);
 
     finishWorkspaceCountsTiming("ops:workspace:countsAndPreview");
     finishTotalTiming("ops:totalBeforeRender");
@@ -346,20 +264,6 @@ export default async function OpsPage({
       selectedPreviewRows,
       operationalTenantIdentityPromise,
     });
-    // Contractor Focus is scoped to the bucket currently being rendered. Queue
-    // chips navigate (server round-trip), so the rendered bucket always matches
-    // what the user is viewing and these per-bucket counts stay correct. Use the
-    // bucket's rows before the contractor filter is applied so the picker lists
-    // every contractor in the bucket, not just the selected one.
-    const contractorFocusSourceRows = (
-      selectedWorkspaceKey === "permits"
-        ? activePermitRequestRows
-        : selectedWorkspaceKey === "contractor_intake"
-        ? reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []
-        : selectedWorkspaceKey === "closeout"
-        ? closeoutQueueRowsFull
-        : reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []
-    ) as ContractorFocusRow[];
     const {
       allCount: contractorFocusAllCount,
       internalCount: contractorFocusInternalCount,
@@ -371,7 +275,7 @@ export default async function OpsPage({
       selectedIds: contractorFocusIdSet,
       enabled: showContractorFocusSelection,
     });
-    const activeWorkspaceBaseHref = `/ops${buildQueryString({
+    const activeWorkspaceBaseHref = `/ops${buildOpsWorkspaceQueryString({
       bucket: effectiveBoardBucketFilter,
       create: "",
       contractor: contractorFocusFilter ?? "",
@@ -396,34 +300,24 @@ export default async function OpsPage({
       workspaceEvidence,
     });
 
-    // Oldest/Newest describe time in the active queue, matching the "In queue"
-    // badge. Evidence and the presentation service are assembled first so the
-    // sort and rendered age badge use the same queue-entry policy.
-    if (selectedWorkspaceSection && selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake") {
-      const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows as OpsWorkspaceJob[], boardSort, {
-        queueEnteredAt: (job) => rowViewBuilders.queueEnteredAt(job, selectedWorkspaceKey),
-      });
-      selectedWorkspaceSection.previewRows.splice(0, selectedWorkspaceSection.previewRows.length, ...queueSortedRows);
-    }
-
     const canShowJobQueueExport = selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake";
     const canExportContractorSafeCsv = contractorFocusIds.length > 0;
 
-    const selectedWorkspaceItemNoun =
-      selectedWorkspaceKey === "permits"
-        ? "permit requests"
-        : selectedWorkspaceKey === "contractor_intake"
-        ? "intake submissions"
-        : selectedWorkspaceKey === "follow_ups"
-        ? "follow ups"
-        : "jobs";
-    const selectedWorkspaceCountText =
-      selectedWorkspacePreviewCount === selectedWorkspaceTotalCount
-        ? `${selectedWorkspaceTotalCount} ${selectedWorkspaceItemNoun}`
-        : `Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount} ${selectedWorkspaceItemNoun}`;
+    // Oldest/Newest describe time in the active queue, matching the "In queue"
+    // badge. Keep the selection snapshot immutable so every downstream view
+    // observes an explicit projection rather than a mutated shared array.
+    const selectedWorkspaceJobRows = canShowJobQueueExport
+      ? (selectedWorkspaceSection.previewRows as OpsWorkspaceJob[])
+      : [];
+    const sortedSelectedWorkspaceJobRows = sortOpsBoardRows(
+      selectedWorkspaceJobRows,
+      boardSort,
+      { queueEnteredAt: (job) => rowViewBuilders.queueEnteredAt(job, selectedWorkspaceKey) },
+    );
+
     const activeQueueRows: OpsBoardActiveQueueRow[] =
-      canShowJobQueueExport && selectedWorkspaceSection
-        ? (selectedWorkspaceSection.previewRows as OpsWorkspaceJob[]).map((job) => {
+      canShowJobQueueExport
+        ? sortedSelectedWorkspaceJobRows.map((job) => {
             const typedJob: OpsWorkspaceRowJob = job;
             const view = rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key);
             return {
@@ -482,44 +376,6 @@ export default async function OpsPage({
           }
         : {}),
     };
-    // Every queue chip navigates (server round-trip) rather than switching the
-    // panel purely client-side. The board's SSR-only surfaces — the Contractor
-    // Focus picker and Queue Health — are computed for whichever bucket the
-    // server renders, so a client-only switch left them showing the wrong
-    // bucket's contractor counts. Server-nav chips keep the rendered bucket and
-    // those facets in sync.
-    const activeWorkspaceQueueKey = resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter);
-    const opsRailQueueOrder = [
-      "need_to_schedule",
-      "exceptions",
-      "waiting",
-      "updates",
-      "field_work",
-      "follow_ups",
-      "contractor_intake",
-      "closeout",
-      "permits",
-      "without_tech",
-    ];
-    const opsRailQueueRows = [
-      ...workspaceQueueChips.map((chip) => ({
-        key: chip.key,
-        label: chip.label,
-        count: chip.count,
-        href: chip.href,
-        active: chip.isSelected,
-      })),
-      ...hiddenTodayWorkspaceTabs.map((tab) => ({
-        key: tab.key,
-        label: tab.label,
-        count: tab.count,
-        href: tab.href,
-        active: tab.key === activeWorkspaceQueueKey,
-      })),
-    ].sort(
-      (left, right) =>
-        opsRailQueueOrder.indexOf(left.key) - opsRailQueueOrder.indexOf(right.key),
-    );
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const permitWorkspaceSnapshot = await loadOpsPermitWorkspaceSnapshot({
@@ -662,7 +518,7 @@ export default async function OpsPage({
             </div>
             {selectedWorkspaceKey === "contractor_intake" ? (
               <Link
-                href={`/ops/contractor-intake/export${buildQueryString({
+                href={`/ops/contractor-intake/export${buildOpsWorkspaceQueryString({
                   contractor: contractorFocusFilter ?? "",
                 })}`}
                 className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 xl:min-h-10 xl:w-auto xl:rounded-lg xl:border-slate-200/90 xl:bg-slate-50 xl:px-3 xl:py-1 xl:text-[13px]"

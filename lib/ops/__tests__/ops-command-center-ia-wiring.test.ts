@@ -56,6 +56,10 @@ const opsWorkspaceOverviewLoaderSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-overview-loader.ts"),
   "utf-8",
 );
+const opsWorkspaceSelectionLoaderSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-selection-loader.ts"),
+  "utf-8",
+);
 const opsWorkspaceBootstrapLoaderSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-bootstrap-loader.ts"),
   "utf-8",
@@ -114,7 +118,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("keeps focused queue and filter wiring query-parameter driven", () => {
-    expect(opsPageSource).toContain("function buildQueryString(");
+    expect(opsWorkspaceSelectionLoaderSource).toContain("buildOpsWorkspaceQueryString(");
     expect(opsWorkspaceOverviewLoaderSource).toContain("buildOpsWorkspaceTabs({");
     expect(opsPageSource).toContain("loadOpsWorkspaceOverview({");
     expect(opsPageSource).toContain("contractorScopeFilter,");
@@ -127,7 +131,9 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsRowCardSource).toContain("Open Job");
     expect(opsPageSource).toContain("selectedWorkspacePreviewCount");
     expect(opsPageSource).toContain("selectedWorkspaceTotalCount");
-    expect(opsPageSource).toContain("Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount}");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount}",
+    );
     expect(opsPageSource).toContain('label: "Batch Contractor Invoice"');
     expect(opsPageSource).toContain('"/billing/ready-to-bill"');
   });
@@ -164,8 +170,8 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("renders compact reason controls on the primary Ops board", () => {
-    expect(opsPageSource).toContain("buildOpsBoardReasonOptions");
-    expect(opsPageSource).toContain("filterOpsBoardRowsByReason");
+    expect(opsWorkspaceSelectionLoaderSource).toContain("buildOpsBoardReasonOptions");
+    expect(opsWorkspaceSelectionLoaderSource).toContain("filterOpsBoardRowsByReason");
     expect(opsPageSource).toContain("normalizeOpsBoardReason(sp.reason)");
     expect(opsPageSource).toContain('name="reason"');
     expect(opsPageSource).toContain("All reasons");
@@ -178,7 +184,7 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("maps bucket filters to existing Ops board queue categories", () => {
     expect(opsPageSource).toContain('const activeBoardBucketFilter = boardBucketFilter === "all" ? "pending" : boardBucketFilter;');
-    expect(opsPageSource).toContain("resolveOpsWorkspaceQueueKey");
+    expect(opsWorkspaceSelectionLoaderSource).toContain("resolveOpsWorkspaceQueueKey");
     expect(opsWorkspaceQueuesSource).toContain("OPS_WORKSPACE_KEY_BY_BUCKET");
     expect(opsWorkspaceQueuesSource).toContain('pending: "need_to_schedule"');
     expect(opsWorkspaceQueuesSource).toContain('field_work: "field_work"');
@@ -189,7 +195,9 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsWorkspaceQueuesSource).toContain('contractor_intake: "contractor_intake"');
     expect(opsWorkspaceOverviewLoaderSource).toContain("resolveVisibleOpsWorkspaceQueueKeys({");
     expect(opsPageSource).toContain("coreBoardWorkspaceKeys,");
-    expect(opsPageSource).toContain("const requestedWorkspaceKeys = [resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter)];");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "const previewRows = await params.loadWorkspacePreviewRows(selectedWorkspaceKey);",
+    );
   });
 
   it("keeps follow-up reminders always visible with date urgency styling", () => {
@@ -217,10 +225,10 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("<OpsMobileQueueSwitcher queues={opsRailQueueRows} />");
     expect(mobileQueueSwitcherSource).toContain('aria-label="Switch queue"');
     expect(mobileQueueSwitcherSource).toContain('aria-current={queue.active ? "page" : undefined}');
-    expect(opsPageSource).toContain("workspaceQueueChips.map");
-    expect(opsPageSource).toContain("coreBoardWorkspaceKeys.map");
-    expect(opsPageSource).toContain("bucket: definition.bucket");
-    expect(opsPageSource).toContain("mobileLabel: definition.mobileLabel");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "params.coreBoardWorkspaceKeys.map",
+    );
+    expect(opsWorkspaceSelectionLoaderSource).toContain("opsWorkspaceQueueHref(definition.bucket");
     expect(opsWorkspaceQueuesSource).toContain('key: "field_work"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Field Work"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Contractor Intake"');
@@ -249,9 +257,13 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("renders one active queue section refined by filters and sort", () => {
-    expect(opsPageSource).toContain("const selectedWorkspaceSection =");
-    expect(opsPageSource).toContain("(selectedWorkspaceSection.previewRows as OpsWorkspaceJob[]).map");
-    expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "const selectedWorkspaceSection: OpsWorkspaceSelectionSection",
+    );
+    expect(opsPageSource).toContain("sortedSelectedWorkspaceJobRows.map");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows",
+    );
     expect(opsWorkspaceDataLoaderSource).toContain("return sortOpsBoardRows(currentRows, context.boardSort);");
     expect(opsPageSource).not.toContain("visibleWorkspaceSections.map((section)");
   });
@@ -261,7 +273,7 @@ describe("/ops Full Ops command center IA wiring", () => {
       "} = await loadOpsWorkspacePreviewEnrichment({",
     );
     const queueSortIndex = opsPageSource.indexOf(
-      "const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows as OpsWorkspaceJob[], boardSort",
+      "const sortedSelectedWorkspaceJobRows = sortOpsBoardRows(",
     );
 
     expect(failedEvidenceIndex).toBeGreaterThan(-1);
@@ -288,7 +300,9 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("applies contractor filtering to visible board rows without changing row actions", () => {
     expect(opsWorkspaceContractorFacetsSource).toContain("export function filterRowsByContractorFocus");
-    expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows, contractorFocusIdSet)");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "const visiblePreviewRows = filterRowsByContractorFocus(",
+    );
     expect(opsWorkspaceContractorFacetsSource).toContain("selectedIds.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)");
     expect(opsWorkspaceDataLoaderSource).toContain("return sortOpsBoardRows(currentRows, context.boardSort);");
     expect(opsWorkspaceRowViewsSource).toContain("workspaceContractorName(job)");
@@ -301,19 +315,21 @@ describe("/ops Full Ops command center IA wiring", () => {
     // Queue chips navigate (server round-trip) rather than switching the panel
     // client-side, so the SSR-computed contractor facet always matches the
     // bucket being viewed. Chips carry the active-bucket highlight for that nav.
-    expect(opsPageSource).toContain("active: chip.isSelected");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "active: workspaceKey === selectedWorkspaceKey",
+    );
     expect(opsPageSource).not.toContain('"switchable"');
     // Picker source is the selected bucket's rows (before the contractor filter),
     // not a bucket-agnostic sweep of every open job.
-    expect(opsPageSource).toContain(
-      "reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []",
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "contractorFocusSourceRows:",
     );
     expect(opsPageSource).not.toContain("loadActiveQueueContractorFocusSourceRows");
     expect(opsWorkspaceContractorFacetsSource).toContain("internalCount += 1");
     expect(opsPageSource).toContain("buildContractorFocusFacet({");
     // Closeout facet counts the full closeout set, not the 10-row preview.
-    expect(opsPageSource).toContain('selectedWorkspaceKey === "closeout"');
-    expect(opsPageSource).toContain("? closeoutQueueRowsFull");
+    expect(opsWorkspaceSelectionLoaderSource).toContain('selectedWorkspaceKey === "closeout"');
+    expect(opsWorkspaceSelectionLoaderSource).toContain("? params.closeoutQueueRowsFull");
   });
 
   it("keeps sorting combined with Contractor and selected queue", () => {
@@ -326,10 +342,13 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("keeps reason filtering combined with Contractor, selected queue, and Sort", () => {
     expect(opsPageSource).toContain("const boardReasonFilter = normalizeOpsBoardReason(sp.reason);");
-    expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
-    expect(opsPageSource).toContain("const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some");
-    expect(opsPageSource).toContain("filterOpsBoardRowsByReason(");
-    expect(opsPageSource).toContain("section.previewRows as OpsWorkspaceJob[]");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows",
+    );
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "workspaceReasonOptions.some((option) => option.key === params.boardReasonFilter)",
+    );
+    expect(opsWorkspaceSelectionLoaderSource).toContain("filterOpsBoardRowsByReason(");
     expect(opsPageSource).toContain("effectiveBoardReasonFilter,");
     expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
     expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />');
@@ -346,7 +365,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("guards Ops card reason rendering from bypassing the structured visible reason helper", () => {
-    const fullCardRenderStart = opsPageSource.indexOf("(selectedWorkspaceSection.previewRows as OpsWorkspaceJob[]).map");
+    const fullCardRenderStart = opsPageSource.indexOf("sortedSelectedWorkspaceJobRows.map");
     const fullCardRenderEnd = opsPageSource.indexOf("sortable: {", fullCardRenderStart);
     const fullCardRenderSource =
       fullCardRenderStart > -1 && fullCardRenderEnd > fullCardRenderStart
@@ -368,8 +387,8 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsWorkspaceDataLoaderSource).toContain("on_hold_reason: job.on_hold_reason");
     expect(opsWorkspaceDataLoaderSource).toContain("listCloseoutQueueJobs(");
     expect(opsWorkspaceDataLoaderSource).toContain("const enteredAtByJob = buildOpsStatusEnteredAtByJob");
-    expect(opsPageSource).toContain("buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
-    expect(opsPageSource).toContain("filterOpsBoardRowsByReason(");
+    expect(opsWorkspaceSelectionLoaderSource).toContain("buildOpsBoardReasonOptions(reasonSourceRows");
+    expect(opsWorkspaceSelectionLoaderSource).toContain("filterOpsBoardRowsByReason(");
   });
 
   it("guards Closeout loading against status and permit-only prefilters", () => {
@@ -396,10 +415,14 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("shows clear filters and empty filtered state for unmatched board filters", () => {
-    expect(opsPageSource).toContain("const hasActiveOpsBoardFilters = contractorFocusIds.length > 0 || Boolean(effectiveBoardReasonFilter);");
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      "params.contractorFocusIdSet.size > 0 || Boolean(effectiveBoardReasonFilter)",
+    );
     expect(opsPageSource).toContain("clearOpsBoardFiltersHref");
     expect(opsPageSource).toContain("bucket: effectiveBoardBucketFilter");
-    expect(opsPageSource).toContain('boardSort === "oldest" ? "" : boardSort');
+    expect(opsWorkspaceSelectionLoaderSource).toContain(
+      'params.boardSort === "oldest" ? "" : params.boardSort',
+    );
     expect(opsPageSource).toContain("Clear filters");
     expect(opsActiveQueuePanelSource).toContain("No jobs match these filters.");
   });
