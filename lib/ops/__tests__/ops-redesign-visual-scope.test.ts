@@ -7,6 +7,10 @@ import { OPS_BOARD_SORT_OPTIONS } from "@/lib/ops/ops-board-sorting";
 const repoRoot = process.cwd();
 const globalsSource = fs.readFileSync(path.join(repoRoot, "app", "globals.css"), "utf8");
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const opsPermitWorkspaceSource = fs.readFileSync(
+  path.join(repoRoot, "app", "ops", "_components", "OpsPermitWorkspace.tsx"),
+  "utf8",
+);
 const opsRowSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsQueueRowCard.tsx"),
   "utf8",
@@ -41,8 +45,8 @@ describe("ops redesign visual scope", () => {
     expect(opsPageSource).toContain("<OpsBoardActiveQueuePanel");
     expect(opsRowSource).toContain("verifyFieldPaymentCollectionReportFromForm");
     expect(opsRowSource).toContain("rejectFieldPaymentCollectionReportFromForm");
-    expect(opsPageSource).toContain("createManualPermitRequestFromOps");
-    expect(opsPageSource).toContain("createJobAndMarkPermitCreatedFromOps");
+    expect(opsPermitWorkspaceSource).toContain("createManualPermitRequestFromOps");
+    expect(opsPermitWorkspaceSource).toContain("createJobAndMarkPermitCreatedFromOps");
   });
 
   it("uses one sticky header band while retaining conditional operational notices", () => {

@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const repoRoot = process.cwd();
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const opsPermitWorkspaceSource = fs.readFileSync(
+  path.join(repoRoot, "app", "ops", "_components", "OpsPermitWorkspace.tsx"),
+  "utf8",
+);
 const switcherSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsMobileQueueSwitcher.tsx"),
   "utf8",
@@ -141,9 +145,9 @@ describe("Ops mobile queue switcher", () => {
     expect(globalStylesSource).toContain("min-height: 44px");
     expect(globalStylesSource).toContain("min-height: 88px");
     expect(globalStylesSource).toContain(':not([type="checkbox"]):not([type="radio"])');
-    expect(opsPageSource).toContain("form action={createManualPermitRequestFromOps}");
-    expect(opsPageSource).toContain("form action={markPermitCreatedFromOps}");
-    expect(opsPageSource).toContain("form action={createJobAndMarkPermitCreatedFromOps}");
+    expect(opsPermitWorkspaceSource).toContain("form action={createManualPermitRequestFromOps}");
+    expect(opsPermitWorkspaceSource).toContain("form action={markPermitCreatedFromOps}");
+    expect(opsPermitWorkspaceSource).toContain("form action={createJobAndMarkPermitCreatedFromOps}");
   });
 
   it("keeps mobile utility workflows touch-safe and targets the visible export menu", () => {

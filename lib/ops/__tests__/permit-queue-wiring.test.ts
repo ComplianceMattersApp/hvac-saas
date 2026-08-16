@@ -19,20 +19,29 @@ const permitWorkspaceActionsSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_actions/permit-workspace-actions.ts"),
   "utf8",
 );
+const opsPermitWorkspaceSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_components/OpsPermitWorkspace.tsx"),
+  "utf8",
+);
 
 function permitRenderBranch() {
-  const selectedRowsIndex = opsPageSource.indexOf("permitWorkspaceSnapshot.rows.length === 0");
-  const start = opsPageSource.lastIndexOf('{selectedWorkspaceKey === "permits" ? (', selectedRowsIndex);
-  const end = opsPageSource.indexOf(') : selectedWorkspaceKey === "contractor_intake"', start);
-  expect(selectedRowsIndex).toBeGreaterThanOrEqual(0);
-  expect(start).toBeGreaterThanOrEqual(0);
-  expect(end).toBeGreaterThan(start);
-  return opsPageSource.slice(start, end);
+  expect(opsPageSource).toContain("<OpsPermitWorkspace");
+  expect(opsPageSource).toContain("snapshot={permitWorkspaceSnapshot}");
+  return opsPermitWorkspaceSource;
 }
 
 describe("Ops workspace permit queue wiring", () => {
+  it("keeps permit presentation details behind the dedicated workspace boundary", () => {
+    expect(opsPageSource).toContain('import OpsPermitWorkspace from "./_components/OpsPermitWorkspace";');
+    expect(opsPageSource).toContain("<OpsPermitWorkspace");
+    expect(opsPageSource).not.toContain('name="permit_request_id"');
+    expect(opsPageSource).not.toContain("<ServiceLocationAddressFields");
+    expect(opsPageSource).not.toContain("<ImmediateSubmitButton");
+    expect(opsPermitWorkspaceSource).toContain('name="permit_request_id"');
+  });
+
   it("locks permit workflow submissions and shows immediate pending feedback", () => {
-    expect(opsPageSource).toContain('import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";');
+    expect(opsPermitWorkspaceSource).toContain('import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";');
     for (const pendingText of [
       "Creating permit...",
       "Starting...",
@@ -42,7 +51,7 @@ describe("Ops workspace permit queue wiring", () => {
       "Saving intake...",
       "Creating job...",
     ]) {
-      expect(opsPageSource).toContain(`pendingText="${pendingText}"`);
+      expect(opsPermitWorkspaceSource).toContain(`pendingText="${pendingText}"`);
     }
   });
 
@@ -63,7 +72,7 @@ describe("Ops workspace permit queue wiring", () => {
   it("selecting bucket=permits renders the active permit queue", () => {
     const branch = permitRenderBranch();
 
-    expect(branch).toContain("permitWorkspaceSnapshot.rows");
+    expect(branch).toContain("snapshot.rows");
     expect(branch).toContain("No active permit requests.");
     expect(branch).toContain("permitRequest.internalStatusLabel");
     expect(branch).toContain("subtitle={display.context}");
@@ -78,23 +87,23 @@ describe("Ops workspace permit queue wiring", () => {
 
   it("renders a small internal manual intake entry point for permits", () => {
     expect(permitWorkspaceActionsSource).toContain("createInternalManualPermitRequest");
-    expect(opsPageSource).toContain("createManualPermitRequestFromOps");
-    expect(opsPageSource).toContain("+ New Permit Request");
-    expect(opsPageSource).toContain("Create one from a text, phone call, email, or photo request.");
+    expect(opsPermitWorkspaceSource).toContain("createManualPermitRequestFromOps");
+    expect(opsPermitWorkspaceSource).toContain("+ New Permit Request");
+    expect(opsPermitWorkspaceSource).toContain("Create one from a text, phone call, email, or photo request.");
     expect(opsPageSource).toContain("shouldExpandPermitCreateForm");
-    expect(opsPageSource).toContain('name="contractor_id"');
-    expect(opsPageSource).toContain('name="request_label"');
-    expect(opsPageSource).toContain('name="intake_note"');
-    expect(opsPageSource).toContain("<ServiceLocationAddressFields");
-    expect(opsPageSource).toContain('addressLine1Name="service_address_text"');
-    expect(opsPageSource).toContain("Create Permit Request");
+    expect(opsPermitWorkspaceSource).toContain('name="contractor_id"');
+    expect(opsPermitWorkspaceSource).toContain('name="request_label"');
+    expect(opsPermitWorkspaceSource).toContain('name="intake_note"');
+    expect(opsPermitWorkspaceSource).toContain("<ServiceLocationAddressFields");
+    expect(opsPermitWorkspaceSource).toContain('addressLine1Name="service_address_text"');
+    expect(opsPermitWorkspaceSource).toContain("Create Permit Request");
   });
 
   it("keeps the full create form collapsed by default and only opens from the create intent", () => {
     expect(opsPageSource).toContain("createIntent");
-    expect(opsPageSource).toContain("open={shouldExpandPermitCreateForm}");
-    expect(opsPageSource).toContain('id="permit-request-create"');
-    expect(opsPageSource).not.toContain('No active permit requests.</div>\n                  <Link href=');
+    expect(opsPageSource).toContain("expandCreateForm={shouldExpandPermitCreateForm}");
+    expect(opsPermitWorkspaceSource).toContain("open={expanded}");
+    expect(opsPermitWorkspaceSource).toContain('id="permit-request-create"');
   });
 
   it("renders active-state permit controls with the mark-created completion entry point", () => {
@@ -105,7 +114,7 @@ describe("Ops workspace permit queue wiring", () => {
     expect(permitWorkspaceActionsSource).toContain("resumeInternalPermitRequest");
     expect(permitWorkspaceActionsSource).toContain("markInternalPermitCreated");
     expect(permitWorkspaceActionsSource).toContain("markInternalPermitRequestNotNeeded");
-    expect(opsPageSource).toContain("markPermitCreatedFromOps");
+    expect(opsPermitWorkspaceSource).toContain("markPermitCreatedFromOps");
     expect(branch).toContain("Accept / Start Permit");
     expect(branch).toContain("Put On Hold");
     expect(branch).toContain("Resume / In Process");
@@ -123,7 +132,7 @@ describe("Ops workspace permit queue wiring", () => {
     const branch = permitRenderBranch();
 
     expect(permitWorkspaceActionsSource).toContain("createJobFromPermitRequestAndMarkCreated");
-    expect(opsPageSource).toContain("createJobAndMarkPermitCreatedFromOps");
+    expect(opsPermitWorkspaceSource).toContain("createJobAndMarkPermitCreatedFromOps");
     expect(branch).toContain("No job is linked yet. This will start the customer/job record from the permit intake below.");
     expect(branch).toContain("Permit intake draft");
     expect(branch).toContain("Create Job From Permit Intake");
@@ -158,7 +167,8 @@ describe("Ops workspace permit queue wiring", () => {
   it("keeps linked active permit requests on the existing mark-created path", () => {
     const branch = permitRenderBranch();
 
-    expect(branch).toContain("permitRequest.jobId ? (");
+    expect(branch).toContain("const isLinked = Boolean(permitRequest.jobId)");
+    expect(branch).toContain("isLinked ? (");
     expect(branch).toContain('action={markPermitCreatedFromOps}');
     expect(branch).toContain('action={createJobAndMarkPermitCreatedFromOps}');
     expect(branch).toContain("Moves the linked job to scheduling when it is unscheduled, or keeps it scheduled if it already has a time.");
@@ -169,7 +179,7 @@ describe("Ops workspace permit queue wiring", () => {
     const branch = permitRenderBranch();
 
     expect(permitWorkspaceActionsSource).toContain("updateInternalPermitRequestIntake");
-    expect(opsPageSource).toContain("updatePermitRequestIntakeFromOps");
+    expect(opsPermitWorkspaceSource).toContain("updatePermitRequestIntakeFromOps");
     expect(branch).toContain("Edit Permit Intake");
     expect(branch).toContain("Save Intake Details");
     expect(branch).toContain('name="request_label"');
@@ -179,7 +189,7 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain('name="service_address_text_snapshot"');
     expect(branch).toContain('name="total_value"');
     expect(branch).toContain("permitRequest.addressLine2Snapshot");
-    expect(branch).toContain('label: "Internal intake note"');
+    expect(branch).toContain('label="Internal intake note"');
     expect(branch).toContain('name="permit_number"');
     expect(branch).toContain('name="post_permit_route"');
     expect(branch).toContain('value="ready_for_testing"');
@@ -233,11 +243,12 @@ describe("Ops workspace permit queue wiring", () => {
   });
 
   it("keeps permit UI mutations routed through server actions instead of inline lifecycle SQL", () => {
-    const source = `${opsPageSource}\n${permitWorkspaceActionsSource}`.toLowerCase();
+    const source = `${opsPageSource}\n${opsPermitWorkspaceSource}\n${permitWorkspaceActionsSource}`.toLowerCase();
 
     expect(source).not.toContain("insert into public.job_events");
     expect(source).not.toContain("update public.jobs set ops_status");
     expect(source).not.toContain("permit_request_events");
     expect(permitWorkspaceActionsSource).toContain("createJobFromPermitRequestAndMarkCreated(formData)");
+    expect(opsPageSource).not.toContain("createJobAndMarkPermitCreatedFromOps");
   });
 });
