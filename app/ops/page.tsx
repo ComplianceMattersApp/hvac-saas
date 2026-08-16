@@ -37,15 +37,13 @@ import {
   resumeInternalPermitRequest,
   updateInternalPermitRequestIntake,
 } from "@/lib/actions/internal-permit-request-actions";
-import { buildOpsStatusEnteredAtByJob } from "@/lib/utils/lifecycle-aging";
 import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
-import { type FocusedQueueJob } from "@/lib/ops/focused-queues";
 import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
+import { loadWaitingExceptionQueueSnapshot } from "@/lib/ops/waiting-exception-loader";
 import {
-  loadFocusedOpsQueueRows,
-  loadWaitingExceptionQueueSnapshot,
-} from "@/lib/ops/waiting-exception-loader";
-import { OPS_WORKSPACE_JOB_SELECT } from "@/lib/ops/ops-workspace-job-contract";
+  OPS_WORKSPACE_JOB_SELECT,
+  type OpsWorkspaceJob,
+} from "@/lib/ops/ops-workspace-job-contract";
 import {
   getCachedAccountTimeZone,
   getCachedBillingMode,
@@ -54,7 +52,6 @@ import {
 import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
 import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
-import { buildLatestCustomerAttemptByJob } from "@/lib/ops/recent-attempt-display";
 import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
 import {
   OPS_BOARD_SORT_OPTIONS,
@@ -85,15 +82,19 @@ import {
   createOpsWorkspaceRowViewBuilders,
   type OpsWorkspaceRowJob,
 } from "@/lib/ops/ops-workspace-row-views";
-import { buildOpsWorkspaceEvidenceIndex } from "@/lib/ops/ops-workspace-evidence";
+import {
+  buildCloseoutProjectionInputs,
+  createOpsWorkspacePreviewLoader,
+  loadOpsWorkspacePreviewEnrichment,
+  type OpsWorkspacePreviewRow,
+} from "@/lib/ops/ops-workspace-data-loader";
+import { startOpsServerTimer } from "@/lib/ops/ops-server-timing";
 import {
   listActivePermitRequestQueueRowsIfAvailable,
   type PermitRequestQueueRow,
 } from "@/lib/permits/permit-requests-read-model";
 import {
-  CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT,
   countPendingContractorIntakeQueueRows,
-  listPendingContractorIntakeQueueRows,
   type ContractorIntakeQueueRow,
 } from "@/lib/ops/contractor-intake-queue";
 import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/permit-request-attachments-read-model";
@@ -104,6 +105,8 @@ type ContractorFocusOption = {
   count: number;
   selected: boolean;
 };
+
+type ContractorFocusRow = OpsWorkspacePreviewRow | PermitRequestQueueRow;
 
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -201,9 +204,9 @@ export default async function OpsPage({
   const createIntent = (sp.create ?? "").trim().toLowerCase();
 
   const opsTimingEnabled = process.env.OPS_TIMING_DEBUG === "true";
-  const _t_total = opsTimingEnabled ? Date.now() : 0;
+  const finishTotalTiming = startOpsServerTimer(opsTimingEnabled);
 
-  const _t_requestActorContext = opsTimingEnabled ? Date.now() : 0;
+  const finishRequestActorContextTiming = startOpsServerTimer(opsTimingEnabled);
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
   const user = actorContext.user;
@@ -231,7 +234,7 @@ export default async function OpsPage({
 
   const internalUser = actorContext.internalUser;
   const admin = createAdminClient();
-  if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
+  finishRequestActorContextTiming("ops:requestActorContext");
 
   const showTeamClockStatusCardForRole =
     internalUser.role === "admin" || internalUser.role === "office";
@@ -251,7 +254,7 @@ export default async function OpsPage({
   ] = await Promise.all([
     getCachedAccountTimeZone(internalUser.account_owner_user_id),
     loadFieldBillingExplicitCapabilitiesForUser({
-      supabase: supabase as any,
+      supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
       internalUserId: internalUser.user_id,
     }),
@@ -294,7 +297,8 @@ export default async function OpsPage({
     throw timeClockAccountSettingsResult.error;
   }
   const isTimeClockEnabled = Boolean(
-    (timeClockAccountSettingsResult?.data as any)?.time_clock_enabled,
+    (timeClockAccountSettingsResult?.data as { time_clock_enabled?: boolean | null } | null)
+      ?.time_clock_enabled,
   );
 
   // Second group: both reads depend on results from the group above but not on
@@ -364,18 +368,14 @@ export default async function OpsPage({
   const contractorFocusIdSet = new Set(contractorFocusIds);
   const permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(internalUser.account_owner_user_id);
 
-  const _t_businessIdentity = opsTimingEnabled ? Date.now() : 0;
+  const finishBusinessIdentityTiming = startOpsServerTimer(opsTimingEnabled);
   const operationalTenantIdentityPromise = resolveOperationalTenantIdentity({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   }).then((result) => {
-    if (opsTimingEnabled) console.log(`[ops:businessIdentity] ${Date.now() - _t_businessIdentity}ms`);
+    finishBusinessIdentityTiming("ops:businessIdentity");
     return result;
   });
-
-  // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
-  let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
-  let workspaceEvidence = buildOpsWorkspaceEvidenceIndex();
 
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
   const wsStartTomorrowUtc = startOfTomorrowUtcIsoLA();
@@ -383,22 +383,7 @@ export default async function OpsPage({
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start, follow_up_date, next_action_note, action_required_by";
 
-    function closeoutProjectionInputs(rows: any[]) {
-      return (rows ?? []).map((job: any) => ({
-        id: String(job?.id ?? "").trim(),
-        field_complete: job?.field_complete,
-        job_type: job?.job_type,
-        ops_status: job?.ops_status,
-        pending_info_reason: job?.pending_info_reason,
-        on_hold_reason: job?.on_hold_reason,
-        permit_number: job?.permit_number,
-        invoice_complete: job?.invoice_complete,
-        billing_disposition: job?.billing_disposition,
-        certs_complete: job?.certs_complete,
-      }));
-    }
-
-    const _t_workspaceCounts = opsTimingEnabled ? Date.now() : 0;
+    const finishWorkspaceCountsTiming = startOpsServerTimer(opsTimingEnabled);
 
     function opsStatusCountQuery(opsStatus: string, options?: { requireOpenStatus?: boolean }) {
       let q = supabase
@@ -431,7 +416,7 @@ export default async function OpsPage({
       .neq("status", "cancelled")
       .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null");
 
-    let fieldWorkCountQ = supabase
+    const fieldWorkCountQ = supabase
       .from("jobs")
       .select("id, status, ops_status, follow_up_date, next_action_note, action_required_by")
       .is("deleted_at", null)
@@ -445,7 +430,7 @@ export default async function OpsPage({
       .gte("scheduled_date", wsStartTodayUtc)
       .lt("scheduled_date", wsStartTomorrowUtc);
 
-    let scheduledOpenRowsQ = supabase
+    const scheduledOpenRowsQ = supabase
       .from("jobs")
       .select(scheduledSnapshotSelect)
       .is("deleted_at", null)
@@ -458,7 +443,7 @@ export default async function OpsPage({
       .order("scheduled_date", { ascending: true })
       .order("window_start", { ascending: true });
 
-    let closeoutCountRowsQ = supabase
+    const closeoutCountRowsQ = supabase
       .from("jobs")
       .select(OPS_WORKSPACE_JOB_SELECT)
       .is("deleted_at", null)
@@ -499,7 +484,7 @@ export default async function OpsPage({
       listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
       permitWorkflowEnabled
         ? listActivePermitRequestQueueRowsIfAvailable({
-            supabase: supabase as any,
+            supabase,
             accountOwnerUserId: internalUser.account_owner_user_id,
             limit: 50,
           })
@@ -524,13 +509,13 @@ export default async function OpsPage({
       ["problem", waitingExceptionSnapshot.statusCounts.get("problem") ?? 0],
       [
         "follow_ups",
-        (followUpReminderRowsRes.data ?? []).filter((job: any) =>
+        ((followUpReminderRowsRes.data ?? []) as OpsWorkspaceJob[]).filter((job) =>
           isPrimaryQueueJob(job, "follow_ups"),
         ).length,
       ],
     ]);
 
-    const scheduledOpenRows = (scheduledOpenRowsRes.data ?? []) as any[];
+    const scheduledOpenRows = (scheduledOpenRowsRes.data ?? []) as OpsWorkspaceJob[];
     const scheduledIds = scheduledOpenRows
       .map((row) => String(row?.id ?? "").trim())
       .filter(Boolean);
@@ -545,7 +530,7 @@ export default async function OpsPage({
       previewLimit: Math.max(scheduledOpenRows.length, 1),
     });
 
-    const fieldWorkCountRows = (fieldWorkCountRes.data ?? []) as any[];
+    const fieldWorkCountRows = (fieldWorkCountRes.data ?? []) as OpsWorkspaceJob[];
     const fieldWorkCountIds = fieldWorkCountRows
       .map((row) => String(row?.id ?? "").trim())
       .filter(Boolean);
@@ -572,17 +557,17 @@ export default async function OpsPage({
       (countsWs.get("pending_office_review") ?? 0) +
       (countsWs.get("problem") ?? 0);
 
-    const closeoutCountSourceRows = closeoutCountRowsRes.data ?? [];
+    const closeoutCountSourceRows = (closeoutCountRowsRes.data ?? []) as OpsWorkspaceJob[];
     const { projectionsByJobId: closeoutCountProjectionByJobId } = await buildBillingTruthCloseoutProjectionMap({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
-      jobs: closeoutProjectionInputs(closeoutCountSourceRows),
+      jobs: buildCloseoutProjectionInputs(closeoutCountSourceRows),
     });
     // Full closeout set (uncapped) — reused for counts, contractor facets, and
     // every desktop/mobile queue card.
     const closeoutQueueRowsFull = listCloseoutQueueJobs(
       closeoutCountSourceRows,
-      (job: any) => closeoutCountProjectionByJobId.get(String(job?.id ?? "").trim()) ?? job,
+      (job) => closeoutCountProjectionByJobId.get(String(job.id ?? "").trim()) ?? job,
     );
     const closeoutCount = closeoutQueueRowsFull.length;
     const permitRequestsSchemaAvailable = permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable;
@@ -617,186 +602,23 @@ export default async function OpsPage({
     });
     const requestedWorkspaceKeys = [resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter)];
 
-    async function loadWithoutTechPreviewRows() {
-      const withoutTechPreviewIds = (scheduledWithoutTechSnapshot.preview ?? [])
-        .map((job: any) => String(job?.id ?? "").trim())
-        .filter(Boolean);
-
-      if (withoutTechPreviewIds.length > 0) {
-        const withoutTechPreviewRes = await supabase
-          .from("jobs")
-          .select(OPS_WORKSPACE_JOB_SELECT)
-          .in("id", withoutTechPreviewIds)
-          .is("deleted_at", null)
-          .neq("status", "cancelled");
-
-        if (withoutTechPreviewRes.error) throw withoutTechPreviewRes.error;
-
-        const withoutTechRowsById = new Map(
-          (withoutTechPreviewRes.data ?? []).map((row: any) => [String(row?.id ?? "").trim(), row])
-        );
-
-        return withoutTechPreviewIds
-          .map((id) => withoutTechRowsById.get(id))
-          .filter(Boolean) as any[];
-      }
-
-      return [];
-    }
-
-    async function loadCloseoutWorkspaceRows() {
-      // Invoice-needed closeout is status-invariant. Failed/on-hold/pending status
-      // may add exception routing, but must not suppress closeout invoice reminder.
-      const closeoutRowsRes = await supabase
-        .from("jobs")
-        .select(OPS_WORKSPACE_JOB_SELECT)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        // Closed jobs can never pass isInCloseoutQueue (projection copies
-        // ops_status verbatim) — keep this read bounded by active work.
-        .neq("ops_status", "closed")
-        .eq("field_complete", true)
-        .order("created_at", { ascending: true });
-      if (closeoutRowsRes.error) throw closeoutRowsRes.error;
-
-      const closeoutSourceRows = closeoutRowsRes.data ?? [];
-      const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
-        supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        jobs: closeoutProjectionInputs(closeoutSourceRows),
-      });
-
-      // Entered-at events are only consulted for rows that survive the queue
-      // filter — fetch them for that subset, not the whole source set.
-      const closeoutQueueRows = listCloseoutQueueJobs(
-        closeoutSourceRows,
-        (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
-      );
-      const closeoutJobIds = closeoutQueueRows
-        .map((job: any) => String(job?.id ?? "").trim())
-        .filter(Boolean);
-      const closeoutStatusEventsRes = closeoutJobIds.length
-        ? await supabase
-            .from("job_events")
-            .select("job_id, created_at, meta")
-            .in("job_id", closeoutJobIds)
-            .eq("event_type", "ops_update")
-            .order("created_at", { ascending: false })
-        : { data: [], error: null };
-      if (closeoutStatusEventsRes.error) throw closeoutStatusEventsRes.error;
-      const closeoutEnteredAtByJob = buildOpsStatusEnteredAtByJob(closeoutStatusEventsRes.data ?? []);
-
-      return sortOpsBoardRows(
-        closeoutQueueRows,
-        boardSort,
-        {
-          queueEnteredAt: (job) => {
-            const jobId = String(job?.id ?? "").trim();
-            const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
-            return (
-              String(job?.field_complete_at ?? "").trim() ||
-              (jobId ? closeoutEnteredAtByJob.get(jobId)?.[opsStatus] ?? null : null) ||
-              String(job?.created_at ?? "").trim() ||
-              null
-            );
-          },
-        },
-      );
-    }
-
-    async function loadWorkspacePreviewRows(workspaceKey: string) {
-      if (workspaceKey === "without_tech") {
-        return loadWithoutTechPreviewRows();
-      }
-
-      if (workspaceKey === "closeout") {
-        return loadCloseoutWorkspaceRows();
-      }
-
-      if (workspaceKey === "contractor_intake") {
-        if (!contractorIntakeQueueAvailable) return [];
-        return listPendingContractorIntakeQueueRows({
-          supabase: admin,
-          accountOwnerUserId: internalUser.account_owner_user_id,
-          limit: CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT,
-        });
-      }
-
-      if (workspaceKey === "waiting" || workspaceKey === "exceptions") {
-        return loadFocusedOpsQueueRows({
-          supabase,
-          queueKey: workspaceKey,
-          continuationParentIds: retestContinuationParentIds,
-          serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
-          sortKey: boardSort,
-        });
-      }
-
-      let queueQ = supabase
-        .from("jobs")
-        .select(OPS_WORKSPACE_JOB_SELECT)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .order("created_at", { ascending: true });
-
-      if (workspaceKey === "need_to_schedule") {
-        queueQ = queueQ
-          .eq("status", "open")
-          .eq("ops_status", "need_to_schedule")
-          .is("follow_up_date", null)
-          .is("next_action_note", null)
-          .is("action_required_by", null);
-      } else if (workspaceKey === "field_work") {
-        queueQ = queueQ
-          .in("status", ["open", "on_the_way", "in_process", "in_progress"])
-          .neq("ops_status", "closed")
-          .eq("field_complete", false)
-          .is("follow_up_date", null)
-          .is("next_action_note", null)
-          .is("action_required_by", null)
-          .gte("scheduled_date", wsStartTodayUtc)
-          .lt("scheduled_date", wsStartTomorrowUtc)
-          .order("window_start", { ascending: true });
-      } else if (workspaceKey === "follow_ups") {
-        queueQ = queueQ
-          .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")
-          .order("follow_up_date", { ascending: true, nullsFirst: false });
-      } else if (workspaceKey === "permits") {
-        return [];
-      } else {
-        return [];
-      }
-
-      const queueRes = await queueQ;
-      if (queueRes.error) throw queueRes.error;
-      let queueRows = queueRes.data ?? [];
-      if (workspaceKey === "field_work") {
-        const fieldWorkIds = queueRows
-          .map((row: any) => String(row?.id ?? "").trim())
-          .filter(Boolean);
-        const assignmentMap = fieldWorkIds.length
-          ? await getActiveJobAssignmentDisplayMap({ supabase, jobIds: fieldWorkIds })
-          : {};
-        queueRows = queueRows.filter((row: any) => {
-          const jobId = String(row?.id ?? "").trim();
-          return (
-            resolvePrimaryOpsQueue(row) === null &&
-            Array.isArray(assignmentMap[jobId]) &&
-            assignmentMap[jobId].length > 0
-          );
-        });
-      }
-      const typedQueueRows = queueRows as FocusedQueueJob[];
-      const currentRows = workspaceKey === "follow_ups"
-        ? typedQueueRows.filter((row) => isPrimaryQueueJob(row, "follow_ups"))
-        : typedQueueRows;
-      return sortOpsBoardRows(currentRows, boardSort);
-    }
+    const loadWorkspacePreviewRows = createOpsWorkspacePreviewLoader({
+      supabase,
+      admin,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      boardSort,
+      contractorIntakeQueueAvailable,
+      retestContinuationParentIds,
+      serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
+      scheduledWithoutTechSnapshot,
+      startTodayUtc: wsStartTodayUtc,
+      startTomorrowUtc: wsStartTomorrowUtc,
+    });
 
     const workspacePreviewEntries = await Promise.all(
       requestedWorkspaceKeys.map(async (workspaceKey) => [workspaceKey, await loadWorkspacePreviewRows(workspaceKey)] as const),
     );
-    const workspacePreviewRowsByKey = new Map<string, any[]>(workspacePreviewEntries);
+    const workspacePreviewRowsByKey = new Map<string, OpsWorkspacePreviewRow[]>(workspacePreviewEntries);
     const reasonSourceWorkspaceSections = requestedWorkspaceKeys.map((workspaceKey) => {
       const tab = workspaceTabs.find((item) => item.key === workspaceKey) ?? workspaceTabs[0];
       return {
@@ -805,31 +627,39 @@ export default async function OpsPage({
       };
     });
     const selectedWorkspaceKey = requestedWorkspaceKeys[0];
-    const reasonSourceRows = reasonSourceWorkspaceSections.flatMap((section) => section.previewRows);
+    const selectedWorkspaceUsesJobRows =
+      selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake";
+    const reasonSourceRows: OpsWorkspaceJob[] = selectedWorkspaceUsesJobRows
+      ? (reasonSourceWorkspaceSections.flatMap((section) => section.previewRows) as OpsWorkspaceJob[])
+      : [];
     const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });
     const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some((option) => option.key === boardReasonFilter)
       ? boardReasonFilter
       : null;
     const reasonFilteredWorkspaceSections = reasonSourceWorkspaceSections.map((section) => ({
       ...section,
-      previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key }),
+      previewRows: selectedWorkspaceUsesJobRows
+        ? filterOpsBoardRowsByReason(
+            section.previewRows as OpsWorkspaceJob[],
+            effectiveBoardReasonFilter,
+            { queueKey: section.key },
+          )
+        : section.previewRows,
     }));
 
-    function rowContractorFocusId(row: any) {
-      if (selectedWorkspaceKey === "contractor_intake" || selectedWorkspaceKey === "permits") {
-        return String(row?.contractorId ?? "").trim();
-      }
-      return String(row?.contractor_id ?? "").trim();
+    function rowContractorFocusId(row: ContractorFocusRow) {
+      return "contractorId" in row
+        ? String(row.contractorId ?? "").trim()
+        : String(row.contractor_id ?? "").trim();
     }
 
-    function rowContractorFocusName(row: any) {
-      if (selectedWorkspaceKey === "contractor_intake" || selectedWorkspaceKey === "permits") {
-        return String(row?.contractorName ?? "").trim();
-      }
-      return String(row?.contractors?.name ?? "").trim();
+    function rowContractorFocusName(row: ContractorFocusRow) {
+      return "contractorName" in row
+        ? String(row.contractorName ?? "").trim()
+        : String(row.contractors?.name ?? "").trim();
     }
 
-    function filterRowsByContractorFocus(rows: any[]) {
+    function filterRowsByContractorFocus<T extends ContractorFocusRow>(rows: T[]): T[] {
       if (contractorFocusIdSet.size === 0) return rows;
       return rows.filter((row) => {
         const rowContractorId = rowContractorFocusId(row);
@@ -850,10 +680,10 @@ export default async function OpsPage({
       selectedWorkspaceKey === "contractor_intake"
         ? ((selectedWorkspaceSection?.previewRows ?? []) as ContractorIntakeQueueRow[])
         : [];
-    const selectedPreviewRows =
+    const selectedPreviewRows: OpsWorkspaceJob[] =
       selectedWorkspaceKey === "permits" || selectedWorkspaceKey === "contractor_intake"
         ? []
-        : visibleWorkspaceSections.flatMap((section) => section.previewRows);
+        : (visibleWorkspaceSections.flatMap((section) => section.previewRows) as OpsWorkspaceJob[]);
     const selectedWorkspacePreviewCount =
       selectedWorkspaceKey === "permits"
         ? selectedPermitRows.length
@@ -900,107 +730,27 @@ export default async function OpsPage({
     })}#ops-workspace`;
     const hasActiveOpsBoardFilters = contractorFocusIds.length > 0 || Boolean(effectiveBoardReasonFilter);
 
-    if (opsTimingEnabled) {
-      console.log(`[ops:workspace:countsAndPreview] ${Date.now() - _t_workspaceCounts}ms`);
-      console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
-    }
+    finishWorkspaceCountsTiming("ops:workspace:countsAndPreview");
+    finishTotalTiming("ops:totalBeforeRender");
 
-    const selectedPreviewJobIds = selectedPreviewRows
-      .map((job: any) => String(job?.id ?? "").trim())
-      .filter(Boolean);
     // These enrichment reads all depend only on the selected preview job ids
     // (plus two independent account-level reads), so they run as one barrier
     // instead of eight sequential round-trips.
-    const _t_selectedPreviewEnrichment = opsTimingEnabled ? Date.now() : 0;
-    const [
-      selectedPreviewAssignmentDisplayMap,
-      selectedPreviewFailedRunsRes,
-      selectedPreviewCustomerAttemptEventsRes,
-      selectedPreviewContractorReportEventsRes,
-      selectedPreviewJobEventsRes,
-      selectedWorkspaceCloseoutProjection,
+    const {
+      assignmentDisplayMap: selectedPreviewAssignmentDisplayMap,
+      closeoutProjectionByJob: selectedWorkspaceCloseoutProjectionByJob,
+      latestCustomerAttemptByJob: selectedPreviewLatestCustomerAttemptByJob,
+      opsStatusEnteredAtByJob,
       operationalTenantIdentity,
-      workspaceContractorsRes,
-    ] = await Promise.all([
-      selectedPreviewJobIds.length
-        ? getActiveJobAssignmentDisplayMap({
-            supabase,
-            jobIds: selectedPreviewJobIds,
-          })
-        : Promise.resolve({}),
-      selectedPreviewJobIds.length
-        ? supabase
-            .from("ecc_test_runs")
-            .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
-            .in("job_id", selectedPreviewJobIds)
-            .eq("is_completed", true)
-            .or("override_pass.eq.false,computed_pass.eq.false")
-        : Promise.resolve({ data: [], error: null }),
-      selectedPreviewJobIds.length
-        ? supabase
-            .from("job_events")
-            .select("job_id, created_at")
-            .in("job_id", selectedPreviewJobIds)
-            .eq("event_type", "customer_attempt")
-            .order("created_at", { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
-      selectedPreviewJobIds.length
-        ? supabase
-            .from("job_events")
-            .select("job_id, event_type, created_at, meta")
-            .in("job_id", selectedPreviewJobIds)
-            .eq("event_type", "contractor_report_sent")
-            .order("created_at", { ascending: false })
-        : Promise.resolve({ data: [], error: null }),
-      selectedPreviewJobIds.length
-        ? supabase
-            .from("job_events")
-            .select("job_id, event_type, created_at, message, meta")
-            .in("job_id", selectedPreviewJobIds)
-            .order("created_at", { ascending: false })
-            .limit(1000)
-        : Promise.resolve({ data: [], error: null }),
-      selectedWorkspaceKey === "closeout" && selectedPreviewRows.length
-        ? buildBillingTruthCloseoutProjectionMap({
-            supabase,
-            accountOwnerUserId: internalUser.account_owner_user_id,
-            jobs: closeoutProjectionInputs(selectedPreviewRows),
-          })
-        : Promise.resolve(null),
+      workspaceContractors,
+      workspaceEvidence,
+    } = await loadOpsWorkspacePreviewEnrichment({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      selectedWorkspaceKey,
+      selectedPreviewRows,
       operationalTenantIdentityPromise,
-      supabase
-        .from("contractors")
-        .select("id, name")
-        .eq("lifecycle_state", "active")
-        .order("name", { ascending: true }),
-    ]);
-    if (opsTimingEnabled) {
-      console.log(`[ops:selectedPreviewEnrichment] ${Date.now() - _t_selectedPreviewEnrichment}ms`);
-    }
-
-    if (selectedPreviewFailedRunsRes.error) throw selectedPreviewFailedRunsRes.error;
-    if (selectedPreviewCustomerAttemptEventsRes.error) throw selectedPreviewCustomerAttemptEventsRes.error;
-    if (selectedPreviewContractorReportEventsRes.error) throw selectedPreviewContractorReportEventsRes.error;
-    if (selectedPreviewJobEventsRes.error) throw selectedPreviewJobEventsRes.error;
-
-    const selectedPreviewJobEvents = selectedPreviewJobEventsRes.data ?? [];
-    opsStatusEnteredAtByJob = buildOpsStatusEnteredAtByJob(
-      selectedPreviewJobEvents.filter((event: any) => String(event?.event_type ?? "") === "ops_update"),
-    );
-    workspaceEvidence = buildOpsWorkspaceEvidenceIndex({
-      jobEvents: selectedPreviewJobEvents,
-      contractorReportEvents: selectedPreviewContractorReportEventsRes.data ?? [],
-      failedRuns: selectedPreviewFailedRunsRes.data ?? [],
     });
-
-    const selectedPreviewLatestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
-      (selectedPreviewCustomerAttemptEventsRes.data ?? []) as Array<{ job_id: string; created_at: string }>,
-    );
-    const selectedWorkspaceCloseoutProjectionByJob =
-      selectedWorkspaceCloseoutProjection?.projectionsByJobId ?? new Map<string, any>();
-
-    if (workspaceContractorsRes.error) throw workspaceContractorsRes.error;
-    const workspaceContractors = workspaceContractorsRes.data ?? [];
     // Contractor Focus is scoped to the bucket currently being rendered. Queue
     // chips navigate (server round-trip), so the rendered bucket always matches
     // what the user is viewing and these per-bucket counts stay correct. Use the
@@ -1040,7 +790,7 @@ export default async function OpsPage({
     // actually filters to the rows the user can see.
     const contractorFocusByName = new Map<string, { id: string; name: string; count: number }>();
     const focusNameKey = (name: string) => name.trim().toLowerCase();
-    for (const contractorOption of workspaceContractors as Array<{ id: string; name: string | null }>) {
+    for (const contractorOption of workspaceContractors) {
       const name = String(contractorOption.name ?? "").trim() || contractorOption.id;
       contractorFocusByName.set(focusNameKey(name), {
         id: contractorOption.id,
@@ -1096,8 +846,8 @@ export default async function OpsPage({
     // badge. Evidence and the presentation service are assembled first so the
     // sort and rendered age badge use the same queue-entry policy.
     if (selectedWorkspaceSection && selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake") {
-      const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows, boardSort, {
-        queueEnteredAt: (job) => rowViewBuilders.queueEnteredAt(job as OpsWorkspaceRowJob, selectedWorkspaceKey),
+      const queueSortedRows = sortOpsBoardRows(selectedWorkspaceSection.previewRows as OpsWorkspaceJob[], boardSort, {
+        queueEnteredAt: (job) => rowViewBuilders.queueEnteredAt(job, selectedWorkspaceKey),
       });
       selectedWorkspaceSection.previewRows.splice(0, selectedWorkspaceSection.previewRows.length, ...queueSortedRows);
     }
@@ -1119,19 +869,19 @@ export default async function OpsPage({
         : `Showing ${selectedWorkspacePreviewCount} of ${selectedWorkspaceTotalCount} ${selectedWorkspaceItemNoun}`;
     const activeQueueRows: OpsBoardActiveQueueRow[] =
       canShowJobQueueExport && selectedWorkspaceSection
-        ? selectedWorkspaceSection.previewRows.map((job: any) => {
-            const typedJob = job as OpsWorkspaceRowJob;
+        ? (selectedWorkspaceSection.previewRows as OpsWorkspaceJob[]).map((job) => {
+            const typedJob: OpsWorkspaceRowJob = job;
             const view = rowViewBuilders.buildJobRowView(typedJob, selectedWorkspaceSection.key);
             return {
-              id: String(job?.id ?? ""),
+              id: String(job.id ?? ""),
               reasonKey: getOpsBoardReasonLabel(rowViewBuilders.reasonInput(typedJob), { queueKey: selectedWorkspaceSection.key })?.key ?? null,
               sortable: {
-                created_at: job?.created_at ?? null,
+                created_at: job.created_at ?? null,
                 queue_entered_at: rowViewBuilders.queueEnteredAt(typedJob, selectedWorkspaceSection.key),
-                scheduled_date: job?.scheduled_date ?? null,
-                window_start: job?.window_start ?? null,
-                customer_first_name: job?.customer_first_name ?? null,
-                customer_last_name: job?.customer_last_name ?? null,
+                scheduled_date: job.scheduled_date ?? null,
+                window_start: job.window_start ?? null,
+                customer_first_name: job.customer_first_name ?? null,
+                customer_last_name: job.customer_last_name ?? null,
                 contractors: { name: rowViewBuilders.contractorName(typedJob) || null },
               },
               view,
@@ -1142,7 +892,9 @@ export default async function OpsPage({
       canShowJobQueueExport && selectedWorkspaceSection?.key === "closeout" && canViewFieldPaymentVerificationAttention
         ? (fieldPaymentReconciliationAttention?.items ?? []).map((item) => rowViewBuilders.buildFieldPaymentReviewRowView(item))
         : [];
-    const queueHealthAgingOver30 = activeQueueRows.filter((row) => (row.view as any).ageDays != null && (row.view as any).ageDays > 30).length;
+    const queueHealthAgingOver30 = activeQueueRows.filter(
+      (row) => "ageDays" in row.view && row.view.ageDays != null && row.view.ageDays > 30,
+    ).length;
     const queueHealthBreakdown = new Map<string, number>();
     let queueHealthUnassigned = 0;
     for (const row of activeQueueRows) {

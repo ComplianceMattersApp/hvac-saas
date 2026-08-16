@@ -10,6 +10,10 @@ const rowViewsSource = readFileSync(
   resolve(__dirname, "../ops-workspace-row-views.ts"),
   "utf-8",
 );
+const dataLoaderSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-data-loader.ts"),
+  "utf-8",
+);
 const opsWorkspaceQueuesSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
   "utf-8",
@@ -60,11 +64,14 @@ const closeoutCardSource =
 const fieldPaymentCardStart = rowCardSource.indexOf("function FieldPaymentReviewCard(");
 const fieldPaymentCardSource = fieldPaymentCardStart > -1 ? rowCardSource.slice(fieldPaymentCardStart) : "";
 
-const loadWorkspaceRowsStart = opsPageSource.indexOf("async function loadWorkspacePreviewRows(");
-const loadWorkspaceRowsEnd = opsPageSource.indexOf("const workspacePreviewEntries", loadWorkspaceRowsStart);
+const loadWorkspaceRowsStart = dataLoaderSource.indexOf("return async function loadWorkspacePreviewRows(");
+const loadWorkspaceRowsEnd = dataLoaderSource.indexOf(
+  "export async function loadOpsWorkspacePreviewEnrichment(",
+  loadWorkspaceRowsStart,
+);
 const loadWorkspaceRowsSource =
   loadWorkspaceRowsStart > -1 && loadWorkspaceRowsEnd > loadWorkspaceRowsStart
-    ? opsPageSource.slice(loadWorkspaceRowsStart, loadWorkspaceRowsEnd)
+    ? dataLoaderSource.slice(loadWorkspaceRowsStart, loadWorkspaceRowsEnd)
     : "";
 
 describe("/ops Needs Scheduling rich cards", () => {
@@ -84,8 +91,8 @@ describe("/ops Needs Scheduling rich cards", () => {
   });
 
   it("keeps contact timestamp display wired to the existing recent-attempt read model on the workspace cards", () => {
-    expect(opsPageSource).toContain("buildLatestCustomerAttemptByJob");
-    expect(opsPageSource).toContain('.eq("event_type", "customer_attempt")');
+    expect(dataLoaderSource).toContain("buildLatestCustomerAttemptByJob");
+    expect(dataLoaderSource).toContain('.eq("event_type", "customer_attempt")');
     expect(rowViewsSource).toContain("resolveRecentAttemptDisplay(");
     expect(rowViewsSource).toContain("context.latestCustomerAttemptByJob.get(job.id) ?? null");
     expect(buildNeedsSchedulingSource).toContain("formattedRecentAttempt");
@@ -142,7 +149,7 @@ describe("/ops Closeout rich cards", () => {
 
   it("uses closeout projection for the compact next step without inline mutation actions", () => {
     expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
-    expect(opsPageSource).toContain("const selectedWorkspaceCloseoutProjectionByJob");
+    expect(opsPageSource).toContain("closeoutProjectionByJob: selectedWorkspaceCloseoutProjectionByJob");
     expect(buildCloseoutSource).toContain("context.closeoutProjectionByJob.get(jobId) ?? job");
     expect(buildCloseoutSource).toContain("getCloseoutQueueNextStepLabel(projection)");
     expect(closeoutCardSource).not.toContain("form action={markInvoiceCompleteFromForm}");

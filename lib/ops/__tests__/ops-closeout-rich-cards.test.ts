@@ -10,6 +10,10 @@ const rowViewsSource = readFileSync(
   resolve(__dirname, "../ops-workspace-row-views.ts"),
   "utf-8",
 );
+const dataLoaderSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-data-loader.ts"),
+  "utf-8",
+);
 const rowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
   "utf-8",
@@ -19,18 +23,24 @@ const opsWorkspaceJobContractSource = readFileSync(
   "utf-8",
 );
 
-const closeoutProjectionInputsStart = opsPageSource.indexOf("function closeoutProjectionInputs(");
-const closeoutProjectionInputsEnd = opsPageSource.indexOf("const _t_workspaceCounts", closeoutProjectionInputsStart);
+const closeoutProjectionInputsStart = dataLoaderSource.indexOf("export function buildCloseoutProjectionInputs(");
+const closeoutProjectionInputsEnd = dataLoaderSource.indexOf(
+  "export function buildOpsWorkspacePreviewEnrichmentReadModels(",
+  closeoutProjectionInputsStart,
+);
 const closeoutProjectionInputsSource =
   closeoutProjectionInputsStart > -1 && closeoutProjectionInputsEnd > closeoutProjectionInputsStart
-    ? opsPageSource.slice(closeoutProjectionInputsStart, closeoutProjectionInputsEnd)
+    ? dataLoaderSource.slice(closeoutProjectionInputsStart, closeoutProjectionInputsEnd)
     : "";
 
-const loadCloseoutWorkspaceRowsStart = opsPageSource.indexOf("async function loadCloseoutWorkspaceRows()");
-const loadCloseoutWorkspaceRowsEnd = opsPageSource.indexOf("async function loadWorkspacePreviewRows(", loadCloseoutWorkspaceRowsStart);
+const loadCloseoutWorkspaceRowsStart = dataLoaderSource.indexOf("async function loadCloseoutWorkspaceRows()");
+const loadCloseoutWorkspaceRowsEnd = dataLoaderSource.indexOf(
+  "return async function loadWorkspacePreviewRows(",
+  loadCloseoutWorkspaceRowsStart,
+);
 const loadCloseoutWorkspaceRowsSource =
   loadCloseoutWorkspaceRowsStart > -1 && loadCloseoutWorkspaceRowsEnd > loadCloseoutWorkspaceRowsStart
-    ? opsPageSource.slice(loadCloseoutWorkspaceRowsStart, loadCloseoutWorkspaceRowsEnd)
+    ? dataLoaderSource.slice(loadCloseoutWorkspaceRowsStart, loadCloseoutWorkspaceRowsEnd)
     : "";
 
 const buildCloseoutStart = rowViewsSource.indexOf("function buildCloseoutRowView(");

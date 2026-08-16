@@ -12,7 +12,6 @@ import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import {
   formatAssignmentSummaryForJob,
   getOpsQueueCardStatusReason,
-  type FocusedQueueJob,
 } from "@/lib/ops/focused-queues";
 import { buildFocusedQueueRowPresentation } from "@/lib/ops/focused-queue-row-presentation";
 import { resolveRecentAttemptDisplay } from "@/lib/ops/recent-attempt-display";
@@ -23,6 +22,7 @@ import {
 import type { OpsWorkspaceEvidenceIndex } from "@/lib/ops/ops-workspace-evidence";
 import { opsWorkspaceEvidenceEpochMs } from "@/lib/ops/ops-workspace-evidence";
 import type { ServiceFollowUpQueueStateByJob } from "@/lib/ops/service-follow-up-queue-state";
+import type { OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
 
 export type OpsQueueCardTone = "rose" | "amber" | "slate" | "green";
 
@@ -31,16 +31,7 @@ export type OpsQueueStateChip = {
   tone: OpsQueueCardTone;
 };
 
-export type OpsWorkspaceRowJob = FocusedQueueJob & {
-  action_required_by?: string | null;
-  certs_complete?: boolean | null;
-  contractors?: { name?: string | null } | null;
-  customer_phone?: string | null;
-  field_complete_at?: string | null;
-  follow_up_date?: string | null;
-  jurisdiction?: string | null;
-  permit_date?: string | null;
-};
+export type OpsWorkspaceRowJob = OpsWorkspaceJob;
 
 export type NeedsSchedulingRowView = {
   kind: "need_to_schedule";

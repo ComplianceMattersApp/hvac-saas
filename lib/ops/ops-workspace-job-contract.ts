@@ -3,6 +3,7 @@ import type { FocusedQueueJob } from "@/lib/ops/focused-queues";
 export type OpsWorkspaceJob = FocusedQueueJob & {
   customer_phone?: string | null;
   action_required_by?: string | null;
+  follow_up_date?: string | null;
   ops_board_failure_note?: string | null;
   jurisdiction?: string | null;
   permit_date?: string | null;

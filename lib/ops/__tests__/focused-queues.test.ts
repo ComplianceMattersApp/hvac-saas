@@ -81,6 +81,10 @@ const opsWorkspaceRowViewsSource = readFileSync(
   resolve(__dirname, "../ops-workspace-row-views.ts"),
   "utf-8",
 );
+const opsWorkspaceDataLoaderSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-data-loader.ts"),
+  "utf-8",
+);
 const serviceFollowUpQueueStateSource = readFileSync(
   resolve(__dirname, "../service-follow-up-queue-state.ts"),
   "utf-8",
@@ -670,7 +674,8 @@ describe("focused ops queue pages", () => {
 
   it("uses the same waiting predicate for the Operations count and preview", () => {
     expect(opsPageSource).toContain("loadWaitingExceptionQueueSnapshot({ supabase })");
-    expect(opsPageSource).toContain("loadFocusedOpsQueueRows({");
+    expect(opsWorkspaceDataLoaderSource).toContain("loadFocusedOpsQueueRows({");
+    expect(opsPageSource).toContain("createOpsWorkspacePreviewLoader({");
     expect(waitingExceptionLoaderSource).toContain(
       '["pending_info", buildWaitingQueueRows(currentPendingInfoRows).length]',
     );

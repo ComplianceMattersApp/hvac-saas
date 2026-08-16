@@ -3,6 +3,7 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 const source = readFileSync(resolve(__dirname, "../../../app/ops/page.tsx"), "utf8");
+const workspaceLoaderSource = readFileSync(resolve(__dirname, "../ops-workspace-data-loader.ts"), "utf8");
 const loaderSource = readFileSync(resolve(__dirname, "../waiting-exception-loader.ts"), "utf8");
 const exceptionsSource = readFileSync(resolve(__dirname, "../../../app/ops/queues/exceptions/page.tsx"), "utf8");
 const waitingSource = readFileSync(resolve(__dirname, "../../../app/ops/queues/waiting/page.tsx"), "utf8");
@@ -17,10 +18,11 @@ describe("/ops ECC retest queue exclusivity wiring", () => {
   });
 
   it("filters historical retest parents from both exception and waiting rows", () => {
-    expect(source).toContain(
+    expect(workspaceLoaderSource).toContain(
       'workspaceKey === "waiting" || workspaceKey === "exceptions"',
     );
-    expect(source).toContain("loadFocusedOpsQueueRows({");
+    expect(workspaceLoaderSource).toContain("loadFocusedOpsQueueRows({");
+    expect(source).toContain("createOpsWorkspacePreviewLoader({");
     expect(loaderSource).toContain("excludeHistoricalRetestParents(");
     expect(exceptionsSource).toContain("loadFocusedOpsQueueData({");
     expect(waitingSource).toContain("loadFocusedOpsQueueData({");
