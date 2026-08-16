@@ -3,28 +3,29 @@ import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
-  EXCEPTION_QUEUE_STATUSES,
-  buildExceptionQueueRows,
   customerLocationLabel,
   getExceptionQueueDisplayLabel,
 } from "@/lib/ops/focused-queues";
-import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
-import { buildRetestContinuationParentIds, excludeHistoricalRetestParents } from "@/lib/ops/retest-queue-exclusivity";
+import type { OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
+import { loadFocusedOpsQueueData } from "@/lib/ops/waiting-exception-loader";
+import { resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 
-const exceptionSelect =
-  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, created_at";
+type ExceptionQueueJobWithLifecycle = OpsWorkspaceJob & {
+  _stateEnteredAtByStatus: Record<string, string> | null;
+  _failedEvidenceAt: string | null;
+};
 
-function jobTitle(job: any) {
+function jobTitle(job: OpsWorkspaceJob) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
 }
 
-function ageDays(job: any): number | null {
+function ageDays(job: ExceptionQueueJobWithLifecycle): number | null {
   const resolved = resolveLifecycleAging({
     status: String(job?.status ?? "").trim() || null,
     opsStatus: String(job?.ops_status ?? "").trim() || null,
     createdAt: String(job?.created_at ?? "").trim() || null,
-    stateEnteredAtByStatus: (job as any)._stateEnteredAtByStatus ?? null,
-    failedEvidenceAt: (job as any)._failedEvidenceAt ?? null,
+    stateEnteredAtByStatus: job._stateEnteredAtByStatus,
+    failedEvidenceAt: job._failedEvidenceAt,
   });
 
   const source = String(resolved.sourceTimestamp ?? "").trim();
@@ -36,14 +37,14 @@ function ageDays(job: any): number | null {
   return Math.max(0, Math.floor((Date.now() - stamp) / 86400000));
 }
 
-function ageLabel(job: any): string {
+function ageLabel(job: ExceptionQueueJobWithLifecycle): string {
   return (
     resolveLifecycleAging({
       status: String(job?.status ?? "").trim() || null,
       opsStatus: String(job?.ops_status ?? "").trim() || null,
       createdAt: String(job?.created_at ?? "").trim() || null,
-      stateEnteredAtByStatus: (job as any)._stateEnteredAtByStatus ?? null,
-      failedEvidenceAt: (job as any)._failedEvidenceAt ?? null,
+      stateEnteredAtByStatus: job._stateEnteredAtByStatus,
+      failedEvidenceAt: job._failedEvidenceAt,
     }).label ?? "-"
   );
 }
@@ -57,70 +58,18 @@ export default async function OpsExceptionsQueuePage() {
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
-  const [{ data, error }, continuationRowsRes] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select(exceptionSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .neq("ops_status", "closed")
-      .in("ops_status", [...EXCEPTION_QUEUE_STATUSES])
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("jobs")
-      .select("parent_job_id")
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("job_type", "ecc")
-      .not("parent_job_id", "is", null),
-  ]);
+  const {
+    rows,
+    opsStatusEnteredAtByJob: enteredAtByJob,
+    latestFailedEvidenceByJob,
+  } = await loadFocusedOpsQueueData({
+    supabase,
+    queueKey: "exceptions",
+    sortKey: "oldest",
+    includeLifecycleEvidence: true,
+  });
 
-  if (error) throw error;
-  if (continuationRowsRes.error) throw continuationRowsRes.error;
-
-  const rows = buildExceptionQueueRows(excludeHistoricalRetestParents(
-    (data ?? []) as any[],
-    buildRetestContinuationParentIds(continuationRowsRes.data),
-  ));
-  const rowJobIds = rows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
-
-  const [statusEventsRes, failedRunsRes] = await Promise.all([
-    rowJobIds.length
-      ? supabase
-          .from("job_events")
-          .select("job_id, created_at, meta")
-          .in("job_id", rowJobIds)
-          .eq("event_type", "ops_update")
-          .order("created_at", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-    rowJobIds.length
-      ? supabase
-          .from("ecc_test_runs")
-          .select("job_id, created_at, computed_pass, override_pass, is_completed")
-          .in("job_id", rowJobIds)
-          .eq("is_completed", true)
-          .or("override_pass.eq.false,computed_pass.eq.false")
-          .order("created_at", { ascending: false })
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-
-  if (statusEventsRes.error) throw statusEventsRes.error;
-  if (failedRunsRes.error) throw failedRunsRes.error;
-
-  const enteredAtByJob = buildOpsStatusEnteredAtByJob(
-    (statusEventsRes.data ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
-  );
-
-  const latestFailedEvidenceByJob = new Map<string, string>();
-  for (const row of failedRunsRes.data ?? []) {
-    const jobId = String((row as any)?.job_id ?? "").trim();
-    if (!jobId || latestFailedEvidenceByJob.has(jobId)) continue;
-    const createdAt = String((row as any)?.created_at ?? "").trim();
-    if (!createdAt) continue;
-    latestFailedEvidenceByJob.set(jobId, createdAt);
-  }
-
-  const rowsWithLifecycleMeta = rows.map((job: any) => {
+  const rowsWithLifecycleMeta: ExceptionQueueJobWithLifecycle[] = rows.map((job) => {
     const jobId = String(job?.id ?? "").trim();
     return {
       ...job,
@@ -128,7 +77,7 @@ export default async function OpsExceptionsQueuePage() {
       _failedEvidenceAt: latestFailedEvidenceByJob.get(jobId) ?? null,
     };
   });
-  const agedOpenExceptions = rowsWithLifecycleMeta.filter((job: any) => (ageDays(job) ?? 0) >= 14).length;
+  const agedOpenExceptions = rowsWithLifecycleMeta.filter((job) => (ageDays(job) ?? 0) >= 14).length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -170,7 +119,7 @@ export default async function OpsExceptionsQueuePage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {rowsWithLifecycleMeta.map((job: any) => {
+          {rowsWithLifecycleMeta.map((job) => {
             const jobId = String(job?.id ?? "");
             const isAged = (ageDays(job) ?? 0) >= 14;
 

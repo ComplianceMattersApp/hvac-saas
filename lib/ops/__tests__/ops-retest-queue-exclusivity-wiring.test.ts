@@ -22,8 +22,10 @@ describe("/ops ECC retest queue exclusivity wiring", () => {
     );
     expect(source).toContain("loadFocusedOpsQueueRows({");
     expect(loaderSource).toContain("excludeHistoricalRetestParents(");
-    expect(exceptionsSource).toContain("excludeHistoricalRetestParents(");
-    expect(waitingSource).toContain("excludeHistoricalRetestParents(");
+    expect(exceptionsSource).toContain("loadFocusedOpsQueueData({");
+    expect(waitingSource).toContain("loadFocusedOpsQueueData({");
+    expect(exceptionsSource).not.toContain("excludeHistoricalRetestParents(");
+    expect(waitingSource).not.toContain("excludeHistoricalRetestParents(");
   });
 
   it("does not mutate parent jobs or historical ECC test truth from the queue read path", () => {

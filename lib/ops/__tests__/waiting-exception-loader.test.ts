@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildWaitingExceptionQueueSnapshot } from "@/lib/ops/waiting-exception-loader";
+import {
+  buildFocusedOpsQueueRows,
+  buildWaitingExceptionQueueSnapshot,
+} from "@/lib/ops/waiting-exception-loader";
+import { buildServiceFollowUpQueueStateByJob } from "@/lib/ops/service-follow-up-queue-state";
 
 describe("waiting and exception queue snapshot", () => {
   it("counts waiting states while excluding superseded retest parents", () => {
@@ -70,5 +74,63 @@ describe("waiting and exception queue snapshot", () => {
 
     expect([...snapshot.statusCounts.values()].every((count) => count === 0)).toBe(true);
     expect(snapshot.serviceFollowUpByJob.size).toBe(0);
+  });
+
+  it("builds standalone and workspace rows through the same queue pipeline", () => {
+    const rows = [
+      {
+        id: "continued-wait",
+        ops_status: "pending_info",
+        pending_info_reason: "Materials Needed: blower motor",
+        created_at: "2026-08-13T10:00:00.000Z",
+      },
+      {
+        id: "active-wait",
+        ops_status: "on_hold",
+        on_hold_reason: "Customer requested a pause",
+        created_at: "2026-08-15T10:00:00.000Z",
+      },
+      {
+        id: "wrong-queue",
+        ops_status: "failed",
+        created_at: "2026-08-14T10:00:00.000Z",
+      },
+    ];
+
+    const serviceFollowUpByJob = buildServiceFollowUpQueueStateByJob(rows, [
+      {
+        job_id: "continued-wait",
+        created_at: "2026-08-16T10:00:00.000Z",
+        meta: {
+          follow_up_bridge_action: "add_to_scheduling_queue",
+          continued_through_child_job_id: "return-job",
+        },
+      },
+    ]);
+    const waitingRows = buildFocusedOpsQueueRows({
+      rows,
+      queueKey: "waiting",
+      continuationParentIds: new Set(),
+      serviceFollowUpByJob,
+      sortKey: "oldest",
+    });
+
+    expect(waitingRows.map((row) => row.id)).toEqual(["active-wait"]);
+  });
+
+  it("suppresses historical retest parents before returning exception rows", () => {
+    const rows = buildFocusedOpsQueueRows({
+      rows: [
+        { id: "old-parent", ops_status: "failed", created_at: "2026-08-13T10:00:00.000Z" },
+        { id: "active", ops_status: "problem", created_at: "2026-08-15T10:00:00.000Z" },
+        { id: "waiting", ops_status: "on_hold", created_at: "2026-08-14T10:00:00.000Z" },
+      ],
+      queueKey: "exceptions",
+      continuationParentIds: new Set(["old-parent"]),
+      serviceFollowUpByJob: new Map(),
+      sortKey: "oldest",
+    });
+
+    expect(rows.map((row) => row.id)).toEqual(["active"]);
   });
 });

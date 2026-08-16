@@ -531,7 +531,8 @@ describe("focused queue display labels", () => {
     expect(waitingQueuePageSource).toContain("readyToScheduleLabel");
     expect(waitingQueuePageSource).toContain("Ready to Schedule Return");
     expect(waitingQueuePageSource).toContain('"Original reason"');
-    expect(waitingQueuePageSource).toContain("buildServiceFollowUpQueueStateByJob");
+    expect(waitingQueuePageSource).toContain("loadFocusedOpsQueueData");
+    expect(waitingExceptionLoaderSource).toContain("buildServiceFollowUpQueueStateByJob");
     expect(serviceFollowUpQueueStateSource).toContain("buildServiceFollowUpProgressState");
   });
 
@@ -608,9 +609,16 @@ describe("focused queue display labels", () => {
 });
 
 describe("focused ops queue pages", () => {
-  it("focused queue pages use canonical status constants for route filters", () => {
-    expect(waitingQueuePageSource).toContain("WAITING_QUEUE_STATUSES");
-    expect(exceptionsQueuePageSource).toContain("EXCEPTION_QUEUE_STATUSES");
+  it("focused queue pages delegate canonical filters and projections to the shared loader", () => {
+    expect(waitingQueuePageSource).toContain("loadFocusedOpsQueueData");
+    expect(waitingQueuePageSource).toContain('queueKey: "waiting"');
+    expect(exceptionsQueuePageSource).toContain("loadFocusedOpsQueueData");
+    expect(exceptionsQueuePageSource).toContain('queueKey: "exceptions"');
+    expect(waitingQueuePageSource).not.toContain('.from("jobs")');
+    expect(exceptionsQueuePageSource).not.toContain('.from("jobs")');
+    expect(waitingExceptionLoaderSource).toContain("OPS_WORKSPACE_JOB_SELECT");
+    expect(waitingExceptionLoaderSource).toContain("WAITING_QUEUE_STATUSES");
+    expect(waitingExceptionLoaderSource).toContain("EXCEPTION_QUEUE_STATUSES");
 
     for (const status of WAITING_QUEUE_STATUSES) {
       expect(isWaitingQueueStatus(status)).toBe(true);
@@ -621,12 +629,12 @@ describe("focused ops queue pages", () => {
     }
   });
 
-  it("waiting page reads both pending info and on-hold reasons", () => {
-    expect(waitingQueuePageSource).toContain("pending_info_reason");
-    expect(waitingQueuePageSource).toContain("on_hold_reason");
-    expect(waitingQueuePageSource).toContain("invoice_complete");
-    expect(waitingQueuePageSource).toContain("field_complete");
-    expect(waitingQueuePageSource).toContain("job_type");
+  it("shared focused queue projection includes waiting and closeout context", () => {
+    expect(opsWorkspaceJobContractSource).toContain("pending_info_reason");
+    expect(opsWorkspaceJobContractSource).toContain("on_hold_reason");
+    expect(opsWorkspaceJobContractSource).toContain("invoice_complete");
+    expect(opsWorkspaceJobContractSource).toContain("field_complete");
+    expect(opsWorkspaceJobContractSource).toContain("job_type");
   });
 
   it("waiting and exception pages use focused queue display labels", () => {
@@ -657,6 +665,14 @@ describe("focused ops queue pages", () => {
     expect(waitingExceptionLoaderSource).toContain(
       '? WAITING_QUEUE_STATUSES',
     );
+  });
+
+  it("standalone focused pages request shared lifecycle evidence", () => {
+    expect(waitingQueuePageSource).toContain("includeLifecycleEvidence: true");
+    expect(exceptionsQueuePageSource).toContain("includeLifecycleEvidence: true");
+    expect(waitingExceptionLoaderSource).toContain('from("job_events")');
+    expect(waitingExceptionLoaderSource).toContain('from("ecc_test_runs")');
+    expect(waitingExceptionLoaderSource).toContain("buildOpsStatusEnteredAtByJob");
   });
 
   it("waiting page includes safe empty state and return navigation", () => {

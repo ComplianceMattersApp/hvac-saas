@@ -28,6 +28,7 @@ import {
   type ServiceFollowUpQueueEvent,
   type ServiceFollowUpQueueStateByJob,
 } from "@/lib/ops/service-follow-up-queue-state";
+import { buildOpsStatusEnteredAtByJob } from "@/lib/utils/lifecycle-aging";
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -50,6 +51,35 @@ export type WaitingExceptionQueueSnapshot = {
   retestContinuationParentIds: ReadonlySet<string>;
   serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
 };
+
+export type FocusedOpsQueueData = {
+  rows: OpsWorkspaceJob[];
+  continuationParentIds: ReadonlySet<string>;
+  serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
+  opsStatusEnteredAtByJob: ReadonlyMap<string, Record<string, string>>;
+  latestFailedEvidenceByJob: ReadonlyMap<string, string>;
+};
+
+export function buildFocusedOpsQueueRows(params: {
+  rows: OpsWorkspaceJob[];
+  queueKey: FocusedOpsQueueKey;
+  continuationParentIds: ReadonlySet<string>;
+  serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
+  sortKey: OpsBoardSortKey;
+}): OpsWorkspaceJob[] {
+  const enrichedRows = params.queueKey === "waiting"
+    ? enrichServiceFollowUpQueueRows(params.rows, params.serviceFollowUpByJob)
+    : params.rows;
+  const currentRows = excludeHistoricalRetestParents(
+    enrichedRows,
+    params.continuationParentIds,
+  );
+  const queueRows = params.queueKey === "waiting"
+    ? buildWaitingQueueRows(currentRows)
+    : buildExceptionQueueRows(currentRows);
+
+  return sortOpsBoardRows(queueRows, params.sortKey);
+}
 
 export function buildWaitingExceptionQueueSnapshot(
   input: WaitingExceptionSummaryInput,
@@ -162,6 +192,105 @@ export async function loadWaitingExceptionQueueSnapshot(params: {
   });
 }
 
+export async function loadFocusedOpsQueueData(params: {
+  supabase: ServerSupabaseClient;
+  queueKey: FocusedOpsQueueKey;
+  continuationParentIds?: ReadonlySet<string>;
+  serviceFollowUpByJob?: ServiceFollowUpQueueStateByJob;
+  sortKey: OpsBoardSortKey;
+  includeLifecycleEvidence?: boolean;
+}): Promise<FocusedOpsQueueData> {
+  const statuses = params.queueKey === "waiting"
+    ? WAITING_QUEUE_STATUSES
+    : EXCEPTION_QUEUE_STATUSES;
+  const [queueRes, continuationRowsRes] = await Promise.all([
+    params.supabase
+      .from("jobs")
+      .select(OPS_WORKSPACE_JOB_SELECT)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .neq("ops_status", "closed")
+      .in("ops_status", [...statuses])
+      .order("created_at", { ascending: true }),
+    params.continuationParentIds
+      ? Promise.resolve({ data: [], error: null })
+      : params.supabase
+          .from("jobs")
+          .select("parent_job_id")
+          .is("deleted_at", null)
+          .neq("status", "cancelled")
+          .eq("job_type", "ecc")
+          .not("parent_job_id", "is", null),
+  ]);
+
+  if (queueRes.error) throw queueRes.error;
+  if (continuationRowsRes.error) throw continuationRowsRes.error;
+
+  const rows = (queueRes.data ?? []) as unknown as OpsWorkspaceJob[];
+  const continuationParentIds = params.continuationParentIds ??
+    buildRetestContinuationParentIds(continuationRowsRes.data ?? []);
+  const rowJobIds = rows
+    .map((job) => String(job?.id ?? "").trim())
+    .filter(Boolean);
+  const shouldLoadOpsEvents = rowJobIds.length > 0 && (
+    params.includeLifecycleEvidence === true ||
+    (params.queueKey === "waiting" && !params.serviceFollowUpByJob)
+  );
+  const shouldLoadFailedEvidence = rowJobIds.length > 0 &&
+    params.includeLifecycleEvidence === true &&
+    params.queueKey === "exceptions";
+  const [statusEventsRes, failedRunsRes] = await Promise.all([
+    shouldLoadOpsEvents
+      ? params.supabase
+          .from("job_events")
+          .select("job_id, created_at, meta")
+          .in("job_id", rowJobIds)
+          .eq("event_type", "ops_update")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    shouldLoadFailedEvidence
+      ? params.supabase
+          .from("ecc_test_runs")
+          .select("job_id, created_at, computed_pass, override_pass, is_completed")
+          .in("job_id", rowJobIds)
+          .eq("is_completed", true)
+          .or("override_pass.eq.false,computed_pass.eq.false")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (statusEventsRes.error) throw statusEventsRes.error;
+  if (failedRunsRes.error) throw failedRunsRes.error;
+
+  const statusEvents = (statusEventsRes.data ?? []) as ServiceFollowUpQueueEvent[];
+  const serviceFollowUpByJob = params.serviceFollowUpByJob ?? (
+    params.queueKey === "waiting"
+      ? buildServiceFollowUpQueueStateByJob(rows, statusEvents)
+      : new Map()
+  );
+  const latestFailedEvidenceByJob = new Map<string, string>();
+  for (const row of failedRunsRes.data ?? []) {
+    const jobId = String((row as { job_id?: unknown })?.job_id ?? "").trim();
+    if (!jobId || latestFailedEvidenceByJob.has(jobId)) continue;
+    const createdAt = String((row as { created_at?: unknown })?.created_at ?? "").trim();
+    if (createdAt) latestFailedEvidenceByJob.set(jobId, createdAt);
+  }
+
+  return {
+    rows: buildFocusedOpsQueueRows({
+      rows,
+      queueKey: params.queueKey,
+      continuationParentIds,
+      serviceFollowUpByJob,
+      sortKey: params.sortKey,
+    }),
+    continuationParentIds,
+    serviceFollowUpByJob,
+    opsStatusEnteredAtByJob: buildOpsStatusEnteredAtByJob(statusEvents),
+    latestFailedEvidenceByJob,
+  };
+}
+
 export async function loadFocusedOpsQueueRows(params: {
   supabase: ServerSupabaseClient;
   queueKey: FocusedOpsQueueKey;
@@ -169,31 +298,6 @@ export async function loadFocusedOpsQueueRows(params: {
   serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
   sortKey: OpsBoardSortKey;
 }): Promise<OpsWorkspaceJob[]> {
-  const statuses = params.queueKey === "waiting"
-    ? WAITING_QUEUE_STATUSES
-    : EXCEPTION_QUEUE_STATUSES;
-  const queueRes = await params.supabase
-    .from("jobs")
-    .select(OPS_WORKSPACE_JOB_SELECT)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .neq("ops_status", "closed")
-    .in("ops_status", [...statuses])
-    .order("created_at", { ascending: true });
-
-  if (queueRes.error) throw queueRes.error;
-
-  const rows = (queueRes.data ?? []) as unknown as OpsWorkspaceJob[];
-  const enrichedRows = params.queueKey === "waiting"
-    ? enrichServiceFollowUpQueueRows(rows, params.serviceFollowUpByJob)
-    : rows;
-  const currentRows = excludeHistoricalRetestParents(
-    enrichedRows,
-    params.continuationParentIds,
-  );
-  const queueRows = params.queueKey === "waiting"
-    ? buildWaitingQueueRows(currentRows)
-    : buildExceptionQueueRows(currentRows);
-
-  return sortOpsBoardRows(queueRows, params.sortKey);
+  const result = await loadFocusedOpsQueueData(params);
+  return result.rows;
 }

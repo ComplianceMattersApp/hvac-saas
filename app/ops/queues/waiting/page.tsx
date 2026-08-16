@@ -3,25 +3,18 @@ import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
-  WAITING_QUEUE_STATUSES,
-  buildWaitingQueueRows,
   customerLocationLabel,
   getWaitingQueueDisplay,
   getWaitingQueueRecommendedNextStep,
 } from "@/lib/ops/focused-queues";
 import {
-  buildServiceFollowUpQueueStateByJob,
-  enrichServiceFollowUpQueueRows,
   resolveServiceFollowUpQueueState,
-  type ServiceFollowUpQueueEvent,
 } from "@/lib/ops/service-follow-up-queue-state";
-import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
-import { buildRetestContinuationParentIds, excludeHistoricalRetestParents } from "@/lib/ops/retest-queue-exclusivity";
+import { loadFocusedOpsQueueData } from "@/lib/ops/waiting-exception-loader";
+import type { OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
+import { resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 
-const waitingSelect =
-  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, field_complete, job_type, permit_number, invoice_complete, created_at";
-
-function jobTitle(job: any) {
+function jobTitle(job: OpsWorkspaceJob) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
 }
 
@@ -34,55 +27,16 @@ export default async function OpsWaitingQueuePage() {
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
-  const [{ data, error }, continuationRowsRes] = await Promise.all([
-    supabase
-      .from("jobs")
-      .select(waitingSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .neq("ops_status", "closed")
-      .in("ops_status", [...WAITING_QUEUE_STATUSES])
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("jobs")
-      .select("parent_job_id")
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("job_type", "ecc")
-      .not("parent_job_id", "is", null),
-  ]);
-
-  if (error) throw error;
-  if (continuationRowsRes.error) throw continuationRowsRes.error;
-
-  const candidateRows = buildWaitingQueueRows(excludeHistoricalRetestParents(
-    (data ?? []) as any[],
-    buildRetestContinuationParentIds(continuationRowsRes.data),
-  ));
-  const rowJobIds = candidateRows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
-
-  const { data: statusEvents, error: statusEventsError } = rowJobIds.length
-    ? await supabase
-        .from("job_events")
-        .select("job_id, created_at, meta")
-        .in("job_id", rowJobIds)
-        .eq("event_type", "ops_update")
-        .order("created_at", { ascending: false })
-    : { data: [], error: null };
-
-  if (statusEventsError) throw statusEventsError;
-
-  const enteredAtByJob = buildOpsStatusEnteredAtByJob(
-    (statusEvents ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
-  );
-  const serviceFollowUpByJob = buildServiceFollowUpQueueStateByJob(
-    candidateRows,
-    (statusEvents ?? []) as ServiceFollowUpQueueEvent[],
-  );
-  const rows = buildWaitingQueueRows(enrichServiceFollowUpQueueRows(
-    candidateRows,
+  const {
+    rows,
     serviceFollowUpByJob,
-  ));
+    opsStatusEnteredAtByJob: enteredAtByJob,
+  } = await loadFocusedOpsQueueData({
+    supabase,
+    queueKey: "waiting",
+    sortKey: "oldest",
+    includeLifecycleEvidence: true,
+  });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -121,7 +75,7 @@ export default async function OpsWaitingQueuePage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {rows.map((job: any) => {
+          {rows.map((job) => {
             const jobId = String(job?.id ?? "");
             const waitingDisplay = getWaitingQueueDisplay(job);
             const followUpProgress = resolveServiceFollowUpQueueState(
