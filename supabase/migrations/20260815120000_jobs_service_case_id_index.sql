@@ -1,0 +1,58 @@
+-- Performance: index on jobs(service_case_id, created_at)
+--
+-- Problem: jobs.service_case_id is a foreign key to service_cases(id), and PostgreSQL
+-- does not create an index for a foreign key automatically. The jobs table carries
+-- indexes on contractor_id, customer_id, follow_up_date, lifecycle_state, location_id,
+-- ops_status and parent_job_id — but nothing on service_case_id. Every read that walks
+-- a service case back to its jobs therefore scans jobs sequentially, and jobs is one of
+-- the largest tables in the schema.
+--
+-- This is on the /jobs/[id] render path: the service case summary read runs on every
+-- job detail load for any job attached to a case.
+--
+-- Affected call sites (all .eq("service_case_id", ...) against jobs):
+--   - app/jobs/[id]/page.tsx                                   (service case summary, render path)
+--   - app/jobs/[id]/_components/DeferredServiceChainPanelBody  (ordered by created_at ASC)
+--   - app/jobs/[id]/_components/DeferredWorkflowMilestonesPanelBody
+--   - lib/actions/service-case-reconciliation.ts               (runs after job mutations)
+--   - lib/workflows/actions.ts
+--   - lib/workflows/read-model.ts                              (ordered by created_at DESC, limited)
+--
+-- Composite rather than single-column: two of the call sites order by created_at after
+-- filtering. A btree index is scannable in either direction, so (service_case_id,
+-- created_at) serves both the ASC and DESC orderings as well as the bare equality reads.
+--
+-- CONCURRENTLY note (same constraint as job_events_composite_index_job_id_event_type):
+--   The Supabase migration runner wraps statements in an implicit transaction, and
+--   PostgreSQL does not allow CREATE INDEX CONCURRENTLY inside a transaction block.
+--
+--   For production, apply via the Supabase SQL editor (outside a transaction) first:
+--
+--     CREATE INDEX CONCURRENTLY IF NOT EXISTS jobs_service_case_id_created_at_idx
+--       ON public.jobs
+--       USING btree (service_case_id, created_at DESC);
+--
+--   The migration here uses the non-concurrent form for sandbox/local proof only.
+--   Building this index non-concurrently takes an ACCESS EXCLUSIVE lock on jobs, which
+--   on a production-sized table will block reads and writes for the duration. A separate
+--   production runbook step is required before this migration is promoted.
+--   Once the concurrent production index exists, this migration is a safe IF NOT EXISTS
+--   no-op when eventually applied.
+--
+-- Verify the planner actually uses it, rather than assuming:
+--
+--   EXPLAIN ANALYZE
+--   SELECT id, status, ops_status, created_at
+--     FROM public.jobs
+--    WHERE service_case_id = '<a real service case id>'
+--    ORDER BY created_at DESC;
+--
+--   Expect an Index Scan on jobs_service_case_id_created_at_idx. A Seq Scan means either
+--   the table is still small enough that the planner prefers one, or the statistics are
+--   stale — run ANALYZE public.jobs and re-check.
+--
+-- Does NOT drop or alter any existing index.
+
+CREATE INDEX IF NOT EXISTS jobs_service_case_id_created_at_idx
+  ON public.jobs
+  USING btree (service_case_id, created_at DESC);
