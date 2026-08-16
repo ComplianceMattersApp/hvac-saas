@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   hasActiveFollowUpReminder,
+  isScheduledAssignedMyWorkEligible,
   resolvePrimaryOpsQueue,
 } from "@/lib/ops/queue-membership";
 import { isInCloseoutQueue } from "@/lib/utils/closeout";
@@ -83,4 +84,27 @@ describe("primary operations queue matrix", () => {
       current_ops_status: "pending_office_review",
     })).toBe("pending_office_review");
   });
+
+  it.each([
+    ["pending_info", "waiting"],
+    ["on_hold", "waiting"],
+    ["waiting", "waiting"],
+    ["failed", "exceptions"],
+    ["retest_needed", "exceptions"],
+    ["pending_office_review", "exceptions"],
+    ["problem", "exceptions"],
+  ] as const)(
+    "keeps %s office-owned work out of assigned My Work",
+    (opsStatus, expectedQueue) => {
+      const job = {
+        status: "in_process",
+        ops_status: opsStatus,
+        scheduledDate: "2026-08-14",
+        fieldComplete: false,
+      };
+
+      expect(resolvePrimaryOpsQueue(job)).toBe(expectedQueue);
+      expect(isScheduledAssignedMyWorkEligible(job)).toBe(false);
+    },
+  );
 });

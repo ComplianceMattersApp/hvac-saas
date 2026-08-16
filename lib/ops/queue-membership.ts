@@ -1,3 +1,13 @@
+import {
+  isJobLifecycleExceptionState,
+  isTerminalJobLifecycleState,
+  resolveJobLifecycleState,
+} from "@/lib/jobs/job-lifecycle-state";
+import {
+  EXCEPTION_QUEUE_STATUSES,
+  WAITING_QUEUE_STATUSES,
+} from "@/lib/ops/queue-status-contracts";
+
 export type PrimaryOpsQueueKey =
   | "need_to_schedule"
   | "waiting"
@@ -13,18 +23,9 @@ export type PrimaryQueueJob = {
   action_required_by?: string | null;
 };
 
-export const PRIMARY_WAITING_OPS_STATUSES = [
-  "pending_info",
-  "on_hold",
-  "waiting",
-] as const;
+export const PRIMARY_WAITING_OPS_STATUSES = WAITING_QUEUE_STATUSES;
 
-export const PRIMARY_EXCEPTION_OPS_STATUSES = [
-  "failed",
-  "retest_needed",
-  "pending_office_review",
-  "problem",
-] as const;
+export const PRIMARY_EXCEPTION_OPS_STATUSES = EXCEPTION_QUEUE_STATUSES;
 
 const WAITING_STATUS_SET = new Set<string>(PRIMARY_WAITING_OPS_STATUSES);
 const EXCEPTION_STATUS_SET = new Set<string>(PRIMARY_EXCEPTION_OPS_STATUSES);
@@ -72,4 +73,44 @@ export function resolvePrimaryOpsQueue(job: PrimaryQueueJob): PrimaryOpsQueueKey
 
 export function isPrimaryQueueJob(job: PrimaryQueueJob, queue: PrimaryOpsQueueKey): boolean {
   return resolvePrimaryOpsQueue(job) === queue;
+}
+
+export type ScheduledAssignedMyWorkInput = PrimaryQueueJob & {
+  scheduledDate?: string | null;
+  fieldComplete?: boolean | null;
+};
+
+/**
+ * Resolves whether assigned work is still actionable for a field user.
+ *
+ * The appointment remains historical truth when work is interrupted, so a
+ * schedule date alone cannot establish field responsibility. Office-owned
+ * queues and lifecycle exceptions take precedence until the blocker is
+ * explicitly released or a new visit is scheduled and assigned.
+ */
+export function isScheduledAssignedMyWorkEligible(
+  input: ScheduledAssignedMyWorkInput,
+): boolean {
+  if (input.fieldComplete === true) return false;
+
+  // Preserve the field queue's defensive handling of legacy rows whose
+  // lifecycle completed before their operational projection caught up.
+  const lifecycleStatus = normalize(input.status);
+  if (["completed", "closed", "cancelled"].includes(lifecycleStatus)) return false;
+
+  if (resolvePrimaryOpsQueue(input) !== null) return false;
+
+  const state = resolveJobLifecycleState({
+    status: input.status,
+    opsStatus: input.ops_status,
+    deletedAt: input.deleted_at,
+    hasScheduledAppointment: Boolean(String(input.scheduledDate ?? "").trim()),
+  });
+
+  if (isTerminalJobLifecycleState(state) || isJobLifecycleExceptionState(state)) {
+    return false;
+  }
+
+  if (state === "on_the_way" || state === "in_process") return true;
+  return Boolean(String(input.scheduledDate ?? "").trim());
 }

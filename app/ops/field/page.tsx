@@ -81,7 +81,7 @@ export default async function OpsFieldPage() {
     const { data, error: jobsErr } = await supabase
       .from("jobs")
       .select(
-        "id, title, status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractors(name), field_complete, field_complete_at"
+        "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractors(name), field_complete, field_complete_at, deleted_at, follow_up_date, next_action_note, action_required_by"
       )
       .in("id", assignedJobIds)
       .eq("account_owner_user_id", accountOwnerUserId)

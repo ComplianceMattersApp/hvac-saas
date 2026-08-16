@@ -49,6 +49,86 @@ describe("groupFieldJobs", () => {
     expect(grouped.overdue.map((j) => j.id)).toEqual(["most-recent", "middle", "oldest"]);
   });
 
+  it.each(["pending_info", "on_hold", "waiting"])(
+    "routes past-scheduled %s work out of My Work",
+    (opsStatus) => {
+      const grouped = groupFieldJobs([
+        {
+          id: opsStatus,
+          status: "open",
+          ops_status: opsStatus,
+          scheduled_date: "2026-07-04",
+          field_complete: false,
+        },
+      ], TODAY);
+
+      expect(grouped.overdue).toEqual([]);
+      expect(grouped.today).toEqual([]);
+      expect(grouped.upcoming).toEqual([]);
+    },
+  );
+
+  it.each(["failed", "retest_needed", "pending_office_review", "problem"])(
+    "routes past-scheduled %s exceptions out of My Work",
+    (opsStatus) => {
+      const grouped = groupFieldJobs([
+        {
+          id: opsStatus,
+          status: "open",
+          ops_status: opsStatus,
+          scheduled_date: "2026-07-04",
+          field_complete: false,
+        },
+      ], TODAY);
+
+      expect(grouped.overdue).toEqual([]);
+    },
+  );
+
+  it("gives On Hold precedence over a stale in-process field status", () => {
+    const grouped = groupFieldJobs([
+      {
+        id: "held-in-process",
+        status: "in_process",
+        ops_status: "on_hold",
+        scheduled_date: "2026-07-04",
+        field_complete: false,
+      },
+    ], TODAY);
+
+    expect(grouped.inProgress).toEqual([]);
+    expect(grouped.overdue).toEqual([]);
+  });
+
+  it("returns released scheduled work to My Work", () => {
+    const grouped = groupFieldJobs([
+      {
+        id: "released",
+        status: "open",
+        ops_status: "scheduled",
+        scheduled_date: TODAY,
+        field_complete: false,
+      },
+    ], TODAY);
+
+    expect(grouped.today.map((job) => job.id)).toEqual(["released"]);
+  });
+
+  it("keeps reminder-owned follow-up work out of My Work", () => {
+    const grouped = groupFieldJobs([
+      {
+        id: "follow-up",
+        status: "open",
+        ops_status: "scheduled",
+        scheduled_date: "2026-07-04",
+        field_complete: false,
+        follow_up_date: TODAY,
+      },
+    ], TODAY);
+
+    expect(grouped.overdue).toEqual([]);
+  });
+
   it("groups future-dated jobs as upcoming in chronological order", () => {
     const jobs = [
       { id: "later", status: "scheduled", scheduled_date: "2026-07-10" },

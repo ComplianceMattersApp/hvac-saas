@@ -1,17 +1,22 @@
 import {
   isActiveFieldWorkStatus,
-  isScheduledAssignedMyWorkEligible,
 } from "@/lib/ops/queue-status-contracts";
+import { isScheduledAssignedMyWorkEligible } from "@/lib/ops/queue-membership";
 
 export type FieldQueueJob = {
   id: string;
   title?: string | null;
   status?: string | null;
+  ops_status?: string | null;
   scheduled_date?: string | null;
   window_start?: string | null;
   window_end?: string | null;
   field_complete?: boolean | null;
   field_complete_at?: string | null;
+  deleted_at?: string | null;
+  follow_up_date?: string | null;
+  next_action_note?: string | null;
+  action_required_by?: string | null;
 };
 
 export type GroupedFieldJobs<T extends FieldQueueJob> = {
@@ -21,11 +26,6 @@ export type GroupedFieldJobs<T extends FieldQueueJob> = {
   upcoming: T[];
   completed: T[];
 };
-
-function isLifecycleComplete(job: FieldQueueJob): boolean {
-  const status = String(job?.status ?? "").toLowerCase();
-  return ["completed", "closed", "cancelled"].includes(status);
-}
 
 function sortBySchedule<T extends FieldQueueJob>(a: T, b: T): number {
   const dateDiff = String(a?.scheduled_date ?? "").localeCompare(String(b?.scheduled_date ?? ""));
@@ -81,17 +81,16 @@ export function groupFieldJobs<T extends FieldQueueJob>(
     )
     .sort(sortByCompletionNewest);
 
-  const activeJobs = (jobs ?? []).filter((job) => {
-    if (isLifecycleComplete(job)) return false;
-    if (Boolean(job?.field_complete)) return false;
-    return true;
-  });
-
-  const visibleMyWorkJobs = activeJobs.filter((job) =>
+  const visibleMyWorkJobs = (jobs ?? []).filter((job) =>
     isScheduledAssignedMyWorkEligible({
       status: job?.status,
+      ops_status: job?.ops_status,
+      deleted_at: job?.deleted_at,
       scheduledDate: job?.scheduled_date,
       fieldComplete: job?.field_complete,
+      follow_up_date: job?.follow_up_date,
+      next_action_note: job?.next_action_note,
+      action_required_by: job?.action_required_by,
     }),
   );
 

@@ -54,13 +54,3 @@ export function isCloseoutBlockingQueueStatus(value: unknown): boolean {
 export function isActiveFieldWorkStatus(value: unknown): boolean {
   return ACTIVE_FIELD_WORK_STATUS_SET.has(normalize(value));
 }
-
-export function isScheduledAssignedMyWorkEligible(input: {
-  status?: string | null;
-  scheduledDate?: string | null;
-  fieldComplete?: boolean | null;
-}): boolean {
-  if (input.fieldComplete === true) return false;
-  if (isActiveFieldWorkStatus(input.status)) return true;
-  return Boolean(String(input.scheduledDate ?? "").trim());
-}

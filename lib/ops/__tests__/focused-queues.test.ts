@@ -20,9 +20,9 @@ import {
   isCloseoutBlockingQueueStatus,
   isExceptionQueueStatus,
   isOfficeReviewQueueStatus,
-  isScheduledAssignedMyWorkEligible,
   isWaitingQueueStatus,
 } from "@/lib/ops/queue-status-contracts";
+import { isScheduledAssignedMyWorkEligible } from "@/lib/ops/queue-membership";
 
 const waitingQueuePageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/queues/waiting/page.tsx"),
@@ -659,6 +659,8 @@ describe("focused ops queue pages", () => {
   it("field My Work uses the scheduled/actionable contract and no unscheduled section", () => {
     expect(fieldQueueLibSource).toContain("isScheduledAssignedMyWorkEligible");
     expect(fieldQueueLibSource).toContain("isActiveFieldWorkStatus");
+    expect(opsFieldPageSource).toContain("status, ops_status, scheduled_date");
+    expect(opsFieldPageSource).toContain("follow_up_date, next_action_note, action_required_by");
     expect(opsFieldPageSource).toContain("All caught up");
     expect(opsFieldPageSource).not.toContain('key: "unscheduled"');
     expect(opsFieldPageSource).not.toContain('title: "Unscheduled"');
