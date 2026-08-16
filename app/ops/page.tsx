@@ -116,6 +116,7 @@ import {
   formatFailedEccQueueReasonFromRun,
   getOpsQueueCardStatusReason,
 } from "@/lib/ops/focused-queues";
+import { buildFocusedQueueRowPresentation } from "@/lib/ops/focused-queue-row-presentation";
 import {
   listActivePermitRequestQueueRowsIfAvailable,
   type PermitRequestQueueRow,
@@ -1708,9 +1709,49 @@ export default async function OpsPage({
       };
     }
 
+    const focusedQueuePresentationNow = new Date();
+
     function buildGenericRowView(job: any, visibleReason: OpsBoardVisibleReason, queueKey: string): GenericRowView {
       const jobId = String(job?.id ?? "").trim();
       const fallbackAssignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
+      if (queueKey === "waiting" || queueKey === "exceptions") {
+        const presentation = buildFocusedQueueRowPresentation({
+          job,
+          queueKey,
+          serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
+          stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
+          failedEvidenceAt: failedStatusSinceByJob(jobId),
+          primaryFailureReason: primaryFailureReasonByJob.get(jobId) ?? null,
+          assignmentSummary: fallbackAssignmentSummary,
+          failureReportSent: queueKey === "exceptions"
+            ? latestContractorReportSentAtByJob.has(jobId)
+            : null,
+          now: focusedQueuePresentationNow,
+        });
+
+        return {
+          kind: "generic",
+          jobId,
+          href: presentation.href,
+          title: presentation.title,
+          subtitle: presentation.customerLocation,
+          jobTypeLabel: presentation.jobTypeLabel,
+          customerName: presentation.customerName,
+          address: presentation.address,
+          reasonLabel: presentation.visibleReason.label,
+          reasonDetail: presentation.visibleReason.detail,
+          ageLabel: presentation.ageLabel,
+          ageDays: presentation.ageDays,
+          stateChips: presentation.stateChips,
+          tone: presentation.tone,
+          lastActionText: workspaceLastActionTag(job),
+          recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
+          assignmentSummary: fallbackAssignmentSummary,
+          contractorName: workspaceContractorName(job),
+          actionLabel: presentation.primaryActionLabel,
+        };
+      }
+
       const fallbackStateChips = deriveOpsQueueStateChips(visibleReason.label, fallbackAssignmentSummary);
       if (queueKey === "exceptions" && visibleReason.label.trim().toLowerCase().startsWith("failed ecc")) {
         fallbackStateChips.push(
@@ -1739,6 +1780,7 @@ export default async function OpsPage({
         recentAttemptText: resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null),
         assignmentSummary: fallbackAssignmentSummary,
         contractorName: workspaceContractorName(job),
+        actionLabel: "Open Job",
       };
     }
 

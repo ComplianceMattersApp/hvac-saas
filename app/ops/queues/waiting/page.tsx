@@ -2,21 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
-import {
-  customerLocationLabel,
-  getWaitingQueueDisplay,
-  getWaitingQueueRecommendedNextStep,
-} from "@/lib/ops/focused-queues";
-import {
-  resolveServiceFollowUpQueueState,
-} from "@/lib/ops/service-follow-up-queue-state";
+import { buildFocusedQueueRowPresentation } from "@/lib/ops/focused-queue-row-presentation";
 import { loadFocusedOpsQueueData } from "@/lib/ops/waiting-exception-loader";
-import type { OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
-import { resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
-
-function jobTitle(job: OpsWorkspaceJob) {
-  return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
-}
 
 export default async function OpsWaitingQueuePage() {
   const actorContext = await getRequestActorContext();
@@ -37,6 +24,14 @@ export default async function OpsWaitingQueuePage() {
     sortKey: "oldest",
     includeLifecycleEvidence: true,
   });
+  const presentationNow = new Date();
+  const presentedRows = rows.map((job) => buildFocusedQueueRowPresentation({
+    job,
+    queueKey: "waiting",
+    serviceFollowUpByJob,
+    stateEnteredAtByStatus: enteredAtByJob.get(job.id) ?? null,
+    now: presentationNow,
+  }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -56,13 +51,13 @@ export default async function OpsWaitingQueuePage() {
           </div>
           <p className="mt-1 text-sm text-slate-600">
             Work that cannot move forward until missing information or blockers are resolved. {" "}
-            <span className="font-semibold text-slate-800">{rows.length}</span>{" "}
-            {rows.length === 1 ? "item" : "items"}
+            <span className="font-semibold text-slate-800">{presentedRows.length}</span>{" "}
+            {presentedRows.length === 1 ? "item" : "items"}
           </p>
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {presentedRows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
           <p className="text-sm font-medium text-slate-500">No waiting work right now.</p>
           <p className="mt-1 text-xs text-slate-400">The queue is clear. Return to Operations for broad monitoring.</p>
@@ -75,75 +70,58 @@ export default async function OpsWaitingQueuePage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {rows.map((job) => {
-            const jobId = String(job?.id ?? "");
-            const waitingDisplay = getWaitingQueueDisplay(job);
-            const followUpProgress = resolveServiceFollowUpQueueState(
-              job,
-              serviceFollowUpByJob,
-            );
-            const nextStep =
-              followUpProgress.bridgeActionLabel ??
-              followUpProgress.nextActionLabel ??
-              followUpProgress.returnPromptLabel ??
-              getWaitingQueueRecommendedNextStep(job);
-            const readyToScheduleLabel = followUpProgress.bridgeActionLabel
-              ? `${followUpProgress.progressLabel ?? "Ready"} - Ready to Schedule Return`
-              : null;
-
+          {presentedRows.map((presentation) => {
             return (
               <li
-                key={jobId}
+                key={presentation.jobId}
                 className="rounded-xl border border-l-4 border-l-amber-300 border-slate-200 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)]"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <Link
-                      href={`/jobs/${jobId}?tab=ops`}
+                      href={presentation.href}
                       className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline"
                     >
-                      {jobTitle(job)}
+                      {presentation.title}
                     </Link>
-                    <div className="mt-1 text-sm text-slate-700">{customerLocationLabel(job)}</div>
+                    <div className="mt-1 text-sm text-slate-700">{presentation.customerLocation}</div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-700">
-                        {readyToScheduleLabel ?? waitingDisplay.label}
+                        {presentation.queueStatusLabel}
                       </span>
                       <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-500">
-                        {resolveLifecycleAging({
-                          status: String(job?.status ?? "").trim() || null,
-                          opsStatus: String(job?.ops_status ?? "").trim() || null,
-                          createdAt: String(job?.created_at ?? "").trim() || null,
-                          stateEnteredAtByStatus: enteredAtByJob.get(jobId) ?? null,
-                        }).label ?? "-"}
+                        {presentation.ageLabel}
                       </span>
-                      {followUpProgress.progressLabel ? (
+                      {presentation.progressLabel ? (
                         <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-800">
-                          {followUpProgress.progressLabel}
+                          {presentation.progressLabel}
                         </span>
                       ) : null}
                     </div>
                     <div className="mt-2 text-xs text-slate-600">
-                      {readyToScheduleLabel ? "Original reason" : "Reason"}: {waitingDisplay.reason}
+                      {presentation.isReadyToSchedule ? "Original reason" : "Reason"}: {presentation.visibleReason.label}
+                      {presentation.visibleReason.detail ? ` · ${presentation.visibleReason.detail}` : ""}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      Next step: {nextStep}
+                      Next step: {presentation.nextStepText}
                     </div>
                   </div>
 
                   <div className="flex shrink-0 gap-2">
                     <Link
-                      href={`/jobs/${jobId}?tab=ops`}
+                      href={presentation.href}
                       className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
                     >
-                      Open Job
+                      {presentation.primaryActionLabel}
                     </Link>
-                    <Link
-                      href={`/jobs/${jobId}?tab=ops#followup`}
-                      className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-                    >
-                      {followUpProgress.bridgeActionLabel ?? "Create Return Visit"}
-                    </Link>
+                    {presentation.secondaryAction ? (
+                      <Link
+                        href={presentation.secondaryAction.href}
+                        className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                      >
+                        {presentation.secondaryAction.label}
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </li>

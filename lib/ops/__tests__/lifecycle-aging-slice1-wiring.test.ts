@@ -12,6 +12,11 @@ const exceptionsQueueSource = readFileSync(
   "utf-8",
 );
 
+const focusedQueuePresentationSource = readFileSync(
+  resolve(__dirname, "../focused-queue-row-presentation.ts"),
+  "utf-8",
+);
+
 const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
@@ -44,13 +49,16 @@ const notificationsSource = readFileSync(
 
 describe("lifecycle aging slice 1 wiring", () => {
   it("applies lifecycle-aware labels to waiting queue", () => {
-    expect(waitingQueueSource).toContain("resolveLifecycleAging");
+    expect(waitingQueueSource).toContain("buildFocusedQueueRowPresentation");
+    expect(focusedQueuePresentationSource).toContain("stateEnteredAtByStatus");
+    expect(focusedQueuePresentationSource).toContain("ageDaysSince");
     expect(waitingQueueSource).not.toContain("Age {ageLabel(job)}");
   });
 
   it("applies lifecycle-aware labels to exceptions queue", () => {
-    expect(exceptionsQueueSource).toContain("resolveLifecycleAging");
-    expect(exceptionsQueueSource).toContain("failedEvidenceAt");
+    expect(exceptionsQueueSource).toContain("buildFocusedQueueRowPresentation");
+    expect(focusedQueuePresentationSource).toContain("failedEvidenceAt");
+    expect(exceptionsQueueSource).toContain("latestFailedEvidenceByJob");
   });
 
   it("applies lifecycle-aware labels to ops workspace cards", () => {

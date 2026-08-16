@@ -21,6 +21,10 @@ const waitingQueuePageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/queues/waiting/page.tsx"),
   "utf-8",
 );
+const focusedQueuePresentationSource = readFileSync(
+  resolve(__dirname, "../../ops/focused-queue-row-presentation.ts"),
+  "utf-8",
+);
 
 function extractCreateNextVisitActionBlock() {
   const start = jobActionsSource.indexOf("export async function createNextServiceVisitFromForm");
@@ -111,8 +115,8 @@ describe("office return visit entry points", () => {
   });
 
   it("adds optional waiting deep-link into the job detail return-visit section", () => {
-    expect(waitingQueuePageSource).toContain('followUpProgress.bridgeActionLabel ?? "Create Return Visit"');
-    expect(waitingQueuePageSource).toContain("followUpProgress.bridgeActionLabel");
-    expect(waitingQueuePageSource).toContain("#followup");
+    expect(waitingQueuePageSource).toContain("presentation.secondaryAction");
+    expect(focusedQueuePresentationSource).toContain('followUp?.bridgeActionLabel ?? "Create Return Visit"');
+    expect(focusedQueuePresentationSource).toContain("#followup");
   });
 });

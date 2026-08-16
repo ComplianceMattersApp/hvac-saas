@@ -77,6 +77,10 @@ const serviceFollowUpQueueStateSource = readFileSync(
   resolve(__dirname, "../service-follow-up-queue-state.ts"),
   "utf-8",
 );
+const focusedQueueRowPresentationSource = readFileSync(
+  resolve(__dirname, "../focused-queue-row-presentation.ts"),
+  "utf-8",
+);
 
 const opsRowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
@@ -528,11 +532,12 @@ describe("focused queue display labels", () => {
   });
 
   it("waiting queue shows resolved service follow-ups as ready to schedule while preserving original reason", () => {
-    expect(waitingQueuePageSource).toContain("readyToScheduleLabel");
-    expect(waitingQueuePageSource).toContain("Ready to Schedule Return");
+    expect(waitingQueuePageSource).toContain("buildFocusedQueueRowPresentation");
+    expect(waitingQueuePageSource).toContain("presentation.isReadyToSchedule");
     expect(waitingQueuePageSource).toContain('"Original reason"');
     expect(waitingQueuePageSource).toContain("loadFocusedOpsQueueData");
-    expect(waitingExceptionLoaderSource).toContain("buildServiceFollowUpQueueStateByJob");
+    expect(focusedQueueRowPresentationSource).toContain("Ready to Schedule Return");
+    expect(focusedQueueRowPresentationSource).toContain("resolveServiceFollowUpQueueState");
     expect(serviceFollowUpQueueStateSource).toContain("buildServiceFollowUpProgressState");
   });
 
@@ -637,15 +642,17 @@ describe("focused ops queue pages", () => {
     expect(opsWorkspaceJobContractSource).toContain("job_type");
   });
 
-  it("waiting and exception pages use focused queue display labels", () => {
-    expect(waitingQueuePageSource).toContain("getWaitingQueueDisplay");
-    expect(waitingQueuePageSource).toContain("getWaitingQueueRecommendedNextStep");
-    expect(waitingQueuePageSource).toContain("resolveServiceFollowUpQueueState");
-    expect(waitingQueuePageSource).toContain("followUpProgress.progressLabel");
+  it("waiting and exception pages use the shared presentation model", () => {
+    expect(waitingQueuePageSource).toContain("buildFocusedQueueRowPresentation");
+    expect(exceptionsQueuePageSource).toContain("buildFocusedQueueRowPresentation");
+    expect(opsPageSource).toContain("buildFocusedQueueRowPresentation");
+    expect(focusedQueueRowPresentationSource).toContain("getWaitingQueueDisplay");
+    expect(focusedQueueRowPresentationSource).toContain("getWaitingQueueRecommendedNextStep");
+    expect(focusedQueueRowPresentationSource).toContain("resolveServiceFollowUpQueueState");
+    expect(focusedQueueRowPresentationSource).toContain("getExceptionQueueDisplayLabel");
     expect(waitingQueuePageSource).toContain("Next step:");
-    expect(waitingQueuePageSource).toContain("#followup");
-    expect(waitingQueuePageSource).toContain("Create Return Visit");
-    expect(exceptionsQueuePageSource).toContain("getExceptionQueueDisplayLabel");
+    expect(focusedQueueRowPresentationSource).toContain("#followup");
+    expect(focusedQueueRowPresentationSource).toContain("Create Return Visit");
   });
 
   it("uses the same waiting predicate for the Operations count and preview", () => {
@@ -673,6 +680,9 @@ describe("focused ops queue pages", () => {
     expect(waitingExceptionLoaderSource).toContain('from("job_events")');
     expect(waitingExceptionLoaderSource).toContain('from("ecc_test_runs")');
     expect(waitingExceptionLoaderSource).toContain("buildOpsStatusEnteredAtByJob");
+    expect(waitingExceptionLoaderSource).toContain("test_type");
+    expect(waitingExceptionLoaderSource).toContain("primaryFailureReasonByJob");
+    expect(exceptionsQueuePageSource).toContain("primaryFailureReasonByJob.get(job.id)");
   });
 
   it("waiting page includes safe empty state and return navigation", () => {

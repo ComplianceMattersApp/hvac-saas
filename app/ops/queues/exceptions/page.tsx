@@ -2,52 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
-import {
-  customerLocationLabel,
-  getExceptionQueueDisplayLabel,
-} from "@/lib/ops/focused-queues";
-import type { OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
+import { buildFocusedQueueRowPresentation } from "@/lib/ops/focused-queue-row-presentation";
 import { loadFocusedOpsQueueData } from "@/lib/ops/waiting-exception-loader";
-import { resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
-
-type ExceptionQueueJobWithLifecycle = OpsWorkspaceJob & {
-  _stateEnteredAtByStatus: Record<string, string> | null;
-  _failedEvidenceAt: string | null;
-};
-
-function jobTitle(job: OpsWorkspaceJob) {
-  return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
-}
-
-function ageDays(job: ExceptionQueueJobWithLifecycle): number | null {
-  const resolved = resolveLifecycleAging({
-    status: String(job?.status ?? "").trim() || null,
-    opsStatus: String(job?.ops_status ?? "").trim() || null,
-    createdAt: String(job?.created_at ?? "").trim() || null,
-    stateEnteredAtByStatus: job._stateEnteredAtByStatus,
-    failedEvidenceAt: job._failedEvidenceAt,
-  });
-
-  const source = String(resolved.sourceTimestamp ?? "").trim();
-  if (!source) return null;
-
-  const stamp = new Date(source).getTime();
-  if (!Number.isFinite(stamp)) return null;
-
-  return Math.max(0, Math.floor((Date.now() - stamp) / 86400000));
-}
-
-function ageLabel(job: ExceptionQueueJobWithLifecycle): string {
-  return (
-    resolveLifecycleAging({
-      status: String(job?.status ?? "").trim() || null,
-      opsStatus: String(job?.ops_status ?? "").trim() || null,
-      createdAt: String(job?.created_at ?? "").trim() || null,
-      stateEnteredAtByStatus: job._stateEnteredAtByStatus,
-      failedEvidenceAt: job._failedEvidenceAt,
-    }).label ?? "-"
-  );
-}
 
 export default async function OpsExceptionsQueuePage() {
   const actorContext = await getRequestActorContext();
@@ -62,6 +18,7 @@ export default async function OpsExceptionsQueuePage() {
     rows,
     opsStatusEnteredAtByJob: enteredAtByJob,
     latestFailedEvidenceByJob,
+    primaryFailureReasonByJob,
   } = await loadFocusedOpsQueueData({
     supabase,
     queueKey: "exceptions",
@@ -69,15 +26,16 @@ export default async function OpsExceptionsQueuePage() {
     includeLifecycleEvidence: true,
   });
 
-  const rowsWithLifecycleMeta: ExceptionQueueJobWithLifecycle[] = rows.map((job) => {
-    const jobId = String(job?.id ?? "").trim();
-    return {
-      ...job,
-      _stateEnteredAtByStatus: enteredAtByJob.get(jobId) ?? null,
-      _failedEvidenceAt: latestFailedEvidenceByJob.get(jobId) ?? null,
-    };
-  });
-  const agedOpenExceptions = rowsWithLifecycleMeta.filter((job) => (ageDays(job) ?? 0) >= 14).length;
+  const presentationNow = new Date();
+  const presentedRows = rows.map((job) => buildFocusedQueueRowPresentation({
+    job,
+    queueKey: "exceptions",
+    stateEnteredAtByStatus: enteredAtByJob.get(job.id) ?? null,
+    failedEvidenceAt: latestFailedEvidenceByJob.get(job.id) ?? null,
+    primaryFailureReason: primaryFailureReasonByJob.get(job.id) ?? null,
+    now: presentationNow,
+  }));
+  const agedOpenExceptions = presentedRows.filter((row) => row.isAged).length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -97,8 +55,8 @@ export default async function OpsExceptionsQueuePage() {
           </div>
           <p className="mt-1 text-sm text-slate-600">
             Work that needs review, correction, retest, or escalation before it can progress. {" "}
-            <span className="font-semibold text-slate-800">{rows.length}</span>{" "}
-            {rows.length === 1 ? "item" : "items"}
+            <span className="font-semibold text-slate-800">{presentedRows.length}</span>{" "}
+            {presentedRows.length === 1 ? "item" : "items"}
             {agedOpenExceptions > 0 ? (
               <span className="ml-2 text-rose-700">• {agedOpenExceptions} aged 14+ days</span>
             ) : null}
@@ -106,7 +64,7 @@ export default async function OpsExceptionsQueuePage() {
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {presentedRows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
           <p className="text-sm font-medium text-slate-500">No exceptions are waiting right now.</p>
           <p className="mt-1 text-xs text-slate-400">No failed, retest, or review states currently need action.</p>
@@ -119,32 +77,29 @@ export default async function OpsExceptionsQueuePage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {rowsWithLifecycleMeta.map((job) => {
-            const jobId = String(job?.id ?? "");
-            const isAged = (ageDays(job) ?? 0) >= 14;
-
+          {presentedRows.map((presentation) => {
             return (
               <li
-                key={jobId}
+                key={presentation.jobId}
                 className="rounded-xl border border-l-4 border-l-rose-300 border-slate-200 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)]"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <Link
-                      href={`/jobs/${jobId}?tab=ops`}
+                      href={presentation.href}
                       className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline"
                     >
-                      {jobTitle(job)}
+                      {presentation.title}
                     </Link>
-                    <div className="mt-1 text-sm text-slate-700">{customerLocationLabel(job)}</div>
+                    <div className="mt-1 text-sm text-slate-700">{presentation.customerLocation}</div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-800">
-                        {getExceptionQueueDisplayLabel(job)}
+                        {presentation.queueStatusLabel}
                       </span>
                       <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-500">
-                        Age {ageLabel(job)}
+                        {presentation.ageLabel}
                       </span>
-                      {isAged ? (
+                      {presentation.isAged ? (
                         <span className="inline-flex rounded-full border border-rose-300 bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">
                           Aged exception
                         </span>
@@ -154,10 +109,10 @@ export default async function OpsExceptionsQueuePage() {
 
                   <div className="flex shrink-0 gap-2">
                     <Link
-                      href={`/jobs/${jobId}?tab=ops`}
+                      href={presentation.href}
                       className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800"
                     >
-                      Review Exception
+                      {presentation.primaryActionLabel}
                     </Link>
                   </div>
                 </div>

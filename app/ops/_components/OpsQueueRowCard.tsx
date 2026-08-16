@@ -15,7 +15,6 @@ const compactContactActionClass =
   "inline-flex min-h-11 min-w-14 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
 const primaryActionClass =
   "inline-flex min-h-11 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99] xl:min-h-8 xl:text-[11px]";
-const chipClass = "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
 const inputClass = "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900";
 
 export type NeedsSchedulingRowView = {
@@ -114,6 +113,7 @@ export type GenericRowView = {
   recentAttemptText: string;
   assignmentSummary: string;
   contractorName: string;
+  actionLabel: string;
 };
 
 export type FieldPaymentReviewRowView = {
@@ -299,7 +299,11 @@ function DesktopLedgerRow({ view }: { view: LedgerRowView }) {
         </div>
         <div className="flex flex-wrap content-center items-center justify-center gap-1.5 border-l border-[#eceeea] bg-slate-50 px-2 py-3">
           <Link href={view.href} className="inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-3 text-[13px] font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
-            {view.kind === "follow_ups" ? "Open Follow Up" : "Open Job"}
+            {view.kind === "follow_ups"
+              ? "Open Follow Up"
+              : view.kind === "generic"
+              ? view.actionLabel
+              : "Open Job"}
           </Link>
         </div>
       </div>
@@ -505,7 +509,7 @@ function GenericCard({ view }: { view: GenericRowView }) {
   return (
     <MobileOpsCard
       view={view}
-      actionLabel="Open Job"
+      actionLabel={view.actionLabel}
       fields={[
         { label: "Contractor", value: view.contractorName || view.assignmentSummary || "Internal work" },
         ...(view.contractorName

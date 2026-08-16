@@ -2,6 +2,7 @@ import type { createClient } from "@/lib/supabase/server";
 import {
   buildExceptionQueueRows,
   buildWaitingQueueRows,
+  formatFailedEccQueueReasonFromRun,
   type FocusedQueueJob,
 } from "@/lib/ops/focused-queues";
 import {
@@ -58,6 +59,7 @@ export type FocusedOpsQueueData = {
   serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
   opsStatusEnteredAtByJob: ReadonlyMap<string, Record<string, string>>;
   latestFailedEvidenceByJob: ReadonlyMap<string, string>;
+  primaryFailureReasonByJob: ReadonlyMap<string, string>;
 };
 
 export function buildFocusedOpsQueueRows(params: {
@@ -251,7 +253,7 @@ export async function loadFocusedOpsQueueData(params: {
     shouldLoadFailedEvidence
       ? params.supabase
           .from("ecc_test_runs")
-          .select("job_id, created_at, computed_pass, override_pass, is_completed")
+          .select("job_id, created_at, test_type, computed_pass, override_pass, is_completed")
           .in("job_id", rowJobIds)
           .eq("is_completed", true)
           .or("override_pass.eq.false,computed_pass.eq.false")
@@ -269,11 +271,16 @@ export async function loadFocusedOpsQueueData(params: {
       : new Map()
   );
   const latestFailedEvidenceByJob = new Map<string, string>();
+  const primaryFailureReasonByJob = new Map<string, string>();
   for (const row of failedRunsRes.data ?? []) {
     const jobId = String((row as { job_id?: unknown })?.job_id ?? "").trim();
     if (!jobId || latestFailedEvidenceByJob.has(jobId)) continue;
     const createdAt = String((row as { created_at?: unknown })?.created_at ?? "").trim();
-    if (createdAt) latestFailedEvidenceByJob.set(jobId, createdAt);
+    if (!createdAt) continue;
+
+    latestFailedEvidenceByJob.set(jobId, createdAt);
+    const failureReason = formatFailedEccQueueReasonFromRun(row);
+    if (failureReason) primaryFailureReasonByJob.set(jobId, failureReason);
   }
 
   return {
@@ -288,6 +295,7 @@ export async function loadFocusedOpsQueueData(params: {
     serviceFollowUpByJob,
     opsStatusEnteredAtByJob: buildOpsStatusEnteredAtByJob(statusEvents),
     latestFailedEvidenceByJob,
+    primaryFailureReasonByJob,
   };
 }
 
