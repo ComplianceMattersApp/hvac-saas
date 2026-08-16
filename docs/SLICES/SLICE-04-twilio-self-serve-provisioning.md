@@ -235,10 +235,23 @@ the page by audience:
 
 The hardcoded `communicationsStatus` / `activationSummary` /
 `complianceChecklist` literals in `sms-provider-readiness-read.ts` predate live
-SMS and now lie. Derive at minimum the activation summary and communications
-status from actual row state (activation_status + readiness_status). The
-static checklist may stay but must stop claiming `explicit_activation:
-disabled` when activation is live.
+SMS and now lie — confirmed on the live production page 2026-08-15: the
+Activation Status section reads "SMS is not enabled. Live sends are disabled."
+on the same page whose Live SMS Activation card shows LIVE, and the
+Compliance Readiness checklist marks quiet-hours, webhook signature
+validation, sandbox validation, and explicit activation as Deferred/Disabled
+when all four are shipped and running. Derive activation summary,
+communications status, and the checklist rows from actual row state; delete
+any entry that cannot be derived rather than hardcoding it.
+
+Also resolve, with evidence, the **template pointer question** observed live:
+governance shows "No current governed template version is selected" and v2
+only `approved_for_sandbox` with incomplete reviews, yet live sending is
+active and intents render from "Template v2". Determine which version the
+live send path actually reads (`current_version_id` vs `sandbox_version_id`
+vs something else), make the governed pointer reflect reality (data fix
+and/or code fix), and make the UI state impossible to contradict live-send
+truth. Report what you found — this may be a real latent bug, not just copy.
 
 ## 4. Out of scope (named follow-ups)
 
