@@ -8,9 +8,10 @@ import {
   removeMentionFromText,
 } from "@/lib/notifications/internal-note-mentions";
 import SubmitButton from "@/components/SubmitButton";
+import { IN_PLACE_ACTION_MESSAGES, useInPlaceAction, type InPlaceResult } from "./useInPlaceAction";
 
 type InternalNoteMentionComposerProps = {
-  action: (formData: FormData) => void | Promise<void>;
+  action: (formData: FormData) => Promise<InPlaceResult>;
   jobId: string;
   tab: string;
   candidates: InternalNoteMentionCandidate[];
@@ -94,8 +95,13 @@ export default function InternalNoteMentionComposer({
     setNote((current) => removeMentionFromText({ text: current, displayName: candidate.display_name }));
   }
 
+  const formRef = useRef<HTMLFormElement>(null);
+  const { submitAction, lastResult, pending } = useInPlaceAction(action, {
+    onSuccess: () => formRef.current?.reset(),
+  });
+
   return (
-    <form action={action} className="space-y-3">
+    <form ref={formRef} action={submitAction} className="space-y-3">
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="tab" value={tab} />
       <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#${returnAnchor}`} />
@@ -164,8 +170,19 @@ export default function InternalNoteMentionComposer({
           </div>
         </noscript>
 
-        <div className="flex justify-end">
-          <SubmitButton loadingText="Adding note..." className={buttonClassName}>
+        <div className="flex items-center justify-end gap-3">
+          {lastResult ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className={`text-sm font-medium ${
+                lastResult.ok ? "text-emerald-700" : "text-red-700"
+              }`}
+            >
+              {IN_PLACE_ACTION_MESSAGES[lastResult.code] ?? lastResult.code}
+            </p>
+          ) : null}
+          <SubmitButton loadingText="Adding note..." className={buttonClassName} disabled={pending}>
             Save internal note
           </SubmitButton>
         </div>

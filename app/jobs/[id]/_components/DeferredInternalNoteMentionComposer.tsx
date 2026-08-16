@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { addInternalNoteFromForm } from "@/lib/actions/job-note-actions";
+import { addInternalNoteInPlace } from "@/lib/actions/job-note-actions";
 import { getAssignableInternalUsers } from "@/lib/staffing/human-layer";
 import InternalNoteMentionComposer from "./InternalNoteMentionComposer";
 
@@ -32,7 +32,7 @@ export default async function DeferredInternalNoteMentionComposer({
 
   return (
     <InternalNoteMentionComposer
-      action={addInternalNoteFromForm}
+      action={addInternalNoteInPlace}
       jobId={jobId}
       tab={tab}
       candidates={candidates}
