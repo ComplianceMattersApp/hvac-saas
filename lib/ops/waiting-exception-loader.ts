@@ -18,6 +18,14 @@ import {
   sortOpsBoardRows,
   type OpsBoardSortKey,
 } from "@/lib/ops/ops-board-sorting";
+import {
+  buildServiceFollowUpProgressState,
+  type ServiceFollowUpProgressEvent,
+} from "@/lib/jobs/service-follow-up-progress";
+import {
+  OPS_WORKSPACE_JOB_SELECT,
+  type OpsWorkspaceJob,
+} from "@/lib/ops/ops-workspace-job-contract";
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -26,34 +34,77 @@ export type WaitingExceptionStatus =
   | (typeof WAITING_QUEUE_STATUSES)[number]
   | (typeof EXCEPTION_QUEUE_STATUSES)[number];
 
-export type OpsWorkspaceJob = FocusedQueueJob & {
-  customer_phone?: string | null;
-  action_required_by?: string | null;
-  ops_board_failure_note?: string | null;
-  jurisdiction?: string | null;
-  permit_date?: string | null;
-  field_complete_at?: string | null;
-  billing_disposition?: string | null;
-  certs_complete?: boolean | null;
-  contractor_id?: string | null;
-  contractors?: { name?: string | null } | null;
-};
-
-export const OPS_WORKSPACE_JOB_SELECT =
-  "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, ops_board_failure_note, permit_number, jurisdiction, permit_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
-
 type WaitingExceptionSummaryInput = {
   pendingInfoRows: FocusedQueueJob[];
+  serviceFollowUpEvents?: ServiceFollowUpQueueEvent[];
   onHoldCount: number | null;
   waitingCount: number | null;
   exceptionRows: RetestQueueJob[];
   retestContinuationRows: Array<{ parent_job_id?: string | null }>;
 };
 
+export type ServiceFollowUpQueueEvent = ServiceFollowUpProgressEvent & {
+  job_id?: string | null;
+};
+
+export type ServiceFollowUpQueueState = {
+  progressLabel: string | null;
+  continued: boolean;
+};
+
 export type WaitingExceptionQueueSnapshot = {
   statusCounts: ReadonlyMap<WaitingExceptionStatus, number>;
   retestContinuationParentIds: ReadonlySet<string>;
+  serviceFollowUpByJob: ReadonlyMap<string, ServiceFollowUpQueueState>;
 };
+
+export function buildServiceFollowUpQueueStateByJob(
+  jobs: FocusedQueueJob[],
+  events: ServiceFollowUpQueueEvent[],
+): ReadonlyMap<string, ServiceFollowUpQueueState> {
+  const eventsByJob = new Map<string, ServiceFollowUpProgressEvent[]>();
+  for (const event of events) {
+    const jobId = String(event?.job_id ?? "").trim();
+    if (!jobId) continue;
+    const jobEvents = eventsByJob.get(jobId) ?? [];
+    jobEvents.push(event);
+    eventsByJob.set(jobId, jobEvents);
+  }
+
+  const stateByJob = new Map<string, ServiceFollowUpQueueState>();
+  for (const job of jobs) {
+    const jobId = String(job?.id ?? "").trim();
+    if (!jobId) continue;
+    const state = buildServiceFollowUpProgressState({
+      pendingInfoReason: job.pending_info_reason ?? null,
+      events: eventsByJob.get(jobId) ?? [],
+    });
+    if (!state.progressLabel && !state.continuedThroughChildJobId) continue;
+    stateByJob.set(jobId, {
+      progressLabel: state.progressLabel,
+      continued: Boolean(state.continuedThroughChildJobId),
+    });
+  }
+
+  return stateByJob;
+}
+
+function enrichServiceFollowUpRows<T extends FocusedQueueJob>(
+  jobs: T[],
+  stateByJob: ReadonlyMap<string, ServiceFollowUpQueueState>,
+): T[] {
+  return jobs.map((job) => {
+    const state = stateByJob.get(String(job?.id ?? "").trim());
+    if (!state) return job;
+    return {
+      ...job,
+      service_follow_up_progress_label:
+        state.progressLabel ?? job.service_follow_up_progress_label ?? null,
+      service_follow_up_continued:
+        state.continued || Boolean(job.service_follow_up_continued),
+    };
+  });
+}
 
 export function buildWaitingExceptionQueueSnapshot(
   input: WaitingExceptionSummaryInput,
@@ -65,10 +116,18 @@ export function buildWaitingExceptionQueueSnapshot(
     input.exceptionRows,
     retestContinuationParentIds,
   );
+  const serviceFollowUpByJob = buildServiceFollowUpQueueStateByJob(
+    input.pendingInfoRows,
+    input.serviceFollowUpEvents ?? [],
+  );
+  const currentPendingInfoRows = enrichServiceFollowUpRows(
+    input.pendingInfoRows,
+    serviceFollowUpByJob,
+  );
 
   return {
     statusCounts: new Map<WaitingExceptionStatus, number>([
-      ["pending_info", buildWaitingQueueRows(input.pendingInfoRows).length],
+      ["pending_info", buildWaitingQueueRows(currentPendingInfoRows).length],
       ["on_hold", input.onHoldCount ?? 0],
       ["waiting", input.waitingCount ?? 0],
       ["pending_office_review", exceptionCounts.get("pending_office_review") ?? 0],
@@ -77,6 +136,7 @@ export function buildWaitingExceptionQueueSnapshot(
       ["problem", exceptionCounts.get("problem") ?? 0],
     ]),
     retestContinuationParentIds,
+    serviceFollowUpByJob,
   };
 }
 
@@ -131,8 +191,25 @@ export async function loadWaitingExceptionQueueSnapshot(params: {
   if (exceptionRowsRes.error) throw exceptionRowsRes.error;
   if (retestContinuationRowsRes.error) throw retestContinuationRowsRes.error;
 
+  const pendingInfoRows = (pendingInfoRowsRes.data ?? []) as FocusedQueueJob[];
+  const pendingInfoJobIds = pendingInfoRows
+    .map((job) => String(job?.id ?? "").trim())
+    .filter(Boolean);
+  const serviceFollowUpEventsRes = pendingInfoJobIds.length
+    ? await params.supabase
+        .from("job_events")
+        .select("job_id, created_at, meta")
+        .in("job_id", pendingInfoJobIds)
+        .eq("event_type", "ops_update")
+        .order("created_at", { ascending: false })
+    : { data: [], error: null };
+
+  if (serviceFollowUpEventsRes.error) throw serviceFollowUpEventsRes.error;
+
   return buildWaitingExceptionQueueSnapshot({
-    pendingInfoRows: (pendingInfoRowsRes.data ?? []) as FocusedQueueJob[],
+    pendingInfoRows,
+    serviceFollowUpEvents:
+      (serviceFollowUpEventsRes.data ?? []) as ServiceFollowUpQueueEvent[],
     onHoldCount: onHoldCountRes.count,
     waitingCount: waitingCountRes.count,
     exceptionRows: (exceptionRowsRes.data ?? []) as RetestQueueJob[],
@@ -144,6 +221,7 @@ export async function loadFocusedOpsQueueRows(params: {
   supabase: ServerSupabaseClient;
   queueKey: FocusedOpsQueueKey;
   continuationParentIds: ReadonlySet<string>;
+  serviceFollowUpByJob: ReadonlyMap<string, ServiceFollowUpQueueState>;
   sortKey: OpsBoardSortKey;
 }): Promise<OpsWorkspaceJob[]> {
   const statuses = params.queueKey === "waiting"
@@ -161,8 +239,11 @@ export async function loadFocusedOpsQueueRows(params: {
   if (queueRes.error) throw queueRes.error;
 
   const rows = (queueRes.data ?? []) as unknown as OpsWorkspaceJob[];
+  const enrichedRows = params.queueKey === "waiting"
+    ? enrichServiceFollowUpRows(rows, params.serviceFollowUpByJob)
+    : rows;
   const currentRows = excludeHistoricalRetestParents(
-    rows,
+    enrichedRows,
     params.continuationParentIds,
   );
   const queueRows = params.queueKey === "waiting"

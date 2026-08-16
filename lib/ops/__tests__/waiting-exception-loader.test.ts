@@ -6,8 +6,31 @@ describe("waiting and exception queue snapshot", () => {
   it("counts waiting states while excluding superseded retest parents", () => {
     const snapshot = buildWaitingExceptionQueueSnapshot({
       pendingInfoRows: [
-        { id: "pending", ops_status: "pending_info" },
-        { id: "continued", ops_status: "pending_info", service_follow_up_continued: true },
+        {
+          id: "pending",
+          ops_status: "pending_info",
+          pending_info_reason: "Materials Needed: blower motor",
+        },
+        {
+          id: "continued",
+          ops_status: "pending_info",
+          pending_info_reason: "Materials Needed: control board",
+        },
+      ],
+      serviceFollowUpEvents: [
+        {
+          job_id: "pending",
+          created_at: "2026-08-15T10:00:00.000Z",
+          meta: { service_follow_up_progress: "part_ordered" },
+        },
+        {
+          job_id: "continued",
+          created_at: "2026-08-15T11:00:00.000Z",
+          meta: {
+            follow_up_bridge_action: "add_to_scheduling_queue",
+            continued_through_child_job_id: "return-job",
+          },
+        },
       ],
       onHoldCount: 2,
       waitingCount: 3,
@@ -30,6 +53,10 @@ describe("waiting and exception queue snapshot", () => {
       problem: 1,
     });
     expect(snapshot.retestContinuationParentIds).toEqual(new Set(["failed-parent"]));
+    expect(Object.fromEntries(snapshot.serviceFollowUpByJob)).toEqual({
+      pending: { progressLabel: "Part Ordered", continued: false },
+      continued: { progressLabel: null, continued: true },
+    });
   });
 
   it("normalizes absent count results to zero", () => {
@@ -42,5 +69,6 @@ describe("waiting and exception queue snapshot", () => {
     });
 
     expect([...snapshot.statusCounts.values()].every((count) => count === 0)).toBe(true);
+    expect(snapshot.serviceFollowUpByJob.size).toBe(0);
   });
 });

@@ -66,6 +66,7 @@ import {
   loadFocusedOpsQueueRows,
   loadWaitingExceptionQueueSnapshot,
 } from "@/lib/ops/waiting-exception-loader";
+import { OPS_WORKSPACE_JOB_SELECT } from "@/lib/ops/ops-workspace-job-contract";
 import {
   getCachedAccountTimeZone,
   getCachedBillingMode,
@@ -450,8 +451,6 @@ export default async function OpsPage({
   let latestContractorReportSentAtByJob = new Map<string, string>();
   let latestFailedRunByJob = new Map<string, any>();
   let primaryFailureReasonByJob = new Map<string, string>();
-  let serviceFollowUpProgressLabelByJob = new Map<string, string>();
-  let continuedServiceFollowUpParentIds = new Set<string>();
 
   function toEpochMs(value?: string | null) {
     const t = new Date(String(value ?? "")).getTime();
@@ -554,18 +553,6 @@ export default async function OpsPage({
     if (!raw) return "";
     const hhmm = /^\d{2}:\d{2}/.test(raw) ? raw.slice(0, 5) : "";
     return hhmm || "";
-  }
-
-  function withServiceFollowUpProgress(job: any) {
-    const jobId = String(job?.id ?? "").trim();
-    const progressLabel = jobId ? serviceFollowUpProgressLabelByJob.get(jobId) ?? null : null;
-    const continued = jobId ? continuedServiceFollowUpParentIds.has(jobId) : false;
-    if (!progressLabel && !continued) return job;
-    return {
-      ...job,
-      service_follow_up_progress_label: progressLabel,
-      service_follow_up_continued: continued,
-    };
   }
 
   function workspaceAgeLabel(job: any) {
@@ -698,7 +685,7 @@ export default async function OpsPage({
     }
     if (queueKey === "without_tech") return "Scheduled without an active assignee";
     if (specificFailureReason) return specificFailureReason;
-    return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
+    return getOpsQueueCardStatusReason(job);
   }
 
   function workspaceReasonInput(job: any) {
@@ -731,8 +718,6 @@ export default async function OpsPage({
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
   const wsStartTomorrowUtc = startOfTomorrowUtcIsoLA();
 
-    const workspaceSelect =
-      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, pending_info_reason, on_hold_reason, follow_up_date, next_action_note, action_required_by, ops_board_failure_note, permit_number, jurisdiction, permit_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start, follow_up_date, next_action_note, action_required_by";
 
@@ -813,7 +798,7 @@ export default async function OpsPage({
 
     let closeoutCountRowsQ = supabase
       .from("jobs")
-      .select(workspaceSelect)
+      .select(OPS_WORKSPACE_JOB_SELECT)
       .is("deleted_at", null)
       .neq("status", "cancelled")
       // isInCloseoutQueue rejects closed jobs unconditionally, and the billing
@@ -1038,7 +1023,7 @@ export default async function OpsPage({
       if (withoutTechPreviewIds.length > 0) {
         const withoutTechPreviewRes = await supabase
           .from("jobs")
-          .select(workspaceSelect)
+          .select(OPS_WORKSPACE_JOB_SELECT)
           .in("id", withoutTechPreviewIds)
           .is("deleted_at", null)
           .neq("status", "cancelled");
@@ -1062,7 +1047,7 @@ export default async function OpsPage({
       // may add exception routing, but must not suppress closeout invoice reminder.
       const closeoutRowsRes = await supabase
         .from("jobs")
-        .select(workspaceSelect)
+        .select(OPS_WORKSPACE_JOB_SELECT)
         .is("deleted_at", null)
         .neq("status", "cancelled")
         // Closed jobs can never pass isInCloseoutQueue (projection copies
@@ -1140,13 +1125,14 @@ export default async function OpsPage({
           supabase,
           queueKey: workspaceKey,
           continuationParentIds: retestContinuationParentIds,
+          serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
           sortKey: boardSort,
         });
       }
 
       let queueQ = supabase
         .from("jobs")
-        .select(workspaceSelect)
+        .select(OPS_WORKSPACE_JOB_SELECT)
         .is("deleted_at", null)
         .neq("status", "cancelled")
         .order("created_at", { ascending: true });

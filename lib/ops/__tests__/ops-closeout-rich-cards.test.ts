@@ -10,13 +10,10 @@ const rowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
   "utf-8",
 );
-
-const workspaceSelectStart = opsPageSource.indexOf("const workspaceSelect =");
-const workspaceSelectEnd = opsPageSource.indexOf("const scheduledSnapshotSelect", workspaceSelectStart);
-const workspaceSelectSource =
-  workspaceSelectStart > -1 && workspaceSelectEnd > workspaceSelectStart
-    ? opsPageSource.slice(workspaceSelectStart, workspaceSelectEnd)
-    : "";
+const opsWorkspaceJobContractSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-job-contract.ts"),
+  "utf-8",
+);
 
 const closeoutProjectionInputsStart = opsPageSource.indexOf("function closeoutProjectionInputs(");
 const closeoutProjectionInputsEnd = opsPageSource.indexOf("const _t_workspaceCounts", closeoutProjectionInputsStart);
@@ -55,9 +52,9 @@ const activeQueueRowsSource =
 
 describe("/ops Closeout rich card contractor visibility", () => {
   it("keeps contractor available in the narrow workspace read model", () => {
-    expect(workspaceSelectSource).toContain("contractor_id");
-    expect(workspaceSelectSource).toContain("contractors(name)");
-    expect(loadCloseoutWorkspaceRowsSource).toContain(".select(workspaceSelect)");
+    expect(opsWorkspaceJobContractSource).toContain("contractor_id");
+    expect(opsWorkspaceJobContractSource).toContain("contractors(name)");
+    expect(loadCloseoutWorkspaceRowsSource).toContain(".select(OPS_WORKSPACE_JOB_SELECT)");
   });
 
   it("renders contractor name in always-visible closeout card metadata when present", () => {

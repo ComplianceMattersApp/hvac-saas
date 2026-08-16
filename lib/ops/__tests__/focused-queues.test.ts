@@ -69,6 +69,10 @@ const waitingExceptionLoaderSource = readFileSync(
   resolve(__dirname, "../waiting-exception-loader.ts"),
   "utf-8",
 );
+const opsWorkspaceJobContractSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-job-contract.ts"),
+  "utf-8",
+);
 
 const opsRowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
@@ -564,7 +568,7 @@ describe("focused queue display labels", () => {
   });
 
   it("Operations Workspace rows include contractor context only when a job contractor exists", () => {
-    expect(opsPageSource).toContain("contractors(name)");
+    expect(opsWorkspaceJobContractSource).toContain("contractors(name)");
     expect(opsPageSource).toContain("workspaceContractorName(job)");
     expect(opsRowCardSource).toContain("Contractor");
     expect(opsPageSource).not.toContain("Contractor:</span> -");
@@ -635,8 +639,15 @@ describe("focused ops queue pages", () => {
     expect(opsPageSource).toContain("loadWaitingExceptionQueueSnapshot({ supabase })");
     expect(opsPageSource).toContain("loadFocusedOpsQueueRows({");
     expect(waitingExceptionLoaderSource).toContain(
-      '["pending_info", buildWaitingQueueRows(input.pendingInfoRows).length]',
+      '["pending_info", buildWaitingQueueRows(currentPendingInfoRows).length]',
     );
+    expect(opsPageSource).toContain(
+      "serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob",
+    );
+    expect(opsPageSource).not.toContain("continuedServiceFollowUpParentIds");
+    expect(waitingExceptionLoaderSource).toContain('.from("job_events")');
+    expect(waitingExceptionLoaderSource).toContain('.eq("event_type", "ops_update")');
+    expect(waitingExceptionLoaderSource).toContain("enrichServiceFollowUpRows(");
     expect(waitingExceptionLoaderSource).toContain('? buildWaitingQueueRows(currentRows)');
     expect(waitingExceptionLoaderSource).toContain(
       '? WAITING_QUEUE_STATUSES',
