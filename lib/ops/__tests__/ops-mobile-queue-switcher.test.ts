@@ -9,6 +9,10 @@ const opsPermitWorkspaceSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsPermitWorkspace.tsx"),
   "utf8",
 );
+const utilityRailSource = fs.readFileSync(
+  path.join(repoRoot, "app", "ops", "_components", "OpsWorkspaceUtilityRail.tsx"),
+  "utf8",
+);
 const switcherSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsMobileQueueSwitcher.tsx"),
   "utf8",
@@ -151,12 +155,12 @@ describe("Ops mobile queue switcher", () => {
   });
 
   it("keeps mobile utility workflows touch-safe and targets the visible export menu", () => {
-    expect(opsPageSource).toContain('href="/ops/workshare/returned" className="flex min-h-11');
-    expect(opsPageSource).toContain('href="/ops/workshare/incoming" className="flex min-h-11');
-    expect(opsPageSource).toContain('href="/time-clock" className="flex min-h-11');
-    expect(opsPageSource).toContain('href="#ops-export-menu-mobile"');
-    expect(opsPageSource).toContain('href="#ops-export-menu"');
-    expect(opsPageSource).toContain("flex min-h-11 cursor-pointer");
+    expect(utilityRailSource).toContain('href="/ops/workshare/returned" className="flex min-h-11');
+    expect(utilityRailSource).toContain('href="/ops/workshare/incoming" className="flex min-h-11');
+    expect(utilityRailSource).toContain('href="/time-clock" className="flex min-h-11');
+    expect(utilityRailSource).toContain('href="#ops-export-menu-mobile"');
+    expect(utilityRailSource).toContain('href="#ops-export-menu"');
+    expect(utilityRailSource).toContain("flex min-h-11 cursor-pointer");
   });
 
   it("records the frozen desktop and rejected mobile behavior", () => {

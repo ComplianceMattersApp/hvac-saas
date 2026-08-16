@@ -8,6 +8,10 @@ import { EXCEPTION_QUEUE_STATUSES } from "@/lib/ops/queue-status-contracts";
 
 const repoRoot = process.cwd();
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const utilityRailSource = fs.readFileSync(
+  path.join(repoRoot, "app", "ops", "_components", "OpsWorkspaceUtilityRail.tsx"),
+  "utf8",
+);
 const waitingExceptionLoaderSource = fs.readFileSync(
   path.join(repoRoot, "lib", "ops", "waiting-exception-loader.ts"),
   "utf8",
@@ -41,8 +45,8 @@ describe("frozen Ops desktop contract", () => {
     ]);
     expect(waitingExceptionLoaderSource).toContain("EXCEPTION_QUEUE_STATUSES");
     expect(waitingExceptionLoaderSource).toContain("excludeHistoricalRetestParents");
-    expect(opsPageSource).toContain('queue.count === 0 ? "opacity-40" : ""');
-    expect(opsPageSource).not.toContain("disabled={queue.count === 0}");
+    expect(utilityRailSource).toContain('queue.count === 0 ? "opacity-40" : ""');
+    expect(utilityRailSource).not.toContain("disabled={queue.count === 0}");
   });
 
   it("pins current sorting and Contractor Focus gates", () => {

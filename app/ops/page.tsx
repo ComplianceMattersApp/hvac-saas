@@ -72,6 +72,7 @@ import { type ContractorIntakeQueueRow } from "@/lib/ops/contractor-intake-queue
 import { loadOpsPermitWorkspaceSnapshot } from "@/lib/ops/ops-permit-workspace-loader";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import OpsPermitWorkspace from "./_components/OpsPermitWorkspace";
+import OpsWorkspaceUtilityRail from "./_components/OpsWorkspaceUtilityRail";
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "need_to_schedule") return "pending";
@@ -903,140 +904,15 @@ export default async function OpsPage({
         </section>
         </div>
 
-        <aside className="space-y-3 sm:space-y-4 xl:sticky xl:top-44 xl:self-start">
-          <section className="hidden rounded-xl border border-slate-200 bg-white px-4 py-3 xl:block" aria-label="Operations queue index">
-            <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Queues</div>
-            <nav className="space-y-0.5">
-              {opsRailQueueRows.map((queue) => {
-                const isException = queue.key === "exceptions";
-                const isWaiting = queue.key === "waiting";
-                const tickClass = queue.active
-                  ? "bg-blue-600"
-                  : isException
-                  ? "bg-rose-600"
-                  : isWaiting
-                  ? "bg-amber-500"
-                  : "bg-[#cfd2cd]";
-                const countClass = queue.active
-                  ? "bg-blue-600 px-2 py-0.5 text-white"
-                  : isException
-                  ? "text-rose-700"
-                  : isWaiting
-                  ? "text-amber-700"
-                  : "text-slate-500";
-
-                return (
-                  <Link
-                    key={queue.key}
-                    href={queue.href}
-                    aria-current={queue.active ? "page" : undefined}
-                    className={`grid min-h-10 grid-cols-[2px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md px-1.5 py-1.5 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
-                      queue.count === 0 ? "opacity-40" : ""
-                    }`}
-                  >
-                    <span className={`h-3.5 w-0.5 rounded-sm ${tickClass}`} aria-hidden="true" />
-                    <span className={`min-w-0 text-[13.5px] ${queue.active ? "font-bold text-navy" : "font-medium text-slate-700"}`}>
-                      {queue.label}
-                    </span>
-                    <span className={`rounded-full font-mono text-[12px] font-semibold tabular-nums ${countClass}`}>
-                      {queue.count}
-                    </span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </section>
-
-          <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Queue Health</div>
-            <div className="space-y-2 text-[13.5px] text-slate-700">
-              <div className="flex items-center gap-2">
-                <span className={`h-1.5 w-1.5 rounded-full ${queueHealthStats.agingOver30 > 0 ? "bg-amber-500" : "bg-[#cfd2cd]"}`} aria-hidden="true" />
-                <span><strong className="font-mono font-semibold tabular-nums text-navy">{queueHealthStats.agingOver30}</strong> aging over 30 days</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`h-1.5 w-1.5 rounded-full ${queueHealthStats.unassigned > 0 ? "bg-amber-500" : "bg-[#cfd2cd]"}`} aria-hidden="true" />
-                <span><strong className="font-mono font-semibold tabular-nums text-navy">{queueHealthStats.unassigned}</strong> unassigned</span>
-              </div>
-              {showTeamClockStatusCard ? (
-                <div className="flex items-center gap-2">
-                  <span className={`h-1.5 w-1.5 rounded-full ${teamClockStatusRows.length === 0 ? "bg-amber-500" : "bg-[#cfd2cd]"}`} aria-hidden="true" />
-                  <span>
-                    {teamClockStatusRows.length === 0
-                      ? "No team members clocked in"
-                      : `${teamClockStatusRows.length} team member${teamClockStatusRows.length === 1 ? "" : "s"} clocked in`}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-            {queueHealthStats.breakdown.length > 0 ? (
-              <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3">
-                {queueHealthStats.breakdown.map((entry) => (
-                  <div key={entry.label} className="flex items-center justify-between text-[11.5px]">
-                    <span className="text-slate-600">{entry.label}</span>
-                    <span className="font-mono font-semibold tabular-nums text-navy">{entry.count}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-          </section>
-
-          {returnedWorkshareCount > 0 || hasActiveIncomingWorkshareConnection ? (
-            <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Workshare</div>
-              <div className="space-y-2 text-[13.5px]">
-                {returnedWorkshareCount > 0 ? (
-                  <Link href="/ops/workshare/returned" className="flex min-h-11 items-center justify-between gap-2 rounded-lg text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:rounded-none xl:text-[12.5px] xl:font-normal">
-                    <span>{returnedWorkshareCount} returned · needs action</span>
-                    <span aria-hidden="true">&rarr;</span>
-                  </Link>
-                ) : null}
-                {hasActiveIncomingWorkshareConnection ? (
-                  <Link href="/ops/workshare/incoming" className="flex min-h-11 items-center justify-between gap-2 rounded-lg text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:rounded-none xl:text-[12.5px] xl:font-normal">
-                    <span>Incoming ECC/HERS requests</span>
-                    <span aria-hidden="true">&rarr;</span>
-                  </Link>
-                ) : null}
-              </div>
-            </section>
-          ) : null}
-
-          {canShowJobQueueExport || showTeamClockStatusCard ? (
-            <section className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <div className="mb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-600">Quick Links</div>
-              <div className="space-y-2 text-[13.5px]">
-                {showTeamClockStatusCard ? (
-                  <Link href="/time-clock" className="flex min-h-11 items-center text-sm font-medium text-blue-700 hover:underline xl:min-h-0 xl:text-[12.5px] xl:font-normal">Open time clock</Link>
-                ) : null}
-                {canShowJobQueueExport ? (
-                  <>
-                    <a href="#ops-export-menu-mobile" className="flex min-h-11 items-center text-sm font-medium text-blue-700 hover:underline xl:hidden">Export this queue</a>
-                    <a href="#ops-export-menu" className="hidden text-blue-700 hover:underline xl:block">Export this queue</a>
-                  </>
-                ) : null}
-              </div>
-
-              {showTeamClockStatusCard && teamClockStatusRows.length > 0 ? (
-                <details className="mt-3 border-t border-slate-200 pt-3">
-                  <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-slate-700 hover:text-navy xl:min-h-0 xl:text-[11.5px] [&::-webkit-details-marker]:hidden">
-                    Clocked-in team · {teamClockStatusRows.length}
-                  </summary>
-                  <div className="mt-2 space-y-1.5">
-                    {teamClockStatusRows.slice(0, 8).map((row) => (
-                      <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-md bg-slate-50 px-2 py-1.5">
-                        <div className="min-w-0">
-                          <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
-                          <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>
-                        </div>
-                        <span className="shrink-0 text-[11px] font-medium text-slate-700">{row.statusLabel} · {row.elapsed}</span>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              ) : null}
-            </section>
-          ) : null}
-        </aside>
+        <OpsWorkspaceUtilityRail
+          canExportQueue={canShowJobQueueExport}
+          hasIncomingWorkshare={hasActiveIncomingWorkshareConnection}
+          queueHealth={queueHealthStats}
+          queues={opsRailQueueRows}
+          returnedWorkshareCount={returnedWorkshareCount}
+          showTeamClock={showTeamClockStatusCard}
+          teamClockRows={teamClockStatusRows}
+        />
         </div>
       </div>
     );
