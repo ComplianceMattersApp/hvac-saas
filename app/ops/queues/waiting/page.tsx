@@ -9,7 +9,12 @@ import {
   getWaitingQueueDisplay,
   getWaitingQueueRecommendedNextStep,
 } from "@/lib/ops/focused-queues";
-import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
+import {
+  buildServiceFollowUpQueueStateByJob,
+  enrichServiceFollowUpQueueRows,
+  resolveServiceFollowUpQueueState,
+  type ServiceFollowUpQueueEvent,
+} from "@/lib/ops/service-follow-up-queue-state";
 import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 import { buildRetestContinuationParentIds, excludeHistoricalRetestParents } from "@/lib/ops/retest-queue-exclusivity";
 
@@ -70,28 +75,14 @@ export default async function OpsWaitingQueuePage() {
   const enteredAtByJob = buildOpsStatusEnteredAtByJob(
     (statusEvents ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
   );
-  const progressEventsByJob = new Map<string, Array<{ created_at?: string | null; meta?: unknown }>>();
-  for (const event of statusEvents ?? []) {
-    const eventJobId = String((event as any)?.job_id ?? "").trim();
-    if (!eventJobId) continue;
-    const rows = progressEventsByJob.get(eventJobId) ?? [];
-    rows.push({
-      created_at: String((event as any)?.created_at ?? "").trim() || null,
-      meta: (event as any)?.meta ?? null,
-    });
-    progressEventsByJob.set(eventJobId, rows);
-  }
-  const rows = buildWaitingQueueRows(candidateRows.map((job: any) => {
-    const jobId = String(job?.id ?? "").trim();
-    const followUpState = buildServiceFollowUpProgressState({
-      pendingInfoReason: job?.pending_info_reason ?? null,
-      events: progressEventsByJob.get(jobId) ?? [],
-    });
-    return {
-      ...job,
-      service_follow_up_continued: Boolean(followUpState.continuedThroughChildJobId),
-    };
-  }));
+  const serviceFollowUpByJob = buildServiceFollowUpQueueStateByJob(
+    candidateRows,
+    (statusEvents ?? []) as ServiceFollowUpQueueEvent[],
+  );
+  const rows = buildWaitingQueueRows(enrichServiceFollowUpQueueRows(
+    candidateRows,
+    serviceFollowUpByJob,
+  ));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -133,10 +124,10 @@ export default async function OpsWaitingQueuePage() {
           {rows.map((job: any) => {
             const jobId = String(job?.id ?? "");
             const waitingDisplay = getWaitingQueueDisplay(job);
-            const followUpProgress = buildServiceFollowUpProgressState({
-              pendingInfoReason: job?.pending_info_reason ?? null,
-              events: progressEventsByJob.get(jobId) ?? [],
-            });
+            const followUpProgress = resolveServiceFollowUpQueueState(
+              job,
+              serviceFollowUpByJob,
+            );
             const nextStep =
               followUpProgress.bridgeActionLabel ??
               followUpProgress.nextActionLabel ??

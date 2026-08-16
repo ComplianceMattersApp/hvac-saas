@@ -19,13 +19,15 @@ import {
   type OpsBoardSortKey,
 } from "@/lib/ops/ops-board-sorting";
 import {
-  buildServiceFollowUpProgressState,
-  type ServiceFollowUpProgressEvent,
-} from "@/lib/jobs/service-follow-up-progress";
-import {
   OPS_WORKSPACE_JOB_SELECT,
   type OpsWorkspaceJob,
 } from "@/lib/ops/ops-workspace-job-contract";
+import {
+  buildServiceFollowUpQueueStateByJob,
+  enrichServiceFollowUpQueueRows,
+  type ServiceFollowUpQueueEvent,
+  type ServiceFollowUpQueueStateByJob,
+} from "@/lib/ops/service-follow-up-queue-state";
 
 type ServerSupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -43,68 +45,11 @@ type WaitingExceptionSummaryInput = {
   retestContinuationRows: Array<{ parent_job_id?: string | null }>;
 };
 
-export type ServiceFollowUpQueueEvent = ServiceFollowUpProgressEvent & {
-  job_id?: string | null;
-};
-
-export type ServiceFollowUpQueueState = {
-  progressLabel: string | null;
-  continued: boolean;
-};
-
 export type WaitingExceptionQueueSnapshot = {
   statusCounts: ReadonlyMap<WaitingExceptionStatus, number>;
   retestContinuationParentIds: ReadonlySet<string>;
-  serviceFollowUpByJob: ReadonlyMap<string, ServiceFollowUpQueueState>;
+  serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
 };
-
-export function buildServiceFollowUpQueueStateByJob(
-  jobs: FocusedQueueJob[],
-  events: ServiceFollowUpQueueEvent[],
-): ReadonlyMap<string, ServiceFollowUpQueueState> {
-  const eventsByJob = new Map<string, ServiceFollowUpProgressEvent[]>();
-  for (const event of events) {
-    const jobId = String(event?.job_id ?? "").trim();
-    if (!jobId) continue;
-    const jobEvents = eventsByJob.get(jobId) ?? [];
-    jobEvents.push(event);
-    eventsByJob.set(jobId, jobEvents);
-  }
-
-  const stateByJob = new Map<string, ServiceFollowUpQueueState>();
-  for (const job of jobs) {
-    const jobId = String(job?.id ?? "").trim();
-    if (!jobId) continue;
-    const state = buildServiceFollowUpProgressState({
-      pendingInfoReason: job.pending_info_reason ?? null,
-      events: eventsByJob.get(jobId) ?? [],
-    });
-    if (!state.progressLabel && !state.continuedThroughChildJobId) continue;
-    stateByJob.set(jobId, {
-      progressLabel: state.progressLabel,
-      continued: Boolean(state.continuedThroughChildJobId),
-    });
-  }
-
-  return stateByJob;
-}
-
-function enrichServiceFollowUpRows<T extends FocusedQueueJob>(
-  jobs: T[],
-  stateByJob: ReadonlyMap<string, ServiceFollowUpQueueState>,
-): T[] {
-  return jobs.map((job) => {
-    const state = stateByJob.get(String(job?.id ?? "").trim());
-    if (!state) return job;
-    return {
-      ...job,
-      service_follow_up_progress_label:
-        state.progressLabel ?? job.service_follow_up_progress_label ?? null,
-      service_follow_up_continued:
-        state.continued || Boolean(job.service_follow_up_continued),
-    };
-  });
-}
 
 export function buildWaitingExceptionQueueSnapshot(
   input: WaitingExceptionSummaryInput,
@@ -120,7 +65,7 @@ export function buildWaitingExceptionQueueSnapshot(
     input.pendingInfoRows,
     input.serviceFollowUpEvents ?? [],
   );
-  const currentPendingInfoRows = enrichServiceFollowUpRows(
+  const currentPendingInfoRows = enrichServiceFollowUpQueueRows(
     input.pendingInfoRows,
     serviceFollowUpByJob,
   );
@@ -221,7 +166,7 @@ export async function loadFocusedOpsQueueRows(params: {
   supabase: ServerSupabaseClient;
   queueKey: FocusedOpsQueueKey;
   continuationParentIds: ReadonlySet<string>;
-  serviceFollowUpByJob: ReadonlyMap<string, ServiceFollowUpQueueState>;
+  serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
   sortKey: OpsBoardSortKey;
 }): Promise<OpsWorkspaceJob[]> {
   const statuses = params.queueKey === "waiting"
@@ -240,7 +185,7 @@ export async function loadFocusedOpsQueueRows(params: {
 
   const rows = (queueRes.data ?? []) as unknown as OpsWorkspaceJob[];
   const enrichedRows = params.queueKey === "waiting"
-    ? enrichServiceFollowUpRows(rows, params.serviceFollowUpByJob)
+    ? enrichServiceFollowUpQueueRows(rows, params.serviceFollowUpByJob)
     : rows;
   const currentRows = excludeHistoricalRetestParents(
     enrichedRows,

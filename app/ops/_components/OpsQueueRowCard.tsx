@@ -508,6 +508,9 @@ function GenericCard({ view }: { view: GenericRowView }) {
       actionLabel="Open Job"
       fields={[
         { label: "Contractor", value: view.contractorName || view.assignmentSummary || "Internal work" },
+        ...(view.contractorName
+          ? [{ label: "Assignment", value: view.assignmentSummary }]
+          : []),
         { label: "Last Action", value: view.lastActionText },
         { label: "Last Attempt", value: view.recentAttemptText, fullWidth: true },
       ]}

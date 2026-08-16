@@ -53,10 +53,10 @@ describe("waiting and exception queue snapshot", () => {
       problem: 1,
     });
     expect(snapshot.retestContinuationParentIds).toEqual(new Set(["failed-parent"]));
-    expect(Object.fromEntries(snapshot.serviceFollowUpByJob)).toEqual({
-      pending: { progressLabel: "Part Ordered", continued: false },
-      continued: { progressLabel: null, continued: true },
-    });
+    expect(snapshot.serviceFollowUpByJob.get("pending")?.progressLabel).toBe("Part Ordered");
+    expect(
+      snapshot.serviceFollowUpByJob.get("continued")?.continuedThroughChildJobId,
+    ).toBe("return-job");
   });
 
   it("normalizes absent count results to zero", () => {

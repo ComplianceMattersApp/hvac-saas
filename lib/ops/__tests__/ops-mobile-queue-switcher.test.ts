@@ -106,6 +106,16 @@ describe("Ops mobile queue switcher", () => {
     expect(rowCardSource.match(/\{ label: "Last Attempt", value: view\.recentAttemptText/g)).toHaveLength(4);
   });
 
+  it("keeps generic mobile assignment visible when contractor context is also present", () => {
+    const genericCardSource = rowCardSource.slice(
+      rowCardSource.indexOf("function GenericCard("),
+      rowCardSource.indexOf("function FieldPaymentReviewCard("),
+    );
+
+    expect(genericCardSource).toContain("...(view.contractorName");
+    expect(genericCardSource).toContain('{ label: "Assignment", value: view.assignmentSummary }');
+  });
+
   it("suppresses duplicate closeout Needs and Next Step text on mobile", () => {
     expect(rowCardSource).toContain("const showNeeds =");
     expect(rowCardSource).toContain("const showNext =");

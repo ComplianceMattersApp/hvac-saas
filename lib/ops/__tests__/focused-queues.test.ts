@@ -73,6 +73,10 @@ const opsWorkspaceJobContractSource = readFileSync(
   resolve(__dirname, "../ops-workspace-job-contract.ts"),
   "utf-8",
 );
+const serviceFollowUpQueueStateSource = readFileSync(
+  resolve(__dirname, "../service-follow-up-queue-state.ts"),
+  "utf-8",
+);
 
 const opsRowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
@@ -527,7 +531,8 @@ describe("focused queue display labels", () => {
     expect(waitingQueuePageSource).toContain("readyToScheduleLabel");
     expect(waitingQueuePageSource).toContain("Ready to Schedule Return");
     expect(waitingQueuePageSource).toContain('"Original reason"');
-    expect(waitingQueuePageSource).toContain("buildServiceFollowUpProgressState");
+    expect(waitingQueuePageSource).toContain("buildServiceFollowUpQueueStateByJob");
+    expect(serviceFollowUpQueueStateSource).toContain("buildServiceFollowUpProgressState");
   });
 
   it("formats Operations Workspace assignment summaries without closing over render-order state", () => {
@@ -627,7 +632,7 @@ describe("focused ops queue pages", () => {
   it("waiting and exception pages use focused queue display labels", () => {
     expect(waitingQueuePageSource).toContain("getWaitingQueueDisplay");
     expect(waitingQueuePageSource).toContain("getWaitingQueueRecommendedNextStep");
-    expect(waitingQueuePageSource).toContain("buildServiceFollowUpProgressState");
+    expect(waitingQueuePageSource).toContain("resolveServiceFollowUpQueueState");
     expect(waitingQueuePageSource).toContain("followUpProgress.progressLabel");
     expect(waitingQueuePageSource).toContain("Next step:");
     expect(waitingQueuePageSource).toContain("#followup");
@@ -647,7 +652,7 @@ describe("focused ops queue pages", () => {
     expect(opsPageSource).not.toContain("continuedServiceFollowUpParentIds");
     expect(waitingExceptionLoaderSource).toContain('.from("job_events")');
     expect(waitingExceptionLoaderSource).toContain('.eq("event_type", "ops_update")');
-    expect(waitingExceptionLoaderSource).toContain("enrichServiceFollowUpRows(");
+    expect(waitingExceptionLoaderSource).toContain("enrichServiceFollowUpQueueRows(");
     expect(waitingExceptionLoaderSource).toContain('? buildWaitingQueueRows(currentRows)');
     expect(waitingExceptionLoaderSource).toContain(
       '? WAITING_QUEUE_STATUSES',
