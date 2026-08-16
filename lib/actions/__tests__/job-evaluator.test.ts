@@ -192,7 +192,7 @@ describe("evaluateJobOpsStatus", () => {
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
   });
 
-  it("pre-field path calls setOpsStatusIfNotManual (does not bypass manual-lock boundary)", async () => {
+  it("pre-field path preserves a manual responsibility through the safe setter", async () => {
     await runWithJob(
       buildJob({
         job_type: "service",

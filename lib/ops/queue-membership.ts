@@ -23,12 +23,8 @@ export type PrimaryQueueJob = {
   action_required_by?: string | null;
 };
 
-export const PRIMARY_WAITING_OPS_STATUSES = WAITING_QUEUE_STATUSES;
-
-export const PRIMARY_EXCEPTION_OPS_STATUSES = EXCEPTION_QUEUE_STATUSES;
-
-const WAITING_STATUS_SET = new Set<string>(PRIMARY_WAITING_OPS_STATUSES);
-const EXCEPTION_STATUS_SET = new Set<string>(PRIMARY_EXCEPTION_OPS_STATUSES);
+const WAITING_STATUS_SET = new Set<string>(WAITING_QUEUE_STATUSES);
+const EXCEPTION_STATUS_SET = new Set<string>(EXCEPTION_QUEUE_STATUSES);
 
 function normalize(value: unknown): string {
   return String(value ?? "").trim().toLowerCase();

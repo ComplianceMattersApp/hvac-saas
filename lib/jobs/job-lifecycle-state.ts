@@ -1,3 +1,5 @@
+import { isWaitingQueueStatus } from "@/lib/ops/queue-status-contracts";
+
 /**
  * One precedence order for "what state is this job in", shared by every job-detail
  * surface.
@@ -38,8 +40,6 @@ export type JobLifecycleStateInput = {
   isLinkedToActiveJob?: boolean;
 };
 
-const WAITING_OPS_STATUSES = new Set(["pending_info", "waiting", "on_hold"]);
-
 /**
  * Ordered most- to least-authoritative. Terminal states outrank everything, then
  * exceptions that need someone to act, then where the job sits on the calendar.
@@ -60,7 +60,7 @@ export function resolveJobLifecycleState(input: JobLifecycleStateInput): JobLife
   if (opsStatus === "failed" || status === "failed") return "failed";
   if (opsStatus === "pending_office_review") return "pending_office_review";
   if (opsStatus === "retest_needed") return "retest_needed";
-  if (WAITING_OPS_STATUSES.has(opsStatus)) return "waiting";
+  if (isWaitingQueueStatus(opsStatus)) return "waiting";
   if (opsStatus === "invoice_required") return "invoice_required";
   if (opsStatus === "paperwork_required") return "paperwork_required";
 

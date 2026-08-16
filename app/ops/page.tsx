@@ -63,6 +63,10 @@ import {
 import { buildWaitingQueueRows, type FocusedQueueJob } from "@/lib/ops/focused-queues";
 import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
 import {
+  EXCEPTION_QUEUE_STATUSES,
+  WAITING_QUEUE_STATUSES,
+} from "@/lib/ops/queue-status-contracts";
+import {
   getCachedAccountTimeZone,
   getCachedBillingMode,
   getCachedProductMode,
@@ -792,7 +796,7 @@ export default async function OpsPage({
       .select("id, ops_status")
       .is("deleted_at", null)
       .neq("status", "cancelled")
-      .in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
+      .in("ops_status", [...EXCEPTION_QUEUE_STATUSES]);
     const retestContinuationRowsQ = supabase
       .from("jobs")
       .select("parent_job_id")
@@ -1201,9 +1205,9 @@ export default async function OpsPage({
           .lt("scheduled_date", wsStartTomorrowUtc)
           .order("window_start", { ascending: true });
       } else if (workspaceKey === "waiting") {
-        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["pending_info", "on_hold", "waiting"]);
+        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", [...WAITING_QUEUE_STATUSES]);
       } else if (workspaceKey === "exceptions") {
-        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
+        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", [...EXCEPTION_QUEUE_STATUSES]);
       } else if (workspaceKey === "follow_ups") {
         queueQ = queueQ
           .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")

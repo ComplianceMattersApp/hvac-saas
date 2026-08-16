@@ -15,6 +15,10 @@ import { formatCityNamePart, formatPersonNamePart } from "@/lib/utils/identity-d
 import { resolveLifecycleDaysAgingLabel } from "@/lib/utils/lifecycle-aging";
 import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
+import {
+  EXCEPTION_QUEUE_STATUSES,
+  WAITING_QUEUE_STATUSES,
+} from "@/lib/ops/queue-status-contracts";
 
 export type OpsExportMode = "internal" | "contractor_safe";
 export type OpsExportQueueKey =
@@ -261,9 +265,9 @@ async function loadJobRows(params: {
       .lt("scheduled_date", tomorrow)
       .order("window_start", { ascending: true });
   } else if (params.queueKey === "waiting") {
-    q = q.neq("ops_status", "closed").in("ops_status", ["pending_info", "on_hold", "waiting"]);
+    q = q.neq("ops_status", "closed").in("ops_status", [...WAITING_QUEUE_STATUSES]);
   } else if (params.queueKey === "exceptions") {
-    q = q.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
+    q = q.neq("ops_status", "closed").in("ops_status", [...EXCEPTION_QUEUE_STATUSES]);
   } else if (params.queueKey === "follow_ups") {
     q = q
       .neq("ops_status", "closed")

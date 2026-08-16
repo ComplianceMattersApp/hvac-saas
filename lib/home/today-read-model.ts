@@ -496,6 +496,7 @@ import {
   isTerminalJobLifecycleState,
   resolveJobLifecycleState,
 } from "@/lib/jobs/job-lifecycle-state";
+import { EXCEPTION_QUEUE_STATUSES } from "@/lib/ops/queue-status-contracts";
 
 const TODAY_JOB_SELECT =
   "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, field_complete_at, deleted_at, created_at";
@@ -989,7 +990,7 @@ async function safeLoadPriorityCounts(params: {
           .select("id, ops_status")
           .is("deleted_at", null)
           .neq("status", "cancelled")
-          .in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]),
+          .in("ops_status", [...EXCEPTION_QUEUE_STATUSES]),
         supabase
           .from("jobs")
           .select("parent_job_id")

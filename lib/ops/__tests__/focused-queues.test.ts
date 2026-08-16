@@ -631,7 +631,7 @@ describe("focused ops queue pages", () => {
     expect(opsPageSource).toContain('["pending_info", buildWaitingQueueRows(pendingInfoRowsRes.data ?? []).length]');
     expect(opsPageSource).toContain('const currentRows = workspaceKey === "waiting"');
     expect(opsPageSource).toContain('? buildWaitingQueueRows(typedHistoryFilteredRows)');
-    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold", "waiting"])');
+    expect(opsPageSource).toContain('.in("ops_status", [...WAITING_QUEUE_STATUSES])');
   });
 
   it("waiting page includes safe empty state and return navigation", () => {

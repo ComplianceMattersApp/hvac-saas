@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { OPS_BOARD_SORT_OPTIONS } from "@/lib/ops/ops-board-sorting";
 import { resolveVisibleOpsWorkspaceQueueKeys } from "@/lib/ops/ops-workspace-queues";
+import { EXCEPTION_QUEUE_STATUSES } from "@/lib/ops/queue-status-contracts";
 
 const repoRoot = process.cwd();
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
@@ -28,9 +29,13 @@ describe("frozen Ops desktop contract", () => {
         permitRequestsSchemaAvailable: false,
       }),
     ).toContain("exceptions");
-    expect(opsPageSource).toContain(
-      '.in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"])',
-    );
+    expect(EXCEPTION_QUEUE_STATUSES).toEqual([
+      "failed",
+      "retest_needed",
+      "pending_office_review",
+      "problem",
+    ]);
+    expect(opsPageSource).toContain('.in("ops_status", [...EXCEPTION_QUEUE_STATUSES])');
     expect(opsPageSource).toContain("excludeHistoricalRetestParents");
     expect(opsPageSource).toContain('queue.count === 0 ? "opacity-40" : ""');
     expect(opsPageSource).not.toContain("disabled={queue.count === 0}");
