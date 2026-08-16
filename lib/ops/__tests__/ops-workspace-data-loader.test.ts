@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
 import {
   buildCloseoutProjectionInputs,
@@ -6,6 +8,14 @@ import {
 } from "@/lib/ops/ops-workspace-data-loader";
 
 describe("Operations workspace data-loader read models", () => {
+  it("reuses the overview closeout rows instead of reloading projected membership", () => {
+    const source = readFileSync(resolve(__dirname, "../ops-workspace-data-loader.ts"), "utf8");
+
+    expect(source).toContain("if (context.closeoutQueueRows)");
+    expect(source).toContain("queueRows = [...context.closeoutQueueRows]");
+    expect(source).toContain('params.selectedWorkspaceKey === "closeout" && hasJobs && !params.closeoutProjectionByJob');
+  });
+
   it("projects only canonical closeout membership and billing fields", () => {
     const [projection] = buildCloseoutProjectionInputs([
       {

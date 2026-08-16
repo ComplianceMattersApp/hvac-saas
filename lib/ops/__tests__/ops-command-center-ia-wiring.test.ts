@@ -52,6 +52,14 @@ const opsWorkspaceDataLoaderSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-data-loader.ts"),
   "utf-8",
 );
+const opsWorkspaceOverviewLoaderSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-overview-loader.ts"),
+  "utf-8",
+);
+const opsWorkspaceContractorFacetsSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-contractor-facets.ts"),
+  "utf-8",
+);
 const focusedQueueRowPresentationSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/focused-queue-row-presentation.ts"),
   "utf-8",
@@ -103,7 +111,8 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("keeps focused queue and filter wiring query-parameter driven", () => {
     expect(opsPageSource).toContain("function buildQueryString(");
-    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsPageSource).toContain("loadOpsWorkspaceOverview({");
     expect(opsPageSource).toContain("contractorScopeFilter,");
     expect(opsWorkspaceQueuesSource).toContain("opsWorkspaceQueueHref(definition.bucket, { contractor })");
     expect(opsPageSource).toContain("q: q ?? \"\"");
@@ -172,15 +181,15 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsWorkspaceQueuesSource).toContain('closeout: "closeout"');
     expect(opsWorkspaceQueuesSource).toContain('follow_ups: "follow_ups"');
     expect(opsWorkspaceQueuesSource).toContain('contractor_intake: "contractor_intake"');
-    expect(opsPageSource).toContain("resolveVisibleOpsWorkspaceQueueKeys");
-    expect(opsPageSource).toContain("const coreBoardWorkspaceKeys = resolveVisibleOpsWorkspaceQueueKeys({");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("resolveVisibleOpsWorkspaceQueueKeys({");
+    expect(opsPageSource).toContain("coreBoardWorkspaceKeys,");
     expect(opsPageSource).toContain("const requestedWorkspaceKeys = [resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter)];");
   });
 
   it("keeps follow-up reminders always visible with date urgency styling", () => {
     expect(opsWorkspaceQueuesSource).toContain('key: "follow_ups"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Follow Ups"');
-    expect(opsPageSource).toContain('.or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")');
+    expect(opsWorkspaceOverviewLoaderSource).toContain('.or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")');
     expect(opsWorkspaceRowViewsSource).toContain("export function resolveFollowUpUrgency(dueDate: string, todayDate: string)");
     expect(opsWorkspaceRowViewsSource).toContain('variant: "follow-up-overdue"');
     expect(opsWorkspaceRowViewsSource).toContain('variant: "follow-up-soon"');
@@ -258,7 +267,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("does not cap active operations queues to ten preview rows", () => {
-    expect(opsPageSource).toContain("previewLimit: Math.max(scheduledOpenRows.length, 1)");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("previewLimit: Math.max(params.scheduledOpenRows.length, 1)");
     expect(opsPageSource).not.toContain(").slice(0, 10);");
     expect(opsPageSource).not.toContain("queuePreviewLimit");
   });
@@ -272,9 +281,9 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("applies contractor filtering to visible board rows without changing row actions", () => {
-    expect(opsPageSource).toContain("function filterRowsByContractorFocus<T extends ContractorFocusRow>(rows: T[]): T[]");
-    expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows)");
-    expect(opsPageSource).toContain("contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)");
+    expect(opsWorkspaceContractorFacetsSource).toContain("export function filterRowsByContractorFocus");
+    expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows, contractorFocusIdSet)");
+    expect(opsWorkspaceContractorFacetsSource).toContain("selectedIds.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)");
     expect(opsWorkspaceDataLoaderSource).toContain("return sortOpsBoardRows(currentRows, context.boardSort);");
     expect(opsWorkspaceRowViewsSource).toContain("workspaceContractorName(job)");
     expect(opsWorkspaceRowViewsSource).toContain('href: `/jobs/${jobId}?tab=ops`');
@@ -294,7 +303,8 @@ describe("/ops Full Ops command center IA wiring", () => {
       "reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []",
     );
     expect(opsPageSource).not.toContain("loadActiveQueueContractorFocusSourceRows");
-    expect(opsPageSource).toContain("contractorFocusInternalCount += 1");
+    expect(opsWorkspaceContractorFacetsSource).toContain("internalCount += 1");
+    expect(opsPageSource).toContain("buildContractorFocusFacet({");
     // Closeout facet counts the full closeout set, not the 10-row preview.
     expect(opsPageSource).toContain('selectedWorkspaceKey === "closeout"');
     expect(opsPageSource).toContain("? closeoutQueueRowsFull");
@@ -405,13 +415,13 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("adds pending contractor intake as an operational queue without using notifications as truth", () => {
-    expect(opsPageSource).toContain("countPendingContractorIntakeQueueRows");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("countPendingContractorIntakeQueueRows");
     expect(opsWorkspaceDataLoaderSource).toContain("listPendingContractorIntakeQueueRows");
     expect(opsWorkspaceDataLoaderSource).toContain("CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT");
     expect(opsPageSource).toContain("isContractorIntakeQueueAvailableForProductMode");
     expect(opsPageSource).toContain("contractorIntakeQueueAvailable");
-    expect(opsPageSource).toContain("? countPendingContractorIntakeQueueRows");
-    expect(opsPageSource).toContain("resolveEffectiveOpsBoardBucketFilter");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("? countPendingContractorIntakeQueueRows");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("resolveEffectiveOpsBoardBucketFilter");
     expect(opsPageSource).toContain('if (normalized === "intake") return "contractor_intake";');
     expect(opsPageSource).toContain('normalized === "contractor_intake"');
     expect(opsPageSource).toContain('selectedWorkspaceKey === "contractor_intake"');
@@ -423,7 +433,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("keeps the existing Ops workbench chips in place", () => {
-    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("buildOpsWorkspaceTabs({");
     expect(opsWorkspaceQueuesSource).toContain('label: "Needs Scheduling"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Field Work"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Waiting / Pending Info"');

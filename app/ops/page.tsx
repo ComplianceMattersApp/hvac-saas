@@ -18,15 +18,9 @@ import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/busine
 import { listSenderWorkshareConnectionsForReceiver } from "@/lib/workflows/account-workshare-connections-read";
 import { countReturnedWorkshareRequestsForSender } from "@/lib/workflows/account-workshare-requests-read";
 
-import { startOfTodayUtcIsoLA, startOfTomorrowUtcIsoLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { getActiveJobAssignmentDisplayMap, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
+import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
-import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
-import {
-  listInternalContractorUpdateAwareness,
-  listInternalNewWorkRequestAwareness,
-} from "@/lib/actions/notification-read-actions";
 import {
   acceptInternalPermitRequest,
   createJobFromPermitRequestAndMarkCreated,
@@ -37,13 +31,7 @@ import {
   resumeInternalPermitRequest,
   updateInternalPermitRequestIntake,
 } from "@/lib/actions/internal-permit-request-actions";
-import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
-import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
-import { loadWaitingExceptionQueueSnapshot } from "@/lib/ops/waiting-exception-loader";
-import {
-  OPS_WORKSPACE_JOB_SELECT,
-  type OpsWorkspaceJob,
-} from "@/lib/ops/ops-workspace-job-contract";
+import { type OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
 import {
   getCachedAccountTimeZone,
   getCachedBillingMode,
@@ -52,20 +40,16 @@ import {
 import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
 import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
-import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
 import {
   OPS_BOARD_SORT_OPTIONS,
   normalizeOpsBoardSort,
   sortOpsBoardRows,
 } from "@/lib/ops/ops-board-sorting";
 import {
-  buildOpsWorkspaceTabs,
   getOpsWorkspaceQueueDefinition,
   isContractorIntakeQueueAvailableForProductMode,
   opsWorkspaceQueueHref,
-  resolveEffectiveOpsBoardBucketFilter,
   resolveOpsWorkspaceQueueKey,
-  resolveVisibleOpsWorkspaceQueueKeys,
   type OpsBoardFilterBucket,
 } from "@/lib/ops/ops-workspace-queues";
 import {
@@ -83,31 +67,23 @@ import {
   type OpsWorkspaceRowJob,
 } from "@/lib/ops/ops-workspace-row-views";
 import {
-  buildCloseoutProjectionInputs,
   createOpsWorkspacePreviewLoader,
   loadOpsWorkspacePreviewEnrichment,
   type OpsWorkspacePreviewRow,
 } from "@/lib/ops/ops-workspace-data-loader";
+import { loadOpsWorkspaceOverview } from "@/lib/ops/ops-workspace-overview-loader";
+import {
+  buildContractorFocusFacet,
+  filterRowsByContractorFocus,
+  INTERNAL_WORK_CONTRACTOR_FOCUS_ID,
+  normalizeContractorFocusIds,
+  type ContractorFocusRow,
+} from "@/lib/ops/ops-workspace-contractor-facets";
 import { startOpsServerTimer } from "@/lib/ops/ops-server-timing";
-import {
-  listActivePermitRequestQueueRowsIfAvailable,
-  type PermitRequestQueueRow,
-} from "@/lib/permits/permit-requests-read-model";
-import {
-  countPendingContractorIntakeQueueRows,
-  type ContractorIntakeQueueRow,
-} from "@/lib/ops/contractor-intake-queue";
+import { type PermitRequestQueueRow } from "@/lib/permits/permit-requests-read-model";
+import { type ContractorIntakeQueueRow } from "@/lib/ops/contractor-intake-queue";
 import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/permit-request-attachments-read-model";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
-type ContractorFocusOption = {
-  id: string;
-  name: string;
-  count: number;
-  selected: boolean;
-};
-
-type ContractorFocusRow = OpsWorkspacePreviewRow | PermitRequestQueueRow;
-
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "need_to_schedule") return "pending";
@@ -161,18 +137,6 @@ function buildQueryString(params: Record<string, string | undefined | null>) {
   }
   const s = sp.toString();
   return s ? `?${s}` : "";
-}
-
-const INTERNAL_WORK_CONTRACTOR_FOCUS_ID = "__internal_work";
-
-function normalizeContractorFocusIds(value: unknown) {
-  const rawValues = Array.isArray(value) ? value : [value];
-  const ids = rawValues
-    .flatMap((item) => String(item ?? "").split(","))
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  return Array.from(new Set(ids));
 }
 
 export default async function OpsPage({
@@ -377,26 +341,6 @@ export default async function OpsPage({
     return result;
   });
 
-  const wsStartTodayUtc = startOfTodayUtcIsoLA();
-  const wsStartTomorrowUtc = startOfTomorrowUtcIsoLA();
-
-    const scheduledSnapshotSelect =
-      "id, status, ops_status, scheduled_date, window_start, follow_up_date, next_action_note, action_required_by";
-
-    const finishWorkspaceCountsTiming = startOpsServerTimer(opsTimingEnabled);
-
-    function opsStatusCountQuery(opsStatus: string, options?: { requireOpenStatus?: boolean }) {
-      let q = supabase
-        .from("jobs")
-        .select("id", { count: "exact", head: true })
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .eq("ops_status", opsStatus);
-
-      if (options?.requireOpenStatus) q = q.eq("status", "open");
-      return q;
-    }
-
     const followUpTodayDate = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Los_Angeles",
       year: "numeric",
@@ -404,202 +348,30 @@ export default async function OpsPage({
       day: "2-digit",
     }).format(new Date());
 
-    const needToScheduleCountQ = opsStatusCountQuery("need_to_schedule", { requireOpenStatus: true })
-      .is("follow_up_date", null)
-      .is("next_action_note", null)
-      .is("action_required_by", null);
-    const waitingExceptionSnapshotQ = loadWaitingExceptionQueueSnapshot({ supabase });
-    const followUpReminderRowsQ = supabase
-      .from("jobs")
-      .select("id, status, ops_status, follow_up_date, next_action_note, action_required_by")
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null");
+    const finishWorkspaceCountsTiming = startOpsServerTimer(opsTimingEnabled);
 
-    const fieldWorkCountQ = supabase
-      .from("jobs")
-      .select("id, status, ops_status, follow_up_date, next_action_note, action_required_by")
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .in("status", ["open", "on_the_way", "in_process", "in_progress"])
-      .neq("ops_status", "closed")
-      .eq("field_complete", false)
-      .is("follow_up_date", null)
-      .is("next_action_note", null)
-      .is("action_required_by", null)
-      .gte("scheduled_date", wsStartTodayUtc)
-      .lt("scheduled_date", wsStartTomorrowUtc);
-
-    const scheduledOpenRowsQ = supabase
-      .from("jobs")
-      .select(scheduledSnapshotSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("status", "open")
-      .eq("ops_status", "scheduled")
-      .is("follow_up_date", null)
-      .is("next_action_note", null)
-      .is("action_required_by", null)
-      .order("scheduled_date", { ascending: true })
-      .order("window_start", { ascending: true });
-
-    const closeoutCountRowsQ = supabase
-      .from("jobs")
-      .select(OPS_WORKSPACE_JOB_SELECT)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      // isInCloseoutQueue rejects closed jobs unconditionally, and the billing
-      // projection copies ops_status verbatim (a closed job can never re-enter
-      // the queue). Filtering here keeps this read bounded by active closeout
-      // work instead of growing with all-time completed history.
-      .neq("ops_status", "closed")
-      .eq("field_complete", true)
-      .order("created_at", { ascending: false });
-
-    const [
-      needToScheduleCountRes,
+    const {
+      activePermitRequestRows,
+      closeoutProjectionByJob: overviewCloseoutProjectionByJob,
+      closeoutQueueRowsFull,
+      coreBoardWorkspaceKeys,
+      effectiveBoardBucketFilter,
+      scheduledWithoutTechSnapshot,
+      startTodayUtc: wsStartTodayUtc,
+      startTomorrowUtc: wsStartTomorrowUtc,
       waitingExceptionSnapshot,
-      followUpReminderRowsRes,
-      fieldWorkCountRes,
-      scheduledOpenRowsRes,
-      closeoutCountRowsRes,
-      contractorIntakeCount,
-      unreadContractorUpdates,
-      unreadNewWorkRequests,
-      activePermitRequestsResult,
-    ] = await Promise.all([
-      needToScheduleCountQ,
-      waitingExceptionSnapshotQ,
-      followUpReminderRowsQ,
-      fieldWorkCountQ,
-      scheduledOpenRowsQ,
-      closeoutCountRowsQ,
-      contractorIntakeQueueAvailable
-        ? countPendingContractorIntakeQueueRows({
-            supabase: admin,
-            accountOwnerUserId: internalUser.account_owner_user_id,
-          })
-        : Promise.resolve(0),
-      listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
-      listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
-      permitWorkflowEnabled
-        ? listActivePermitRequestQueueRowsIfAvailable({
-            supabase,
-            accountOwnerUserId: internalUser.account_owner_user_id,
-            limit: 50,
-          })
-        : Promise.resolve({ schemaAvailable: true, rows: [] as PermitRequestQueueRow[] }),
-    ]);
-
-    if (needToScheduleCountRes.error) throw needToScheduleCountRes.error;
-    if (followUpReminderRowsRes.error) throw followUpReminderRowsRes.error;
-    if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
-    if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
-    if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
-
-    const retestContinuationParentIds = waitingExceptionSnapshot.retestContinuationParentIds;
-    const countsWs = new Map<string, number>([
-      ["need_to_schedule", needToScheduleCountRes.count ?? 0],
-      ["pending_info", waitingExceptionSnapshot.statusCounts.get("pending_info") ?? 0],
-      ["on_hold", waitingExceptionSnapshot.statusCounts.get("on_hold") ?? 0],
-      ["waiting", waitingExceptionSnapshot.statusCounts.get("waiting") ?? 0],
-      ["pending_office_review", waitingExceptionSnapshot.statusCounts.get("pending_office_review") ?? 0],
-      ["failed", waitingExceptionSnapshot.statusCounts.get("failed") ?? 0],
-      ["retest_needed", waitingExceptionSnapshot.statusCounts.get("retest_needed") ?? 0],
-      ["problem", waitingExceptionSnapshot.statusCounts.get("problem") ?? 0],
-      [
-        "follow_ups",
-        ((followUpReminderRowsRes.data ?? []) as OpsWorkspaceJob[]).filter((job) =>
-          isPrimaryQueueJob(job, "follow_ups"),
-        ).length,
-      ],
-    ]);
-
-    const scheduledOpenRows = (scheduledOpenRowsRes.data ?? []) as OpsWorkspaceJob[];
-    const scheduledIds = scheduledOpenRows
-      .map((row) => String(row?.id ?? "").trim())
-      .filter(Boolean);
-
-    const scheduledAssignmentMap = scheduledIds.length
-      ? await getActiveJobAssignmentDisplayMap({ supabase, jobIds: scheduledIds })
-      : {};
-
-    const scheduledWithoutTechSnapshot = buildScheduledWithoutTechSnapshot({
-      jobs: scheduledOpenRows,
-      assignmentDisplayMap: scheduledAssignmentMap,
-      previewLimit: Math.max(scheduledOpenRows.length, 1),
-    });
-
-    const fieldWorkCountRows = (fieldWorkCountRes.data ?? []) as OpsWorkspaceJob[];
-    const fieldWorkCountIds = fieldWorkCountRows
-      .map((row) => String(row?.id ?? "").trim())
-      .filter(Boolean);
-    const fieldWorkAssignmentMap = fieldWorkCountIds.length
-      ? await getActiveJobAssignmentDisplayMap({ supabase, jobIds: fieldWorkCountIds })
-      : {};
-    const assignedFieldWorkCount = fieldWorkCountRows.filter((row) => {
-      const jobId = String(row?.id ?? "").trim();
-      return (
-        resolvePrimaryOpsQueue(row) === null &&
-        Array.isArray(fieldWorkAssignmentMap[jobId]) &&
-        fieldWorkAssignmentMap[jobId].length > 0
-      );
-    }).length;
-
-    const waitingCount =
-      (countsWs.get("pending_info") ?? 0) +
-      (countsWs.get("on_hold") ?? 0) +
-      (countsWs.get("waiting") ?? 0);
-
-    const exceptionCount =
-      (countsWs.get("failed") ?? 0) +
-      (countsWs.get("retest_needed") ?? 0) +
-      (countsWs.get("pending_office_review") ?? 0) +
-      (countsWs.get("problem") ?? 0);
-
-    const closeoutCountSourceRows = (closeoutCountRowsRes.data ?? []) as OpsWorkspaceJob[];
-    const { projectionsByJobId: closeoutCountProjectionByJobId } = await buildBillingTruthCloseoutProjectionMap({
+      workspaceTabs,
+    } = await loadOpsWorkspaceOverview({
       supabase,
+      admin,
       accountOwnerUserId: internalUser.account_owner_user_id,
-      jobs: buildCloseoutProjectionInputs(closeoutCountSourceRows),
-    });
-    // Full closeout set (uncapped) — reused for counts, contractor facets, and
-    // every desktop/mobile queue card.
-    const closeoutQueueRowsFull = listCloseoutQueueJobs(
-      closeoutCountSourceRows,
-      (job) => closeoutCountProjectionByJobId.get(String(job.id ?? "").trim()) ?? job,
-    );
-    const closeoutCount = closeoutQueueRowsFull.length;
-    const permitRequestsSchemaAvailable = permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable;
-    const activePermitRequestRows = activePermitRequestsResult.rows;
-    const effectiveBoardBucketFilter = resolveEffectiveOpsBoardBucketFilter({
-      requestedBucket: activeBoardBucketFilter,
-      productMode,
-      permitRequestsSchemaAvailable,
-    });
-
-    const workspaceTabs = buildOpsWorkspaceTabs({
-      counts: {
-        need_to_schedule: countsWs.get("need_to_schedule") ?? 0,
-        field_work: assignedFieldWorkCount,
-        without_tech: scheduledWithoutTechSnapshot.count,
-        waiting: waitingCount,
-        exceptions: exceptionCount,
-        closeout: closeoutCount,
-        follow_ups: countsWs.get("follow_ups") ?? 0,
-        contractor_intake: contractorIntakeCount,
-        permits: activePermitRequestRows.length,
-        updates: unreadContractorUpdates.length + unreadNewWorkRequests.length,
-      },
-      contractorScopeFilter,
       contractorIntakeQueueAvailable,
-      permitRequestsSchemaAvailable,
+      contractorScopeFilter,
+      permitWorkflowEnabled,
+      productMode,
+      requestedBucket: activeBoardBucketFilter,
     });
 
-    const coreBoardWorkspaceKeys = resolveVisibleOpsWorkspaceQueueKeys({
-      productMode,
-      permitRequestsSchemaAvailable,
-    });
     const requestedWorkspaceKeys = [resolveOpsWorkspaceQueueKey(effectiveBoardBucketFilter)];
 
     const loadWorkspacePreviewRows = createOpsWorkspacePreviewLoader({
@@ -607,8 +379,9 @@ export default async function OpsPage({
       admin,
       accountOwnerUserId: internalUser.account_owner_user_id,
       boardSort,
+      closeoutQueueRows: closeoutQueueRowsFull,
       contractorIntakeQueueAvailable,
-      retestContinuationParentIds,
+      retestContinuationParentIds: waitingExceptionSnapshot.retestContinuationParentIds,
       serviceFollowUpByJob: waitingExceptionSnapshot.serviceFollowUpByJob,
       scheduledWithoutTechSnapshot,
       startTodayUtc: wsStartTodayUtc,
@@ -647,35 +420,15 @@ export default async function OpsPage({
         : section.previewRows,
     }));
 
-    function rowContractorFocusId(row: ContractorFocusRow) {
-      return "contractorId" in row
-        ? String(row.contractorId ?? "").trim()
-        : String(row.contractor_id ?? "").trim();
-    }
-
-    function rowContractorFocusName(row: ContractorFocusRow) {
-      return "contractorName" in row
-        ? String(row.contractorName ?? "").trim()
-        : String(row.contractors?.name ?? "").trim();
-    }
-
-    function filterRowsByContractorFocus<T extends ContractorFocusRow>(rows: T[]): T[] {
-      if (contractorFocusIdSet.size === 0) return rows;
-      return rows.filter((row) => {
-        const rowContractorId = rowContractorFocusId(row);
-        return rowContractorId
-          ? contractorFocusIdSet.has(rowContractorId)
-          : contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID);
-      });
-    }
-
     const visibleWorkspaceSections = reasonFilteredWorkspaceSections.map((section) => ({
       ...section,
-      previewRows: filterRowsByContractorFocus(section.previewRows),
+      previewRows: filterRowsByContractorFocus(section.previewRows, contractorFocusIdSet),
     }));
     const selectedWorkspaceSection =
       visibleWorkspaceSections.find((section) => section.key === selectedWorkspaceKey) ?? visibleWorkspaceSections[0];
-    const selectedPermitRows = selectedWorkspaceKey === "permits" ? filterRowsByContractorFocus(activePermitRequestRows) : [];
+    const selectedPermitRows = selectedWorkspaceKey === "permits"
+      ? filterRowsByContractorFocus(activePermitRequestRows, contractorFocusIdSet)
+      : [];
     const selectedContractorIntakeRows =
       selectedWorkspaceKey === "contractor_intake"
         ? ((selectedWorkspaceSection?.previewRows ?? []) as ContractorIntakeQueueRow[])
@@ -747,6 +500,7 @@ export default async function OpsPage({
     } = await loadOpsWorkspacePreviewEnrichment({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
+      closeoutProjectionByJob: overviewCloseoutProjectionByJob,
       selectedWorkspaceKey,
       selectedPreviewRows,
       operationalTenantIdentityPromise,
@@ -756,67 +510,26 @@ export default async function OpsPage({
     // what the user is viewing and these per-bucket counts stay correct. Use the
     // bucket's rows before the contractor filter is applied so the picker lists
     // every contractor in the bucket, not just the selected one.
-    const contractorFocusSourceRows =
+    const contractorFocusSourceRows = (
       selectedWorkspaceKey === "permits"
         ? activePermitRequestRows
         : selectedWorkspaceKey === "contractor_intake"
         ? reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []
         : selectedWorkspaceKey === "closeout"
         ? closeoutQueueRowsFull
-        : reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? [];
-    const contractorFocusCounts = new Map<string, number>();
-    const contractorFocusNameById = new Map<string, string>();
-    let contractorFocusInternalCount = 0;
-    for (const row of contractorFocusSourceRows) {
-      const contractorId = rowContractorFocusId(row);
-      if (contractorId) {
-        contractorFocusCounts.set(contractorId, (contractorFocusCounts.get(contractorId) ?? 0) + 1);
-        if (!contractorFocusNameById.has(contractorId)) {
-          const rowName = rowContractorFocusName(row);
-          if (rowName) contractorFocusNameById.set(contractorId, rowName);
-        }
-      } else contractorFocusInternalCount += 1;
-    }
-    const showWorkspaceContractorFilter =
-      showContractorFocusSelection && (workspaceContractors.length > 0 || contractorFocusInternalCount > 0);
-    // Selectable options = the union of lifecycle-active contractors and any
-    // contractor that actually owns a job in this queue. A queued job can be
-    // assigned to a contractor that is not lifecycle-active (or to a duplicate
-    // contractor record), which previously left it visible in the queue but
-    // absent from — or zeroed out in — the focus filter, so it could never be
-    // selected (the "Top Rank isn't selectable" bug). De-dupe by name, and when
-    // an active-list record has no queued jobs but a same-named queue contractor
-    // does, point the option at the id that owns the jobs so the checkbox
-    // actually filters to the rows the user can see.
-    const contractorFocusByName = new Map<string, { id: string; name: string; count: number }>();
-    const focusNameKey = (name: string) => name.trim().toLowerCase();
-    for (const contractorOption of workspaceContractors) {
-      const name = String(contractorOption.name ?? "").trim() || contractorOption.id;
-      contractorFocusByName.set(focusNameKey(name), {
-        id: contractorOption.id,
-        name,
-        count: contractorFocusCounts.get(contractorOption.id) ?? 0,
-      });
-    }
-    for (const [contractorId, count] of contractorFocusCounts) {
-      const name = contractorFocusNameById.get(contractorId) || contractorId;
-      const key = focusNameKey(name);
-      const existing = contractorFocusByName.get(key);
-      if (!existing) {
-        contractorFocusByName.set(key, { id: contractorId, name, count });
-      } else if (existing.count === 0 && count > 0) {
-        contractorFocusByName.set(key, { id: contractorId, name: existing.name, count });
-      }
-    }
-    const contractorFocusOptions: ContractorFocusOption[] = Array.from(contractorFocusByName.values()).map(
-      (entry): ContractorFocusOption => ({
-        id: entry.id,
-        name: entry.name,
-        count: entry.count,
-        selected: contractorFocusIdSet.has(entry.id),
-      }),
-    );
-    const contractorFocusAllCount = contractorFocusSourceRows.length;
+        : reasonSourceWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? []
+    ) as ContractorFocusRow[];
+    const {
+      allCount: contractorFocusAllCount,
+      internalCount: contractorFocusInternalCount,
+      options: contractorFocusOptions,
+      showFilter: showWorkspaceContractorFilter,
+    } = buildContractorFocusFacet({
+      rows: contractorFocusSourceRows,
+      activeContractors: workspaceContractors,
+      selectedIds: contractorFocusIdSet,
+      enabled: showContractorFocusSelection,
+    });
     const activeWorkspaceBaseHref = `/ops${buildQueryString({
       bucket: effectiveBoardBucketFilter,
       create: "",

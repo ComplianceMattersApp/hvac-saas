@@ -2,9 +2,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const opsPageSource = readFileSync(resolve(process.cwd(), "app/ops/page.tsx"), "utf8");
 const dataLoaderSource = readFileSync(
   resolve(process.cwd(), "lib/ops/ops-workspace-data-loader.ts"),
+  "utf8",
+);
+const overviewLoaderSource = readFileSync(
+  resolve(process.cwd(), "lib/ops/ops-workspace-overview-loader.ts"),
   "utf8",
 );
 const withoutTechPageSource = readFileSync(
@@ -32,18 +35,19 @@ describe("uncapped operations queues", () => {
   it("does not cap Needs Assignment source jobs or its rendered snapshot", () => {
     expect(withoutTechPageSource).not.toContain(".limit(");
     expect(withoutTechPageSource).toContain("previewLimit: scheduledJobs.length");
-    expect(opsPageSource).toContain("previewLimit: Math.max(scheduledOpenRows.length, 1)");
+    expect(overviewLoaderSource).toContain("previewLimit: Math.max(params.scheduledOpenRows.length, 1)");
   });
 
   it("does not cap main workbench assignment and closeout source reads", () => {
-    const countLoader = opsPageSource.match(
-      /let scheduledOpenRowsQ[\s\S]*?const \[/,
+    const countLoader = overviewLoaderSource.match(
+      /export async function loadOpsWorkspaceOverview[\s\S]*?const \[scheduledAssignmentMap/,
     )?.[0] ?? "";
     const closeoutLoader = dataLoaderSource.match(
       /async function loadCloseoutWorkspaceRows[\s\S]*?return async function loadWorkspacePreviewRows/,
     )?.[0] ?? "";
 
     expect(closeoutLoader).not.toBe("");
+    expect(countLoader).not.toBe("");
     expect(countLoader).not.toContain(".limit(");
     expect(closeoutLoader).not.toContain(".limit(");
   });

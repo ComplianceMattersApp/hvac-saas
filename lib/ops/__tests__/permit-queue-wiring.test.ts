@@ -7,6 +7,10 @@ const opsWorkspaceQueuesSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
   "utf8",
 );
+const opsWorkspaceOverviewLoaderSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-overview-loader.ts"),
+  "utf8",
+);
 
 function permitRenderBranch() {
   const selectedRowsIndex = opsPageSource.indexOf("selectedPermitRows.length === 0");
@@ -35,14 +39,14 @@ describe("Ops workspace permit queue wiring", () => {
   });
 
   it("adds an allowlist-and-schema-guarded Permits chip to the Operations Workspace", () => {
-    expect(opsPageSource).toContain("listActivePermitRequestQueueRowsIfAvailable");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("listActivePermitRequestQueueRowsIfAvailable");
     expect(opsPageSource).toContain("isPermitWorkflowEnabledForAccountOwner");
     expect(opsPageSource).toContain("permitWorkflowEnabled");
-    expect(opsPageSource).toContain("permitRequestsSchemaAvailable");
-    expect(opsPageSource).toContain("permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable");
-    expect(opsPageSource).toContain("resolveEffectiveOpsBoardBucketFilter");
-    expect(opsPageSource).toContain("permitRequestsSchemaAvailable,");
-    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("permitRequestsSchemaAvailable");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("params.permitWorkflowEnabled && params.activePermitRequestsResult.schemaAvailable");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("resolveEffectiveOpsBoardBucketFilter");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("permitRequestsSchemaAvailable,");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("buildOpsWorkspaceTabs({");
     expect(opsWorkspaceQueuesSource).toContain('key: "permits"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Permits"');
     expect(opsWorkspaceQueuesSource).toContain('bucket: "permits"');
@@ -206,7 +210,7 @@ describe("Ops workspace permit queue wiring", () => {
   });
 
   it("keeps existing Ops workbench chips and job queues in place", () => {
-    expect(opsPageSource).toContain("buildOpsWorkspaceTabs({");
+    expect(opsWorkspaceOverviewLoaderSource).toContain("buildOpsWorkspaceTabs({");
     expect(opsWorkspaceQueuesSource).toContain('key: "need_to_schedule"');
     expect(opsWorkspaceQueuesSource).toContain('label: "Needs Scheduling"');
     expect(opsWorkspaceQueuesSource).toContain('key: "field_work"');

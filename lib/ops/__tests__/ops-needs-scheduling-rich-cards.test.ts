@@ -14,6 +14,10 @@ const dataLoaderSource = readFileSync(
   resolve(__dirname, "../ops-workspace-data-loader.ts"),
   "utf-8",
 );
+const overviewLoaderSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-overview-loader.ts"),
+  "utf-8",
+);
 const opsWorkspaceQueuesSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
   "utf-8",
@@ -148,7 +152,7 @@ describe("/ops Closeout rich cards", () => {
   });
 
   it("uses closeout projection for the compact next step without inline mutation actions", () => {
-    expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
+    expect(overviewLoaderSource).toContain("buildBillingTruthCloseoutProjectionMap");
     expect(opsPageSource).toContain("closeoutProjectionByJob: selectedWorkspaceCloseoutProjectionByJob");
     expect(buildCloseoutSource).toContain("context.closeoutProjectionByJob.get(jobId) ?? job");
     expect(buildCloseoutSource).toContain("getCloseoutQueueNextStepLabel(projection)");

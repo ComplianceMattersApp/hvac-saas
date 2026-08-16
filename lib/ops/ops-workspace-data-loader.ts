@@ -113,6 +113,7 @@ export function createOpsWorkspacePreviewLoader(context: {
   admin: AdminSupabaseClient;
   accountOwnerUserId: string;
   boardSort: OpsBoardSortKey;
+  closeoutQueueRows?: readonly OpsWorkspaceJob[];
   contractorIntakeQueueAvailable: boolean;
   retestContinuationParentIds: ReadonlySet<string>;
   serviceFollowUpByJob: ServiceFollowUpQueueStateByJob;
@@ -147,31 +148,38 @@ export function createOpsWorkspacePreviewLoader(context: {
   }
 
   async function loadCloseoutWorkspaceRows(): Promise<OpsWorkspaceJob[]> {
-    // Invoice-needed closeout is status-invariant. Failed/on-hold/pending status
-    // may add exception routing, but must not suppress closeout invoice reminder.
-    const closeoutRowsResult = await context.supabase
-      .from("jobs")
-      .select(OPS_WORKSPACE_JOB_SELECT)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      // Closed jobs can never pass isInCloseoutQueue because the canonical
-      // projection copies ops_status verbatim. This bounds active history only.
-      .neq("ops_status", "closed")
-      .eq("field_complete", true)
-      .order("created_at", { ascending: true });
+    let queueRows: OpsWorkspaceJob[];
+    if (context.closeoutQueueRows) {
+      // The overview already loaded and canonically projected the full closeout
+      // set for counts and facets. Reuse it so cards cannot drift from either.
+      queueRows = [...context.closeoutQueueRows];
+    } else {
+      // Invoice-needed closeout is status-invariant. Failed/on-hold/pending status
+      // may add exception routing, but must not suppress closeout invoice reminder.
+      const closeoutRowsResult = await context.supabase
+        .from("jobs")
+        .select(OPS_WORKSPACE_JOB_SELECT)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        // Closed jobs can never pass isInCloseoutQueue because the canonical
+        // projection copies ops_status verbatim. This bounds active history only.
+        .neq("ops_status", "closed")
+        .eq("field_complete", true)
+        .order("created_at", { ascending: true });
 
-    if (closeoutRowsResult.error) throw closeoutRowsResult.error;
+      if (closeoutRowsResult.error) throw closeoutRowsResult.error;
 
-    const sourceRows = (closeoutRowsResult.data ?? []) as OpsWorkspaceJob[];
-    const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
-      supabase: context.supabase,
-      accountOwnerUserId: context.accountOwnerUserId,
-      jobs: buildCloseoutProjectionInputs(sourceRows),
-    });
-    const queueRows = listCloseoutQueueJobs(
-      sourceRows,
-      (job) => projectionsByJobId.get(normalizedJobId(job)) ?? job,
-    );
+      const sourceRows = (closeoutRowsResult.data ?? []) as OpsWorkspaceJob[];
+      const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+        supabase: context.supabase,
+        accountOwnerUserId: context.accountOwnerUserId,
+        jobs: buildCloseoutProjectionInputs(sourceRows),
+      });
+      queueRows = listCloseoutQueueJobs(
+        sourceRows,
+        (job) => projectionsByJobId.get(normalizedJobId(job)) ?? job,
+      );
+    }
     const jobIds = queueRows.map(normalizedJobId).filter(Boolean);
     const statusEventsResult = jobIds.length
       ? await context.supabase
@@ -291,6 +299,7 @@ export function createOpsWorkspacePreviewLoader(context: {
 export async function loadOpsWorkspacePreviewEnrichment(params: {
   supabase: ServerSupabaseClient;
   accountOwnerUserId: string;
+  closeoutProjectionByJob?: ReadonlyMap<string, BillingTruthCloseoutProjection>;
   selectedWorkspaceKey: string;
   selectedPreviewRows: OpsWorkspaceJob[];
   operationalTenantIdentityPromise: Promise<OperationalTenantIdentity>;
@@ -344,7 +353,7 @@ export async function loadOpsWorkspacePreviewEnrichment(params: {
           .order("created_at", { ascending: false })
           .limit(1000)
       : Promise.resolve(emptyResult),
-    params.selectedWorkspaceKey === "closeout" && hasJobs
+    params.selectedWorkspaceKey === "closeout" && hasJobs && !params.closeoutProjectionByJob
       ? buildBillingTruthCloseoutProjectionMap({
           supabase: params.supabase,
           accountOwnerUserId: params.accountOwnerUserId,
@@ -375,7 +384,10 @@ export async function loadOpsWorkspacePreviewEnrichment(params: {
   return {
     ...readModels,
     assignmentDisplayMap,
-    closeoutProjectionByJob: closeoutProjection?.projectionsByJobId ?? new Map(),
+    closeoutProjectionByJob:
+      params.selectedWorkspaceKey === "closeout" && params.closeoutProjectionByJob
+        ? new Map(params.closeoutProjectionByJob)
+        : closeoutProjection?.projectionsByJobId ?? new Map(),
     operationalTenantIdentity,
     workspaceContractors: (workspaceContractorsResult.data ?? []) as WorkspaceContractor[],
   };
