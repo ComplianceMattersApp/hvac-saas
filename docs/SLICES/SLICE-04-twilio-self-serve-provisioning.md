@@ -211,14 +211,47 @@ same error-sanitization discipline as `twilio-messages-client.ts` (redact
   SELECT the key — trust is still established solely by the signature; wrong
   or missing key → 403 exactly as today. Add tests for both key paths.
 
+### WU5b — Audience split on the communications admin page (owner requirement)
+
+`/ops/admin/communications` currently shows every tenant admin the full
+engineering console: Provider Setup (Sandbox) forms, raw MG/campaign SID
+fields, template governance version machinery, the sandbox send queue, and the
+compliance-readiness checklist. **Tenant admins must never see that.** Split
+the page by audience:
+
+- **Tenant admins see:** a status summary in plain language, the provisioning
+  wizard entry/status (WU3), live activation with its attestations, the
+  on-the-way template's current text (simple view), active suppressions
+  (lift with reason), and sandbox test recipients. Nothing that asks for a
+  SID, mentions Twilio by name in a form field, or exposes internal review
+  machinery.
+- **Advanced console sections render only for accounts in a new env allowlist
+  `ENABLE_SMS_ADVANCED_CONSOLE_ACCOUNT_OWNER_IDS`** (same pattern as the
+  self-serve gate; default: empty = hidden for everyone). The owner's own
+  account goes in it so the existing concierge workflow keeps working
+  unchanged. No functionality is deleted — it is gated.
+
 ### WU6 — Truth cleanup (small)
 
 The hardcoded `communicationsStatus` / `activationSummary` /
 `complianceChecklist` literals in `sms-provider-readiness-read.ts` predate live
-SMS and now lie. Derive at minimum the activation summary and communications
-status from actual row state (activation_status + readiness_status). The
-static checklist may stay but must stop claiming `explicit_activation:
-disabled` when activation is live.
+SMS and now lie — confirmed on the live production page 2026-08-15: the
+Activation Status section reads "SMS is not enabled. Live sends are disabled."
+on the same page whose Live SMS Activation card shows LIVE, and the
+Compliance Readiness checklist marks quiet-hours, webhook signature
+validation, sandbox validation, and explicit activation as Deferred/Disabled
+when all four are shipped and running. Derive activation summary,
+communications status, and the checklist rows from actual row state; delete
+any entry that cannot be derived rather than hardcoding it.
+
+Also resolve, with evidence, the **template pointer question** observed live:
+governance shows "No current governed template version is selected" and v2
+only `approved_for_sandbox` with incomplete reviews, yet live sending is
+active and intents render from "Template v2". Determine which version the
+live send path actually reads (`current_version_id` vs `sandbox_version_id`
+vs something else), make the governed pointer reflect reality (data fix
+and/or code fix), and make the UI state impossible to contradict live-send
+truth. Report what you found — this may be a real latent bug, not just copy.
 
 ## 4. Out of scope (named follow-ups)
 
@@ -250,6 +283,11 @@ setup into a subaccount (it keeps working via the no-subaccount path).
 - [ ] Attestations persist on activation.
 - [ ] Non-allowlisted accounts see no provisioning surface and can trigger no
       Twilio call.
+- [ ] A tenant admin NOT in the advanced-console allowlist sees only the
+      simple surfaces on `/ops/admin/communications` (status, wizard,
+      activation, template text, suppressions, test recipients) — no SID
+      fields, no governance machinery, no sandbox queue, no compliance
+      checklist; an allowlisted account sees everything exactly as today.
 - [ ] `npm run test` (pre-existing failures called out), `npm run build`,
       `tsc --noEmit` clean; lint delta explained.
 
