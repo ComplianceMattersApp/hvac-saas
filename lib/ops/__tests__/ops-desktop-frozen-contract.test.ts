@@ -8,6 +8,10 @@ import { EXCEPTION_QUEUE_STATUSES } from "@/lib/ops/queue-status-contracts";
 
 const repoRoot = process.cwd();
 const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const waitingExceptionLoaderSource = fs.readFileSync(
+  path.join(repoRoot, "lib", "ops", "waiting-exception-loader.ts"),
+  "utf8",
+);
 const rowSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsQueueRowCard.tsx"),
   "utf8",
@@ -35,8 +39,8 @@ describe("frozen Ops desktop contract", () => {
       "pending_office_review",
       "problem",
     ]);
-    expect(opsPageSource).toContain('.in("ops_status", [...EXCEPTION_QUEUE_STATUSES])');
-    expect(opsPageSource).toContain("excludeHistoricalRetestParents");
+    expect(waitingExceptionLoaderSource).toContain("EXCEPTION_QUEUE_STATUSES");
+    expect(waitingExceptionLoaderSource).toContain("excludeHistoricalRetestParents");
     expect(opsPageSource).toContain('queue.count === 0 ? "opacity-40" : ""');
     expect(opsPageSource).not.toContain("disabled={queue.count === 0}");
   });

@@ -86,7 +86,7 @@ function compareByCreatedAtOldest(left: FocusedQueueJob, right: FocusedQueueJob)
   return String(left.id ?? "").localeCompare(String(right.id ?? ""));
 }
 
-export function buildWaitingQueueRows(jobs: FocusedQueueJob[]): FocusedQueueJob[] {
+export function buildWaitingQueueRows<T extends FocusedQueueJob>(jobs: T[]): T[] {
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => {
       if (!String(job?.id ?? "").trim()) return false;
@@ -96,7 +96,7 @@ export function buildWaitingQueueRows(jobs: FocusedQueueJob[]): FocusedQueueJob[
     .sort(compareByCreatedAtOldest);
 }
 
-export function buildExceptionQueueRows(jobs: FocusedQueueJob[]): FocusedQueueJob[] {
+export function buildExceptionQueueRows<T extends FocusedQueueJob>(jobs: T[]): T[] {
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => {
       if (!String(job?.id ?? "").trim()) return false;

@@ -60,12 +60,12 @@ import {
 import {
   listCloseoutQueueJobs,
 } from "@/lib/ops/closeout-queue";
-import { buildWaitingQueueRows, type FocusedQueueJob } from "@/lib/ops/focused-queues";
+import { type FocusedQueueJob } from "@/lib/ops/focused-queues";
 import { isPrimaryQueueJob, resolvePrimaryOpsQueue } from "@/lib/ops/queue-membership";
 import {
-  EXCEPTION_QUEUE_STATUSES,
-  WAITING_QUEUE_STATUSES,
-} from "@/lib/ops/queue-status-contracts";
+  loadFocusedOpsQueueRows,
+  loadWaitingExceptionQueueSnapshot,
+} from "@/lib/ops/waiting-exception-loader";
 import {
   getCachedAccountTimeZone,
   getCachedBillingMode,
@@ -127,13 +127,6 @@ import {
 } from "@/lib/ops/contractor-intake-queue";
 import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/permit-request-attachments-read-model";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
-import {
-  buildRetestContinuationParentIds,
-  countCurrentExceptionStatuses,
-  excludeHistoricalRetestParents,
-} from "@/lib/ops/retest-queue-exclusivity";
-
-
 type ContractorFocusOption = {
   id: string;
   name: string;
@@ -783,27 +776,7 @@ export default async function OpsPage({
       .is("follow_up_date", null)
       .is("next_action_note", null)
       .is("action_required_by", null);
-    const pendingInfoRowsQ = supabase
-      .from("jobs")
-      .select("id, ops_status, pending_info_reason, on_hold_reason, field_complete, job_type, permit_number, invoice_complete, created_at")
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("ops_status", "pending_info");
-    const onHoldCountQ = opsStatusCountQuery("on_hold");
-    const waitingStatusCountQ = opsStatusCountQuery("waiting");
-    const exceptionStatusRowsQ = supabase
-      .from("jobs")
-      .select("id, ops_status")
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .in("ops_status", [...EXCEPTION_QUEUE_STATUSES]);
-    const retestContinuationRowsQ = supabase
-      .from("jobs")
-      .select("parent_job_id")
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("job_type", "ecc")
-      .not("parent_job_id", "is", null);
+    const waitingExceptionSnapshotQ = loadWaitingExceptionQueueSnapshot({ supabase });
     const followUpReminderRowsQ = supabase
       .from("jobs")
       .select("id, status, ops_status, follow_up_date, next_action_note, action_required_by")
@@ -853,11 +826,7 @@ export default async function OpsPage({
 
     const [
       needToScheduleCountRes,
-      pendingInfoRowsRes,
-      onHoldCountRes,
-      waitingStatusCountRes,
-      exceptionStatusRowsRes,
-      retestContinuationRowsRes,
+      waitingExceptionSnapshot,
       followUpReminderRowsRes,
       fieldWorkCountRes,
       scheduledOpenRowsRes,
@@ -868,11 +837,7 @@ export default async function OpsPage({
       activePermitRequestsResult,
     ] = await Promise.all([
       needToScheduleCountQ,
-      pendingInfoRowsQ,
-      onHoldCountQ,
-      waitingStatusCountQ,
-      exceptionStatusRowsQ,
-      retestContinuationRowsQ,
+      waitingExceptionSnapshotQ,
       followUpReminderRowsQ,
       fieldWorkCountQ,
       scheduledOpenRowsQ,
@@ -895,30 +860,21 @@ export default async function OpsPage({
     ]);
 
     if (needToScheduleCountRes.error) throw needToScheduleCountRes.error;
-    if (pendingInfoRowsRes.error) throw pendingInfoRowsRes.error;
-    if (onHoldCountRes.error) throw onHoldCountRes.error;
-    if (waitingStatusCountRes.error) throw waitingStatusCountRes.error;
-    if (exceptionStatusRowsRes.error) throw exceptionStatusRowsRes.error;
-    if (retestContinuationRowsRes.error) throw retestContinuationRowsRes.error;
     if (followUpReminderRowsRes.error) throw followUpReminderRowsRes.error;
     if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
     if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
     if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
 
-    const retestContinuationParentIds = buildRetestContinuationParentIds(retestContinuationRowsRes.data);
-    const currentExceptionCounts = countCurrentExceptionStatuses(
-      exceptionStatusRowsRes.data ?? [],
-      retestContinuationParentIds,
-    );
+    const retestContinuationParentIds = waitingExceptionSnapshot.retestContinuationParentIds;
     const countsWs = new Map<string, number>([
       ["need_to_schedule", needToScheduleCountRes.count ?? 0],
-      ["pending_info", buildWaitingQueueRows(pendingInfoRowsRes.data ?? []).length],
-      ["on_hold", onHoldCountRes.count ?? 0],
-      ["waiting", waitingStatusCountRes.count ?? 0],
-      ["pending_office_review", currentExceptionCounts.get("pending_office_review") ?? 0],
-      ["failed", currentExceptionCounts.get("failed") ?? 0],
-      ["retest_needed", currentExceptionCounts.get("retest_needed") ?? 0],
-      ["problem", currentExceptionCounts.get("problem") ?? 0],
+      ["pending_info", waitingExceptionSnapshot.statusCounts.get("pending_info") ?? 0],
+      ["on_hold", waitingExceptionSnapshot.statusCounts.get("on_hold") ?? 0],
+      ["waiting", waitingExceptionSnapshot.statusCounts.get("waiting") ?? 0],
+      ["pending_office_review", waitingExceptionSnapshot.statusCounts.get("pending_office_review") ?? 0],
+      ["failed", waitingExceptionSnapshot.statusCounts.get("failed") ?? 0],
+      ["retest_needed", waitingExceptionSnapshot.statusCounts.get("retest_needed") ?? 0],
+      ["problem", waitingExceptionSnapshot.statusCounts.get("problem") ?? 0],
       [
         "follow_ups",
         (followUpReminderRowsRes.data ?? []).filter((job: any) =>
@@ -1179,6 +1135,15 @@ export default async function OpsPage({
         });
       }
 
+      if (workspaceKey === "waiting" || workspaceKey === "exceptions") {
+        return loadFocusedOpsQueueRows({
+          supabase,
+          queueKey: workspaceKey,
+          continuationParentIds: retestContinuationParentIds,
+          sortKey: boardSort,
+        });
+      }
+
       let queueQ = supabase
         .from("jobs")
         .select(workspaceSelect)
@@ -1204,10 +1169,6 @@ export default async function OpsPage({
           .gte("scheduled_date", wsStartTodayUtc)
           .lt("scheduled_date", wsStartTomorrowUtc)
           .order("window_start", { ascending: true });
-      } else if (workspaceKey === "waiting") {
-        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", [...WAITING_QUEUE_STATUSES]);
-      } else if (workspaceKey === "exceptions") {
-        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", [...EXCEPTION_QUEUE_STATUSES]);
       } else if (workspaceKey === "follow_ups") {
         queueQ = queueQ
           .or("follow_up_date.not.is.null,next_action_note.not.is.null,action_required_by.not.is.null")
@@ -1237,15 +1198,10 @@ export default async function OpsPage({
           );
         });
       }
-      const historyFilteredRows = workspaceKey === "exceptions" || workspaceKey === "waiting"
-        ? excludeHistoricalRetestParents(queueRows, retestContinuationParentIds)
-        : queueRows;
-      const typedHistoryFilteredRows = historyFilteredRows as FocusedQueueJob[];
-      const currentRows = workspaceKey === "waiting"
-        ? buildWaitingQueueRows(typedHistoryFilteredRows)
-        : workspaceKey === "follow_ups"
-        ? typedHistoryFilteredRows.filter((row) => isPrimaryQueueJob(row, "follow_ups"))
-        : typedHistoryFilteredRows;
+      const typedQueueRows = queueRows as FocusedQueueJob[];
+      const currentRows = workspaceKey === "follow_ups"
+        ? typedQueueRows.filter((row) => isPrimaryQueueJob(row, "follow_ups"))
+        : typedQueueRows;
       return sortOpsBoardRows(currentRows, boardSort);
     }
 

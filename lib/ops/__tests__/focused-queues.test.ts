@@ -65,6 +65,10 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const waitingExceptionLoaderSource = readFileSync(
+  resolve(__dirname, "../waiting-exception-loader.ts"),
+  "utf-8",
+);
 
 const opsRowCardSource = readFileSync(
   resolve(__dirname, "../../../app/ops/_components/OpsQueueRowCard.tsx"),
@@ -628,10 +632,15 @@ describe("focused ops queue pages", () => {
   });
 
   it("uses the same waiting predicate for the Operations count and preview", () => {
-    expect(opsPageSource).toContain('["pending_info", buildWaitingQueueRows(pendingInfoRowsRes.data ?? []).length]');
-    expect(opsPageSource).toContain('const currentRows = workspaceKey === "waiting"');
-    expect(opsPageSource).toContain('? buildWaitingQueueRows(typedHistoryFilteredRows)');
-    expect(opsPageSource).toContain('.in("ops_status", [...WAITING_QUEUE_STATUSES])');
+    expect(opsPageSource).toContain("loadWaitingExceptionQueueSnapshot({ supabase })");
+    expect(opsPageSource).toContain("loadFocusedOpsQueueRows({");
+    expect(waitingExceptionLoaderSource).toContain(
+      '["pending_info", buildWaitingQueueRows(input.pendingInfoRows).length]',
+    );
+    expect(waitingExceptionLoaderSource).toContain('? buildWaitingQueueRows(currentRows)');
+    expect(waitingExceptionLoaderSource).toContain(
+      '? WAITING_QUEUE_STATUSES',
+    );
   });
 
   it("waiting page includes safe empty state and return navigation", () => {
