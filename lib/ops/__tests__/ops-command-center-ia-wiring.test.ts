@@ -56,6 +56,10 @@ const opsWorkspaceOverviewLoaderSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-overview-loader.ts"),
   "utf-8",
 );
+const opsWorkspaceBootstrapLoaderSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-bootstrap-loader.ts"),
+  "utf-8",
+);
 const opsWorkspaceContractorFacetsSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-contractor-facets.ts"),
   "utf-8",
@@ -130,7 +134,9 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("renders an Excel-style Contractor Focus selector for ECC/hybrid while queue chips own bucket selection", () => {
     expect(opsPageSource).toContain("Board Filters");
-    expect(opsPageSource).toContain('const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";');
+    expect(opsWorkspaceBootstrapLoaderSource).toContain(
+      'const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";',
+    );
     expect(opsPageSource).toContain("<ContractorFocusSelector");
     expect(opsPageSource).toContain("contractorFocusInternalCount");
     expect(contractorFocusSelectorSource).toContain("Contractor Focus");
@@ -418,7 +424,9 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsWorkspaceOverviewLoaderSource).toContain("countPendingContractorIntakeQueueRows");
     expect(opsWorkspaceDataLoaderSource).toContain("listPendingContractorIntakeQueueRows");
     expect(opsWorkspaceDataLoaderSource).toContain("CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT");
-    expect(opsPageSource).toContain("isContractorIntakeQueueAvailableForProductMode");
+    expect(opsWorkspaceBootstrapLoaderSource).toContain(
+      "isContractorIntakeQueueAvailableForProductMode",
+    );
     expect(opsPageSource).toContain("contractorIntakeQueueAvailable");
     expect(opsWorkspaceOverviewLoaderSource).toContain("? countPendingContractorIntakeQueueRows");
     expect(opsWorkspaceOverviewLoaderSource).toContain("resolveEffectiveOpsBoardBucketFilter");

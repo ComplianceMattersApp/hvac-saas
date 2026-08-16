@@ -6,13 +6,17 @@ const page = readFileSync(resolve(process.cwd(), "app/billing/ready-to-bill/page
 const selection = readFileSync(resolve(process.cwd(), "app/billing/ready-to-bill/ReadyToBillSelection.tsx"), "utf8");
 const invoiceReport = readFileSync(resolve(process.cwd(), "app/reports/invoices/page.tsx"), "utf8");
 const closeoutQueue = readFileSync(resolve(process.cwd(), "app/ops/page.tsx"), "utf8");
+const bootstrapLoader = readFileSync(
+  resolve(process.cwd(), "lib/ops/ops-workspace-bootstrap-loader.ts"),
+  "utf8",
+);
 
 describe("Ready to Bill page wiring", () => {
   it("is discoverable from ECC closeout instead of the invoice report", () => {
     expect(closeoutQueue).toContain("Batch Contractor Invoice");
     expect(closeoutQueue).toContain("/billing/ready-to-bill");
-    expect(closeoutQueue).toContain('productMode === "ecc_hers" || productMode === "hybrid"');
-    expect(closeoutQueue).toContain('billingMode === "internal_invoicing"');
+    expect(bootstrapLoader).toContain('productMode === "ecc_hers" || productMode === "hybrid"');
+    expect(bootstrapLoader).toContain('billingMode === "internal_invoicing"');
     expect(invoiceReport).not.toContain('href="/billing/ready-to-bill"');
   });
 

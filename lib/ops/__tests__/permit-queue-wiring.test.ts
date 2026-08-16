@@ -11,6 +11,10 @@ const opsWorkspaceOverviewLoaderSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-workspace-overview-loader.ts"),
   "utf8",
 );
+const opsWorkspaceBootstrapLoaderSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-bootstrap-loader.ts"),
+  "utf8",
+);
 const opsPermitWorkspaceLoaderSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-permit-workspace-loader.ts"),
   "utf8",
@@ -57,7 +61,7 @@ describe("Ops workspace permit queue wiring", () => {
 
   it("adds an allowlist-and-schema-guarded Permits chip to the Operations Workspace", () => {
     expect(opsWorkspaceOverviewLoaderSource).toContain("listActivePermitRequestQueueRowsIfAvailable");
-    expect(opsPageSource).toContain("isPermitWorkflowEnabledForAccountOwner");
+    expect(opsWorkspaceBootstrapLoaderSource).toContain("isPermitWorkflowEnabledForAccountOwner");
     expect(opsPageSource).toContain("permitWorkflowEnabled");
     expect(opsWorkspaceOverviewLoaderSource).toContain("permitRequestsSchemaAvailable");
     expect(opsWorkspaceOverviewLoaderSource).toContain("params.permitWorkflowEnabled && params.activePermitRequestsResult.schemaAvailable");

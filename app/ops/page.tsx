@@ -9,25 +9,9 @@ import {
   landingPathForDualContextAccess,
   resolveDualContextAccess,
 } from "@/lib/auth/dual-context-access";
-import { canViewFinancialRegister } from "@/lib/auth/financial-access";
-import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
-import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
-import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
-import { listSenderWorkshareConnectionsForReceiver } from "@/lib/workflows/account-workshare-connections-read";
-import { countReturnedWorkshareRequestsForSender } from "@/lib/workflows/account-workshare-requests-read";
-
-import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { type OpsWorkspaceJob } from "@/lib/ops/ops-workspace-job-contract";
-import {
-  getCachedAccountTimeZone,
-  getCachedBillingMode,
-  getCachedProductMode,
-} from "@/lib/business/tenant-reference-cache";
-import { formatTimestampInAccountTimeZone } from "@/lib/utils/account-time-zone";
 import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
-import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
   OPS_BOARD_SORT_OPTIONS,
   normalizeOpsBoardSort,
@@ -35,7 +19,6 @@ import {
 } from "@/lib/ops/ops-board-sorting";
 import {
   getOpsWorkspaceQueueDefinition,
-  isContractorIntakeQueueAvailableForProductMode,
   opsWorkspaceQueueHref,
   resolveOpsWorkspaceQueueKey,
   type OpsBoardFilterBucket,
@@ -70,7 +53,7 @@ import {
 import { startOpsServerTimer } from "@/lib/ops/ops-server-timing";
 import { type ContractorIntakeQueueRow } from "@/lib/ops/contractor-intake-queue";
 import { loadOpsPermitWorkspaceSnapshot } from "@/lib/ops/ops-permit-workspace-loader";
-import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
+import { loadOpsWorkspaceBootstrap } from "@/lib/ops/ops-workspace-bootstrap-loader";
 import OpsPermitWorkspace from "./_components/OpsPermitWorkspace";
 import OpsWorkspaceUtilityRail from "./_components/OpsWorkspaceUtilityRail";
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
@@ -92,31 +75,6 @@ function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
     return normalized;
   }
   return "all";
-}
-
-function formatTeamClockSince(value: string | null | undefined, timeZone: string) {
-  return formatTimestampInAccountTimeZone(value, timeZone, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  });
-}
-
-function formatTeamClockElapsedFromClockIn(clockInAt: string | null | undefined) {
-  const normalized = String(clockInAt ?? "").trim();
-  if (!normalized) return "0m";
-
-  const startedAt = new Date(normalized).getTime();
-  if (!Number.isFinite(startedAt)) return "0m";
-
-  const totalMinutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60000));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  if (hours <= 0) return `${minutes}m`;
-  return `${hours}h ${minutes}m`;
 }
 
 function buildQueryString(params: Record<string, string | undefined | null>) {
@@ -189,129 +147,25 @@ export default async function OpsPage({
   const admin = createAdminClient();
   finishRequestActorContextTiming("ops:requestActorContext");
 
-  const showTeamClockStatusCardForRole =
-    internalUser.role === "admin" || internalUser.role === "office";
-
-  // Everything in this group depends only on the resolved internal user, so it
-  // runs concurrently instead of as seven sequential round-trips. Timezone,
-  // product mode, and billing mode come from the cross-request tenant
-  // reference cache, so they are usually free.
-  const [
+  const {
     accountTimeZone,
-    explicitFieldBillingCapabilities,
-    incomingWorkshareConnectionRows,
-    returnedWorkshareCount,
-    timeClockAccountSettingsResult,
+    canCreateEccBatchInvoice,
+    canViewFieldPaymentVerificationAttention,
+    contractorIntakeQueueAvailable,
+    fieldPaymentReconciliationAttention,
+    hasActiveIncomingWorkshareConnection,
+    permitWorkflowEnabled,
     productMode,
-    billingMode,
-  ] = await Promise.all([
-    getCachedAccountTimeZone(internalUser.account_owner_user_id),
-    loadFieldBillingExplicitCapabilitiesForUser({
-      supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      internalUserId: internalUser.user_id,
-    }),
-    listSenderWorkshareConnectionsForReceiver(supabase, internalUser.account_owner_user_id),
-    countReturnedWorkshareRequestsForSender(supabase, internalUser.account_owner_user_id),
-    showTeamClockStatusCardForRole
-      ? supabase
-          .from("account_settings")
-          .select("time_clock_enabled")
-          .eq("account_owner_user_id", internalUser.account_owner_user_id)
-          .maybeSingle()
-      : Promise.resolve(null),
-    getCachedProductMode(internalUser.account_owner_user_id),
-    getCachedBillingMode(internalUser.account_owner_user_id),
-  ]);
-
-  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    returnedWorkshareCount,
+    showContractorFocusSelection,
+    showTeamClockStatusCard,
+    teamClockStatusRows,
+  } = await loadOpsWorkspaceBootstrap({
     actorUserId: user.id,
     internalUser,
-    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-    explicitCapabilities: explicitFieldBillingCapabilities,
+    supabase,
   });
 
-  const canViewFinancialRegisterForAccount = canViewFinancialRegister({
-      actorUserId: user.id,
-      internalUser,
-      resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-    });
-  const canViewFieldPaymentVerificationAttention =
-    canViewFinancialRegisterForAccount || fieldBillingCapabilities.can_verify_non_card_collection;
-
-  // Show the incoming ECC/HERS request queue only to accounts that have an active
-  // workshare connection where they are the receiver — no point surfacing an empty
-  // queue to accounts that have not set up connections yet.
-  const hasActiveIncomingWorkshareConnection = incomingWorkshareConnectionRows.some(
-    (row) => row.status === "active",
-  );
-
-  if (showTeamClockStatusCardForRole && timeClockAccountSettingsResult?.error) {
-    throw timeClockAccountSettingsResult.error;
-  }
-  const isTimeClockEnabled = Boolean(
-    (timeClockAccountSettingsResult?.data as { time_clock_enabled?: boolean | null } | null)
-      ?.time_clock_enabled,
-  );
-
-  // Second group: both reads depend on results from the group above but not on
-  // each other.
-  const [fieldPaymentReconciliationAttention, teamClockPreviewRows] = await Promise.all([
-    canViewFieldPaymentVerificationAttention
-      ? listFieldPaymentCollectionReportsForReconciliation({
-          admin: supabase,
-          accountOwnerUserId: internalUser.account_owner_user_id,
-          limit: 1,
-        })
-      : Promise.resolve(null),
-    showTeamClockStatusCardForRole && isTimeClockEnabled
-      ? listTeamClockStatusPreview({
-          supabase,
-          accountOwnerUserId: internalUser.account_owner_user_id,
-        })
-      : Promise.resolve(null),
-  ]);
-
-  let showTeamClockStatusCard = false;
-  let teamClockStatusRows: Array<{
-    internalUserId: string;
-    displayName: string;
-    statusLabel: "Clocked In" | "On Lunch";
-    sinceAt: string;
-    elapsed: string;
-  }> = [];
-
-  if (teamClockPreviewRows) {
-    const displayMap = await resolveUserDisplayMap({
-      supabase,
-      userIds: teamClockPreviewRows
-        .map((row) => String(row.internalUserId ?? "").trim())
-        .filter(Boolean),
-    });
-
-    showTeamClockStatusCard = true;
-    teamClockStatusRows = teamClockPreviewRows.map((row) => {
-      const internalUserId = String(row.internalUserId ?? "").trim();
-      const displayName =
-        formatPersonNamePart(displayMap[internalUserId] ?? "") || "Unknown User";
-      const statusLabel = row.status === "on_lunch" ? "On Lunch" : "Clocked In";
-      const sinceSource = row.status === "on_lunch" ? row.lunchStartAt ?? row.clockInAt : row.clockInAt;
-
-      return {
-        internalUserId,
-        displayName,
-        statusLabel,
-        sinceAt: formatTeamClockSince(sinceSource, accountTimeZone),
-        elapsed: formatTeamClockElapsedFromClockIn(row.clockInAt),
-      };
-    });
-  }
-  const canCreateEccBatchInvoice =
-    canViewFinancialRegisterForAccount &&
-    billingMode === "internal_invoicing" &&
-    (productMode === "ecc_hers" || productMode === "hybrid");
-  const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";
-  const contractorIntakeQueueAvailable = isContractorIntakeQueueAvailableForProductMode(productMode);
   const contractorFocusIds = showContractorFocusSelection ? contractorFocusIdsFromQuery : [];
   const contractorScopeFilter =
     contractorFocusIds.length === 1 && contractorFocusIds[0] !== INTERNAL_WORK_CONTRACTOR_FOCUS_ID
@@ -319,8 +173,6 @@ export default async function OpsPage({
       : null;
   const contractorFocusFilter = contractorFocusIds.length > 0 ? contractorFocusIds.join(",") : null;
   const contractorFocusIdSet = new Set(contractorFocusIds);
-  const permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(internalUser.account_owner_user_id);
-
   const finishBusinessIdentityTiming = startOpsServerTimer(opsTimingEnabled);
   const operationalTenantIdentityPromise = resolveOperationalTenantIdentity({
     supabase,

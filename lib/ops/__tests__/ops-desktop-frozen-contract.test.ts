@@ -7,7 +7,10 @@ import { resolveVisibleOpsWorkspaceQueueKeys } from "@/lib/ops/ops-workspace-que
 import { EXCEPTION_QUEUE_STATUSES } from "@/lib/ops/queue-status-contracts";
 
 const repoRoot = process.cwd();
-const opsPageSource = fs.readFileSync(path.join(repoRoot, "app", "ops", "page.tsx"), "utf8");
+const bootstrapLoaderSource = fs.readFileSync(
+  path.join(repoRoot, "lib", "ops", "ops-workspace-bootstrap-loader.ts"),
+  "utf8",
+);
 const utilityRailSource = fs.readFileSync(
   path.join(repoRoot, "app", "ops", "_components", "OpsWorkspaceUtilityRail.tsx"),
   "utf8",
@@ -57,7 +60,7 @@ describe("frozen Ops desktop contract", () => {
       "contractor_az",
       "customer_az",
     ]);
-    expect(opsPageSource).toContain(
+    expect(bootstrapLoaderSource).toContain(
       'const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";',
     );
   });

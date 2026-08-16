@@ -6,20 +6,24 @@ const opsPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
+const bootstrapLoaderSource = readFileSync(
+  resolve(__dirname, "../ops-workspace-bootstrap-loader.ts"),
+  "utf-8",
+);
 
 describe("/ops field payment verification chip wiring", () => {
   it("loads field payment reconciliation count from existing B7-Q read model", () => {
-    expect(opsPageSource).toContain("listFieldPaymentCollectionReportsForReconciliation");
-    expect(opsPageSource).toContain('limit: 1');
+    expect(bootstrapLoaderSource).toContain("listFieldPaymentCollectionReportsForReconciliation");
+    expect(bootstrapLoaderSource).toContain('limit: 1');
   });
 
   it("uses B7-Q permission gate for dashboard visibility", () => {
     expect(opsPageSource).toContain("canViewFieldPaymentVerificationAttention");
-    expect(opsPageSource).toContain("canViewFinancialRegister");
-    expect(opsPageSource).toContain("resolveFieldBillingCapabilities");
-    expect(opsPageSource).toContain("loadFieldBillingExplicitCapabilitiesForUser");
-    expect(opsPageSource).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
-    expect(opsPageSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
+    expect(bootstrapLoaderSource).toContain("canViewFinancialRegister");
+    expect(bootstrapLoaderSource).toContain("resolveFieldBillingCapabilities");
+    expect(bootstrapLoaderSource).toContain("loadFieldBillingExplicitCapabilitiesForUser");
+    expect(bootstrapLoaderSource).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
+    expect(bootstrapLoaderSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
   });
 
   it("does not expose verify/reject/correct/void actions from the dashboard chip", () => {
