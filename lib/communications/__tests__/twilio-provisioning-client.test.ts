@@ -265,14 +265,11 @@ describe("TrustHub evaluations", () => {
           status: "noncompliant",
           results: [
             {
-              passed: false,
               requirement_name: "business_information",
-              fields: [
-                { object_field: "business_name", passed: false, failure_reason: "Required" },
-                { object_field: "business_type", passed: true },
-              ],
+              // Twilio lists ONLY the failing fields here; passing ones are absent.
+              invalid: [{ object_field: "business_name", failure_reason: "Required" }],
             },
-            { passed: true, requirement_name: "authorized_representative_1", fields: [] },
+            { requirement_name: "authorized_representative_1", invalid: [] },
           ],
         },
       },
@@ -288,10 +285,33 @@ describe("TrustHub evaluations", () => {
     expect(result.failures).toEqual([{ field: "business_name", reason: "Required" }]);
   });
 
-  it("records a failed requirement that lists no fields", () => {
+  it("records a failed requirement that names no invalid field", () => {
     expect(
-      extractEvaluationFailures({ results: [{ passed: false, requirement_name: "address", fields: [] }] }),
+      extractEvaluationFailures({ results: [{ passed: false, requirement_name: "address", invalid: [] }] }),
     ).toEqual([{ field: "address", reason: "This requirement was not met." }]);
+  });
+
+  it("treats an empty invalid[] as a pass", () => {
+    expect(extractEvaluationFailures({ results: [{ requirement_name: "address", invalid: [] }] })).toEqual([]);
+  });
+
+  it("reads every invalid field, not just the first", () => {
+    expect(
+      extractEvaluationFailures({
+        results: [
+          {
+            requirement_name: "business_information",
+            invalid: [
+              { object_field: "business_name", failure_reason: "Required" },
+              { object_field: "business_regions_of_operation", failure_reason: "Invalid" },
+            ],
+          },
+        ],
+      }),
+    ).toEqual([
+      { field: "business_name", reason: "Required" },
+      { field: "business_regions_of_operation", reason: "Invalid" },
+    ]);
   });
 
   it("returns nothing rather than throwing on an unrecognized shape", () => {
@@ -300,6 +320,7 @@ describe("TrustHub evaluations", () => {
     expect(extractEvaluationFailures(null)).toEqual([]);
     expect(extractEvaluationFailures({ results: "not-an-array" })).toEqual([]);
     expect(extractEvaluationFailures({ results: [{ passed: true }] })).toEqual([]);
+    expect(extractEvaluationFailures({ results: [{ invalid: "not-an-array" }] })).toEqual([]);
   });
 });
 
@@ -332,5 +353,27 @@ describe("named Twilio failures", () => {
       message: "bad",
       fieldFailures: [{ field: "message_flow", reason: "too vague" }],
     });
+  });
+});
+
+describe("TrustHub policy selection", () => {
+  it("uses a different A2P messaging-profile policy for sole proprietors", async () => {
+    const {
+      a2pMessagingProfilePolicySid,
+      customerProfilePolicySid,
+      TRUSTHUB_POLICY_A2P_MESSAGING_PROFILE_SOLE_PROP,
+      TRUSTHUB_POLICY_STARTER_CUSTOMER_PROFILE,
+      TRUSTHUB_POLICY_SECONDARY_CUSTOMER_PROFILE,
+    } = await import("@/lib/communications/twilio-provisioning-client");
+
+    // A sole proprietor cannot satisfy the standard profile's requirements, so
+    // evaluating against it fails on things they structurally cannot provide.
+    expect(a2pMessagingProfilePolicySid(true)).toBe("RN670d5d2e282a6130ae063b234b6019c8");
+    expect(a2pMessagingProfilePolicySid(true)).toBe(TRUSTHUB_POLICY_A2P_MESSAGING_PROFILE_SOLE_PROP);
+    expect(a2pMessagingProfilePolicySid(false)).toBe(TRUSTHUB_POLICY_A2P_MESSAGING_PROFILE);
+    expect(a2pMessagingProfilePolicySid(true)).not.toBe(a2pMessagingProfilePolicySid(false));
+
+    expect(customerProfilePolicySid(true)).toBe(TRUSTHUB_POLICY_STARTER_CUSTOMER_PROFILE);
+    expect(customerProfilePolicySid(false)).toBe(TRUSTHUB_POLICY_SECONDARY_CUSTOMER_PROFILE);
   });
 });

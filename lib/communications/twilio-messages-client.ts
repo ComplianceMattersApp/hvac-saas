@@ -10,6 +10,17 @@ export type TwilioSandboxMessageParams = {
   to: string;
   body: string;
   messagingServiceSid: string;
+  /**
+   * Send AS this Twilio account. Provisioned tenants own a subaccount; omit for
+   * the platform account, which is exactly the pre-subaccount behavior every
+   * existing tenant keeps.
+   */
+  accountSid?: string | null;
+  /**
+   * Auth token matching `accountSid`. Required with it — a subaccount's
+   * credentials do not authenticate under the platform token.
+   */
+  authToken?: string | null;
 };
 
 export type TwilioSandboxMessageResult = {
@@ -36,8 +47,14 @@ export class TwilioMessageError extends Error {
 export async function sendTwilioSandboxMessage(
   params: TwilioSandboxMessageParams,
 ): Promise<TwilioSandboxMessageResult> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  // A subaccount send needs BOTH its SID and its own token; falling back to the
+  // platform token with a subaccount SID would authenticate as the wrong party.
+  const overrideSid = String(params.accountSid ?? "").trim();
+  const overrideToken = String(params.authToken ?? "").trim();
+  const useOverride = Boolean(overrideSid && overrideToken);
+
+  const accountSid = useOverride ? overrideSid : process.env.TWILIO_ACCOUNT_SID;
+  const authToken = useOverride ? overrideToken : process.env.TWILIO_AUTH_TOKEN;
 
   if (!accountSid || !authToken) {
     throw new TwilioMessageError({

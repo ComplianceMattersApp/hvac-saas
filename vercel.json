@@ -2,6 +2,7 @@
   "crons": [
     { "path": "/api/cron/attention-email", "schedule": "0 * * * *" },
     { "path": "/api/cron/stripe-payment-reconciliation", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/reconciliation", "schedule": "0 9 * * *" }
+    { "path": "/api/cron/reconciliation", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/sms-provisioning-poll", "schedule": "*/10 * * * *" }
   ]
 }

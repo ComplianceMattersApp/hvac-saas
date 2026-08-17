@@ -22,6 +22,26 @@ const TRUSTHUB_BASE = "https://trusthub.twilio.com/v1";
 export const TRUSTHUB_POLICY_SECONDARY_CUSTOMER_PROFILE = "RNdfbf3fae0e1107f8aded0e7cead80bf5";
 export const TRUSTHUB_POLICY_STARTER_CUSTOMER_PROFILE = "RN806dd6cd175f314e1f96a9727ee271f4";
 export const TRUSTHUB_POLICY_A2P_MESSAGING_PROFILE = "RNb0d4771c2c98518d916a3d4cd70a8f8b";
+/**
+ * Sole proprietors evaluate their A2P messaging profile against a DIFFERENT
+ * policy than standard brands. Using the standard one here fails evaluation
+ * with requirements a sole proprietor structurally cannot satisfy.
+ */
+export const TRUSTHUB_POLICY_A2P_MESSAGING_PROFILE_SOLE_PROP = "RN670d5d2e282a6130ae063b234b6019c8";
+
+/** The A2P messaging-profile policy for a registration path. */
+export function a2pMessagingProfilePolicySid(soleProprietor: boolean): string {
+  return soleProprietor
+    ? TRUSTHUB_POLICY_A2P_MESSAGING_PROFILE_SOLE_PROP
+    : TRUSTHUB_POLICY_A2P_MESSAGING_PROFILE;
+}
+
+/** The customer-profile policy for a registration path. */
+export function customerProfilePolicySid(soleProprietor: boolean): string {
+  return soleProprietor
+    ? TRUSTHUB_POLICY_STARTER_CUSTOMER_PROFILE
+    : TRUSTHUB_POLICY_SECONDARY_CUSTOMER_PROFILE;
+}
 
 export type TwilioAuth = {
   /** The account the call is made AS. The subaccount once one exists. */
@@ -470,23 +490,30 @@ export async function evaluateTrustProduct(params: {
 /**
  * Pull per-field failures out of an evaluation response.
  *
- * Twilio nests them as results[].requirement_name → fields[].failure_reason,
- * with shapes that vary by policy, so this is defensive: an unrecognized shape
- * yields no failures rather than throwing and losing the whole evaluation.
+ * Twilio reports them as results[].invalid[] — an array of only the failing
+ * fields, each with object_field and failure_reason. There is no fields[] array
+ * listing passes and failures together; a requirement that passed simply has an
+ * empty invalid[]. Defensive throughout: an unrecognized shape yields no
+ * failures rather than throwing and losing the whole evaluation, which would
+ * cost the operator the free preflight and push them into a paid rejection.
  */
 export function extractEvaluationFailures(json: any): TwilioFieldFailure[] {
   const failures: TwilioFieldFailure[] = [];
   const results = Array.isArray(json?.results) ? json.results : [];
   for (const result of results) {
-    if (String(result?.passed ?? "") === "true" || result?.passed === true) continue;
     const requirementName = String(result?.requirement_name ?? result?.friendly_name ?? "").trim();
-    const fields = Array.isArray(result?.fields) ? result.fields : [];
-    if (fields.length === 0 && requirementName) {
-      failures.push({ field: requirementName, reason: "This requirement was not met." });
+    const invalid = Array.isArray(result?.invalid) ? result.invalid : [];
+
+    if (invalid.length === 0) {
+      // Nothing invalid means the requirement passed — unless Twilio explicitly
+      // says otherwise, in which case report it at requirement level.
+      if (result?.passed === false && requirementName) {
+        failures.push({ field: requirementName, reason: "This requirement was not met." });
+      }
       continue;
     }
-    for (const field of fields) {
-      if (field?.passed === true) continue;
+
+    for (const field of invalid) {
       failures.push({
         field: String(field?.object_field ?? field?.friendly_name ?? requirementName).trim(),
         reason: sanitizeProviderMessage(
