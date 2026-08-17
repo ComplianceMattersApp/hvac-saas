@@ -7,7 +7,11 @@ import {
   readDraft,
   writeDraft,
 } from "@/lib/field-drafts/form-draft-storage";
-import { FIELD_DRAFT_KEY_PREFIX, FIELD_DRAFT_MAX_AGE_MS } from "@/lib/field-drafts/form-drafts";
+import {
+  FIELD_DRAFT_KEY_PREFIX,
+  FIELD_DRAFT_MAX_AGE_MS,
+  FIELD_DRAFT_VERSION,
+} from "@/lib/field-drafts/form-drafts";
 
 /** Minimal localStorage stand-in with the same enumeration surface. */
 function installStorage(seed: Record<string, string> = {}, options: { failWrites?: boolean } = {}) {
@@ -31,7 +35,7 @@ const KEY = `${FIELD_DRAFT_KEY_PREFIX}:user-1:job-1:test-run:run-1`;
 const otherKey = (n: number) => `${FIELD_DRAFT_KEY_PREFIX}:user-1:job-1:test-run:run-${n}`;
 
 function storedDraft(savedAt: string, values: Record<string, unknown> = { cfm: "418" }) {
-  return JSON.stringify({ version: "v1", savedAt, serverStateToken: "t1", values });
+  return JSON.stringify({ version: FIELD_DRAFT_VERSION, savedAt, serverStateToken: "t1", values });
 }
 
 afterEach(() => {
@@ -69,7 +73,11 @@ describe("writeDraft", () => {
     const { map } = installStorage();
     writeDraft({ key: KEY, values: { cfm: "418" }, serverStateToken: "t9", now: Date.parse("2026-08-12T10:00:00.000Z") });
     const parsed = JSON.parse(map.get(KEY) as string);
-    expect(parsed).toMatchObject({ version: "v1", serverStateToken: "t9", values: { cfm: "418" } });
+    expect(parsed).toMatchObject({
+      version: FIELD_DRAFT_VERSION,
+      serverStateToken: "t9",
+      values: { cfm: "418" },
+    });
     expect(parsed.savedAt).toBe("2026-08-12T10:00:00.000Z");
   });
 
@@ -156,6 +164,22 @@ describe("pruneDrafts", () => {
 
     expect(map.has(otherKey(2))).toBe(false);
     expect(map.has(otherKey(3))).toBe(true);
+  });
+
+  it("sweeps drafts left behind by a superseded format version", () => {
+    // The version bump renames the key prefix, so v1 entries match nothing this
+    // build looks up and would otherwise sit on the device forever.
+    const { map } = installStorage({
+      "esfw-draft:v1:user-1:job-1:test-run:run-1": "{}",
+      [KEY]: storedDraft(new Date().toISOString()),
+      "some-other-app-key": "keep me",
+    });
+
+    pruneDrafts();
+
+    expect(map.has("esfw-draft:v1:user-1:job-1:test-run:run-1")).toBe(false);
+    expect(map.has(KEY)).toBe(true);
+    expect(map.has("some-other-app-key")).toBe(true);
   });
 
   it("never evicts the form currently being edited", () => {

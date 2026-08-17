@@ -6,9 +6,12 @@ import {
   buildFieldDraft,
   buildFieldDraftKey,
   draftDiffersFromCurrent,
+  draftHasRestorableDifference,
+  draftWasSubmittedAndConfirmed,
   formatDraftAge,
   isDraftEmpty,
   isFieldDraftKey,
+  mergeRetainedDraftValues,
   parseStoredDraft,
   selectDraftKeysToEvict,
   serializeDraftFields,
@@ -107,6 +110,81 @@ describe("draftDiffersFromCurrent", () => {
 
   it("ignores whitespace-only differences", () => {
     expect(draftDiffersFromCurrent({ notes: " attic " }, { notes: "attic" })).toBe(false);
+  });
+});
+
+describe("draftHasRestorableDifference", () => {
+  it("is true when a field on screen disagrees with the draft", () => {
+    expect(draftHasRestorableDifference({ cfm: "418" }, { cfm: "400" })).toBe(true);
+  });
+
+  it("ignores differences in fields that are not mounted", () => {
+    // The measured-CFM box after an exemption hides the results section: there
+    // is nowhere to restore it to, so offering it would loop a banner that
+    // Restore can never clear.
+    expect(
+      draftHasRestorableDifference({ measured_cfm: "418" }, { duct_exception: "asbestos" }),
+    ).toBe(false);
+  });
+
+  it("still offers the restore when at least one difference is on screen", () => {
+    expect(
+      draftHasRestorableDifference(
+        { measured_cfm: "418", notes: "attic" },
+        { notes: "", duct_exception: "" },
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("mergeRetainedDraftValues", () => {
+  it("keeps an edited value whose field left the screen", () => {
+    expect(
+      mergeRetainedDraftValues({
+        stored: { measured_cfm: "418", notes: "attic" },
+        snapshot: { notes: "attic hatch" },
+        retainNames: ["measured_cfm", "notes"],
+      }),
+    ).toEqual({ measured_cfm: "418", notes: "attic hatch" });
+  });
+
+  it("never retains a name the tech has not edited", () => {
+    expect(
+      mergeRetainedDraftValues({
+        stored: { tonnage: "2" },
+        snapshot: { notes: "attic" },
+        retainNames: ["notes"],
+      }),
+    ).toEqual({ notes: "attic" });
+  });
+});
+
+describe("draftWasSubmittedAndConfirmed", () => {
+  it("is true once the row moved after the draft was submitted", () => {
+    expect(
+      draftWasSubmittedAndConfirmed(
+        { serverStateToken: "2026-08-17T08:40:00Z", submittedAt: "2026-08-17T08:41:00Z" },
+        "2026-08-17T08:42:00Z",
+      ),
+    ).toBe(true);
+  });
+
+  it("is false while the row has not moved — the save may never have landed", () => {
+    expect(
+      draftWasSubmittedAndConfirmed(
+        { serverStateToken: "2026-08-17T08:40:00Z", submittedAt: "2026-08-17T08:41:00Z" },
+        "2026-08-17T08:40:00Z",
+      ),
+    ).toBe(false);
+  });
+
+  it("is false for a draft that was never submitted", () => {
+    expect(
+      draftWasSubmittedAndConfirmed(
+        { serverStateToken: "2026-08-17T08:40:00Z", submittedAt: null },
+        "2026-08-17T08:42:00Z",
+      ),
+    ).toBe(false);
   });
 });
 
