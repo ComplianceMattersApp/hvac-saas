@@ -33,10 +33,15 @@ import {
   customerProfilePolicySid,
   evaluateCustomerProfile,
   evaluateTrustProduct,
+  fetchEndUser,
+  listBundleAssignedObjectSids,
+  listOwnedIncomingNumbers,
   purchaseLocalNumber,
+  resubmitBrandRegistration,
   searchAvailableLocalNumbers,
   submitCustomerProfileForReview,
   submitTrustProductForReview,
+  updateEndUser,
   type TwilioAuth,
   type TwilioFieldFailure,
 } from "./twilio-provisioning-client";
@@ -55,7 +60,13 @@ export type ProvisioningStep =
 
 export type ProvisioningStepResult = {
   step: ProvisioningStep;
-  outcome: "advanced" | "blocked" | "failed" | "complete";
+  /**
+   * "waiting" means the step's PREREQUISITE review has not cleared yet (bundle
+   * approval before brand, brand approval before campaign) — nothing ran,
+   * nothing was spent, and nothing is wrong. The poller refreshes those
+   * statuses; the operator just tries again later.
+   */
+  outcome: "advanced" | "blocked" | "failed" | "waiting" | "complete";
   message?: string;
   fieldFailures?: TwilioFieldFailure[];
 };
@@ -67,18 +78,50 @@ export const INBOUND_WEBHOOK_URL = `${WEBHOOK_BASE}/api/sms/twilio/inbound`;
 export const STATUS_CALLBACK_URL = `${WEBHOOK_BASE}/api/sms/twilio/status-callback`;
 
 /**
- * The next step this registration needs, derived purely from which references
- * it already holds. A ref present means that step's spend already happened.
+ * The next step this registration needs, derived from which references it
+ * holds AND each step's status. A ref present means that step's Twilio
+ * resource exists — but a 'failed' status means the step did not finish
+ * (validation rejected, or a later call in the step broke), so the step
+ * re-runs IN PLACE against the existing resource. Presence alone must never
+ * skip a failed step: that would submit a bundle that was never fixed.
  */
 export function nextProvisioningStep(registration: ProvisioningRegistration): ProvisioningStep {
+  const failed = (status: unknown) => String(status ?? "").toLowerCase() === "failed";
+
   if (!registration?.subaccount_sid) return "subaccount";
-  if (!registration.phone_number_sid) return "number";
-  if (!registration.messaging_service_sid) return "messaging_service";
-  if (!registration.customer_profile_sid) return "customer_profile";
-  if (!registration.trust_product_sid) return "trust_product";
-  if (!registration.brand_registration_sid) return "brand";
-  if (!registration.campaign_sid) return "campaign";
+  if (!registration.phone_number_sid || failed(registration.number_status)) return "number";
+  if (!registration.messaging_service_sid || failed(registration.messaging_service_status)) {
+    return "messaging_service";
+  }
+  if (!registration.customer_profile_sid || failed(registration.customer_profile_status)) {
+    return "customer_profile";
+  }
+  if (!registration.trust_product_sid || failed(registration.trust_product_status)) {
+    return "trust_product";
+  }
+  if (
+    !registration.brand_registration_sid
+    || String(registration.brand_status ?? "").toUpperCase() === "FAILED"
+    || failed(registration.brand_status)
+  ) {
+    return "brand";
+  }
+  if (!registration.campaign_sid || failed(registration.campaign_status)) return "campaign";
   return "done";
+}
+
+/** TrustHub bundle review statuses that allow the brand step to run. */
+const BUNDLE_APPROVED = "twilio-approved";
+
+export function brandStepPrerequisitesMet(registration: ProvisioningRegistration): boolean {
+  return (
+    String(registration?.customer_profile_status ?? "").toLowerCase() === BUNDLE_APPROVED
+    && String(registration?.trust_product_status ?? "").toLowerCase() === BUNDLE_APPROVED
+  );
+}
+
+export function campaignStepPrerequisitesMet(registration: ProvisioningRegistration): boolean {
+  return String(registration?.brand_status ?? "").toUpperCase() === "APPROVED";
 }
 
 export function isSoleProprietorPath(registration: ProvisioningRegistration): boolean {
@@ -102,10 +145,20 @@ async function patchRegistration(params: {
   registrationId: string;
   patch: Record<string, unknown>;
 }): Promise<void> {
-  await params.admin
+  // Throws on failure: silently losing a Twilio ref is how a retry double-buys
+  // a resource. The recovery story for a lost write is adoption (the number
+  // step lists what the subaccount already owns), but the first line of
+  // defense is refusing to continue as if the write landed.
+  const { error } = await params.admin
     .from("sms_provisioning_registrations")
     .update(params.patch)
     .eq("id", params.registrationId);
+  if (error) {
+    throw new TwilioProvisioningError({
+      step: "bookkeeping",
+      message: `Could not record provisioning progress: ${String(error.message ?? "database error")}`,
+    });
+  }
 }
 
 /** Business-information attributes for the EIN (standard) path. */
@@ -227,6 +280,27 @@ export async function runNextProvisioningStep(params: {
 
       case "number": {
         const auth = await authForRegistration({ admin, registration });
+
+        // ADOPT before buying. The subaccount is exclusively this tenant's, so
+        // any number already in it came from a prior attempt whose bookkeeping
+        // write failed — buying another would be the double-spend this module
+        // exists to prevent.
+        const owned = await listOwnedIncomingNumbers({ auth });
+        const adopted = owned[0] ?? null;
+        if (adopted) {
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: {
+              phone_number_sid: adopted.sid,
+              phone_e164: adopted.phoneNumber,
+              number_status: "complete",
+              last_error: null,
+            },
+          });
+          return { step, outcome: "advanced" };
+        }
+
         const candidates = await searchAvailableLocalNumbers({
           auth,
           areaCode: preferredAreaCode(registration),
@@ -262,25 +336,35 @@ export async function runNextProvisioningStep(params: {
 
       case "messaging_service": {
         const auth = await authForRegistration({ admin, registration });
-        const service = await createMessagingService({
-          auth,
-          friendlyName: String(registration.legal_business_name ?? "EveryStep").slice(0, 64),
-          inboundRequestUrl: INBOUND_WEBHOOK_URL,
-          statusCallbackUrl: STATUS_CALLBACK_URL,
-        });
+
+        // Persist the sid the moment the service exists, then attach. A re-run
+        // after a failed attach reuses the recorded service instead of creating
+        // a second one and binding the campaign to the wrong service.
+        let serviceSid = String(registration.messaging_service_sid ?? "").trim();
+        if (!serviceSid) {
+          const service = await createMessagingService({
+            auth,
+            friendlyName: String(registration.legal_business_name ?? "EveryStep").slice(0, 64),
+            inboundRequestUrl: INBOUND_WEBHOOK_URL,
+            statusCallbackUrl: STATUS_CALLBACK_URL,
+          });
+          serviceSid = service.sid;
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: { messaging_service_sid: serviceSid, messaging_service_status: "attaching" },
+          });
+        }
+
         await attachNumberToMessagingService({
           auth,
-          messagingServiceSid: service.sid,
+          messagingServiceSid: serviceSid,
           phoneNumberSid: String(registration.phone_number_sid),
         });
         await patchRegistration({
           admin,
           registrationId,
-          patch: {
-            messaging_service_sid: service.sid,
-            messaging_service_status: "complete",
-            last_error: null,
-          },
+          patch: { messaging_service_status: "complete", last_error: null },
         });
         return { step, outcome: "advanced" };
       }
@@ -288,61 +372,122 @@ export async function runNextProvisioningStep(params: {
       case "customer_profile": {
         const auth = await authForRegistration({ admin, registration });
         const policySid = customerProfilePolicySid(soleProp);
-        const profile = await createCustomerProfile({
-          auth,
-          friendlyName: String(registration.legal_business_name ?? "EveryStep").slice(0, 64),
-          email: String(registration.rep_email ?? ""),
-          policySid,
-        });
 
-        const rep = await createEndUser({
-          auth,
-          friendlyName: "Authorized representative",
-          type: "authorized_representative_1",
-          attributes: buildAuthorizedRepresentativeAttributes(registration),
-        });
-        await assignToCustomerProfile({ auth, customerProfileSid: profile.sid, objectSid: rep.sid });
-
-        if (!soleProp) {
-          const business = await createEndUser({
+        // Create-or-adopt the profile shell, persisting its sid IMMEDIATELY —
+        // the brand will reference this bundle by sid, so a re-run must keep
+        // correcting the same bundle, never start a parallel one.
+        let profileSid = String(registration.customer_profile_sid ?? "").trim();
+        if (!profileSid) {
+          const profile = await createCustomerProfile({
             auth,
-            friendlyName: "Business information",
-            type: "customer_profile_business_information",
-            attributes: buildBusinessInformationAttributes(registration),
+            friendlyName: String(registration.legal_business_name ?? "EveryStep").slice(0, 64),
+            email: String(registration.rep_email ?? ""),
+            policySid,
           });
-          await assignToCustomerProfile({
-            auth,
-            customerProfileSid: profile.sid,
-            objectSid: business.sid,
+          profileSid = profile.sid;
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: { customer_profile_sid: profileSid, customer_profile_status: "in_progress" },
           });
         }
 
-        const address = await createAddress({
+        // Make the bundle contents match the CURRENT form values: existing
+        // EndUsers are updated in place (this is the Edit path after a
+        // validation failure), missing ones are created and assigned.
+        const assigned = await listBundleAssignedObjectSids({
           auth,
-          customerName: String(registration.legal_business_name ?? ""),
-          street: String(registration.address_line1 ?? ""),
-          city: String(registration.city ?? ""),
-          region: String(registration.region ?? ""),
-          postalCode: String(registration.postal_code ?? ""),
-          isoCountry: String(registration.iso_country ?? "US"),
+          bundleKind: "CustomerProfiles",
+          bundleSid: profileSid,
         });
-        const document = await createSupportingDocument({
-          auth,
-          friendlyName: "Business address",
-          type: "customer_profile_address",
-          attributes: { address_sids: address.sid },
-        });
-        await assignToCustomerProfile({
-          auth,
-          customerProfileSid: profile.sid,
-          objectSid: document.sid,
-        });
+        const endUserSidByType: Record<string, string> = {};
+        for (const objectSid of assigned.filter((sid) => sid.startsWith("IT"))) {
+          const endUser = await fetchEndUser({ auth, endUserSid: objectSid });
+          if (endUser.type) endUserSidByType[endUser.type] = endUser.sid;
+        }
+
+        const wantedEndUsers = [
+          {
+            type: "authorized_representative_1",
+            friendlyName: "Authorized representative",
+            attributes: buildAuthorizedRepresentativeAttributes(registration),
+          },
+          ...(soleProp
+            ? []
+            : [
+                {
+                  type: "customer_profile_business_information",
+                  friendlyName: "Business information",
+                  attributes: buildBusinessInformationAttributes(registration),
+                },
+              ]),
+        ];
+        for (const wanted of wantedEndUsers) {
+          const existingSid = endUserSidByType[wanted.type];
+          if (existingSid) {
+            await updateEndUser({ auth, endUserSid: existingSid, attributes: wanted.attributes });
+          } else {
+            const created = await createEndUser({
+              auth,
+              friendlyName: wanted.friendlyName,
+              type: wanted.type,
+              attributes: wanted.attributes,
+            });
+            await assignToCustomerProfile({
+              auth,
+              customerProfileSid: profileSid,
+              objectSid: created.sid,
+            });
+          }
+        }
+
+        // Address document: created once and reused. (A later address change is
+        // a support-path operation — documented limitation of this slice.)
+        let addressSid = String(registration.address_sid ?? "").trim();
+        let documentSid = String(registration.supporting_document_sid ?? "").trim();
+        const documentAssigned = assigned.some((sid) => sid.startsWith("RD"));
+        if (!documentSid || !documentAssigned) {
+          if (!addressSid) {
+            const address = await createAddress({
+              auth,
+              customerName: String(registration.legal_business_name ?? ""),
+              street: String(registration.address_line1 ?? ""),
+              city: String(registration.city ?? ""),
+              region: String(registration.region ?? ""),
+              postalCode: String(registration.postal_code ?? ""),
+              isoCountry: String(registration.iso_country ?? "US"),
+            });
+            addressSid = address.sid;
+            await patchRegistration({ admin, registrationId, patch: { address_sid: addressSid } });
+          }
+          if (!documentSid) {
+            const document = await createSupportingDocument({
+              auth,
+              friendlyName: "Business address",
+              type: "customer_profile_address",
+              attributes: { address_sids: addressSid },
+            });
+            documentSid = document.sid;
+            await patchRegistration({
+              admin,
+              registrationId,
+              patch: { supporting_document_sid: documentSid },
+            });
+          }
+          if (!documentAssigned) {
+            await assignToCustomerProfile({
+              auth,
+              customerProfileSid: profileSid,
+              objectSid: documentSid,
+            });
+          }
+        }
 
         // Free preflight. A rejected brand costs a non-refundable fee, so the
         // operator gets field-level errors here instead of a bill.
         const evaluation = await evaluateCustomerProfile({
           auth,
-          customerProfileSid: profile.sid,
+          customerProfileSid: profileSid,
           policySid,
         });
         if (evaluation.failures.length > 0) {
@@ -350,9 +495,6 @@ export async function runNextProvisioningStep(params: {
             admin,
             registrationId,
             patch: {
-              customer_profile_sid: profile.sid,
-              address_sid: address.sid,
-              supporting_document_sid: document.sid,
               customer_profile_status: "failed",
               last_error: {
                 step: "customer_profile",
@@ -369,17 +511,11 @@ export async function runNextProvisioningStep(params: {
           };
         }
 
-        await submitCustomerProfileForReview({ auth, customerProfileSid: profile.sid });
+        await submitCustomerProfileForReview({ auth, customerProfileSid: profileSid });
         await patchRegistration({
           admin,
           registrationId,
-          patch: {
-            customer_profile_sid: profile.sid,
-            address_sid: address.sid,
-            supporting_document_sid: document.sid,
-            customer_profile_status: "pending_review",
-            last_error: null,
-          },
+          patch: { customer_profile_status: "pending_review", last_error: null },
         });
         return { step, outcome: "advanced" };
       }
@@ -389,31 +525,63 @@ export async function runNextProvisioningStep(params: {
         // Sole proprietors evaluate against a different policy — the standard
         // one asks for things they structurally cannot provide.
         const policySid = a2pMessagingProfilePolicySid(soleProp);
-        const product = await createTrustProduct({
+
+        // Same ensure-idempotent shape as the customer profile: adopt the
+        // bundle if it exists, persist the sid immediately when created, and
+        // make its contents match rather than duplicating them.
+        let productSid = String(registration.trust_product_sid ?? "").trim();
+        if (!productSid) {
+          const product = await createTrustProduct({
+            auth,
+            friendlyName: `${String(registration.legal_business_name ?? "EveryStep")} A2P`.slice(0, 64),
+            email: String(registration.rep_email ?? ""),
+            policySid,
+          });
+          productSid = product.sid;
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: { trust_product_sid: productSid, trust_product_status: "in_progress" },
+          });
+        }
+
+        const assigned = await listBundleAssignedObjectSids({
           auth,
-          friendlyName: `${String(registration.legal_business_name ?? "EveryStep")} A2P`.slice(0, 64),
-          email: String(registration.rep_email ?? ""),
-          policySid,
+          bundleKind: "TrustProducts",
+          bundleSid: productSid,
         });
-        const profileInfo = await createEndUser({
-          auth,
-          friendlyName: "A2P messaging profile",
-          type: "us_a2p_messaging_profile_information",
-          attributes: {
-            company_type: soleProp ? "direct" : "private",
-            ...(soleProp ? {} : { stock_exchange: "NONE", stock_ticker: "" }),
-          },
-        });
-        await assignToTrustProduct({ auth, trustProductSid: product.sid, objectSid: profileInfo.sid });
-        await assignToTrustProduct({
-          auth,
-          trustProductSid: product.sid,
-          objectSid: String(registration.customer_profile_sid),
-        });
+
+        const profileInfoAttributes = {
+          company_type: soleProp ? "direct" : "private",
+          ...(soleProp ? {} : { stock_exchange: "NONE", stock_ticker: "" }),
+        };
+        const existingInfoSid = await (async () => {
+          for (const objectSid of assigned.filter((sid) => sid.startsWith("IT"))) {
+            const endUser = await fetchEndUser({ auth, endUserSid: objectSid });
+            if (endUser.type === "us_a2p_messaging_profile_information") return endUser.sid;
+          }
+          return "";
+        })();
+        if (existingInfoSid) {
+          await updateEndUser({ auth, endUserSid: existingInfoSid, attributes: profileInfoAttributes });
+        } else {
+          const profileInfo = await createEndUser({
+            auth,
+            friendlyName: "A2P messaging profile",
+            type: "us_a2p_messaging_profile_information",
+            attributes: profileInfoAttributes,
+          });
+          await assignToTrustProduct({ auth, trustProductSid: productSid, objectSid: profileInfo.sid });
+        }
+
+        const customerProfileSid = String(registration.customer_profile_sid);
+        if (!assigned.includes(customerProfileSid)) {
+          await assignToTrustProduct({ auth, trustProductSid: productSid, objectSid: customerProfileSid });
+        }
 
         const evaluation = await evaluateTrustProduct({
           auth,
-          trustProductSid: product.sid,
+          trustProductSid: productSid,
           policySid,
         });
         if (evaluation.failures.length > 0) {
@@ -421,7 +589,6 @@ export async function runNextProvisioningStep(params: {
             admin,
             registrationId,
             patch: {
-              trust_product_sid: product.sid,
               trust_product_status: "failed",
               last_error: {
                 step: "trust_product",
@@ -438,21 +605,53 @@ export async function runNextProvisioningStep(params: {
           };
         }
 
-        await submitTrustProductForReview({ auth, trustProductSid: product.sid });
+        await submitTrustProductForReview({ auth, trustProductSid: productSid });
         await patchRegistration({
           admin,
           registrationId,
-          patch: {
-            trust_product_sid: product.sid,
-            trust_product_status: "pending_review",
-            last_error: null,
-          },
+          patch: { trust_product_status: "pending_review", last_error: null },
         });
         return { step, outcome: "advanced" };
       }
 
       case "brand": {
+        // GATE: the brand references both TrustHub bundles, and creating it
+        // while they are still in review is a guaranteed rejection that reads
+        // like an error to the operator. Wait until the poller has seen both
+        // bundles approved. Nothing runs and nothing is spent.
+        if (!brandStepPrerequisitesMet(registration)) {
+          return {
+            step,
+            outcome: "waiting",
+            message:
+              "Waiting for Twilio to approve your business profile — usually minutes to a day. "
+              + "This page updates automatically; no action is needed.",
+          };
+        }
+
         const auth = await authForRegistration({ admin, registration });
+
+        // A FAILED brand is resubmitted in place after the operator fixed the
+        // bundle (a bare re-POST triggers carrier re-evaluation; Twilio covers
+        // two free retries). Creating a second brand would pay a second fee.
+        const existingBrandSid = String(registration.brand_registration_sid ?? "").trim();
+        if (existingBrandSid) {
+          const resubmitted = await resubmitBrandRegistration({
+            auth,
+            brandRegistrationSid: existingBrandSid,
+          });
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: {
+              brand_status: resubmitted.status || "PENDING",
+              brand_identity_status: resubmitted.identityStatus,
+              last_error: null,
+            },
+          });
+          return { step, outcome: "advanced" };
+        }
+
         const brand = await createBrandRegistration({
           auth,
           customerProfileBundleSid: String(registration.customer_profile_sid),
@@ -474,6 +673,18 @@ export async function runNextProvisioningStep(params: {
       }
 
       case "campaign": {
+        // GATE: a campaign created under a brand that is not yet APPROVED is
+        // rejected on sight (error 21717) and burns operator confidence.
+        if (!campaignStepPrerequisitesMet(registration)) {
+          return {
+            step,
+            outcome: "waiting",
+            message:
+              "Waiting for the carriers to approve your business registration — typically minutes, "
+              + "occasionally up to a week. This page updates automatically; no action is needed.",
+          };
+        }
+
         const auth = await authForRegistration({ admin, registration });
         const copy = buildCampaignCopy(registration);
         const campaign = await createCampaign({

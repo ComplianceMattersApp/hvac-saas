@@ -89,3 +89,18 @@ export function isSmsAdvancedConsoleEnabledForAccountOwner(
 }
 
 export { SMS_SELF_SERVE_ALLOWLIST_ENV, SMS_ADVANCED_CONSOLE_ALLOWLIST_ENV };
+
+/**
+ * Which Twilio registration environment new registrations use.
+ *
+ * NOT a tenant choice and never read from a form: sandbox (the default) makes
+ * every brand `Mock=true` — free, never reaching TCR/carriers — so preview and
+ * staging deployments can walk the whole wizard without spend. The owner sets
+ * `SMS_PROVISIONING_ENVIRONMENT=production` on the production deployment,
+ * which is the only place real registrations should ever originate.
+ */
+export function resolveSmsProvisioningEnvironment(): "sandbox" | "production" {
+  return String(process.env.SMS_PROVISIONING_ENVIRONMENT ?? "").trim() === "production"
+    ? "production"
+    : "sandbox";
+}

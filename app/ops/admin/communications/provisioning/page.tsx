@@ -29,6 +29,11 @@ const NOTICE: Record<string, { tone: "success" | "warn" | "error"; message: stri
     tone: "warn",
     message: "Some details did not pass validation. Fix the highlighted fields and try again — nothing was charged.",
   },
+  waiting_on_review: {
+    tone: "warn",
+    message:
+      "Nothing to do yet — Twilio is still reviewing the previous submission. This page updates automatically; check back soon.",
+  },
   ein_required: { tone: "error", message: "Enter your EIN, or choose the no-EIN path." },
   save_failed: { tone: "error", message: "We couldn't save those details. Please try again." },
   registration_missing: { tone: "error", message: "Start by entering your business details." },

@@ -22,6 +22,7 @@
  */
 
 import { prepareSmsProviderDeliveryPreflight } from "@/lib/communications/sms-provider-delivery-preflight";
+import { resolveSubaccountCredential } from "@/lib/communications/sms-account-resolution";
 import {
   sendTwilioSandboxMessage,
   TwilioMessageError,
@@ -83,6 +84,12 @@ export type ResolveLiveProviderConfigResult = {
   blockedReasons: string[];
   providerConfigurationId?: string;
   messagingServiceSid?: string;
+  /**
+   * The subaccount this tenant's traffic runs under (AC…), or null for the
+   * platform account. Written at provisioning completion; the send below and
+   * webhook validation both key off this same column, so they cannot disagree.
+   */
+  providerAccountRef?: string | null;
 };
 
 /**
@@ -103,7 +110,7 @@ export async function resolveSmsLiveProviderConfig(params: {
   const configResponse = await params.admin
     .from("sms_provider_configurations")
     .select(
-      "id, provider_environment, readiness_status, activation_status, default_messaging_service_ref",
+      "id, provider_environment, readiness_status, activation_status, default_messaging_service_ref, provider_account_ref",
     )
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("provider_name", "twilio");
@@ -169,11 +176,14 @@ export async function resolveSmsLiveProviderConfig(params: {
     };
   }
 
+  const providerAccountRef = asTrimmed(config.provider_account_ref) || null;
+
   return {
     ready: true,
     blockedReasons: [],
     providerConfigurationId,
     messagingServiceSid,
+    providerAccountRef,
   };
 }
 
@@ -244,6 +254,29 @@ export async function attemptLiveOnTheWaySend(params: {
         outcome: notActivated ? "not_activated" : "blocked",
         detail: liveConfig.blockedReasons.join(","),
       };
+    }
+
+    // 1b. Which Twilio account this tenant's traffic runs under. A config that
+    // names a subaccount REQUIRES its stored credential: sending under the
+    // platform account with a subaccount-owned Messaging Service would 404, and
+    // silently falling back would also break webhook signature validation,
+    // which keys off the same column. Resolved before the delivery reservation
+    // so a missing credential never burns the single submit attempt.
+    let sendAuth: { accountSid: string; authToken: string } | null = null;
+    const accountRef = asTrimmed(liveConfig.providerAccountRef ?? "");
+    if (accountRef.startsWith("AC")) {
+      const credential = await resolveSubaccountCredential({
+        admin: params.admin,
+        accountOwnerUserId,
+      });
+      if (!credential || credential.accountSid !== accountRef) {
+        return {
+          attempted: false,
+          outcome: "blocked",
+          detail: "subaccount_credential_missing",
+        };
+      }
+      sendAuth = { accountSid: credential.accountSid, authToken: credential.authToken };
     }
 
     // 2. Quiet hours in the account's business time zone
@@ -326,6 +359,7 @@ export async function attemptLiveOnTheWaySend(params: {
         to: recipientPhone,
         body: messageBody,
         messagingServiceSid: liveConfig.messagingServiceSid!,
+        ...(sendAuth ?? {}),
       });
 
       const postNow = new Date().toISOString();

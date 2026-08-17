@@ -1,25 +1,35 @@
 /**
  * Polls in-flight A2P registrations and completes them — server-only.
  *
+ * THE POLLER POLLS. IT NEVER PROVISIONS. Every provisioning step is a
+ * non-refundable spend and runs only from an operator's explicit click in the
+ * wizard (one step per click, by contract). The cron's whole job is to refresh
+ * the statuses of things already submitted for review — TrustHub bundles, the
+ * brand, the campaign — so the wizard's gates open when Twilio approves, and
+ * to run completion when the campaign verifies. A registration the operator
+ * saved but never started must sit untouched forever.
+ *
  * Polling rather than Event Streams because a Streams sink must be configured
  * per subaccount, which is real per-tenant setup cost for status we can simply
  * ask for. Brand review is typically minutes; campaign review can be weeks, so
  * a 10-minute cadence is ample.
  *
  * Never throws, and isolates per row — the same discipline as the QBO sweeps.
- * One tenant whose Twilio account is misconfigured must not stop every other
- * tenant's registration from progressing.
  *
  * Completion lands at `ready_for_activation`. It NEVER sets activation_status
  * to active: a human still performs the three-attestation live activation.
  */
 
-import { fetchBrandRegistration, fetchCampaign } from "./twilio-provisioning-client";
+import {
+  fetchBrandRegistration,
+  fetchCampaign,
+  fetchCustomerProfileStatus,
+  fetchTrustProductStatus,
+} from "./twilio-provisioning-client";
 import { resolveSubaccountCredential } from "./sms-account-resolution";
-import { runNextProvisioningStep } from "./sms-provisioning-orchestrator";
+import { isSmsSelfServeEnabledForAccountOwner } from "./sms-self-serve-gate";
 
 export type PollOutcome =
-  | "advanced"
   | "waiting"
   | "completed"
   | "rejected"
@@ -45,6 +55,9 @@ export async function pollProvisioningRegistrations(params: {
       .from("sms_provisioning_registrations")
       .select("*")
       .is("completed_at", null)
+      // Nothing async exists to poll before the customer profile is created;
+      // rows the operator saved but never started stay untouched.
+      .not("customer_profile_sid", "is", null)
       .order("last_polled_at", { ascending: true, nullsFirst: true })
       .limit(limit);
     if (error || !data) return results;
@@ -86,23 +99,14 @@ export async function pollOneRegistration(params: {
 }): Promise<PollResult> {
   const { admin, registration } = params;
   const registrationId = String(registration.id);
-  await stampPolled(admin, registrationId, params.now);
 
-  // Not yet submitted: keep walking the creation steps rather than polling for
-  // a status that does not exist yet.
-  if (!registration.campaign_sid) {
-    const stepResult = await runNextProvisioningStep({ admin, registration });
-    return {
-      registrationId,
-      outcome:
-        stepResult.outcome === "advanced"
-          ? "advanced"
-          : stepResult.outcome === "complete"
-            ? "waiting"
-            : "failed",
-      detail: stepResult.message,
-    };
+  // An account removed from the allowlist stops being polled — entitlement is
+  // re-checked per row, not assumed from the row's existence.
+  if (!isSmsSelfServeEnabledForAccountOwner(String(registration.account_owner_user_id ?? ""))) {
+    return { registrationId, outcome: "skipped", detail: "not entitled" };
   }
+
+  await stampPolled(admin, registrationId, params.now);
 
   const credential = await resolveSubaccountCredential({
     admin,
@@ -111,7 +115,42 @@ export async function pollOneRegistration(params: {
   if (!credential) return { registrationId, outcome: "skipped", detail: "no subaccount credential" };
   const auth = { accountSid: credential.accountSid, authToken: credential.authToken };
 
-  // Brand first: a failed brand makes the campaign moot, and its failure reason
+  // TrustHub bundle reviews first: the wizard's brand gate opens when both
+  // bundles are twilio-approved, and this refresh is what opens it.
+  for (const bundle of [
+    {
+      sid: registration.customer_profile_sid,
+      column: "customer_profile_status",
+      current: registration.customer_profile_status,
+      fetch: () =>
+        fetchCustomerProfileStatus({
+          auth,
+          customerProfileSid: String(registration.customer_profile_sid),
+        }),
+    },
+    {
+      sid: registration.trust_product_sid,
+      column: "trust_product_status",
+      current: registration.trust_product_status,
+      fetch: () =>
+        fetchTrustProductStatus({ auth, trustProductSid: String(registration.trust_product_sid) }),
+    },
+  ]) {
+    const pending = ["pending_review", "pending-review", "in-review"].includes(
+      String(bundle.current ?? "").toLowerCase(),
+    );
+    if (bundle.sid && pending) {
+      const fetched = await bundle.fetch();
+      if (fetched.status && fetched.status !== String(bundle.current ?? "").toLowerCase()) {
+        await admin
+          .from("sms_provisioning_registrations")
+          .update({ [bundle.column]: fetched.status })
+          .eq("id", registrationId);
+      }
+    }
+  }
+
+  // Brand next: a failed brand makes the campaign moot, and its failure reason
   // is the actionable one (EIN/name mismatch being by far the most common).
   if (registration.brand_registration_sid) {
     const brand = await fetchBrandRegistration({
@@ -136,9 +175,16 @@ export async function pollOneRegistration(params: {
     }
   }
 
+  // Campaign last — and only once it exists. Fetched by its own sid: the
+  // collection URL returns a list envelope with no top-level status.
+  if (!registration.campaign_sid) {
+    return { registrationId, outcome: "waiting", detail: "awaiting operator steps" };
+  }
+
   const campaign = await fetchCampaign({
     auth,
     messagingServiceSid: String(registration.messaging_service_sid),
+    campaignSid: String(registration.campaign_sid),
   });
   if (campaign.status && campaign.status !== registration.campaign_status) {
     await admin
@@ -190,11 +236,11 @@ async function markRejected(params: {
 /**
  * Write the finished registration into the schema the send path already reads.
  *
- * This is the whole point of the lane: the columns
- * (`provider_brand_ref`, `provider_campaign_ref`, `provider_registration_ref`,
- * `provider_sender_ref`, `messaging_service_ref`) have existed since the SMS
- * foundation and were never written. Filling them is what makes a
- * wizard-provisioned tenant indistinguishable from a concierge-provisioned one.
+ * FIND-OR-CREATE, not update: a wizard-only tenant has no provider
+ * configuration or sender identity row — those were only ever inserted by the
+ * concierge forms, which the audience split hides from tenants. An UPDATE that
+ * matches zero rows would stamp the registration complete while leaving the
+ * account unable to ever activate.
  */
 export async function completeRegistration(params: {
   admin: any;
@@ -204,46 +250,88 @@ export async function completeRegistration(params: {
   const { admin, registration } = params;
   const nowIso = (params.now ?? new Date()).toISOString();
   const accountOwnerUserId = registration.account_owner_user_id;
+  const actorUserId = registration.updated_by_user_id ?? registration.created_by_user_id ?? null;
 
-  const { data: configuration } = await admin
+  const configPatch = {
+    provider_account_ref: registration.subaccount_sid,
+    default_messaging_service_ref: registration.messaging_service_sid,
+    // ready_for_activation, never active — a human still attests.
+    readiness_status: "ready_for_activation",
+    inbound_webhook_readiness: "ready",
+    status_callback_readiness: "ready",
+    advanced_opt_out_readiness: "ready",
+  };
+
+  const { data: existingConfig } = await admin
     .from("sms_provider_configurations")
     .select("id")
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("provider_name", "twilio")
     .maybeSingle();
 
-  await admin
-    .from("sms_provider_configurations")
-    .update({
-      provider_account_ref: registration.subaccount_sid,
-      default_messaging_service_ref: registration.messaging_service_sid,
-      // ready_for_activation, never active — a human still attests.
-      readiness_status: "ready_for_activation",
-      inbound_webhook_readiness: "ready",
-      status_callback_readiness: "ready",
-      advanced_opt_out_readiness: "ready",
-    })
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .eq("provider_name", "twilio");
-
-  if (configuration?.id) {
+  let configurationId: string | null = existingConfig?.id ? String(existingConfig.id) : null;
+  if (configurationId) {
     await admin
-      .from("sms_sender_identities")
-      .update({
-        phone_e164: registration.phone_e164,
-        phone_last4: String(registration.phone_e164 ?? "").slice(-4),
-        provider_sender_ref: registration.phone_number_sid,
-        messaging_service_ref: registration.messaging_service_sid,
-        provider_brand_ref: registration.brand_registration_sid,
-        provider_campaign_ref: registration.campaign_sid,
-        provider_registration_ref: registration.customer_profile_sid,
-        registration_type: "a2p_10dlc",
-        // Earned, not attested: the campaign is VERIFIED at the carriers and
-        // the number is attached to the messaging service.
-        verification_status: "verified",
+      .from("sms_provider_configurations")
+      .update(configPatch)
+      .eq("id", configurationId)
+      .eq("account_owner_user_id", accountOwnerUserId);
+  } else {
+    const { data: insertedConfig } = await admin
+      .from("sms_provider_configurations")
+      .insert({
+        account_owner_user_id: accountOwnerUserId,
+        provider_name: "twilio",
+        provider_environment: String(registration.provider_environment ?? "production"),
+        created_by_user_id: actorUserId,
+        updated_by_user_id: actorUserId,
+        ...configPatch,
       })
+      .select("id")
+      .single();
+    configurationId = insertedConfig?.id ? String(insertedConfig.id) : null;
+  }
+
+  if (configurationId) {
+    const senderPatch = {
+      phone_e164: registration.phone_e164,
+      phone_last4: String(registration.phone_e164 ?? "").slice(-4),
+      provider_sender_ref: registration.phone_number_sid,
+      messaging_service_ref: registration.messaging_service_sid,
+      provider_brand_ref: registration.brand_registration_sid,
+      provider_campaign_ref: registration.campaign_sid,
+      provider_registration_ref: registration.customer_profile_sid,
+      registration_type: "a2p_10dlc",
+      // Earned, not attested: the campaign is VERIFIED at the carriers and
+      // the number is attached to the messaging service.
+      verification_status: "verified",
+      activation_status: "active",
+    };
+
+    const { data: existingSender } = await admin
+      .from("sms_sender_identities")
+      .select("id")
       .eq("account_owner_user_id", accountOwnerUserId)
-      .eq("provider_configuration_id", configuration.id);
+      .eq("provider_configuration_id", configurationId)
+      .maybeSingle();
+
+    if (existingSender?.id) {
+      await admin
+        .from("sms_sender_identities")
+        .update(senderPatch)
+        .eq("id", existingSender.id)
+        .eq("account_owner_user_id", accountOwnerUserId);
+    } else {
+      await admin.from("sms_sender_identities").insert({
+        account_owner_user_id: accountOwnerUserId,
+        provider_configuration_id: configurationId,
+        sender_type: "long_code",
+        sender_display_label: "Business Texting Number",
+        created_by_user_id: actorUserId,
+        updated_by_user_id: actorUserId,
+        ...senderPatch,
+      });
+    }
   }
 
   await admin

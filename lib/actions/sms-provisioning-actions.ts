@@ -5,7 +5,10 @@ import { redirect } from "next/navigation";
 
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { assertSmsSelfServeEnabledForAccountOwner } from "@/lib/communications/sms-self-serve-gate";
+import {
+  assertSmsSelfServeEnabledForAccountOwner,
+  resolveSmsProvisioningEnvironment,
+} from "@/lib/communications/sms-self-serve-gate";
 import { runNextProvisioningStep } from "@/lib/communications/sms-provisioning-orchestrator";
 import { resolveSubaccountCredential } from "@/lib/communications/sms-account-resolution";
 import { resendSoleProprietorOtp } from "@/lib/communications/twilio-provisioning-client";
@@ -62,7 +65,9 @@ export async function startSmsProvisioningFromForm(formData: FormData): Promise<
 
   const payload: Record<string, unknown> = {
     account_owner_user_id: accountOwnerUserId,
-    provider_environment: trimmed(formData.get("provider_environment")) === "production" ? "production" : "sandbox",
+    // Derived from the deployment, never from the form: sandbox = Mock brands
+    // (free, never reach carriers); production only where the owner set it.
+    provider_environment: resolveSmsProvisioningEnvironment(),
     registration_path: hasEin ? "a2p_lvs" : "a2p_sole_prop",
     legal_business_name: trimmed(formData.get("legal_business_name")) || null,
     business_type: trimmed(formData.get("business_type")) || null,
@@ -110,6 +115,7 @@ export async function advanceSmsProvisioningFromForm(): Promise<void> {
 
   if (result.outcome === "failed") redirect(withNotice("step_failed"));
   if (result.outcome === "blocked") redirect(withNotice("validation_blocked"));
+  if (result.outcome === "waiting") redirect(withNotice("waiting_on_review"));
   if (result.outcome === "complete") redirect(withNotice("submitted"));
   redirect(withNotice("step_advanced"));
 }
@@ -136,7 +142,10 @@ export async function retrySmsProvisioningStepFromForm(): Promise<void> {
     registration: { ...registration, last_error: null },
   });
   revalidatePath(PATH);
-  redirect(withNotice(result.outcome === "failed" ? "step_failed" : "step_advanced"));
+  if (result.outcome === "failed") redirect(withNotice("step_failed"));
+  if (result.outcome === "blocked") redirect(withNotice("validation_blocked"));
+  if (result.outcome === "waiting") redirect(withNotice("waiting_on_review"));
+  redirect(withNotice("step_advanced"));
 }
 
 /** Sole-proprietor brands verify the rep's phone by OTP; this resends it. */

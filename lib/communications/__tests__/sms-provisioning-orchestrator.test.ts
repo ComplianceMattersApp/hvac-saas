@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  brandStepPrerequisitesMet,
   buildAuthorizedRepresentativeAttributes,
   buildBusinessInformationAttributes,
   buildCampaignCopy,
+  campaignStepPrerequisitesMet,
   describeProvisioningStep,
   isSoleProprietorPath,
   nextProvisioningStep,
@@ -64,6 +66,45 @@ describe("nextProvisioningStep", () => {
       customer_profile_sid: "BU1", trust_product_sid: "BU2", brand_status: "failed",
     };
     expect(nextProvisioningStep(afterFailure)).toBe("brand");
+  });
+
+  it("re-runs a step whose status is failed even when its ref exists", () => {
+    // A ref proves the Twilio resource exists, NOT that the step finished.
+    // Presence-only skipping is how a rejected bundle got submitted to a brand
+    // without ever being fixed.
+    const midFailure = {
+      ...base, subaccount_sid: "AC1", phone_number_sid: "PN1",
+      messaging_service_sid: "MG1", messaging_service_status: "failed",
+    };
+    expect(nextProvisioningStep(midFailure)).toBe("messaging_service");
+
+    const profileFailure = {
+      ...base, subaccount_sid: "AC1", phone_number_sid: "PN1", messaging_service_sid: "MG1",
+      messaging_service_status: "complete",
+      customer_profile_sid: "BU1", customer_profile_status: "failed",
+    };
+    expect(nextProvisioningStep(profileFailure)).toBe("customer_profile");
+  });
+});
+
+describe("review gates", () => {
+  const readyForBrand = {
+    subaccount_sid: "AC1", phone_number_sid: "PN1", messaging_service_sid: "MG1",
+    customer_profile_sid: "BU1", trust_product_sid: "BU2",
+  };
+
+  it("holds the brand step until BOTH bundles are twilio-approved", () => {
+    // A brand created against in-review bundles is a guaranteed rejection that
+    // reads like an error to the operator.
+    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "pending_review", trust_product_status: "twilio-approved" })).toBe(false);
+    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "twilio-approved", trust_product_status: "in-review" })).toBe(false);
+    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "twilio-approved", trust_product_status: "twilio-approved" })).toBe(true);
+  });
+
+  it("holds the campaign step until the brand is APPROVED", () => {
+    expect(campaignStepPrerequisitesMet({ brand_status: "PENDING" })).toBe(false);
+    expect(campaignStepPrerequisitesMet({ brand_status: "IN_REVIEW" })).toBe(false);
+    expect(campaignStepPrerequisitesMet({ brand_status: "APPROVED" })).toBe(true);
   });
 });
 

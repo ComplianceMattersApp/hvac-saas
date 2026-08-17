@@ -121,6 +121,17 @@ describe("phone numbers", () => {
     expect(String(fetchMock.mock.calls[0][0])).not.toContain("AreaCode");
   });
 
+  it("filters on SMS capability only — never VoiceEnabled=false", async () => {
+    // Essentially every US local number is voice-capable, so VoiceEnabled=false
+    // asks for numbers that cannot take calls and returns an empty list for
+    // every tenant, forever.
+    const fetchMock = mockFetchSequence([{ status: 200, body: { available_phone_numbers: [] } }]);
+    await searchAvailableLocalNumbers({ auth: AUTH, areaCode: "209" });
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain("SmsEnabled=true");
+    expect(url).not.toContain("VoiceEnabled");
+  });
+
   it("purchases a number and returns its reference", async () => {
     const fetchMock = mockFetchSequence([
       { status: 201, body: { sid: "PN" + "2".repeat(32), phone_number: "+12095550100" } },
@@ -245,11 +256,66 @@ describe("campaign registration", () => {
     expect(form.get("TermsAndConditionsUrl")).toBe("https://app.example.com/terms");
   });
 
-  it("reads campaign status for the poller", async () => {
-    mockFetchSequence([{ status: 200, body: { sid: "QE1", campaign_status: "VERIFIED" } }]);
-    await expect(fetchCampaign({ auth: AUTH, messagingServiceSid: "MG1" })).resolves.toMatchObject({
-      status: "VERIFIED",
+  it("reads campaign status from the INSTANCE url, not the collection", async () => {
+    // The collection URL returns { compliance_registrations: [...] } with no
+    // top-level status — parsing it would wait forever on an empty string.
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { sid: "QE1", campaign_status: "VERIFIED" } },
+    ]);
+    await expect(
+      fetchCampaign({ auth: AUTH, messagingServiceSid: "MG1", campaignSid: "QE1" }),
+    ).resolves.toMatchObject({ status: "VERIFIED" });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/Services/MG1/Compliance/Usa2p/QE1");
+  });
+
+  it("derives the embedded-phone/link flags from the actual copy", async () => {
+    // Error 30889 rejects campaigns whose flags contradict the samples, so the
+    // flags are computed, never asserted. The default copy carries no phone
+    // number and no link.
+    const fetchMock = mockFetchSequence([
+      { status: 201, body: { sid: "QE1", campaign_status: "PENDING" } },
+    ]);
+    await createCampaign({
+      auth: AUTH,
+      messagingServiceSid: "MG1",
+      brandRegistrationSid: "BN1",
+      description: "Operational service notifications for testing purposes only.",
+      messageFlow:
+        "Customers provide their mobile number when booking and agree to receive updates.",
+      messageSamples: [
+        "Acme: Your technician is on the way. Reply STOP to opt out.",
+        "Acme: Your appointment is confirmed. Reply STOP to opt out.",
+      ],
+      optInMessage: "Acme: You will now receive updates. Reply STOP to cancel.",
+      optOutMessage: "Acme: You are unsubscribed.",
+      helpMessage: "Acme: For help, contact our office.",
+      privacyPolicyUrl: "https://app.example.com/privacy",
+      termsAndConditionsUrl: "https://app.example.com/terms",
     });
+    const form = formOf(fetchMock.mock.calls[0]);
+    expect(form.get("HasEmbeddedPhone")).toBe("false");
+    expect(form.get("HasEmbeddedLinks")).toBe("false");
+  });
+
+  it("sets HasEmbeddedPhone when a sample carries a callback number", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 201, body: { sid: "QE1", campaign_status: "PENDING" } },
+    ]);
+    await createCampaign({
+      auth: AUTH,
+      messagingServiceSid: "MG1",
+      brandRegistrationSid: "BN1",
+      description: "Operational service notifications for testing purposes only.",
+      messageFlow:
+        "Customers provide their mobile number when booking and agree to receive updates.",
+      messageSamples: ["Acme: On the way. Questions? Call (209) 555-1212. Reply STOP to opt out."],
+      optInMessage: "Acme: You will now receive updates.",
+      optOutMessage: "Acme: You are unsubscribed.",
+      helpMessage: "Acme: For help, contact our office.",
+      privacyPolicyUrl: "https://app.example.com/privacy",
+      termsAndConditionsUrl: "https://app.example.com/terms",
+    });
+    expect(formOf(fetchMock.mock.calls[0]).get("HasEmbeddedPhone")).toBe("true");
   });
 });
 

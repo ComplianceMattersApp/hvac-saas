@@ -233,9 +233,10 @@ export async function searchAvailableLocalNumbers(params: {
   limit?: number;
 }): Promise<AvailableNumber[]> {
   const query = new URLSearchParams({
+    // SMS capability is the only requirement. Do NOT filter on VoiceEnabled:
+    // essentially every US local number is voice-capable, so VoiceEnabled=false
+    // asks for numbers that cannot take calls and returns nothing.
     SmsEnabled: "true",
-    // Twilio requires the number to be usable by a Messaging Service.
-    VoiceEnabled: "false",
     PageSize: String(params.limit ?? 10),
   });
   const areaCode = String(params.areaCode ?? "").trim();
@@ -253,6 +254,28 @@ export async function searchAvailableLocalNumbers(params: {
     locality: String(row?.locality ?? "").trim() || null,
     region: String(row?.region ?? "").trim() || null,
   }));
+}
+
+/**
+ * Numbers this (sub)account already owns. The number step adopts an existing
+ * number before ever purchasing: if a prior attempt bought one but the
+ * bookkeeping write failed, the retry must reuse it, never buy a second.
+ */
+export async function listOwnedIncomingNumbers(params: {
+  auth: TwilioAuth;
+}): Promise<PurchasedNumber[]> {
+  const json = await twilioRequest({
+    step: "number_inventory",
+    auth: params.auth,
+    method: "GET",
+    url: `${API_BASE}/Accounts/${params.auth.accountSid}/IncomingPhoneNumbers.json?PageSize=5`,
+  });
+  return (json?.incoming_phone_numbers ?? [])
+    .map((row: any) => ({
+      sid: String(row?.sid ?? ""),
+      phoneNumber: String(row?.phone_number ?? ""),
+    }))
+    .filter((row: PurchasedNumber) => row.sid && row.phoneNumber);
 }
 
 export type PurchasedNumber = { sid: string; phoneNumber: string };
@@ -325,6 +348,20 @@ export async function attachNumberToMessagingService(params: {
   messagingServiceSid: string;
   phoneNumberSid: string;
 }): Promise<void> {
+  // Idempotent by check-then-attach: a re-run after a mid-step failure must
+  // not error on "number already in service", and Twilio's duplicate-add error
+  // code is not stable enough to pattern-match.
+  const existing = await twilioRequest({
+    step: "messaging_service_sender",
+    auth: params.auth,
+    method: "GET",
+    url: `${MESSAGING_BASE}/Services/${params.messagingServiceSid}/PhoneNumbers?PageSize=50`,
+  });
+  const attached = (existing?.phone_numbers ?? []).some(
+    (row: any) => String(row?.sid ?? "") === params.phoneNumberSid,
+  );
+  if (attached) return;
+
   await twilioRequest({
     step: "messaging_service_sender",
     auth: params.auth,
@@ -591,6 +628,85 @@ export async function submitTrustProductForReview(params: {
   return { status: String(json?.status ?? "") };
 }
 
+/** Review status of a customer-profile bundle: draft | pending-review | in-review | twilio-approved | twilio-rejected. */
+export async function fetchCustomerProfileStatus(params: {
+  auth: TwilioAuth;
+  customerProfileSid: string;
+}): Promise<{ status: string }> {
+  const json = await twilioRequest({
+    step: "customer_profile_status",
+    auth: params.auth,
+    method: "GET",
+    url: `${TRUSTHUB_BASE}/CustomerProfiles/${params.customerProfileSid}`,
+  });
+  return { status: String(json?.status ?? "").toLowerCase() };
+}
+
+/** Review status of an A2P trust-product bundle (same enum as customer profiles). */
+export async function fetchTrustProductStatus(params: {
+  auth: TwilioAuth;
+  trustProductSid: string;
+}): Promise<{ status: string }> {
+  const json = await twilioRequest({
+    step: "trust_product_status",
+    auth: params.auth,
+    method: "GET",
+    url: `${TRUSTHUB_BASE}/TrustProducts/${params.trustProductSid}`,
+  });
+  return { status: String(json?.status ?? "").toLowerCase() };
+}
+
+/**
+ * Object sids assigned to a bundle (works for CustomerProfiles and
+ * TrustProducts — both expose the same EntityAssignments subresource).
+ *
+ * The Edit/Retry path depends on this: a brand references its bundles by sid,
+ * so a fix after a failure must correct the SAME bundle in place — creating a
+ * fresh profile would leave the failed brand pointing at the broken one.
+ */
+export async function listBundleAssignedObjectSids(params: {
+  auth: TwilioAuth;
+  bundleKind: "CustomerProfiles" | "TrustProducts";
+  bundleSid: string;
+}): Promise<string[]> {
+  const json = await twilioRequest({
+    step: "bundle_assignments",
+    auth: params.auth,
+    method: "GET",
+    url: `${TRUSTHUB_BASE}/${params.bundleKind}/${params.bundleSid}/EntityAssignments?PageSize=50`,
+  });
+  return (json?.results ?? [])
+    .map((row: any) => String(row?.object_sid ?? ""))
+    .filter(Boolean);
+}
+
+export async function fetchEndUser(params: {
+  auth: TwilioAuth;
+  endUserSid: string;
+}): Promise<{ sid: string; type: string }> {
+  const json = await twilioRequest({
+    step: "end_user_read",
+    auth: params.auth,
+    method: "GET",
+    url: `${TRUSTHUB_BASE}/EndUsers/${params.endUserSid}`,
+  });
+  return { sid: String(json?.sid ?? ""), type: String(json?.type ?? "") };
+}
+
+export async function updateEndUser(params: {
+  auth: TwilioAuth;
+  endUserSid: string;
+  attributes: Record<string, unknown>;
+}): Promise<void> {
+  await twilioRequest({
+    step: "end_user_update",
+    auth: params.auth,
+    method: "POST",
+    url: `${TRUSTHUB_BASE}/EndUsers/${params.endUserSid}`,
+    form: { Attributes: JSON.stringify(params.attributes) },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 6. Brand registration
 // ---------------------------------------------------------------------------
@@ -716,6 +832,18 @@ export async function createCampaign(params: {
   privacyPolicyUrl: string;
   termsAndConditionsUrl: string;
 }): Promise<CampaignRegistration> {
+  // Carrier vetting enforces consistency between these flags and the actual
+  // sample content (error 30889), so they are derived from the samples rather
+  // than asserted: a hardcoded flag that contradicts the copy is a rejection.
+  const sampleText = [
+    ...params.messageSamples,
+    params.optInMessage,
+    params.optOutMessage,
+    params.helpMessage,
+  ].join(" ");
+  const hasEmbeddedPhone = /(\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(sampleText);
+  const hasEmbeddedLinks = /https?:\/\//i.test(sampleText);
+
   const json = await twilioRequest({
     step: "campaign",
     auth: params.auth,
@@ -727,8 +855,8 @@ export async function createCampaign(params: {
       MessageFlow: params.messageFlow,
       MessageSamples: params.messageSamples,
       UsAppToPersonUsecase: "LOW_VOLUME",
-      HasEmbeddedLinks: "false",
-      HasEmbeddedPhone: "true",
+      HasEmbeddedLinks: hasEmbeddedLinks ? "true" : "false",
+      HasEmbeddedPhone: hasEmbeddedPhone ? "true" : "false",
       OptInMessage: params.optInMessage,
       OptOutMessage: params.optOutMessage,
       HelpMessage: params.helpMessage,
@@ -745,12 +873,16 @@ export async function createCampaign(params: {
 export async function fetchCampaign(params: {
   auth: TwilioAuth;
   messagingServiceSid: string;
+  campaignSid: string;
 }): Promise<CampaignRegistration> {
+  // MUST be the instance URL. The collection URL returns a list envelope
+  // ({ compliance_registrations: [...] }) whose top level has no sid/status,
+  // which would parse as an empty status and wait forever.
   const json = await twilioRequest({
     step: "campaign_status",
     auth: params.auth,
     method: "GET",
-    url: `${MESSAGING_BASE}/Services/${params.messagingServiceSid}/Compliance/Usa2p`,
+    url: `${MESSAGING_BASE}/Services/${params.messagingServiceSid}/Compliance/Usa2p/${params.campaignSid}`,
   });
   return toCampaignRegistration(json);
 }
