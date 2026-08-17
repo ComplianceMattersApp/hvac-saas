@@ -1,6 +1,10 @@
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { isPermitRequestSchemaUnavailableError, PermitRequestReadModelError } from "./permit-requests-read-model";
+import {
+  ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+  signAttachmentRows,
+} from "@/lib/attachments/signed-attachment-urls";
 
 type RawAttachmentRow = {
   id: string;
@@ -39,9 +43,6 @@ function isUnavailableError(error: unknown) {
   return isPermitRequestSchemaUnavailableError(error);
 }
 
-function normalizeStoragePath(value: unknown) {
-  return String(value ?? "").trim().replace(/^\/+/, "");
-}
 
 export async function listInternalPermitRequestAttachmentsForAccount(params: {
   accountOwnerUserId: string;
@@ -85,34 +86,22 @@ export async function listInternalPermitRequestAttachmentsForAccount(params: {
     const scopedAttachmentRows = ((attachmentRows ?? []) as RawAttachmentRow[]).filter(
       (row) => row.entity_type === "permit_request" && scopedIds.includes(String(row.entity_id)),
     );
-    const attachmentLinks = await Promise.all(
-      scopedAttachmentRows.map(async (row): Promise<PermitRequestAttachmentLink> => {
-        const bucket = String(row.bucket ?? "").trim();
-        const storagePath = normalizeStoragePath(row.storage_path);
-        let signedUrl: string | null = null;
+    const signedAttachmentRows = await signAttachmentRows({
+      client: admin,
+      rows: scopedAttachmentRows,
+      expiresInSeconds: params.expiresInSeconds ?? ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+    });
 
-        if (bucket && storagePath) {
-          const { data: signedData, error: signedErr } = await admin.storage
-            .from(bucket)
-            .createSignedUrl(storagePath, params.expiresInSeconds ?? 60 * 60);
-
-          signedUrl = signedErr
-            ? null
-            : String((signedData as { signedUrl?: unknown } | null)?.signedUrl ?? "").trim() || null;
-        }
-
-        return {
-          id: String(row.id),
-          permitRequestId: String(row.entity_id),
-          fileName: String(row.file_name ?? "").trim() || "Attachment",
-          contentType: String(row.content_type ?? "").trim() || null,
-          fileSize: typeof row.file_size === "number" ? row.file_size : null,
-          caption: String(row.caption ?? "").trim() || null,
-          createdAt: String(row.created_at ?? "").trim() || null,
-          signedUrl,
-        };
-      }),
-    );
+    const attachmentLinks: PermitRequestAttachmentLink[] = signedAttachmentRows.map((row) => ({
+      id: String(row.id),
+      permitRequestId: String(row.entity_id),
+      fileName: String(row.file_name ?? "").trim() || "Attachment",
+      contentType: row.content_type,
+      fileSize: typeof row.file_size === "number" ? row.file_size : null,
+      caption: String(row.caption ?? "").trim() || null,
+      createdAt: String(row.created_at ?? "").trim() || null,
+      signedUrl: row.signedUrl,
+    }));
 
     const attachmentsByPermitRequestId: Record<string, PermitRequestAttachmentLink[]> = {};
     for (const attachment of attachmentLinks) {

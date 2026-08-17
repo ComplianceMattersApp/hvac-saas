@@ -6,6 +6,7 @@ import { loadScopedInternalAttachmentJobForMutation } from "@/lib/auth/internal-
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 import { getContractorSharedAttachmentIds } from "@/lib/jobs/attachment-share-state";
+import { signAttachmentRows } from "@/lib/attachments/signed-attachment-urls";
 
 import JobAttachmentsInternal from "../_components/JobAttachmentsInternal";
 
@@ -150,56 +151,13 @@ export default async function JobAttachmentsPage({
 
   const attachmentAdmin = createAdminClient();
 
-  const attachmentItems = await Promise.all(
-    (attachmentRows ?? []).map(async (attachment: any) => {
-      const bucket = String(attachment?.bucket ?? "").trim();
-      const storagePath = String(attachment?.storage_path ?? "")
-        .trim()
-        .replace(/^\/+/, "");
-      const contentType =
-        typeof attachment?.content_type === "string" &&
-        attachment.content_type.trim().length > 0
-          ? attachment.content_type.trim()
-          : null;
-
-      let signedUrl: string | null = null;
-
-      if (!bucket || !storagePath) {
-        console.warn("Job attachment row missing bucket/storage_path", {
-          jobId,
-          attachmentId: String(attachment?.id ?? "").trim() || null,
-          bucket: bucket || null,
-          storagePath: storagePath || null,
-          contentType,
-        });
-      } else {
-        const { data, error: signErr } = await attachmentAdmin.storage
-          .from(bucket)
-          .createSignedUrl(storagePath, 60 * 60);
-
-        if (signErr || !data?.signedUrl) {
-          console.warn("Job attachment signing failed", {
-            jobId,
-            attachmentId: String(attachment?.id ?? "").trim() || null,
-            bucket,
-            storagePath,
-            contentType,
-            error: signErr?.message ?? "missing_signed_url",
-          });
-        } else {
-          signedUrl = data.signedUrl;
-        }
-      }
-
-      return {
-        ...attachment,
-        bucket,
-        storage_path: storagePath,
-        content_type: contentType,
-        signedUrl,
-      };
-    })
-  );
+  const attachmentItems = await signAttachmentRows({
+    client: attachmentAdmin,
+    rows: attachmentRows ?? [],
+    onFailure: (failure) => {
+      console.warn("Job attachment signing failed", { jobId, ...failure });
+    },
+  });
 
   const customerName =
     [job.customer_first_name, job.customer_last_name]

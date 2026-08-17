@@ -129,9 +129,16 @@ describe("refrigerant charge evidence helpers", () => {
     const admin = {
       storage: {
         from: () => ({
-          createSignedUrl: async (path: string) => {
-            signedPaths.push(path);
-            return { data: { signedUrl: `https://signed.example/${path}` }, error: null };
+          createSignedUrls: async (paths: string[]) => {
+            signedPaths.push(...paths);
+            return {
+              data: paths.map((path) => ({
+                path,
+                signedUrl: `https://signed.example/${path}`,
+                error: null,
+              })),
+              error: null,
+            };
           },
         }),
       },
@@ -191,7 +198,7 @@ describe("refrigerant charge evidence helpers", () => {
     const admin = {
       storage: {
         from: () => ({
-          createSignedUrl: async () => ({ data: null, error: new Error("signing failed") }),
+          createSignedUrls: async () => ({ data: null, error: new Error("signing failed") }),
         }),
       },
     };

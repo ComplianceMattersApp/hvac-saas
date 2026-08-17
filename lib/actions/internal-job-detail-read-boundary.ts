@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import type { InternalUserRow } from "@/lib/auth/internal-user";
 import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
+import { signAttachmentRows } from "@/lib/attachments/signed-attachment-urls";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -227,56 +228,13 @@ export async function signScopedInternalJobDetailAttachments(params: {
 
   const attachmentAdmin = params.admin ?? createAdminClient();
 
-  const items = await Promise.all(
-    (params.attachmentRows ?? []).map(async (attachment: any) => {
-      const bucket = String(attachment?.bucket ?? "").trim();
-      const storagePath = String(attachment?.storage_path ?? "")
-        .trim()
-        .replace(/^\/+/, "");
-      const contentType =
-        typeof attachment?.content_type === "string" &&
-        attachment.content_type.trim().length > 0
-          ? attachment.content_type.trim()
-          : null;
-
-      let signedUrl: string | null = null;
-
-      if (!bucket || !storagePath) {
-        console.warn("Job attachment row missing bucket/storage_path", {
-          jobId: params.jobId,
-          attachmentId: String(attachment?.id ?? "").trim() || null,
-          bucket: bucket || null,
-          storagePath: storagePath || null,
-          contentType,
-        });
-      } else {
-        const { data, error: signErr } = await attachmentAdmin.storage
-          .from(bucket)
-          .createSignedUrl(storagePath, 60 * 60);
-
-        if (signErr || !data?.signedUrl) {
-          console.warn("Job attachment signing failed", {
-            jobId: params.jobId,
-            attachmentId: String(attachment?.id ?? "").trim() || null,
-            bucket,
-            storagePath,
-            contentType,
-            error: signErr?.message ?? "missing_signed_url",
-          });
-        } else {
-          signedUrl = data.signedUrl;
-        }
-      }
-
-      return {
-        ...attachment,
-        bucket,
-        storage_path: storagePath,
-        content_type: contentType,
-        signedUrl,
-      };
-    }),
-  );
+  const items = await signAttachmentRows({
+    client: attachmentAdmin,
+    rows: params.attachmentRows ?? [],
+    onFailure: (failure) => {
+      console.warn("Job attachment signing failed", { jobId: params.jobId, ...failure });
+    },
+  });
 
   return {
     authorized: true as const,

@@ -19,16 +19,21 @@ import {
   normalizeJobAttachmentEvidenceContext,
   parseEquipmentLabelPhotoCaption,
 } from "@/lib/jobs/refrigerant-charge-evidence";
-
-function safeFileName(name: string) {
-  return name.replace(/[^\w.\- ()]/g, "_");
-}
+import {
+  inferAttachmentContentType,
+  JOB_ATTACHMENT_MAX_PER_JOB,
+  normalizeAttachmentContentType,
+  safeAttachmentFileName,
+  validateJobAttachmentMetadata,
+} from "@/lib/attachments/attachment-upload-policy";
 
 type AttachmentStorageRow = {
   id: string;
   bucket: string | null;
   storage_path: string | null;
   file_name: string | null;
+  content_type?: string | null;
+  file_size?: number | null;
   caption?: string | null;
 };
 
@@ -133,12 +138,9 @@ async function cleanupJobAttachmentRows(input: {
     storagePathsByBucket.get(bucket)?.push(storagePath);
   }
 
-  for (const [bucket, storagePaths] of storagePathsByBucket.entries()) {
-    const uniquePaths = Array.from(new Set(storagePaths));
-    if (!uniquePaths.length) continue;
-    await adminClient.storage.from(bucket).remove(uniquePaths);
-  }
-
+  // Row first, object second. If the object removal fails we are left with an
+  // unreferenced blob (cheap, sweepable); the reverse order would leave a row
+  // pointing at nothing, which renders as a permanently broken attachment.
   const { error: deleteErr } = await supabase
     .from("attachments")
     .delete()
@@ -147,8 +149,67 @@ async function cleanupJobAttachmentRows(input: {
     .in("id", attachmentIds);
 
   if (deleteErr) throw deleteErr;
+
+  for (const [bucket, storagePaths] of storagePathsByBucket.entries()) {
+    const uniquePaths = Array.from(new Set(storagePaths));
+    if (!uniquePaths.length) continue;
+
+    const { error: removeErr } = await adminClient.storage.from(bucket).remove(uniquePaths);
+    if (removeErr) {
+      console.error("job_attachment_storage_cleanup_failed", {
+        jobId,
+        bucket,
+        pathCount: uniquePaths.length,
+        error: removeErr instanceof Error ? removeErr.message : "Unknown storage cleanup error",
+      });
+    }
+  }
 }
 
+/**
+ * Read the object's real size and content type back out of storage.
+ * Returns null when no object exists at that path.
+ */
+async function describeStoredAttachmentObject(input: {
+  adminClient: ReturnType<typeof createAdminClient>;
+  bucket: string;
+  storagePath: string;
+}) {
+  const lastSlash = input.storagePath.lastIndexOf("/");
+  const prefix = lastSlash > 0 ? input.storagePath.slice(0, lastSlash) : "";
+  const objectName = input.storagePath.slice(lastSlash + 1);
+
+  if (!objectName) return null;
+
+  const { data, error } = await input.adminClient.storage
+    .from(input.bucket)
+    .list(prefix, { limit: 100, search: objectName });
+
+  if (error) return null;
+
+  const match = (data ?? []).find(
+    (entry: { name?: unknown }) => String(entry?.name ?? "") === objectName,
+  ) as { metadata?: { size?: unknown; mimetype?: unknown } } | undefined;
+
+  if (!match) return null;
+
+  const size = Number(match.metadata?.size);
+
+  return {
+    fileSize: Number.isFinite(size) && size > 0 ? size : null,
+    contentType: normalizeAttachmentContentType(match.metadata?.mimetype) || null,
+  };
+}
+
+/**
+ * Confirm every requested attachment actually landed in storage, and reconcile
+ * the row against the object that is really there.
+ *
+ * The upload token is issued from client-declared metadata, so `file_size` and
+ * `content_type` are claims until this point. Anything that never uploaded,
+ * overshot the size limit, or arrived as a disallowed type is removed rather
+ * than finalized.
+ */
 async function loadVerifiedJobAttachments(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   adminClient: ReturnType<typeof createAdminClient>;
@@ -164,7 +225,7 @@ async function loadVerifiedJobAttachments(input: {
 
   const { data: attachmentRows, error: attachmentErr } = await supabase
     .from("attachments")
-    .select("id, bucket, storage_path, file_name")
+    .select("id, bucket, storage_path, file_name, content_type, file_size")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
     .in("id", attachmentIds);
@@ -183,16 +244,67 @@ async function loadVerifiedJobAttachments(input: {
       continue;
     }
 
-    const { data, error } = await adminClient.storage.from(bucket).createSignedUrl(storagePath, 60);
-    if (error || !data?.signedUrl) {
+    const stored = await describeStoredAttachmentObject({ adminClient, bucket, storagePath });
+    if (!stored) {
       invalidIds.push(row.id);
       continue;
+    }
+
+    const resolvedContentType = inferAttachmentContentType({
+      fileName: String(row.file_name ?? ""),
+      declaredContentType: stored.contentType ?? row.content_type,
+    });
+
+    const policyError = validateJobAttachmentMetadata({
+      fileName: String(row.file_name ?? ""),
+      contentType: resolvedContentType,
+      fileSize: stored.fileSize ?? row.file_size,
+    });
+
+    if (policyError) {
+      console.warn("job_attachment_rejected_after_upload", {
+        jobId,
+        attachmentId: row.id,
+        reason: policyError,
+        storedFileSize: stored.fileSize,
+        storedContentType: stored.contentType,
+      });
+      invalidIds.push(row.id);
+      continue;
+    }
+
+    // Replace the client's claim with what storage actually holds.
+    const reconciled: Record<string, unknown> = {};
+    if (stored.fileSize != null && stored.fileSize !== Number(row.file_size)) {
+      reconciled.file_size = stored.fileSize;
+    }
+    if (resolvedContentType && resolvedContentType !== String(row.content_type ?? "")) {
+      reconciled.content_type = resolvedContentType;
+    }
+
+    if (Object.keys(reconciled).length) {
+      const { error: reconcileErr } = await supabase
+        .from("attachments")
+        .update(reconciled)
+        .eq("id", row.id)
+        .eq("entity_type", "job")
+        .eq("entity_id", jobId);
+
+      if (reconcileErr) {
+        console.warn("job_attachment_metadata_reconcile_failed", {
+          jobId,
+          attachmentId: row.id,
+          error: reconcileErr.message,
+        });
+      }
     }
 
     verifiedRows.push({
       ...row,
       bucket,
       storage_path: storagePath,
+      file_size: stored.fileSize ?? row.file_size ?? null,
+      content_type: resolvedContentType || row.content_type || null,
     });
   }
 
@@ -240,7 +352,33 @@ export async function createJobAttachmentUploadToken(input: {
     });
   }
 
-  const cleanName = safeFileName(input.fileName);
+  const cleanName = safeAttachmentFileName(input.fileName);
+  const contentType = inferAttachmentContentType({
+    fileName: cleanName,
+    declaredContentType: input.contentType,
+  });
+  const fileSize = Number(input.fileSize);
+
+  const metadataError = validateJobAttachmentMetadata({
+    fileName: cleanName,
+    contentType,
+    fileSize,
+  });
+
+  if (metadataError) throw new Error(metadataError);
+
+  const { count: existingAttachmentCount, error: countErr } = await supabase
+    .from("attachments")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_type", "job")
+    .eq("entity_id", input.jobId);
+
+  if (countErr) throw countErr;
+
+  if (Number(existingAttachmentCount ?? 0) >= JOB_ATTACHMENT_MAX_PER_JOB) {
+    throw new Error(`A job can hold up to ${JOB_ATTACHMENT_MAX_PER_JOB} attachments.`);
+  }
+
   const attachmentEvidenceContext = normalizeJobAttachmentEvidenceContext(
     input.attachmentEvidenceContext,
   );
@@ -261,8 +399,8 @@ export async function createJobAttachmentUploadToken(input: {
     bucket: "attachments",
     storage_path: storagePath,
     file_name: cleanName,
-    content_type: input.contentType,
-    file_size: input.fileSize,
+    content_type: contentType,
+    file_size: fileSize,
     caption: normalizedCaption,
   });
 
@@ -289,6 +427,7 @@ export async function createJobAttachmentUploadToken(input: {
     attachmentId,
     bucket: "attachments",
     path: storagePath,
+    contentType,
     signedUrl: data.signedUrl,
     token: data.token,
   };
@@ -675,12 +814,31 @@ export async function finalizePortalAttachmentSubmission(input: {
   const fileNames = Array.isArray(input.fileNames)
     ? input.fileNames.map((v) => String(v ?? "").trim()).filter(Boolean)
     : [];
-  const attachmentIds = Array.isArray(input.attachmentIds)
-    ? input.attachmentIds.map((v) => String(v ?? "").trim()).filter(Boolean)
-    : [];
+  const attachmentIds = Array.from(new Set(
+    Array.isArray(input.attachmentIds)
+      ? input.attachmentIds.map((v) => String(v ?? "").trim()).filter(Boolean)
+      : [],
+  ));
 
   if (!note && attachmentIds.length === 0) {
     return;
+  }
+
+  // The ids arrive from the browser; confirm each one really belongs to this
+  // job before it is recorded on the timeline as this contractor's upload.
+  if (attachmentIds.length) {
+    const { data: ownedAttachments, error: ownedAttachmentsErr } = await supabase
+      .from("attachments")
+      .select("id")
+      .eq("entity_type", "job")
+      .eq("entity_id", input.jobId)
+      .in("id", attachmentIds);
+
+    if (ownedAttachmentsErr) throw ownedAttachmentsErr;
+
+    if ((ownedAttachments ?? []).length !== attachmentIds.length) {
+      throw new Error("One or more uploads could not be attached to this job.");
+    }
   }
 
   if (input.intent === "review") {

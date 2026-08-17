@@ -15,6 +15,10 @@ import {
 import type { AttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
 import { stripRefrigerantChargeEvidenceTag } from "@/lib/jobs/refrigerant-charge-evidence";
 import { downloadAttachmentZip } from "@/lib/attachments/download-attachment-zip";
+import {
+  JOB_ATTACHMENT_ACCEPT_ATTRIBUTE,
+  partitionJobAttachmentFiles,
+} from "@/lib/attachments/attachment-upload-policy";
 
 type Item = {
   id: string;
@@ -161,6 +165,7 @@ export default function JobAttachmentsInternal({
           idSuffix: "job-file-picker",
           name: "job_file_picker",
           label: "Choose Files",
+          accept: JOB_ATTACHMENT_ACCEPT_ATTRIBUTE,
           multiple: true,
         },
       ];
@@ -172,15 +177,18 @@ export default function JobAttachmentsInternal({
 
   function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const list = Array.from(e.target.files ?? []);
-    setFiles(list);
     e.target.value = "";
+
+    const { accepted, rejected } = partitionJobAttachmentFiles(list);
+    setFiles(accepted);
+    setError(rejected.length ? rejected.join(" ") : null);
   }
 
   async function uploadOne(file: File) {
     const tok = await createJobAttachmentUploadToken({
       jobId,
       fileName: file.name,
-      contentType: file.type || "application/octet-stream",
+      contentType: file.type,
       fileSize: file.size,
       caption: caption.trim() || undefined,
       attachmentEvidenceContext,
@@ -190,7 +198,9 @@ export default function JobAttachmentsInternal({
       const { error: upErr } = await supabase.storage
         .from(tok.bucket)
         .uploadToSignedUrl(tok.path, tok.token, file, {
-          contentType: file.type || "application/octet-stream",
+          // Use the type the server resolved, so files the browser could not
+          // identify still land in storage with a renderable content type.
+          contentType: tok.contentType,
         });
 
       if (upErr) throw new Error(upErr.message);

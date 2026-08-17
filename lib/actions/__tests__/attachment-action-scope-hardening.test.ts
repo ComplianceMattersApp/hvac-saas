@@ -53,6 +53,15 @@ function makeAdminClientFixture(fixture: {
     error: null,
   }));
   const removeMock = vi.fn(async () => ({ data: null, error: null }));
+  const listMock = vi.fn(async (prefix: string, listOptions?: { search?: string }) => ({
+    data: [
+      {
+        name: String(listOptions?.search ?? ""),
+        metadata: { size: 2048, mimetype: "application/pdf" },
+      },
+    ],
+    error: null,
+  }));
 
   return {
     storage: {
@@ -61,6 +70,7 @@ function makeAdminClientFixture(fixture: {
         return {
           createSignedUploadUrl: createSignedUploadUrlMock,
           createSignedUrl: createSignedUrlMock,
+          list: listMock,
           remove: removeMock,
         };
       },
@@ -189,22 +199,35 @@ function makeSessionClientFixture(fixture: {
               })),
             };
           },
-          select: vi.fn(() => ({
+          select: vi.fn((_columns?: string, selectOptions?: { count?: string; head?: boolean }) => ({
             eq: vi.fn((column: string, value: unknown) => ({
-              eq: vi.fn((nextColumn: string, nextValue: unknown) => ({
-                in: vi.fn(async (_inColumn: string, ids: unknown[]) => {
-                  const attachmentIds = ids.map((entry) => String(entry ?? "").trim());
-                  const rows = (fixture.attachments ?? []).filter((attachment) => {
-                    return (
-                      attachmentIds.includes(String((attachment as any)?.id ?? "").trim()) &&
-                      String((attachment as any)?.[column] ?? "") === String(value ?? "") &&
-                      String((attachment as any)?.[nextColumn] ?? "") === String(nextValue ?? "")
-                    );
-                  });
+              eq: vi.fn((nextColumn: string, nextValue: unknown) => {
+                const scopedRows = (fixture.attachments ?? []).filter(
+                  (attachment) =>
+                    String((attachment as any)?.[column] ?? "") === String(value ?? "") &&
+                    String((attachment as any)?.[nextColumn] ?? "") === String(nextValue ?? ""),
+                );
 
-                  return { data: rows, error: null };
-                }),
-              })),
+                // `await ...eq().eq()` is the count/head form used by the
+                // per-job attachment cap; `.in(...)` is the row fetch form.
+                const countResult = Promise.resolve({
+                  data: selectOptions?.head ? null : scopedRows,
+                  count: scopedRows.length,
+                  error: null,
+                });
+
+                return Object.assign(countResult, {
+                  in: vi.fn(async (_inColumn: string, ids: unknown[]) => {
+                    const attachmentIds = ids.map((entry) => String(entry ?? "").trim());
+                    return {
+                      data: scopedRows.filter((attachment) =>
+                        attachmentIds.includes(String((attachment as any)?.id ?? "").trim()),
+                      ),
+                      error: null,
+                    };
+                  }),
+                });
+              }),
             })),
           })),
           delete: vi.fn(() => ({

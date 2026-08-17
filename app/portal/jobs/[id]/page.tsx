@@ -7,6 +7,10 @@ import { insertInternalNotificationForEvent } from "@/lib/actions/notification-a
 import { createClient } from "@/lib/supabase/server";
 import PortalAccessIssue from "@/components/portal/PortalAccessIssue";
 import JobAttachments from "@/components/portal/JobAttachments";
+import {
+  PORTAL_ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+  signAttachmentRows,
+} from "@/lib/attachments/signed-attachment-urls";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
@@ -480,18 +484,13 @@ export default async function PortalJobDetailPage({
 
   if (attErr) throw attErr;
 
-  const attachmentItems = await Promise.all(
-    (attachments ?? []).map(async (a: any) => {
-      const { data } = await supabase.storage
-        .from(String(a.bucket))
-        .createSignedUrl(String(a.storage_path), 60 * 10);
-
-      return {
-        ...a,
-        signedUrl: data?.signedUrl ?? null,
-      };
-    })
-  );
+  // Signed with the caller's RLS-scoped client on purpose: a contractor can only
+  // ever mint URLs for objects their storage policy already lets them read.
+  const attachmentItems = await signAttachmentRows({
+    client: supabase,
+    rows: attachments ?? [],
+    expiresInSeconds: PORTAL_ATTACHMENT_SIGNED_URL_TTL_SECONDS,
+  });
 
   const sharedAttachmentItems = attachmentItems.filter((a: any) =>
     allowedAttachmentIds.has(String(a.id ?? ""))
