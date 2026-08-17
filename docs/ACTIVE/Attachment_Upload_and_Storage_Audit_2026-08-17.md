@@ -38,7 +38,7 @@ What did not:
 | 6 | Abandoned uploads left permanently broken rows | Medium | Fixed |
 | 7 | No uploader recorded anywhere on the attachment row | High (compliance) | Fixed |
 | 8 | Undecodable images silently rendered as document tiles | Medium | Fixed |
-| 9 | Attachment library capped at 500 with no pagination | Low | Open |
+| 9 | Attachment library capped at 500 with no pagination | Low | Fixed |
 | 10 | `account_owner_user_id` absent from `attachments` | Medium | Deferred — see §5 |
 
 ---
@@ -132,7 +132,29 @@ finalize event was written at all. Direct inserts left no actor trail whatsoever
 existing rows genuinely have no recoverable uploader, and inventing one would be
 worse than recording the gap honestly.
 
-### 2.8 Undecodable images masqueraded as documents
+### 2.8 The library read was a cliff, not a limit
+
+`/jobs/[id]/attachments` read with a bare `.limit(500)`. A job past that many
+attachments silently stopped showing the oldest ones, with nothing in the UI to
+say so — and every one of those 500 rows cost a signed URL and, for photos, a
+full-resolution download on first paint.
+
+Now pages at 24 rows with an explicit "Load more" and a "Showing X of Y" count.
+Two details that matter:
+
+- Ordering is `created_at DESC, id DESC` in both the first-page query and the
+  paging action. Ordering on a non-unique column alone lets rows repeat on one
+  page and vanish from another when timestamps collide.
+- Appended pages are discarded whenever the server sends a fresh first page.
+  Later pages were addressed by offset against the previous ordering, so a
+  delete shifts every row past it — keeping them would duplicate or skip
+  attachments.
+
+Selection can only reach what has been paged in, so the select-all control says
+so explicitly ("Select all 24 loaded") rather than letting a bulk download
+quietly cover a subset.
+
+### 2.9 Undecodable images masqueraded as documents
 
 When a preview failed to render, `onError` pushed the id into `failedPreviewIds`,
 `hasThumb` went false, and the tile fell through to the generic file-glyph
@@ -232,11 +254,15 @@ those rows only.
 | `20260817120000_attachment_storage_hardening.sql` | Bucket invariants pinned; `storage_path` indexed |
 | `20260817140000_attachment_provenance_and_staging.sql` | `created_by_user_id`, `finalized_at`, entity/staging indexes, sweep function |
 | `lib/actions/attachment-actions.ts` | Policy enforcement, post-upload reconciliation, staging + finalize stamp, provenance |
-| `JobAttachmentsInternal.tsx` | Distinct preview-failure state |
+| `lib/attachments/job-attachment-pagination.ts` | Page size and clamped range resolution |
+| `loadInternalJobAttachmentsPage` | Scoped, signed page fetch for "load more" |
+| `JobAttachmentsInternal.tsx` | Distinct preview-failure state; paging, stale-page invalidation, honest select-all |
 | 9 read paths | `finalized_at` filter |
 
-Verification: `tsc --noEmit` clean, `eslint` clean on all touched files,
-full suite **6337 tests across 659 files, all passing**.
+Verification: `tsc --noEmit` clean, `eslint` clean on all touched files (the one
+remaining warning is a deliberate `<img>` — `next/image` would break the
+browser-native magnifier described in §3.3), full suite **6363 tests across 661
+files, all passing**.
 
 ---
 
@@ -250,11 +276,16 @@ consistent. Adding a denormalized column that can silently drift from the job's
 real account would be adding sand, not removing it. Worth doing with a
 maintaining trigger and a verified backfill — not as a drive-by.
 
-**Open — pagination.** `/jobs/[id]/attachments` caps at 500 rows with no paging.
-Not a correctness bug, but it is a cliff rather than a limit. Housecall Pro's
-25-per-page default is a reasonable target.
+**Open — thumbnails and per-user quality setting.** Gated on §3.4. Deliberately
+not built ahead of the measurement: the only surviving argument for thumbnails
+is payload, and whether that is worth a pipeline depends on the real average
+file size. Building first and measuring after would be guessing.
 
-**Open — thumbnails and per-user quality setting.** Gated on §3.4.
+**Open — share-state event scan.** `initialSharedAttachmentIds` is derived from
+the most recent 500 `public_note` events. A job past that many events could show
+a stale "Shared with Contractor" badge on an older attachment. Pre-existing and
+cosmetic, but it is the same class of cliff as §2.8 and should get the same
+treatment.
 
 **Roadmap — customer-level media gallery.** Attachments are per-job only.
 Jobber's client-level rollup with source and file-type filters is genuinely

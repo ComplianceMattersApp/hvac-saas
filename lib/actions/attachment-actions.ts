@@ -26,6 +26,8 @@ import {
   safeAttachmentFileName,
   validateJobAttachmentMetadata,
 } from "@/lib/attachments/attachment-upload-policy";
+import { resolveAttachmentPageRange } from "@/lib/attachments/job-attachment-pagination";
+import { signAttachmentRows } from "@/lib/attachments/signed-attachment-urls";
 
 type AttachmentStorageRow = {
   id: string;
@@ -459,6 +461,71 @@ export async function createJobAttachmentUploadToken(input: {
 
 export async function revalidatePortalJob(jobId: string) {
   revalidatePath(`/portal/jobs/${jobId}`);
+}
+
+/**
+ * Fetch one page of a job's attachment library, signed and ready to render.
+ *
+ * Read-only, so it is scoped to the caller's account but deliberately not
+ * entitlement-gated: an account that has lapsed can still look at the evidence
+ * it already captured, it just cannot add to it.
+ *
+ * Ordered by `created_at DESC, id DESC`. The id tiebreaker is what makes paging
+ * stable -- ordering on a non-unique column alone lets rows repeat on one page
+ * and vanish from another when timestamps collide.
+ */
+export async function loadInternalJobAttachmentsPage(input: {
+  jobId: string;
+  offset?: number;
+  limit?: number;
+}) {
+  const jobId = String(input.jobId ?? "").trim();
+  if (!jobId) throw new Error("Missing jobId");
+
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr) throw userErr;
+  if (!user) throw new Error("Not authenticated");
+
+  const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
+
+  const scopedJob = await loadScopedInternalAttachmentJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+  });
+
+  if (!scopedJob?.id) {
+    throw new Error("Not authorized to read attachments for this job");
+  }
+
+  const { offset, limit, to } = resolveAttachmentPageRange(input);
+
+  const { data: rows, error } = await supabase
+    .from("attachments")
+    .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
+    .eq("entity_type", "job")
+    .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(offset, to);
+
+  if (error) throw new Error(error.message);
+
+  const items = await signAttachmentRows({
+    client: createAdminClient(),
+    rows: rows ?? [],
+    onFailure: (failure) => {
+      console.warn("Job attachment signing failed", { jobId, ...failure });
+    },
+  });
+
+  return { items, offset, limit };
 }
 
 export async function discardInternalJobAttachmentUpload(input: {
