@@ -207,7 +207,13 @@ export async function pollOneRegistration(params: {
 
   // Brand next: a failed brand makes the campaign moot, and its failure reason
   // is the actionable one (EIN/name mismatch being by far the most common).
-  if (registration.brand_registration_sid) {
+  // Skip the brand fetch once it is terminally APPROVED — during the weeks a
+  // campaign can sit in carrier review, refetching a settled brand every ten
+  // minutes is a thousand pointless authenticated calls per registration.
+  if (
+    registration.brand_registration_sid
+    && String(registration.brand_status ?? "").toUpperCase() !== "APPROVED"
+  ) {
     const brand = await fetchBrandRegistration({
       auth,
       brandRegistrationSid: String(registration.brand_registration_sid),
@@ -329,6 +335,23 @@ export async function completeRegistration(params: {
   const accountOwnerUserId = registration.account_owner_user_id;
   const actorUserId = registration.updated_by_user_id ?? registration.created_by_user_id ?? null;
 
+  // A sandbox registration is a Mock walkthrough: its brand/campaign never
+  // reached the carriers, so its refs must NEVER land in the columns the live
+  // send path reads. Concierge configs live on provider_environment='sandbox'
+  // rows and can be LIVE-ACTIVE — writing a Mock messaging service over one
+  // would reroute real customer texts into an unregistered lane. Sandbox
+  // completion closes the registration row and touches nothing else.
+  if (String(registration.provider_environment ?? "") === "sandbox") {
+    const { error } = await admin
+      .from("sms_provisioning_registrations")
+      .update({ campaign_status: "VERIFIED", completed_at: nowIso, last_error: null })
+      .eq("id", registration.id);
+    if (error) {
+      throw new Error(`Completion write failed (sandbox stamp): ${String(error.message ?? error)}`);
+    }
+    return;
+  }
+
   // completed_at is stamped ONLY when every write below lands. A completion
   // that half-failed and stamped anyway would retire the row from the poll
   // forever, leaving an account that can never activate and no error anywhere.
@@ -409,13 +432,16 @@ export async function completeRegistration(params: {
     activation_status: "active",
   };
 
-  const { data: existingSender, error: senderReadError } = await admin
+  // List-and-pick for the same reason as the config read above: nothing
+  // guarantees a single sender row per configuration, and a multi-row
+  // maybeSingle error would strand a VERIFIED registration forever.
+  const { data: senderRows, error: senderReadError } = await admin
     .from("sms_sender_identities")
     .select("id")
     .eq("account_owner_user_id", accountOwnerUserId)
-    .eq("provider_configuration_id", configurationId)
-    .maybeSingle();
+    .eq("provider_configuration_id", configurationId);
   require("sender read", senderReadError);
+  const existingSender = (Array.isArray(senderRows) ? senderRows : [])[0] ?? null;
 
   if (existingSender?.id) {
     const { error } = await admin

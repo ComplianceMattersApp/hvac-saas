@@ -216,6 +216,29 @@ describe("completion writes", () => {
     expect(String(configInsert?.values?.activation_status ?? "")).not.toBe("active");
   });
 
+  it("NEVER touches provider config or sender identity for a sandbox (Mock) registration", async () => {
+    // Concierge configs live on provider_environment='sandbox' rows and can be
+    // LIVE-ACTIVE. A Mock walkthrough's refs landing in the columns the live
+    // send path reads would reroute real customer texts into an unregistered
+    // lane. Sandbox completion closes the registration row and nothing else.
+    const sandboxRegistration = { ...registration, id: "reg-5", provider_environment: "sandbox" };
+    const admin = makeAdmin({
+      sms_provisioning_registrations: [sandboxRegistration],
+      sms_provider_configurations: [{ id: "config-live", provider_environment: "sandbox" }],
+      sms_sender_identities: [{ id: "sender-live" }],
+    });
+
+    await completeRegistration({ admin, registration: sandboxRegistration });
+
+    expect(admin.writes).toHaveLength(1);
+    expect(admin.writes[0]).toMatchObject({
+      table: "sms_provisioning_registrations",
+      op: "update",
+    });
+    expect(admin.writes[0].values).toMatchObject({ campaign_status: "VERIFIED" });
+    expect(admin.writes[0].values.completed_at).toBeTruthy();
+  });
+
   it("UPDATES the existing rows for a concierge-configured tenant", async () => {
     const admin = makeAdmin({
       sms_provisioning_registrations: [registration],

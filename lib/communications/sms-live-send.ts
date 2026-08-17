@@ -22,7 +22,7 @@
  */
 
 import { prepareSmsProviderDeliveryPreflight } from "@/lib/communications/sms-provider-delivery-preflight";
-import { resolveTwilioAccountForOwner } from "@/lib/communications/sms-account-resolution";
+import { resolveSubaccountCredential } from "@/lib/communications/sms-account-resolution";
 import {
   sendTwilioSandboxMessage,
   TwilioMessageError,
@@ -256,22 +256,23 @@ export async function attemptLiveOnTheWaySend(params: {
       };
     }
 
-    // 1b. Which Twilio account this tenant's traffic runs under — the EXACT
+    // 1b. Which Twilio account this tenant's traffic runs under — the SAME
     // rule webhook signature validation uses (resolveTwilioAccountForOwner):
     // the subaccount only when the configuration's provider_account_ref names
     // an account whose credential we hold; otherwise the platform account.
-    // Sharing the rule is the point: where a message is sent from and which
-    // token validates its callbacks can never disagree. Concierge tenants
-    // whose free-text account ref matches no stored credential keep sending
-    // via the platform exactly as before this lane existed.
+    // Implemented against the config row ALREADY read in step 1 (no second
+    // configuration read, no read-skew window). Concierge tenants whose
+    // free-text account ref matches no stored credential keep sending via the
+    // platform exactly as before this lane existed.
     let sendAuth: { accountSid: string; authToken: string } | null = null;
-    if (asTrimmed(liveConfig.providerAccountRef ?? "").startsWith("AC")) {
-      const resolved = await resolveTwilioAccountForOwner({
+    const accountRef = asTrimmed(liveConfig.providerAccountRef ?? "");
+    if (accountRef.startsWith("AC")) {
+      const credential = await resolveSubaccountCredential({
         admin: params.admin,
         accountOwnerUserId,
       });
-      if (resolved?.isSubaccount) {
-        sendAuth = { accountSid: resolved.accountSid, authToken: resolved.authToken };
+      if (credential && credential.accountSid === accountRef) {
+        sendAuth = { accountSid: credential.accountSid, authToken: credential.authToken };
       }
     }
 

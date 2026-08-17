@@ -155,6 +155,10 @@ async function twilioRequest(options: RequestOptions): Promise<any> {
           : {}),
       },
       body: options.method === "POST" ? body.toString() : undefined,
+      // Hard deadline WELL inside the spend-step reservation's 2-minute
+      // takeover window: a hung purchase that outlived the reservation would
+      // let a second caller buy again while the first eventually also lands.
+      signal: AbortSignal.timeout(90_000),
     });
   } catch {
     // Deliberately not echoing the URL: it embeds the account SID.
@@ -749,6 +753,25 @@ export async function createBrandRegistration(params: {
   return toBrandRegistration(json);
 }
 
+/**
+ * Brands already registered in this (sub)account. The subaccount is exclusively
+ * one tenant's, so anything here came from a prior attempt whose bookkeeping
+ * write failed — the retry adopts it instead of paying a second brand fee.
+ */
+export async function listBrandRegistrations(params: {
+  auth: TwilioAuth;
+}): Promise<BrandRegistration[]> {
+  const json = await twilioRequest({
+    step: "brand_inventory",
+    auth: params.auth,
+    method: "GET",
+    url: `${MESSAGING_BASE}/a2p/BrandRegistrations?PageSize=5`,
+  });
+  return (json?.data ?? json?.brand_registrations ?? [])
+    .map((row: any) => toBrandRegistration(row))
+    .filter((brand: BrandRegistration) => brand.sid);
+}
+
 export async function fetchBrandRegistration(params: {
   auth: TwilioAuth;
   brandRegistrationSid: string;
@@ -868,6 +891,26 @@ export async function createCampaign(params: {
     },
   });
   return toCampaignRegistration(json);
+}
+
+/**
+ * Campaigns already registered on a Messaging Service (Twilio allows one).
+ * Adoption path for a lost campaign_sid write: without it, every retry hits
+ * the one-campaign-per-service conflict and the registration can never finish.
+ */
+export async function listCampaignsForService(params: {
+  auth: TwilioAuth;
+  messagingServiceSid: string;
+}): Promise<CampaignRegistration[]> {
+  const json = await twilioRequest({
+    step: "campaign_inventory",
+    auth: params.auth,
+    method: "GET",
+    url: `${MESSAGING_BASE}/Services/${params.messagingServiceSid}/Compliance/Usa2p`,
+  });
+  return (json?.compliance_registrations ?? [])
+    .map((row: any) => toCampaignRegistration(row))
+    .filter((campaign: CampaignRegistration) => campaign.sid);
 }
 
 export async function fetchCampaign(params: {

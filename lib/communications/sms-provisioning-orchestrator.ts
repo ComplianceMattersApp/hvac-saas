@@ -34,7 +34,9 @@ import {
   evaluateCustomerProfile,
   evaluateTrustProduct,
   fetchEndUser,
+  listBrandRegistrations,
   listBundleAssignedObjectSids,
+  listCampaignsForService,
   listOwnedIncomingNumbers,
   purchaseLocalNumber,
   resubmitBrandRegistration,
@@ -65,8 +67,12 @@ export type ProvisioningStepResult = {
    * approval before brand, brand approval before campaign) — nothing ran,
    * nothing was spent, and nothing is wrong. The poller refreshes those
    * statuses; the operator just tries again later.
+   *
+   * "busy" means another caller holds the spend-step reservation right now —
+   * a double-click or a second operator. Refresh in a moment; do NOT tell the
+   * operator a carrier review is happening, because nothing was submitted.
    */
-  outcome: "advanced" | "blocked" | "failed" | "waiting" | "complete";
+  outcome: "advanced" | "blocked" | "failed" | "waiting" | "busy" | "complete";
   message?: string;
   fieldFailures?: TwilioFieldFailure[];
 };
@@ -321,7 +327,7 @@ export async function runNextProvisioningStep(params: {
         if (!reserved) {
           return {
             step,
-            outcome: "waiting",
+            outcome: "busy",
             message: "This step is already running — give it a moment, then refresh.",
           };
         }
@@ -697,12 +703,33 @@ export async function runNextProvisioningStep(params: {
         if (!reservedBrand) {
           return {
             step,
-            outcome: "waiting",
+            outcome: "busy",
             message: "This step is already running — give it a moment, then refresh.",
           };
         }
 
         const auth = await authForRegistration({ admin, registration });
+
+        // ADOPT before creating: if a prior attempt registered a brand but the
+        // bookkeeping write failed, the subaccount already holds it — creating
+        // another pays a second non-refundable fee.
+        if (!String(registration.brand_registration_sid ?? "").trim()) {
+          const ownedBrands = await listBrandRegistrations({ auth });
+          const adoptedBrand = ownedBrands[0] ?? null;
+          if (adoptedBrand) {
+            await patchRegistration({
+              admin,
+              registrationId,
+              patch: {
+                brand_registration_sid: adoptedBrand.sid,
+                brand_status: adoptedBrand.status || "PENDING",
+                brand_identity_status: adoptedBrand.identityStatus,
+                last_error: null,
+              },
+            });
+            return { step, outcome: "advanced" };
+          }
+        }
 
         // A FAILED brand is resubmitted in place after the operator fixed the
         // bundle (a bare re-POST triggers carrier re-evaluation; Twilio covers
@@ -760,6 +787,29 @@ export async function runNextProvisioningStep(params: {
         }
 
         const auth = await authForRegistration({ admin, registration });
+
+        // ADOPT before creating: Twilio allows one campaign per Messaging
+        // Service, so a lost campaign_sid write would otherwise make every
+        // retry hit that conflict and the registration could never finish.
+        const existingCampaigns = await listCampaignsForService({
+          auth,
+          messagingServiceSid: String(registration.messaging_service_sid),
+        });
+        const adoptedCampaign = existingCampaigns[0] ?? null;
+        if (adoptedCampaign) {
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: {
+              campaign_sid: adoptedCampaign.sid,
+              campaign_status: adoptedCampaign.status || "PENDING",
+              submitted_at: new Date().toISOString(),
+              last_error: null,
+            },
+          });
+          return { step, outcome: "advanced" };
+        }
+
         const copy = buildCampaignCopy(registration);
         const campaign = await createCampaign({
           auth,

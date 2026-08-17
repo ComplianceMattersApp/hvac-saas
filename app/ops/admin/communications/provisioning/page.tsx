@@ -34,6 +34,15 @@ const NOTICE: Record<string, { tone: "success" | "warn" | "error"; message: stri
     message:
       "Nothing to do yet — Twilio is still reviewing the previous submission. We check the status every few minutes; come back and press Continue once it clears.",
   },
+  step_in_progress: {
+    tone: "warn",
+    message: "This step is already running — likely a double-click. Give it a moment, then refresh.",
+  },
+  path_locked: {
+    tone: "error",
+    message:
+      "The EIN choice can't change once your business profile has been submitted to Twilio — the registration continues on its original path. Contact support if the choice was wrong.",
+  },
   ein_required: { tone: "error", message: "Enter your EIN, or choose the no-EIN path." },
   save_failed: { tone: "error", message: "We couldn't save those details. Please try again." },
   registration_missing: { tone: "error", message: "Start by entering your business details." },

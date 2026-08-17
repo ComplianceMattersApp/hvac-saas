@@ -91,6 +91,24 @@ export async function startSmsProvisioningFromForm(formData: FormData): Promise<
   };
 
   const existing = await loadActiveRegistration(admin, accountOwnerUserId);
+
+  if (existing) {
+    // NEVER rewrite the environment mid-flight: it decides Mock-ness, and
+    // resources already created under one environment cannot change theirs.
+    delete payload.provider_environment;
+
+    // The registration path is locked once TrustHub bundles exist: the engine
+    // corrects bundles IN PLACE, and a bundle created under one policy cannot
+    // be evaluated or branded under the other — the mismatch surfaces only
+    // after the non-refundable brand fee. Before any bundle exists, switching
+    // is safe and allowed.
+    const pathChanged =
+      String(existing.registration_path ?? "") !== String(payload.registration_path ?? "");
+    if (pathChanged && existing.customer_profile_sid) {
+      redirect(withNotice("path_locked"));
+    }
+  }
+
   const { error } = existing
     ? await admin.from("sms_provisioning_registrations").update(payload).eq("id", existing.id)
     : await admin.from("sms_provisioning_registrations").insert(payload);
@@ -117,6 +135,7 @@ export async function advanceSmsProvisioningFromForm(): Promise<void> {
   if (result.outcome === "failed") redirect(withNotice("step_failed"));
   if (result.outcome === "blocked") redirect(withNotice("validation_blocked"));
   if (result.outcome === "waiting") redirect(withNotice("waiting_on_review"));
+  if (result.outcome === "busy") redirect(withNotice("step_in_progress"));
   if (result.outcome === "complete") redirect(withNotice("submitted"));
   redirect(withNotice("step_advanced"));
 }
@@ -146,6 +165,7 @@ export async function retrySmsProvisioningStepFromForm(): Promise<void> {
   if (result.outcome === "failed") redirect(withNotice("step_failed"));
   if (result.outcome === "blocked") redirect(withNotice("validation_blocked"));
   if (result.outcome === "waiting") redirect(withNotice("waiting_on_review"));
+  if (result.outcome === "busy") redirect(withNotice("step_in_progress"));
   if (result.outcome === "complete") redirect(withNotice("submitted"));
   redirect(withNotice("step_advanced"));
 }
