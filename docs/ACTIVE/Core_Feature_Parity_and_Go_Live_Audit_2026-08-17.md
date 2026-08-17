@@ -24,46 +24,94 @@ Method:
 - Market check refreshed 2026-08-17 against current HVAC FSM buyer guidance (see §9).
 
 Standing assumption, per owner instruction: **the Twilio provisioning wizard is assumed to work as
-expected.** §2 records what is actually in the repo so the assumption is not mistaken for evidence.
+expected.** §2 records where it lives and what it does and does not cover.
 
-## 2. The Twilio self-serve provisioning wizard — what actually landed
+> **Correction notice (same-day).** The first version of this audit reported that the wizard did not exist
+> and that a 39-commit delta was unmerged. Both were wrong, caused by comparing against a **stale local
+> `main` ref without fetching first**. `origin/main` is current, the branch delta is zero, sales tax is
+> deployed, and the wizard is fully built on `slice-04-twilio-provisioning`. §2 and §4 below are the
+> corrected findings. Nothing in §3 or §5–§9 depended on the error.
 
-| Item | State |
-|---|---|
-| `supabase/migrations/20260813120000_sms_self_serve_provisioning_foundation.sql` | **Present.** 212 lines. Committed `2189b42`, 2026-08-16. |
-| `sms_provisioning_registrations` table | Present in the migration. Business identity, authorized rep, 9 Twilio ref columns, 8 per-step status columns mirroring Twilio's own enums, `last_error`, poller indexes, RLS enabled with **no policies** (service-role only). |
-| `sms_provider_subaccount_credentials` table | Present. AES-256-GCM encrypted subaccount auth token, documented amendment to the "never store credentials" rule, no tenant policy. |
-| Activation attestation columns on `sms_provider_configurations` | Present (campaign-approved / wording-reviewed / STOP-tested / attested-by). |
-| Wizard UI, server actions, TrustHub API client, registration poller | **Not present.** `grep -rniE "trusthub\|trust_product\|customer_profile_sid\|subaccount\|provisioning_registration\|SMS_CREDENTIALS_ENCRYPTION_KEY"` across all `.ts`/`.tsx` returns **one** hit, and it is an unrelated placeholder string in the existing Admin Communications page. |
-| Lane 7 spec | Still reads "committed future lane, not started" (`SMS_Tenant_Self_Serve_Provisioning_Lane_Spec.md`, dated 2026-08-06). |
-| Deployment | The migration is on the feature branch only — **not on `main`**, therefore not applied to production. |
+## 2. The Twilio self-serve provisioning wizard — where it lives and what it covers
 
-**Reading:** what was built yesterday is the durable, resumable *foundation* for the wizard — and it is
-good work. The security posture is deliberate and correctly reasoned (PII table with no tenant SELECT
-policy at all; the credential-storage amendment is justified in the file rather than done quietly), and
-the step-status vocabulary borrows Twilio's enums instead of inventing a parallel one, which is what makes
-a poller writable later. The registration-path check constraint even encodes the sole-prop/LLC trap
-(Twilio error 30915) at the database level.
+**The wizard is built.** It lives on `origin/slice-04-twilio-provisioning`: **9 commits, ~5,938
+insertions across 30 files**, dated 2026-08-13 through 2026-08-17. The branch is **zero commits behind
+`main`**, so it is cleanly mergeable. What is on `main` today is only the Slice 04 schema foundation
+(migration `20260813120000`, committed `2189b42`); the engine and UI are on the branch awaiting merge.
 
-What does not exist yet is the wizard: no number search/purchase, no Messaging Service creation, no
-webhook wiring, no TrustHub brand/campaign registration, no status polling, no tenant-facing screen.
-Per owner instruction the rest of this audit assumes that lane is closed. It is worth being precise about
-because tenant SMS onboarding is currently **concierge** (the manual checklist in the Lane 7 spec §2), and
-concierge is fine for the first handful of tenants — it is not a blocker for going live, it is a cost and
-an SLA on each new tenant that wants texting.
+| Component | File | Size |
+|---|---|---|
+| Twilio provisioning API client (TrustHub, subaccounts, numbers, Messaging Services, brands, campaigns) | `lib/communications/twilio-provisioning-client.ts` | 953 lines |
+| Step orchestrator / state machine | `lib/communications/sms-provisioning-orchestrator.ts` | 904 lines |
+| Registration status poller | `lib/communications/sms-provisioning-poller.ts` | 471 lines |
+| Tenant-facing wizard UI | `app/ops/admin/communications/provisioning/page.tsx` | 376 lines |
+| Server actions | `lib/actions/sms-provisioning-actions.ts` | 194 lines |
+| Per-tenant account resolution (webhook validation + live send) | `lib/communications/sms-account-resolution.ts` | 183 lines |
+| Self-serve entitlement gate | `lib/communications/sms-self-serve-gate.ts` | 109 lines |
+| Subaccount credential encryption | `lib/communications/sms-credentials-encryption.ts` | 59 lines |
+| Activation state derivation | `lib/communications/sms-activation-state.ts` | 70 lines |
+| Test coverage added | 10 new/expanded spec files | ~2,000 lines |
+
+Also changed: multi-account webhook signature validation on both Twilio routes, live-send restricted to
+the governed current template version, admin Communications console reworked with an audience split, and
+a 10-minute poller cron added to `vercel.json`.
+
+Architecture, per the slice's own decision record (`docs/SLICES/SLICE-04-twilio-self-serve-provisioning.md`):
+one Twilio subaccount per tenant (brands cannot be moved across accounts later); encrypted subaccount
+auth tokens in a dedicated no-tenant-policy table, because subaccount status callbacks are signed with
+that subaccount's token; A2P Low-Volume Standard as the primary path with a sole-proprietor fallback for
+tenants with no EIN; entitlement gate v1 as an owner allowlist env var; polling rather than Event Streams;
+real system-written verification replacing the honor-system checkbox for wizard-provisioned tenants; and
+mock mode so the whole state machine is exercisable in sandbox without TCR spend.
+
+**Assessment.** This is the most carefully built lane in the repo, and the three self-review commits on
+2026-08-17 are the reason. They caught, among others: a Mock/sandbox completion that would overwrite
+`provider_account_ref` on a live tenant's config and reroute real customer texts into an unregistered
+lane; two concurrent clicks both passing the adopt check and **buying a second phone number**; brand and
+campaign steps creating instead of adopting, exposing a non-refundable double-fee path; status writes in
+Twilio's hyphenated vocabulary violating the migration's underscored CHECK constraint on the first real
+review cycle; a completion-time DB error stamping the row complete and stranding the account permanently
+unable to activate; and unstamped poll rows sorting `NULLS FIRST` so unentitled registrations would starve
+entitled tenants out of the poll window. Money-spending steps are now serialized by a conditional flip
+with a two-minute takeover window, `twilioRequest` has a 90-second deadline so a hung purchase cannot
+outlive that window, and the registration path locks once a TrustHub bundle exists. The lane spec's
+"failure states are first-class with retry/edit" lock is honoured in the UI — rejection maps to
+`twilio_rejected` with `last_error`, the step re-runs in place with operator corrections, and reservation
+losers get a distinct "already running" notice rather than copy claiming a carrier review that never
+happened.
+
+**What the slice deliberately does not cover** (named follow-ups in its §4): toll-free verification ·
+Event Streams sinks · a billing add-on replacing the owner allowlist · Twilio Compliance Embeddable ·
+additional campaign classes for review-requests and marketing · **two-way conversations** · migrating the
+platform owner's own existing manual setup into a subaccount.
+
+Two consequences worth holding onto. First, entitlement v1 is an **owner allowlist**
+(`ENABLE_SMS_SELF_SERVE_ACCOUNT_OWNER_IDS`), so this is self-serve *for tenants the owner switches on* —
+the concierge cost does not fully disappear until the billing add-on replaces the allowlist. Second,
+two-way conversation is explicitly out of scope here, which reinforces §6.1 gap 2 rather than resolving it.
+
+**Merge and deploy prerequisites** (from the branch itself): apply migration `20260813120000` to the target
+database, set `SMS_CREDENTIALS_ENCRYPTION_KEY` (32-byte hex, same validation as `QBO_ENCRYPTION_KEY`),
+set `ENABLE_SMS_SELF_SERVE_ACCOUNT_OWNER_IDS` and optionally
+`ENABLE_SMS_ADVANCED_CONSOLE_ACCOUNT_OWNER_IDS` and `SMS_PROVISIONING_ENVIRONMENT`, and confirm the new
+`/api/cron/sms-provisioning-poll` cron is live. Note the sandbox path still purchases a **real** subaccount
+and number (~$1.15/mo until deleted) — mock mode avoids TCR registration fees, not number cost.
 
 ## 3. Engineering health — measured, not asserted
 
-Run on this branch, 2026-08-17, with dependencies installed:
+Run 2026-08-17 with dependencies installed, on `main` and again on the unmerged provisioning branch:
 
-| Check | Result |
-|---|---|
-| `npm run build` (Next 16.2) | **PASS** — full route manifest generated |
-| `npx tsc --noEmit` | **PASS** — zero errors |
-| `npm test` (vitest) | **PASS** — 655 test files, 6,269 tests, 0 failures, 126s |
-| `npm run lint` | 3,205 errors / 327 warnings — see note |
-| Migrations | 170 files |
-| E2E (Playwright) | 2 spec files (`authenticated.spec.ts`, `public-pages.spec.ts`) |
+| Check | `main` (`dc14216`) | `slice-04-twilio-provisioning` |
+|---|---|---|
+| `npm run build` (Next 16.2) | **PASS** — full route manifest | not re-run |
+| `npx tsc --noEmit` | **PASS** — zero errors | **PASS** — zero errors |
+| `npm test` (vitest) | **PASS** — 655 files, 6,269 tests, 0 failures, 126s | **PASS** — 663 files, **6,396 tests**, 0 failures, 109s |
+| `npm run lint` | 3,205 errors / 327 warnings — see note | not re-run |
+| Migrations | 170 files | 170 (its migration is already on `main`) |
+| E2E (Playwright) | 2 spec files (`authenticated.spec.ts`, `public-pages.spec.ts`) | unchanged |
+
+The provisioning branch adds 8 test files and 127 tests and breaks nothing — a clean bill of health on the
+largest slice in the repo.
 
 Lint note: the error count looks alarming and mostly is not. It is dominated by
 `@typescript-eslint/no-explicit-any` at DB boundaries plus `no-require-imports` in root-level helper
@@ -77,27 +125,27 @@ at this stage usually carries. The thin E2E layer is the real coverage gap: the 
 signed payment links, portal scope) are covered by unit tests and by the manual prelaunch checklist, not
 by automated browser runs.
 
-## 4. Deploy-state finding — this is the one that actually gates "ready to go"
+## 4. Deploy state — verified against `origin/main`, no divergence
 
-The working branch is **39 commits ahead of `main`**, and `main`'s last commit is 2026-08-12.
-Per PROJECT_TRUTH §14.4, `main` is shipped production code. Four migrations exist on the branch and not
-on `main`:
+`origin/main` is at `dc14216` (2026-08-16). The audit working branch shares that commit exactly:
+**0 commits behind, and ahead only by this audit document.** Migration file lists are **identical at 170
+files** on both. Invoice sales tax is on `main` — migration `20260812180000_invoice_sales_tax_foundation.sql`
+plus tax surfaces in the invoice line-items table, the invoice page, the public payment page, Pricebook,
+Company Profile and customer edit — which matches the owner's report of seeing tax in the app today.
 
-- `20260812130000_qbo_item_mapping_columns.sql`
-- `20260812180000_invoice_sales_tax_foundation.sql`
-- `20260813120000_sms_self_serve_provisioning_foundation.sql`
-- `20260815120000_jobs_service_case_id_index.sql`
+So all of the following **is** in production code: invoice sales tax, QBO per-line item mapping and
+verify-after-write, offline ECC test-form drafts, the job-actions decomposition, the server-action
+export-surface reduction, and the 2026-08-16 Ops workspace refactor.
 
-So the following is built, tested, and **not in production**: invoice sales tax, QBO per-line item
-mapping and verify-after-write, offline ECC test-form drafts, the job-actions decomposition, the
-server-action export-surface reduction, and the entire 2026-08-16 Ops workspace refactor.
+**Method note, recorded because it changed a conclusion.** The first pass of this audit compared against
+the *local* `main` ref, which the session clone had left at `bb4f2d0` (2026-08-12), and reported a
+false 39-commit unmerged delta including sales tax. `git fetch origin --prune` resolved local `main` to
+`dc14216` and the delta to zero. **Any future audit that compares branches must fetch first and compare
+against `origin/*`, never a local ref inherited from a clone.**
 
-Sales tax is the one to look at hardest. It is a legally material invoicing capability; shipped invoices
-that should carry tax and don't are a correction exercise with a customer-facing edge. Everything else in
-the delta is safe-to-carry improvement.
-
-**This is not a code problem — it is a release-hygiene problem.** The work is done. It needs to be merged
-and the migrations applied with the normal sandbox-first discipline.
+The genuine release-state item is narrower: **`slice-04-twilio-provisioning` is unmerged** (§2), along with
+a number of other unmerged feature branches on the remote. That branch is up to date with `main` and
+carries its own migration plus new env and cron requirements.
 
 ## 5. What is built right
 
@@ -233,7 +281,7 @@ Recorded for owner action; this audit does not edit authority docs.
 | Doc claim | Code reality |
 |---|---|
 | CURRENT_ROADMAP, deferred items: "Tech dispatch phone notifications — genuinely still deferred: **nothing fires on assignment**" | **Stale.** `notifyJobAssignmentCreated` (`lib/actions/job-actions-shared.ts:431`) is called from `job-assignment-actions.ts:497`, `job-actions.ts:3852` and `job-actions-shared.ts:581`; it writes an `internal_job_assigned` notification through `insertTargetedInternalNotification`, which then invokes web-push delivery, and `internal_job_assigned` has a push template (`web-push-delivery.ts:76`). Assignment → in-app + web push **is** wired. What is genuinely missing is an *SMS/phone* notification to the tech and a per-user on/off preference. |
-| CURRENT_ROADMAP, Lane 7: "not started" / Lane 7 spec: "committed future lane, not started" | Partly stale — the Slice 04 DB foundation landed 2026-08-16 (§2). The wizard itself is still unstarted, so the lane status is right in substance and wrong in detail. |
+| CURRENT_ROADMAP Lane 7: "**COMMITTED, not started; demand-triggered**" / Lane 7 spec: "committed future lane, not started" | **Materially stale.** Lane 7 is implemented end to end on `slice-04-twilio-provisioning` — client, orchestrator, poller, wizard UI, gate, credential crypto, per-tenant webhook validation, 6,396 passing tests (§2). The roadmap still tells a reader the lane has not begun and that concierge is the plan of record. This is the single most misleading line in the control plane right now: a session picking up "what now?" from the roadmap would not learn that the biggest lane in the repo is finished and waiting to merge. **Update at merge, and record the env/cron prerequisites with it.** |
 | PROJECT_TRUTH §16.1 SMS row: "live-send + inbound STOP implemented. Pending owner activation" | Accurate, and worth reading alongside §6.1 gap 2 — "inbound" here means STOP/HELP only, not conversational reply handling. |
 
 PROJECT_TRUTH §16.1 otherwise held up well under spot-checking, which is unusual for a capability
@@ -246,17 +294,24 @@ additive discipline, and the source-of-truth boundaries are enforced in code. Th
 needs more foundation. The 2026-07-06 characterisation — post-completion maturation, not foundation
 building — is still the correct read, and the evidence for it got stronger.
 
-**Release readiness: not yet, for four reasons, none of which is a rewrite.**
+**Release readiness: close, with three items outstanding, none of which is a rewrite.** The shipped
+product on `main` is current and coherent — the earlier claim of a large unmerged delta was an artefact of
+this audit's own method error (§4), not a fact about the product.
 
-1. **Merge and deploy the 39-commit delta (§4).** Sales tax especially. Until this ships, "the product as
-   is" and "what customers can use" are two different products. Highest priority and lowest risk.
-2. **Decide the inbound-reply story before activating live SMS (§6.1 gap 2).** Activating outbound
-   texting without a place for replies to land is the one item here that can damage customer trust rather
-   than merely fail to impress.
+1. **Decide the inbound-reply story before activating live SMS (§6.1 gap 2).** This is now the top item.
+   Two-way conversation is explicitly out of scope in the provisioning slice, so merging that lane brings
+   more tenants onto outbound texting without giving any of them a place for replies to land. Activating
+   outbound texting while replies vanish is the one item here that can damage customer trust rather than
+   merely fail to impress. A minimal landing surface for inbound non-STOP messages is enough to close it.
+2. **Merge and deploy `slice-04-twilio-provisioning`**, with its env and cron prerequisites (§2). It is
+   green, reviewed three times, and up to date with `main`. Merging it converts tenant SMS onboarding from
+   a concierge cost into a product capability for allowlisted owners.
 3. **Work the 8 unchecked payment/portal smoke items** in the prelaunch checklist (signed link in a
    private browser, cancelled Checkout, one controlled Stripe payment, one manual payment, contractor
    portal scope positive and negative). These are exactly the paths the thin E2E layer does not cover.
-4. **Close the SMS activation owner action** the roadmap has been carrying.
+
+Then close the standing SMS activation owner action, and update the Lane 7 roadmap entry (§7) so the
+control plane stops describing a finished lane as unstarted.
 
 **Then, in order, the two cheapest competitive wins:** appointment reminders (finished rails, highest
 buyer-cited value) and bulk customer import (unblocks every switch-from-a-competitor deal).
@@ -287,5 +342,7 @@ agreements and has on-the-way; it is short on reminders, portal, and follow-up a
 ## 10. Non-actions
 
 No product code, schema, migration, Supabase data, Stripe, QBO, SMS/provider, production environment, or
-feature-flag changes were made by this audit. `npm ci` was run locally to execute the verification in §3.
-The stale doc claims in §7 are reported, not edited.
+feature-flag changes were made by this audit. `npm ci` was run locally, and a read-only git worktree was
+created at a scratch path to verify the provisioning branch, to execute the verification in §3. The stale
+doc claims in §7 are reported, not edited — including the Lane 7 entry, which belongs to the owner's
+control plane and should be updated when that branch merges.
