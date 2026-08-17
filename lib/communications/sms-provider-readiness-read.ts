@@ -39,10 +39,10 @@ export const SMS_SENDER_IDENTITY_SELECT = [
 export type SmsChecklistStatus = "complete" | "deferred" | "disabled";
 
 export type SmsCommunicationsStatus = {
-  smsEnabled: false;
-  liveSendsEnabled: false;
-  statusLabel: "SMS is not enabled";
-  helperText: "Live sends are disabled. This page is readiness/status only.";
+  smsEnabled: boolean;
+  liveSendsEnabled: boolean;
+  statusLabel: string;
+  helperText: string;
 };
 
 export type SmsProviderConfigurationReadinessRow = {
@@ -113,9 +113,9 @@ export type SmsProviderReadinessReadResult = {
   };
   complianceChecklist: SmsProviderReadinessChecklistItem[];
   activationSummary: {
-    status: "disabled";
-    statusLabel: "SMS is not enabled";
-    helperText: "Live sends are disabled. This page is readiness/status only.";
+    status: string;
+    statusLabel: string;
+    helperText: string;
   };
   deferredItems: string[];
   hasProviderConfiguration: boolean;
@@ -470,6 +470,49 @@ export async function getSmsProviderReadinessForAccount(
       ? "Sender identities are configured for this account. Live sends are still disabled."
       : "No sender identities are configured for this account.",
   };
+
+  // Derived from the rows, not asserted. These were hardcoded to
+  // "SMS is not enabled", contradicting the Live SMS Activation card on the
+  // same page the moment an account went live.
+  const liveConfiguration = result.providerConfigurations.find(
+    (row) => asTrimmed(row.activationStatus).toLowerCase() === "active",
+  );
+  const liveSendsEnabled = Boolean(liveConfiguration);
+  const smsEnabled = result.hasProviderConfiguration && result.hasSenderIdentity;
+
+  result.communicationsStatus = {
+    smsEnabled,
+    liveSendsEnabled,
+    statusLabel: liveSendsEnabled
+      ? "Live SMS is enabled"
+      : smsEnabled
+        ? "SMS is set up, live sends are off"
+        : "SMS is not enabled",
+    helperText: liveSendsEnabled
+      ? "Live sends are enabled for this account."
+      : smsEnabled
+        ? "Provider and sender identity are configured. Live sends are still switched off."
+        : "Live sends are disabled. This page is readiness/status only.",
+  };
+
+  result.activationSummary = {
+    status: liveSendsEnabled ? "active" : "disabled",
+    statusLabel: result.communicationsStatus.statusLabel,
+    helperText: result.communicationsStatus.helperText,
+  };
+
+  // The checklist claimed four shipped controls were Deferred/Disabled. Rows
+  // that cannot be derived from state are DELETED rather than asserted — a
+  // hardcoded claim is what made this section wrong in the first place.
+  result.complianceChecklist = [
+    { key: "recipient_registry", label: "Recipient registry", status: "complete" },
+    { key: "consent_suppression_foundation", label: "Consent/suppression foundation", status: "complete" },
+    { key: "intent_delivery_audit_tables", label: "Intent/delivery audit tables", status: "complete" },
+    { key: "provider_config_sender_identity_schema", label: "Provider config/sender identity schema", status: "complete" },
+    { key: "provider_webhook_signature_validation", label: "Provider webhook/signature validation", status: "complete" },
+    { key: "explicit_activation", label: "Explicit activation", status: liveSendsEnabled ? "complete" : "disabled" },
+  ];
+  result.deferredItems = [];
 
   return result;
 }

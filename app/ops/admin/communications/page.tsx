@@ -1,3 +1,5 @@
+import { isSmsAdvancedConsoleEnabledForAccountOwner } from "@/lib/communications/sms-self-serve-gate";
+import { readSmsActivationState } from "@/lib/communications/sms-activation-state";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
@@ -435,6 +437,22 @@ export default async function AdminCommunicationsPage({
   const templateNotice = resolveTemplateNotice(sp.notice);
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
+
+  // Audience split. Tenant admins get status, activation, template text,
+  // suppressions and the wizard; the engineering console (SID fields, template
+  // version machinery, sandbox queue, compliance checklist) is visibility-gated
+  // to the platform operator. Nothing is deleted — an allowlisted account sees
+  // the page exactly as before.
+  const advancedConsole = isSmsAdvancedConsoleEnabledForAccountOwner(
+    internalUser.account_owner_user_id,
+  );
+
+  // The account's REAL activation state, so what this page claims cannot
+  // disagree with what the live send path does — both read this same helper.
+  const activationState = await readSmsActivationState({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
   // Fail closed to safe-empty readiness if local schemas do not yet include SMS readiness tables.
   const readiness = await getSmsProviderReadinessForAccount({
     supabase,
@@ -567,6 +585,7 @@ export default async function AdminCommunicationsPage({
       </section>
 
       {/* SMS Provider Readiness Section */}
+      {advancedConsole ? (
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Configuration</p>
@@ -637,8 +656,10 @@ export default async function AdminCommunicationsPage({
           )}
         </div>
       </section>
+      ) : null}
 
       {/* Sender Identity Section */}
+      {advancedConsole ? (
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Configuration</p>
@@ -699,8 +720,10 @@ export default async function AdminCommunicationsPage({
           )}
         </div>
       </section>
+      ) : null}
 
       {/* Provider Setup (Sandbox) Section */}
+      {advancedConsole ? (
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Configuration</p>
@@ -955,8 +978,10 @@ export default async function AdminCommunicationsPage({
           </form>
         </div>
       </section>
+      ) : null}
 
       {/* Legacy Customer SMS Backfill Section */}
+      {advancedConsole ? (
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Data</p>
@@ -1003,6 +1028,7 @@ export default async function AdminCommunicationsPage({
           </div>
         </div>
       </section>
+      ) : null}
 
       {/* On-The-Way Notification Section */}
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
@@ -1021,6 +1047,7 @@ export default async function AdminCommunicationsPage({
       </section>
 
       {/* On-The-Way Template Governance Section */}
+      {advancedConsole ? (
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Readiness</p>
@@ -1295,6 +1322,7 @@ export default async function AdminCommunicationsPage({
           </div>
         </div>
       </section>
+      ) : null}
 
       {/* Live Activation Section */}
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
@@ -1428,6 +1456,7 @@ export default async function AdminCommunicationsPage({
       </section>
 
       {/* Sandbox Send Queue Section */}
+      {advancedConsole ? (
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Testing</p>
@@ -1539,8 +1568,10 @@ export default async function AdminCommunicationsPage({
           )}
         </div>
       </section>
+      ) : null}
 
       {/* Compliance Readiness Section */}
+      {advancedConsole ? (
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Readiness</p>
@@ -1578,6 +1609,7 @@ export default async function AdminCommunicationsPage({
           })}
         </div>
       </section>
+      ) : null}
 
       {/* Activation Status Section */}
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">

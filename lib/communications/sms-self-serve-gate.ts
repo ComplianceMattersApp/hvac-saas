@@ -56,4 +56,36 @@ export function assertSmsSelfServeEnabledForAccountOwner(
   }
 }
 
-export { SMS_SELF_SERVE_ALLOWLIST_ENV };
+const SMS_ADVANCED_CONSOLE_ALLOWLIST_ENV = "ENABLE_SMS_ADVANCED_CONSOLE_ACCOUNT_OWNER_IDS";
+
+/**
+ * Who may see the engineering console on /ops/admin/communications.
+ *
+ * Default empty = hidden for everyone, including the owner until they add
+ * themselves. That is deliberate: the console asks for Messaging Service SIDs,
+ * exposes template-version review machinery and the sandbox queue, and shows a
+ * compliance checklist that is meaningful only to whoever operates the
+ * platform. A tenant admin seeing it learns nothing and can break things.
+ *
+ * Nothing is deleted by this gate — it is visibility only, so the owner's
+ * existing concierge workflow keeps working exactly as before once their
+ * account id is listed.
+ */
+export function isSmsAdvancedConsoleEnabledForAccountOwner(
+  accountOwnerUserId: string | null | undefined,
+  rawAllowlist?: string | null,
+) {
+  const normalized = normalizeAccountOwnerId(accountOwnerUserId);
+  if (!normalized) return false;
+
+  const source = rawAllowlist ?? process.env[SMS_ADVANCED_CONSOLE_ALLOWLIST_ENV];
+  const allowlist = new Set(
+    String(source ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+  return allowlist.size > 0 && allowlist.has(normalized);
+}
+
+export { SMS_SELF_SERVE_ALLOWLIST_ENV, SMS_ADVANCED_CONSOLE_ALLOWLIST_ENV };

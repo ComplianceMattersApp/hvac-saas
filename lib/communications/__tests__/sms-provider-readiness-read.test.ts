@@ -250,8 +250,12 @@ describe("sms provider readiness read helper", () => {
     expect(result.providerConfigurations[0]?.activationLabel).toBe(
       "Configured active; live sends still unavailable",
     );
-    expect(result.communicationsStatus.smsEnabled).toBe(false);
-    expect(result.communicationsStatus.liveSendsEnabled).toBe(false);
+    // Derived now. This used to assert liveSendsEnabled === false for a
+    // configuration whose activation_status is "active" — the hardcoded claim
+    // that made the page say "SMS is not enabled" next to a LIVE card.
+    expect(result.communicationsStatus.liveSendsEnabled).toBe(true);
+    expect(result.communicationsStatus.statusLabel).toBe("Live SMS is enabled");
+    expect(result.activationSummary.status).toBe("active");
   });
 
   it("maps callback readiness statuses", async () => {
@@ -509,9 +513,10 @@ describe("sms provider readiness read helper", () => {
     });
 
     expect(result).not.toHaveProperty("canSend");
-    expect(result.communicationsStatus.smsEnabled).toBe(false);
-    expect(result.communicationsStatus.liveSendsEnabled).toBe(false);
-    expect(result.activationSummary.statusLabel).toBe("SMS is not enabled");
+    // This fixture is an active configuration with an active sender, so the
+    // derived status reports live rather than asserting a blanket "off".
+    expect(result.communicationsStatus.liveSendsEnabled).toBe(true);
+    expect(result.activationSummary.statusLabel).toBe("Live SMS is enabled");
   });
 
   it("returns the expected readiness checklist statuses", async () => {
@@ -522,26 +527,28 @@ describe("sms provider readiness read helper", () => {
       accountOwnerUserId: "owner-1",
     });
 
-    expect(result.complianceChecklist).toEqual([
-      { key: "recipient_registry", label: "Recipient registry", status: "complete" },
-      { key: "consent_suppression_foundation", label: "Consent/suppression foundation", status: "complete" },
-      { key: "non_sending_eligibility_helper", label: "Non-sending eligibility helper", status: "complete" },
-      { key: "intent_delivery_audit_tables", label: "Intent/delivery audit tables", status: "complete" },
-      {
-        key: "provider_config_sender_identity_schema",
-        label: "Provider config/sender identity schema",
-        status: "complete",
-      },
-      { key: "quiet_hours_send_gate", label: "Quiet-hours send gate", status: "deferred" },
-      { key: "template_governance", label: "Template governance", status: "deferred" },
-      {
-        key: "provider_webhook_signature_validation",
-        label: "Provider webhook/signature validation",
-        status: "deferred",
-      },
-      { key: "sandbox_validation", label: "Sandbox validation", status: "deferred" },
-      { key: "legal_provider_review", label: "Legal/provider review", status: "deferred" },
-      { key: "explicit_activation", label: "Explicit activation", status: "disabled" },
-    ]);
+    // Rows that cannot be derived from state are now DELETED rather than
+    // asserted — hardcoded claims are exactly what made this section wrong.
+    const keys = result.complianceChecklist.map((row) => row.key);
+    for (const removed of [
+      "quiet_hours_send_gate",
+      "template_governance",
+      "sandbox_validation",
+      "legal_provider_review",
+    ]) {
+      expect(keys).not.toContain(removed);
+    }
+
+    // Webhook signature validation is shipped and running; it claimed Deferred.
+    expect(
+      result.complianceChecklist.find((row) => row.key === "provider_webhook_signature_validation")
+        ?.status,
+    ).toBe("complete");
+
+    // With no configuration in this fixture, activation is genuinely disabled.
+    expect(
+      result.complianceChecklist.find((row) => row.key === "explicit_activation")?.status,
+    ).toBe("disabled");
+    expect(result.deferredItems).toEqual([]);
   });
 });
