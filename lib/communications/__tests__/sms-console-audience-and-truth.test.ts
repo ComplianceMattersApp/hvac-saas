@@ -98,3 +98,104 @@ describe("readiness truth derivation", () => {
     expect(readiness).toContain('status: liveSendsEnabled ? "complete" : "disabled"');
   });
 });
+
+describe("WU3 wizard surface", () => {
+  const wizard = readFileSync(
+    resolve(process.cwd(), "app/ops/admin/communications/provisioning/page.tsx"),
+    "utf8",
+  );
+  const actions = readFileSync(resolve(process.cwd(), "lib/actions/sms-provisioning-actions.ts"), "utf8");
+
+  it("is unreachable for a non-entitled account", () => {
+    // Every step spends money, so the surface itself must not exist without
+    // entitlement — not merely the buttons.
+    expect(wizard).toContain("if (!isSmsSelfServeEnabledForAccountOwner(accountOwnerUserId))");
+    expect(wizard).toContain('redirect("/ops/admin/communications")');
+    // And the assert sits in the shared action context, not per call site.
+    expect(actions).toContain("assertSmsSelfServeEnabledForAccountOwner(accountOwnerUserId)");
+  });
+
+  it("branches on EIN and warns registered businesses off the sole-prop path", () => {
+    expect(wizard).toContain('name="has_ein"');
+    expect(wizard).toMatch(/registered LLC or corporation, you must choose Yes/i);
+  });
+
+  it("labels the legal name against the IRS letter", () => {
+    // The single most common brand rejection.
+    expect(wizard).toMatch(/CP&nbsp;575 or 147c/);
+  });
+
+  it("renders failures as first-class states with Retry and Edit", () => {
+    expect(wizard).toContain("retrySmsProvisioningStepFromForm");
+    expect(wizard).toContain("Retry this step");
+    expect(wizard).toContain("Edit details");
+    expect(wizard).toContain("lastError.fieldFailures");
+  });
+
+  it("carries the newly-issued-EIN explanation", () => {
+    expect(wizard).toMatch(/30 to 90 days/);
+  });
+
+  it("offers the sole-proprietor OTP resend", () => {
+    expect(wizard).toContain("resendSmsProvisioningOtpFromForm");
+    expect(wizard).toContain("Resend verification code");
+  });
+
+  it("sets plain-language expectations on carrier review", () => {
+    expect(wizard).toMatch(/up to about two weeks/i);
+  });
+
+  it("never clears a Twilio reference on retry", () => {
+    // Clearing a ref would re-run a step whose money is already spent.
+    const retryBody = actions.slice(actions.indexOf("export async function retrySmsProvisioningStepFromForm"));
+    expect(retryBody).toContain("last_error: null");
+    for (const ref of ["subaccount_sid", "phone_number_sid", "brand_registration_sid", "campaign_sid"]) {
+      expect(retryBody.slice(0, retryBody.indexOf("redirect("))).not.toContain(ref);
+    }
+  });
+});
+
+describe("tenant-facing test recipients", () => {
+  it("renders outside the gated console", () => {
+    // A tenant cannot honestly sign the activation attestations without having
+    // texted themselves first, so this must not require the advanced console.
+    const index = page.indexOf("{/* Test Recipients Section (tenant-facing) */}");
+    expect(index).toBeGreaterThan(-1);
+    expect(page.slice(index, index + 300)).not.toContain("advancedConsole ? (");
+    expect(page).toContain("addSmsSandboxTestRecipientFromForm");
+    expect(page).toContain("deactivateSmsSandboxTestRecipientFromForm");
+  });
+
+  it("shows no SIDs in the tenant-facing section", () => {
+    const start = page.indexOf("{/* Test Recipients Section (tenant-facing) */}");
+    const section = page.slice(start, page.indexOf("{/* Live Activation Section */}"));
+    // Simple view only: nothing that asks for or displays a provider reference.
+    for (const forbidden of [
+      "Messaging Service SID",
+      "provider_account_ref",
+      "messaging_service_ref",
+      "default_messaging_service_ref",
+    ]) {
+      expect(section, `tenant section must not expose ${forbidden}`).not.toContain(forbidden);
+    }
+  });
+
+  it("offers the wizard entry only to entitled accounts", () => {
+    expect(page).toContain("{selfServeEnabled ? (");
+    expect(page).toContain("/ops/admin/communications/provisioning");
+  });
+});
+
+describe("activation attestations persist", () => {
+  it("writes all three attestation timestamps and the attesting user", () => {
+    const setup = readFileSync(resolve(process.cwd(), "lib/actions/sms-provider-setup-actions.ts"), "utf8");
+    for (const column of [
+      "activation_attested_campaign_approved_at",
+      "activation_attested_wording_reviewed_at",
+      "activation_attested_stop_tested_at",
+      "activation_attested_by_user_id",
+    ]) {
+      expect(setup).toContain(column);
+    }
+  });
+});

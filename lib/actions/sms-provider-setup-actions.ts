@@ -329,6 +329,13 @@ export async function activateSmsLiveSendingFromForm(formData: FormData): Promis
         status_callback_readiness: "ready",
         inbound_webhook_readiness: "ready",
         advanced_opt_out_readiness: "ready",
+        // Persist the attestations. Live SMS is the one action here with real
+        // legal exposure; the record that a human attested to each precondition
+        // has to survive the request that made it.
+        activation_attested_campaign_approved_at: new Date().toISOString(),
+        activation_attested_wording_reviewed_at: new Date().toISOString(),
+        activation_attested_stop_tested_at: new Date().toISOString(),
+        activation_attested_by_user_id: actingUserId,
         updated_by_user_id: actingUserId,
       })
       .eq("id", existing.id)

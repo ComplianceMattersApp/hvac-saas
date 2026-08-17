@@ -1,4 +1,8 @@
-import { isSmsAdvancedConsoleEnabledForAccountOwner } from "@/lib/communications/sms-self-serve-gate";
+import { createAdminClient } from "@/lib/supabase/server";
+import {
+  isSmsAdvancedConsoleEnabledForAccountOwner,
+  isSmsSelfServeEnabledForAccountOwner,
+} from "@/lib/communications/sms-self-serve-gate";
 import { readSmsActivationState } from "@/lib/communications/sms-activation-state";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -449,6 +453,17 @@ export default async function AdminCommunicationsPage({
 
   // The account's REAL activation state, so what this page claims cannot
   // disagree with what the live send path does — both read this same helper.
+  const selfServeEnabled = isSmsSelfServeEnabledForAccountOwner(internalUser.account_owner_user_id);
+  const { data: provisioningRow } = selfServeEnabled
+    ? await createAdminClient()
+        .from("sms_provisioning_registrations")
+        .select("id")
+        .eq("account_owner_user_id", internalUser.account_owner_user_id)
+        .is("completed_at", null)
+        .maybeSingle()
+    : { data: null };
+  const smsProvisioningStarted = Boolean(provisioningRow?.id);
+
   const activationState = await readSmsActivationState({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -902,81 +917,6 @@ export default async function AdminCommunicationsPage({
         </div>
 
         {/* Test recipients */}
-        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <p className="text-sm font-semibold text-slate-900">Verified sandbox test recipients</p>
-          <p className="mt-1 text-xs text-slate-600">
-            Sandbox test sends only go to phones on this list. Add your own phone here to smoke-test
-            once the campaign is approved.
-          </p>
-
-          {sandboxSetup.testRecipients.length > 0 ? (
-            <div className="mt-3 space-y-2">
-              {sandboxSetup.testRecipients.map((recipient) => (
-                <div
-                  key={recipient.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm"
-                >
-                  <div className="text-slate-800">
-                    ••••{recipient.phoneLast4}
-                    {recipient.phoneLabel ? ` • ${recipient.phoneLabel}` : ""}
-                    {!recipient.isActive ? (
-                      <span className="ml-2 inline-flex items-center rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-                        Inactive
-                      </span>
-                    ) : null}
-                  </div>
-                  {recipient.isActive ? (
-                    <form action={deactivateSmsSandboxTestRecipientFromForm}>
-                      <input type="hidden" name="test_recipient_id" value={recipient.id} />
-                      <button
-                        type="submit"
-                        className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Deactivate
-                      </button>
-                    </form>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              No test recipients yet.
-            </p>
-          )}
-
-          <form action={addSmsSandboxTestRecipientFromForm} className="mt-3 flex flex-wrap items-end gap-2">
-            <div>
-              <label htmlFor="test-recipient-phone" className="text-xs font-semibold text-slate-700">
-                Phone
-              </label>
-              <input
-                id="test-recipient-phone"
-                name="phone"
-                required
-                placeholder="(209) 555-1234"
-                className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="test-recipient-label" className="text-xs font-semibold text-slate-700">
-                Label (optional)
-              </label>
-              <input
-                id="test-recipient-label"
-                name="phone_label"
-                placeholder="Owner phone"
-                className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
-              />
-            </div>
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
-            >
-              Add verified test recipient
-            </button>
-          </form>
-        </div>
       </section>
       ) : null}
 
@@ -1323,6 +1263,112 @@ export default async function AdminCommunicationsPage({
         </div>
       </section>
       ) : null}
+
+      {/* Enable Texting Section (tenant-facing wizard entry) */}
+      {selfServeEnabled ? (
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Setup</p>
+        <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Enable texting</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+          Carriers require every business that sends texts to register its own identity and use its
+          own phone number. We handle the setup — you provide the business details they ask for.
+        </p>
+        <a
+          href="/ops/admin/communications/provisioning"
+          className="mt-3 inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          {smsProvisioningStarted ? "Continue setup" : "Start setup"}
+        </a>
+      </section>
+      ) : null}
+
+      {/* Test Recipients Section (tenant-facing) */}
+      <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Test Before You Go Live</p>
+          <h2 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">Test recipients</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            Add your own mobile number, send yourself a test, and check that the message reads the
+            way you want and that replying STOP works. You need to have done this before you can
+            honestly confirm the activation checklist below.
+          </p>
+        </div>
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-900">Verified sandbox test recipients</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Sandbox test sends only go to phones on this list. Add your own phone here to smoke-test
+            once the campaign is approved.
+          </p>
+
+          {sandboxSetup.testRecipients.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {sandboxSetup.testRecipients.map((recipient) => (
+                <div
+                  key={recipient.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-sm"
+                >
+                  <div className="text-slate-800">
+                    ••••{recipient.phoneLast4}
+                    {recipient.phoneLabel ? ` • ${recipient.phoneLabel}` : ""}
+                    {!recipient.isActive ? (
+                      <span className="ml-2 inline-flex items-center rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+                        Inactive
+                      </span>
+                    ) : null}
+                  </div>
+                  {recipient.isActive ? (
+                    <form action={deactivateSmsSandboxTestRecipientFromForm}>
+                      <input type="hidden" name="test_recipient_id" value={recipient.id} />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Deactivate
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              No test recipients yet.
+            </p>
+          )}
+
+          <form action={addSmsSandboxTestRecipientFromForm} className="mt-3 flex flex-wrap items-end gap-2">
+            <div>
+              <label htmlFor="test-recipient-phone" className="text-xs font-semibold text-slate-700">
+                Phone
+              </label>
+              <input
+                id="test-recipient-phone"
+                name="phone"
+                required
+                placeholder="(209) 555-1234"
+                className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="test-recipient-label" className="text-xs font-semibold text-slate-700">
+                Label (optional)
+              </label>
+              <input
+                id="test-recipient-label"
+                name="phone_label"
+                placeholder="Owner phone"
+                className="mt-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm"
+              />
+            </div>
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm hover:bg-slate-50"
+            >
+              Add verified test recipient
+            </button>
+          </form>
+        </div>
+      </section>
 
       {/* Live Activation Section */}
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
