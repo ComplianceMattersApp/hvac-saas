@@ -27,8 +27,18 @@ Owner decisions already made (do not relitigate inside a slice):
 | 8 | Cleanup — delete classic job-detail branch + retired mobile renderer, purge stale root audit docs/cruft, refresh schema snapshot | Not started |
 | 9 | Owner actions (no code) — workshare prod smoke test; tenancy-transfer contingency memo | Not started |
 | — | (Open slot: second go-live item, TBD by owner) | — |
+| 4b | Ops-refactor review fixups — 6 findings from the batch review of the owner's Ops-workspace refactor (note-loss on failed save, mention composer stale state, My Work follow-up-fields exclusion, in-place duplicate/empty branches, queue-row presentation dedup, import nit) | **Queued — starts AFTER Slice 04 pass 2 lands** (never concurrently in the same working copy); branch `ops-refactor-review-fixes` |
 | 10 | Extend the form-draft guard beyond `/jobs/[id]/tests` (job detail, closeout, estimate builder) | Queued — after initial go-live work (1–9) |
 | 11 | Offline app shell (service worker) — offline page loads for field surfaces; also hoist the guard's per-form visibility/pagehide listeners to one shared listener | Queued — after initial go-live work (1–9) |
 | 12 | Retire the SMS concierge console (delete, not abandon — the manual SID forms, honor-system verification checkbox, sandbox queue internals). Preconditions: Slice 04 shipped AND wizard has provisioned several real tenants without needing the manual escape hatch AND the owner's own account is migrated to a wizard-provisioned subaccount. Until then it stays, gated behind the advanced-console allowlist (WU5b) so no customer ever sees it | Queued — post-launch, precondition-gated |
 
 Parallel strategic track (after core): EDDS regulations research → go/no-go memo.
+
+Status notes:
+- 2026-08-17: the three chronically failing test files (attachment-entitlement-hardening,
+  job-evaluator, today-hierarchy-wiring) are FIXED on main via the owner's Ops-workspace
+  refactor — the full suite is green. Slice reports should no longer carry a
+  "pre-existing failures" caveat; any red test is new.
+- Working-copy rule (learned 2026-08-16): one agent session per checkout. Concurrent
+  agents get separate `git worktree` folders; agents work on named branches only;
+  only the owner merges to main.
