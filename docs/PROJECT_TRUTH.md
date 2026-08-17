@@ -527,16 +527,21 @@ This table exists so build planning and competitive comparison start from what i
 | Permits | `lib/permits`, `app/ops` permit surfaces | Owner-scoped permit workflow |
 | Contractor portal | `app/portal`, `lib/portal` | Invoices, jobs, intake submissions, permit requests. Scoped by frozen billing identity, never job assignment |
 | Notifications | `lib/notifications` | In-app, email, account-scoped web push |
-| **SMS** | `lib/communications` | Twilio approved, prod smoke passed, live-send + inbound STOP implemented. **Pending owner activation** |
+| **SMS** | `lib/communications` | Twilio approved, prod smoke passed, live-send + inbound STOP implemented. **Pending owner activation.** Precision (2026-08-17): "inbound" means **STOP/HELP only** — there is no conversation thread, so a customer's reply reaches no one. And of the eight classes in `SMS_ALLOWED_MESSAGE_CLASSES`, only `on_the_way` has an intent creator; the other seven are schema-reserved and unsent |
+| **SMS tenant self-serve provisioning** | `slice-04-twilio-provisioning` branch (schema foundation is on `main`) | **Built and green, unmerged** as of 2026-08-17: TrustHub/provisioning client, step orchestrator, status poller, tenant wizard, entitlement gate, encrypted subaccount credentials, per-tenant webhook validation. Provisioning ends at `ready_for_activation` and never flips `activation_status`. See CURRENT_ROADMAP Lane 7 for merge prerequisites |
 | Support | `lib/support`, `lib/help-assistant` | Support case/call log, help-gap logging, trainer AI |
 | PWA / device | `lib/pwa` | Install, push subscription, device setup |
 | Android shell | `capacitor.config.ts`, `android/` | Capacitor 8 remote-URL shell, validated. No store submission |
 
 ### 16.2 Known absences (for honest comparison)
 
-Not built, and deliberately so unless noted: customer portal / client hub · online booking and customer self-scheduling · two-way conversational SMS · review, referral and marketing automation · AI receptionist / call tracking · inventory, purchase orders, job costing, payroll, financing · ACH, deposits, instant payouts · GPS location capture · live drive times · offline mode beyond PWA basics.
+Not built, and deliberately so unless noted: customer portal / client hub · online booking and customer self-scheduling · two-way conversational SMS · **customer appointment confirmation and reminder texts** · **automated invoice payment reminders (no dunning of any kind)** · **bulk customer/location import** (Pricebook has CSV import; customers are export-only, and QBO is push-only so customers cannot be pulled from QuickBooks) · review, referral and marketing automation · AI receptionist / call tracking · inventory, purchase orders, job costing, payroll, financing · change orders · custom fields · ACH, deposits, instant payouts · GPS location capture · offline mode beyond PWA basics · plan-tier feature gating (`plan_key` is stored but gates nothing; access is binary entitlement plus `seat_limit`).
 
-The competitive read on these lives in `ACTIVE/Current_App_Baseline_and_Competitive_Audit_2026-07-06.md`; that document is a dated snapshot, so trust this table for what exists and treat its competitor commentary as the older half.
+Now built, previously listed here: live drive times (Google Routes, 2026-08-09).
+
+Recurring maintenance visits are **tracked, not generated** — agreements expose `next_due_date`, `due_for_booking` and `manual_scheduling_required`, so booking stays manual. Do not read the maintenance-agreement row above as auto-scheduling.
+
+The competitive read on these lives in `ACTIVE/Core_Feature_Parity_and_Go_Live_Audit_2026-08-17.md` (current, code-verified). The earlier `ACTIVE/Current_App_Baseline_and_Competitive_Audit_2026-07-06.md` is superseded on competitor commentary.
 
 **Operational Entitlement Mutation Guard — locked server-side result** (rollout closeout narrative removed; the durable authorization rule is retained):
 - Active entitlement is allowed.

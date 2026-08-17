@@ -208,22 +208,40 @@ webhook-confirmed rather than optimistic. That is the part that is hard to retro
 
 ### 6.1 Core gaps (table stakes for an HVAC service company; ranked by ratio of value to build cost)
 
-**1. Automated appointment reminders and confirmations — highest priority.**
+**1. Customer appointment texts — confirmation at booking, and reminder before the visit.**
 `SMS_ALLOWED_MESSAGE_CLASSES` declares eight classes (`scheduling`, `on_the_way`, `appointment_reminder`,
 `access_coordination`, `follow_up_no_answer`, `completion_notice`, `invoice_ready_notice`,
 `marketing_promotional`) and the consent/suppression schema already accepts all of them. **Only
 `on_the_way` has an intent creator** (`sms-on-the-way-intent-create.ts` is the sole `*-intent-create` file).
-Reminders are the single most-cited must-have in current buyer guidance, they directly reduce no-shows,
-and the entire pipeline — consent, suppression, quiet hours, delivery, status callback, audit — is already
-built and A2P-approved. This is a message-class and scheduler slice on finished rails, not a new
+The entire pipeline — consent, suppression, quiet hours, delivery, status callback, audit — is already
+built and A2P-approved, so this is a message-class and scheduler slice on finished rails, not a new
 subsystem. It is the cheapest large competitive win available.
+
+**Owner direction, 2026-08-17:** send a confirmation **text when the appointment is made, alongside the
+existing email.** That is well-founded — the trigger already exists and is the right seam:
+`customer_job_scheduled_email` in `lib/actions/job-actions-shared.ts:1066` fires on schedule with a
+schedule-signature dedupe key (a reschedule re-sends, a re-save does not) and queued→sent delivery
+tracking. The matching class is **`scheduling`**, already in the enum.
+
+**Keep these two separate.** Confirmation-at-booking (`scheduling`) and reminder-before-visit
+(`appointment_reminder`) are different message classes serving different purposes: the confirmation is the
+receipt for a commitment just made, the reminder is the **no-show reducer** and is what current buyer
+guidance ranks as the single most-cited must-have (day-before and morning-of). Building the confirmation
+does not deliver the reminder, and it would be easy to consider the job done after the first one.
 
 **2. Customers who reply to a text hit a void.** Inbound handling exists only for STOP/HELP
 (`twilio-inbound-processor.ts`); there is no conversation thread anywhere (`sms_conversation` /
-`message_thread`: zero hits). The moment on-my-way texting is activated, some customers will reply
-"can you come later?" — and nothing surfaces it to the office. This is a trust and liability problem
-rather than a missing feature, and it is coupled to the activation the roadmap is about to press. At
-minimum, inbound non-STOP messages should land somewhere a human sees them before live send is switched on.
+`message_thread`: zero hits), and two-way conversation is explicitly out of scope in the Lane 7
+provisioning slice, so merging that lane does not close this. The moment on-my-way texting is activated,
+some customers will reply "can you come later?" — and nothing surfaces it to the office. This is a trust
+and liability problem rather than a missing feature, and it is coupled to the activation the roadmap is
+about to press. At minimum, inbound non-STOP messages should land somewhere a human sees them before live
+send is switched on for more tenants.
+
+**Owner direction, 2026-08-17:** two-way messaging belongs **fully inside the app** — not a forwarded
+third-party inbox. That is the right call and it matches the existing architecture: `sms_message_intents`
+already owns decision/audit truth and `sms_provider_deliveries` already owns provider submission truth, so
+an inbound thread has correct places to anchor without inventing a new truth layer.
 
 **3. Customer portal / client hub.** Confirmed absent: `app/portal` is contractor-only, authorized by
 `contractor_users` and frozen billing identity. Customer self-service today is exactly two unauthenticated
