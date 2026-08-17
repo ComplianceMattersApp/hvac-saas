@@ -93,11 +93,14 @@ export { SMS_SELF_SERVE_ALLOWLIST_ENV, SMS_ADVANCED_CONSOLE_ALLOWLIST_ENV };
 /**
  * Which Twilio registration environment new registrations use.
  *
- * NOT a tenant choice and never read from a form: sandbox (the default) makes
- * every brand `Mock=true` — free, never reaching TCR/carriers — so preview and
- * staging deployments can walk the whole wizard without spend. The owner sets
- * `SMS_PROVISIONING_ENVIRONMENT=production` on the production deployment,
- * which is the only place real registrations should ever originate.
+ * NOT a tenant choice and never read from a form. Sandbox (the default) makes
+ * every brand `Mock=true` — no TCR/carrier fees and nothing reaches the
+ * registry. BE PRECISE about what sandbox does NOT avoid: the subaccount and
+ * the phone number are real regardless of environment (a Mock brand cannot
+ * reference fake resources), so a full sandbox walkthrough still buys one
+ * ~$1.15/mo number — delete the subaccount afterward to stop the charge. The
+ * owner sets `SMS_PROVISIONING_ENVIRONMENT=production` on the production
+ * deployment, which is the only place real registrations should originate.
  */
 export function resolveSmsProvisioningEnvironment(): "sandbox" | "production" {
   return String(process.env.SMS_PROVISIONING_ENVIRONMENT ?? "").trim() === "production"

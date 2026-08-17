@@ -86,7 +86,11 @@ export const STATUS_CALLBACK_URL = `${WEBHOOK_BASE}/api/sms/twilio/status-callba
  * skip a failed step: that would submit a bundle that was never fixed.
  */
 export function nextProvisioningStep(registration: ProvisioningRegistration): ProvisioningStep {
-  const failed = (status: unknown) => String(status ?? "").toLowerCase() === "failed";
+  // 'failed' is the step's own failure; 'twilio_rejected' is the review's.
+  // Both mean the same thing to the engine: this step must re-run in place
+  // (with the operator's corrections) before anything after it may proceed.
+  const failed = (status: unknown) =>
+    ["failed", "twilio_rejected"].includes(String(status ?? "").toLowerCase());
 
   if (!registration?.subaccount_sid) return "subaccount";
   if (!registration.phone_number_sid || failed(registration.number_status)) return "number";
@@ -99,19 +103,19 @@ export function nextProvisioningStep(registration: ProvisioningRegistration): Pr
   if (!registration.trust_product_sid || failed(registration.trust_product_status)) {
     return "trust_product";
   }
-  if (
-    !registration.brand_registration_sid
-    || String(registration.brand_status ?? "").toUpperCase() === "FAILED"
-    || failed(registration.brand_status)
-  ) {
+  if (!registration.brand_registration_sid || failed(registration.brand_status)) {
     return "brand";
   }
   if (!registration.campaign_sid || failed(registration.campaign_status)) return "campaign";
   return "done";
 }
 
-/** TrustHub bundle review statuses that allow the brand step to run. */
-const BUNDLE_APPROVED = "twilio-approved";
+/**
+ * TrustHub bundle review status that allows the brand step to run — the
+ * DATABASE form (underscored, per the migration's CHECK constraint), which the
+ * poller normalizes Twilio's hyphenated API values into.
+ */
+const BUNDLE_APPROVED = "twilio_approved";
 
 export function brandStepPrerequisitesMet(registration: ProvisioningRegistration): boolean {
   return (
@@ -138,6 +142,34 @@ export function preferredAreaCode(registration: ProvisioningRegistration): strin
   if (phone.length === 11 && phone.startsWith("1")) return phone.slice(1, 4);
   if (phone.length === 10) return phone.slice(0, 3);
   return null;
+}
+
+/**
+ * Serialize a money-spending step across concurrent clicks: exactly one caller
+ * wins the conditional flip to 'in_progress'; the loser sees zero rows and
+ * reports "already running". A crashed winner is unstuck by the staleness
+ * window — after two minutes the reservation may be taken over.
+ */
+export async function reserveSpendStep(params: {
+  admin: any;
+  registrationId: string;
+  statusColumn: string;
+  now?: Date;
+}): Promise<boolean> {
+  const staleBefore = new Date((params.now ?? new Date()).getTime() - 2 * 60 * 1000).toISOString();
+  const { data, error } = await params.admin
+    .from("sms_provisioning_registrations")
+    .update({ [params.statusColumn]: "in_progress" })
+    .eq("id", params.registrationId)
+    .or(`${params.statusColumn}.neq.in_progress,updated_at.lt.${staleBefore}`)
+    .select("id");
+  if (error) {
+    throw new TwilioProvisioningError({
+      step: "bookkeeping",
+      message: `Could not reserve the step: ${String(error.message ?? "database error")}`,
+    });
+  }
+  return Array.isArray(data) && data.length > 0;
 }
 
 async function patchRegistration(params: {
@@ -279,6 +311,21 @@ export async function runNextProvisioningStep(params: {
       }
 
       case "number": {
+        // Reserve first: two concurrent clicks would both see an empty
+        // subaccount and both purchase. Exactly one wins the conditional flip.
+        const reserved = await reserveSpendStep({
+          admin,
+          registrationId,
+          statusColumn: "number_status",
+        });
+        if (!reserved) {
+          return {
+            step,
+            outcome: "waiting",
+            message: "This step is already running — give it a moment, then refresh.",
+          };
+        }
+
         const auth = await authForRegistration({ admin, registration });
 
         // ADOPT before buying. The subaccount is exclusively this tenant's, so
@@ -352,7 +399,9 @@ export async function runNextProvisioningStep(params: {
           await patchRegistration({
             admin,
             registrationId,
-            patch: { messaging_service_sid: serviceSid, messaging_service_status: "attaching" },
+            // 'in_progress' — the only intermediate status the migration's
+            // CHECK constraint permits for this column.
+            patch: { messaging_service_sid: serviceSid, messaging_service_status: "in_progress" },
           });
         }
 
@@ -443,10 +492,21 @@ export async function runNextProvisioningStep(params: {
 
         // Address document: created once and reused. (A later address change is
         // a support-path operation — documented limitation of this slice.)
+        // If the sid write was lost but a document IS assigned, ADOPT the
+        // assigned one — creating a second document would record a sid that is
+        // not the one the bundle actually reads.
         let addressSid = String(registration.address_sid ?? "").trim();
         let documentSid = String(registration.supporting_document_sid ?? "").trim();
-        const documentAssigned = assigned.some((sid) => sid.startsWith("RD"));
-        if (!documentSid || !documentAssigned) {
+        const assignedDocumentSid = assigned.find((sid) => sid.startsWith("RD")) ?? "";
+        if (!documentSid && assignedDocumentSid) {
+          documentSid = assignedDocumentSid;
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: { supporting_document_sid: documentSid },
+          });
+        }
+        if (!documentSid) {
           if (!addressSid) {
             const address = await createAddress({
               auth,
@@ -460,27 +520,25 @@ export async function runNextProvisioningStep(params: {
             addressSid = address.sid;
             await patchRegistration({ admin, registrationId, patch: { address_sid: addressSid } });
           }
-          if (!documentSid) {
-            const document = await createSupportingDocument({
-              auth,
-              friendlyName: "Business address",
-              type: "customer_profile_address",
-              attributes: { address_sids: addressSid },
-            });
-            documentSid = document.sid;
-            await patchRegistration({
-              admin,
-              registrationId,
-              patch: { supporting_document_sid: documentSid },
-            });
-          }
-          if (!documentAssigned) {
-            await assignToCustomerProfile({
-              auth,
-              customerProfileSid: profileSid,
-              objectSid: documentSid,
-            });
-          }
+          const document = await createSupportingDocument({
+            auth,
+            friendlyName: "Business address",
+            type: "customer_profile_address",
+            attributes: { address_sids: addressSid },
+          });
+          documentSid = document.sid;
+          await patchRegistration({
+            admin,
+            registrationId,
+            patch: { supporting_document_sid: documentSid },
+          });
+        }
+        if (!assigned.includes(documentSid)) {
+          await assignToCustomerProfile({
+            auth,
+            customerProfileSid: profileSid,
+            objectSid: documentSid,
+          });
         }
 
         // Free preflight. A rejected brand costs a non-refundable fee, so the
@@ -624,8 +682,23 @@ export async function runNextProvisioningStep(params: {
             step,
             outcome: "waiting",
             message:
-              "Waiting for Twilio to approve your business profile — usually minutes to a day. "
-              + "This page updates automatically; no action is needed.",
+              "Twilio is still reviewing your business profile — usually minutes to a day. "
+              + "Come back and press Continue once it clears; we check the status every few minutes.",
+          };
+        }
+
+        // Brand creation carries a non-refundable fee — same reservation
+        // discipline as the number purchase.
+        const reservedBrand = await reserveSpendStep({
+          admin,
+          registrationId,
+          statusColumn: "brand_status",
+        });
+        if (!reservedBrand) {
+          return {
+            step,
+            outcome: "waiting",
+            message: "This step is already running — give it a moment, then refresh.",
           };
         }
 
@@ -680,8 +753,9 @@ export async function runNextProvisioningStep(params: {
             step,
             outcome: "waiting",
             message:
-              "Waiting for the carriers to approve your business registration — typically minutes, "
-              + "occasionally up to a week. This page updates automatically; no action is needed.",
+              "The carriers are still reviewing your business registration — typically minutes, "
+              + "occasionally up to a week. Come back and press Continue once it clears; we check "
+              + "the status every few minutes.",
           };
         }
 

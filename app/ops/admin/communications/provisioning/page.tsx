@@ -32,7 +32,7 @@ const NOTICE: Record<string, { tone: "success" | "warn" | "error"; message: stri
   waiting_on_review: {
     tone: "warn",
     message:
-      "Nothing to do yet — Twilio is still reviewing the previous submission. This page updates automatically; check back soon.",
+      "Nothing to do yet — Twilio is still reviewing the previous submission. We check the status every few minutes; come back and press Continue once it clears.",
   },
   ein_required: { tone: "error", message: "Enter your EIN, or choose the no-EIN path." },
   save_failed: { tone: "error", message: "We couldn't save those details. Please try again." },

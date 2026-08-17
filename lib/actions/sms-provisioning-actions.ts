@@ -66,7 +66,8 @@ export async function startSmsProvisioningFromForm(formData: FormData): Promise<
   const payload: Record<string, unknown> = {
     account_owner_user_id: accountOwnerUserId,
     // Derived from the deployment, never from the form: sandbox = Mock brands
-    // (free, never reach carriers); production only where the owner set it.
+    // (no TCR/carrier fees; subaccount + number are still real — see the
+    // resolver's doc); production only where the owner set it.
     provider_environment: resolveSmsProvisioningEnvironment(),
     registration_path: hasEin ? "a2p_lvs" : "a2p_sole_prop",
     legal_business_name: trimmed(formData.get("legal_business_name")) || null,
@@ -145,6 +146,7 @@ export async function retrySmsProvisioningStepFromForm(): Promise<void> {
   if (result.outcome === "failed") redirect(withNotice("step_failed"));
   if (result.outcome === "blocked") redirect(withNotice("validation_blocked"));
   if (result.outcome === "waiting") redirect(withNotice("waiting_on_review"));
+  if (result.outcome === "complete") redirect(withNotice("submitted"));
   redirect(withNotice("step_advanced"));
 }
 

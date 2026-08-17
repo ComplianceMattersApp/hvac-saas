@@ -122,9 +122,9 @@ describe("the poller never provisions", () => {
       id: "reg-2",
       account_owner_user_id: OWNER,
       customer_profile_sid: "BU1",
-      customer_profile_status: "twilio-approved",
+      customer_profile_status: "twilio_approved",
       trust_product_sid: "BU2",
-      trust_product_status: "twilio-approved",
+      trust_product_status: "twilio_approved",
       brand_registration_sid: null,
       campaign_sid: null,
       messaging_service_sid: "MG1",
@@ -155,7 +155,12 @@ describe("the poller never provisions", () => {
 
     expect(result).toMatchObject({ outcome: "skipped", detail: "not entitled" });
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(admin.writes).toEqual([]);
+    // Exactly ONE write: the last_polled_at stamp, which must land BEFORE the
+    // entitlement skip — unstamped rows sort nullsFirst and 25 of them would
+    // permanently starve every entitled tenant out of the poll window.
+    expect(admin.writes).toHaveLength(1);
+    expect(admin.writes[0]).toMatchObject({ table: "sms_provisioning_registrations", op: "update" });
+    expect(Object.keys(admin.writes[0].values)).toEqual(["last_polled_at"]);
   });
 });
 

@@ -93,12 +93,12 @@ describe("review gates", () => {
     customer_profile_sid: "BU1", trust_product_sid: "BU2",
   };
 
-  it("holds the brand step until BOTH bundles are twilio-approved", () => {
+  it("holds the brand step until BOTH bundles are twilio_approved", () => {
     // A brand created against in-review bundles is a guaranteed rejection that
     // reads like an error to the operator.
-    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "pending_review", trust_product_status: "twilio-approved" })).toBe(false);
-    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "twilio-approved", trust_product_status: "in-review" })).toBe(false);
-    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "twilio-approved", trust_product_status: "twilio-approved" })).toBe(true);
+    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "pending_review", trust_product_status: "twilio_approved" })).toBe(false);
+    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "twilio_approved", trust_product_status: "in_progress" })).toBe(false);
+    expect(brandStepPrerequisitesMet({ ...readyForBrand, customer_profile_status: "twilio_approved", trust_product_status: "twilio_approved" })).toBe(true);
   });
 
   it("holds the campaign step until the brand is APPROVED", () => {

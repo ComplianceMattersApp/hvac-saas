@@ -58,8 +58,12 @@ function makeAdmin() {
           return builder;
         },
         eq: () => builder,
+        or: () => builder,
+        select: () => builder,
         then(onF: any, onR: any) {
-          return Promise.resolve({ data: null, error: null }).then(onF, onR);
+          // One row back means conditional updates (the spend-step reservation)
+          // succeed — these tests exercise the single-caller path.
+          return Promise.resolve({ data: [{ id: "reg-1" }], error: null }).then(onF, onR);
         },
       };
       return builder;
@@ -141,9 +145,9 @@ describe("retry spends nothing twice", () => {
         messaging_service_sid: "MG1",
         messaging_service_status: "complete",
         customer_profile_sid: "BU1",
-        customer_profile_status: "twilio-approved",
+        customer_profile_status: "twilio_approved",
         trust_product_sid: "BU2",
-        trust_product_status: "twilio-approved",
+        trust_product_status: "twilio_approved",
         brand_registration_sid: "BN1",
         brand_status: "FAILED",
       },
@@ -188,9 +192,9 @@ describe("review gates hold spend steps", () => {
         messaging_service_sid: "MG1",
         messaging_service_status: "complete",
         customer_profile_sid: "BU1",
-        customer_profile_status: "twilio-approved",
+        customer_profile_status: "twilio_approved",
         trust_product_sid: "BU2",
-        trust_product_status: "twilio-approved",
+        trust_product_status: "twilio_approved",
         brand_registration_sid: "BN1",
         brand_status: "PENDING",
       },

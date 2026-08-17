@@ -92,6 +92,43 @@ async function stampPolled(admin: any, registrationId: string, now?: Date) {
   }
 }
 
+/**
+ * Twilio's TrustHub API speaks hyphens ("twilio-approved"); the registration
+ * columns are CHECK-constrained to the underscore vocabulary. Rejection maps
+ * to `twilio_rejected`, which the step engine treats like a failure: the step
+ * re-runs in place with the operator's corrections. Unknown values map to
+ * null and are not written.
+ */
+function toDbBundleStatus(apiStatus: string): string | null {
+  switch (String(apiStatus ?? "").toLowerCase().replace(/-/g, "_")) {
+    case "draft":
+    case "in_progress":
+      return "in_progress";
+    case "pending_review":
+    case "in_review":
+      return "pending_review";
+    case "twilio_approved":
+      return "twilio_approved";
+    case "twilio_rejected":
+      return "twilio_rejected";
+    default:
+      return null;
+  }
+}
+
+/** brand_status values the migration's CHECK constraint permits. */
+const ALLOWED_BRAND_STATUSES = new Set([
+  "not_started",
+  "in_progress",
+  "PENDING",
+  "APPROVED",
+  "FAILED",
+  "IN_REVIEW",
+  "DELETED",
+  "SUSPENDED",
+  "failed",
+]);
+
 export async function pollOneRegistration(params: {
   admin: any;
   registration: Record<string, any>;
@@ -100,13 +137,16 @@ export async function pollOneRegistration(params: {
   const { admin, registration } = params;
   const registrationId = String(registration.id);
 
+  // Stamp FIRST, decide after: a row skipped without a stamp keeps
+  // last_polled_at null, sorts to the very front of every poll (nullsFirst),
+  // and 25 such rows would starve every entitled tenant out of the window.
+  await stampPolled(admin, registrationId, params.now);
+
   // An account removed from the allowlist stops being polled — entitlement is
   // re-checked per row, not assumed from the row's existence.
   if (!isSmsSelfServeEnabledForAccountOwner(String(registration.account_owner_user_id ?? ""))) {
     return { registrationId, outcome: "skipped", detail: "not entitled" };
   }
-
-  await stampPolled(admin, registrationId, params.now);
 
   const credential = await resolveSubaccountCredential({
     admin,
@@ -116,12 +156,15 @@ export async function pollOneRegistration(params: {
   const auth = { accountSid: credential.accountSid, authToken: credential.authToken };
 
   // TrustHub bundle reviews first: the wizard's brand gate opens when both
-  // bundles are twilio-approved, and this refresh is what opens it.
+  // bundles are twilio_approved, and this refresh is what opens it. A
+  // rejection also records last_error — the step engine re-runs the bundle
+  // step in place, and the wizard must show WHY, never a calm "waiting".
   for (const bundle of [
     {
       sid: registration.customer_profile_sid,
       column: "customer_profile_status",
       current: registration.customer_profile_status,
+      label: "business profile",
       fetch: () =>
         fetchCustomerProfileStatus({
           auth,
@@ -132,19 +175,31 @@ export async function pollOneRegistration(params: {
       sid: registration.trust_product_sid,
       column: "trust_product_status",
       current: registration.trust_product_status,
+      label: "messaging profile",
       fetch: () =>
         fetchTrustProductStatus({ auth, trustProductSid: String(registration.trust_product_sid) }),
     },
   ]) {
-    const pending = ["pending_review", "pending-review", "in-review"].includes(
-      String(bundle.current ?? "").toLowerCase(),
-    );
+    const pending = String(bundle.current ?? "").toLowerCase() === "pending_review";
     if (bundle.sid && pending) {
       const fetched = await bundle.fetch();
-      if (fetched.status && fetched.status !== String(bundle.current ?? "").toLowerCase()) {
+      const dbStatus = toDbBundleStatus(fetched.status);
+      if (dbStatus && dbStatus !== String(bundle.current ?? "").toLowerCase()) {
+        const patch: Record<string, unknown> =
+          dbStatus === "twilio_rejected"
+            ? {
+                [bundle.column]: dbStatus,
+                last_error: {
+                  step: bundle.column.replace(/_status$/, ""),
+                  message:
+                    `Twilio's review rejected your ${bundle.label}. Edit the details below and `
+                    + "resubmit — the same registration continues; nothing is lost.",
+                },
+              }
+            : { [bundle.column]: dbStatus };
         await admin
           .from("sms_provisioning_registrations")
-          .update({ [bundle.column]: fetched.status })
+          .update(patch)
           .eq("id", registrationId);
       }
     }
@@ -157,7 +212,14 @@ export async function pollOneRegistration(params: {
       auth,
       brandRegistrationSid: String(registration.brand_registration_sid),
     });
-    if (brand.status && brand.status !== registration.brand_status) {
+    // Clamp to the CHECK constraint's vocabulary: an unexpected value from the
+    // API (e.g. DELETION_PENDING) must not turn a status refresh into a
+    // constraint violation. Terminal detection below still sees the raw value.
+    if (
+      brand.status
+      && brand.status !== registration.brand_status
+      && ALLOWED_BRAND_STATUSES.has(brand.status)
+    ) {
       await admin
         .from("sms_provisioning_registrations")
         .update({ brand_status: brand.status, brand_identity_status: brand.identityStatus })
@@ -203,8 +265,23 @@ export async function pollOneRegistration(params: {
   }
 
   if (campaign.status === "VERIFIED") {
-    await completeRegistration({ admin, registration, now: params.now });
-    return { registrationId, outcome: "completed" };
+    try {
+      await completeRegistration({ admin, registration, now: params.now });
+      return { registrationId, outcome: "completed" };
+    } catch (error) {
+      // completed_at was NOT stamped, so the next poll retries this. Record
+      // why, so a persistent failure is visible instead of a silent loop.
+      const message = error instanceof Error ? error.message : "completion failed";
+      try {
+        await admin
+          .from("sms_provisioning_registrations")
+          .update({ last_error: { step: "completion", message } })
+          .eq("id", registrationId);
+      } catch {
+        /* the poll result still carries the failure */
+      }
+      return { registrationId, outcome: "failed", detail: message };
+    }
   }
 
   return { registrationId, outcome: "waiting", detail: campaign.status || undefined };
@@ -252,6 +329,16 @@ export async function completeRegistration(params: {
   const accountOwnerUserId = registration.account_owner_user_id;
   const actorUserId = registration.updated_by_user_id ?? registration.created_by_user_id ?? null;
 
+  // completed_at is stamped ONLY when every write below lands. A completion
+  // that half-failed and stamped anyway would retire the row from the poll
+  // forever, leaving an account that can never activate and no error anywhere.
+  // Throwing instead lets the caller record it and the next poll retry it.
+  const require = (label: string, error: unknown) => {
+    if (error) {
+      throw new Error(`Completion write failed (${label}): ${String((error as any)?.message ?? error)}`);
+    }
+  };
+
   const configPatch = {
     provider_account_ref: registration.subaccount_sid,
     default_messaging_service_ref: registration.messaging_service_sid,
@@ -262,80 +349,97 @@ export async function completeRegistration(params: {
     advanced_opt_out_readiness: "ready",
   };
 
-  const { data: existingConfig } = await admin
+  // List, never maybeSingle: a tenant can legitimately hold one config row per
+  // environment (the unique index allows it), and a multi-row maybeSingle
+  // error must not silently reroute this into the insert branch.
+  const registrationEnvironment = String(registration.provider_environment ?? "production");
+  const { data: configRows, error: configReadError } = await admin
     .from("sms_provider_configurations")
-    .select("id")
+    .select("id, provider_environment")
     .eq("account_owner_user_id", accountOwnerUserId)
-    .eq("provider_name", "twilio")
-    .maybeSingle();
+    .eq("provider_name", "twilio");
+  require("configuration read", configReadError);
+  const rows: any[] = Array.isArray(configRows) ? configRows : [];
+  const existingConfig =
+    rows.find((row) => String(row?.provider_environment ?? "") === registrationEnvironment)
+    ?? rows.find((row) => String(row?.provider_environment ?? "") === "production")
+    ?? rows[0]
+    ?? null;
 
   let configurationId: string | null = existingConfig?.id ? String(existingConfig.id) : null;
   if (configurationId) {
-    await admin
+    const { error } = await admin
       .from("sms_provider_configurations")
       .update(configPatch)
       .eq("id", configurationId)
       .eq("account_owner_user_id", accountOwnerUserId);
+    require("configuration update", error);
   } else {
-    const { data: insertedConfig } = await admin
+    const { data: insertedConfig, error } = await admin
       .from("sms_provider_configurations")
       .insert({
         account_owner_user_id: accountOwnerUserId,
         provider_name: "twilio",
-        provider_environment: String(registration.provider_environment ?? "production"),
+        provider_environment: registrationEnvironment,
         created_by_user_id: actorUserId,
         updated_by_user_id: actorUserId,
         ...configPatch,
       })
       .select("id")
       .single();
+    require("configuration insert", error);
     configurationId = insertedConfig?.id ? String(insertedConfig.id) : null;
   }
-
-  if (configurationId) {
-    const senderPatch = {
-      phone_e164: registration.phone_e164,
-      phone_last4: String(registration.phone_e164 ?? "").slice(-4),
-      provider_sender_ref: registration.phone_number_sid,
-      messaging_service_ref: registration.messaging_service_sid,
-      provider_brand_ref: registration.brand_registration_sid,
-      provider_campaign_ref: registration.campaign_sid,
-      provider_registration_ref: registration.customer_profile_sid,
-      registration_type: "a2p_10dlc",
-      // Earned, not attested: the campaign is VERIFIED at the carriers and
-      // the number is attached to the messaging service.
-      verification_status: "verified",
-      activation_status: "active",
-    };
-
-    const { data: existingSender } = await admin
-      .from("sms_sender_identities")
-      .select("id")
-      .eq("account_owner_user_id", accountOwnerUserId)
-      .eq("provider_configuration_id", configurationId)
-      .maybeSingle();
-
-    if (existingSender?.id) {
-      await admin
-        .from("sms_sender_identities")
-        .update(senderPatch)
-        .eq("id", existingSender.id)
-        .eq("account_owner_user_id", accountOwnerUserId);
-    } else {
-      await admin.from("sms_sender_identities").insert({
-        account_owner_user_id: accountOwnerUserId,
-        provider_configuration_id: configurationId,
-        sender_type: "long_code",
-        sender_display_label: "Business Texting Number",
-        created_by_user_id: actorUserId,
-        updated_by_user_id: actorUserId,
-        ...senderPatch,
-      });
-    }
+  if (!configurationId) {
+    throw new Error("Completion write failed (configuration): no configuration id resolved");
   }
 
-  await admin
+  const senderPatch = {
+    phone_e164: registration.phone_e164,
+    phone_last4: String(registration.phone_e164 ?? "").slice(-4),
+    provider_sender_ref: registration.phone_number_sid,
+    messaging_service_ref: registration.messaging_service_sid,
+    provider_brand_ref: registration.brand_registration_sid,
+    provider_campaign_ref: registration.campaign_sid,
+    provider_registration_ref: registration.customer_profile_sid,
+    registration_type: "a2p_10dlc",
+    // Earned, not attested: the campaign is VERIFIED at the carriers and
+    // the number is attached to the messaging service.
+    verification_status: "verified",
+    activation_status: "active",
+  };
+
+  const { data: existingSender, error: senderReadError } = await admin
+    .from("sms_sender_identities")
+    .select("id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("provider_configuration_id", configurationId)
+    .maybeSingle();
+  require("sender read", senderReadError);
+
+  if (existingSender?.id) {
+    const { error } = await admin
+      .from("sms_sender_identities")
+      .update(senderPatch)
+      .eq("id", existingSender.id)
+      .eq("account_owner_user_id", accountOwnerUserId);
+    require("sender update", error);
+  } else {
+    const { error } = await admin.from("sms_sender_identities").insert({
+      account_owner_user_id: accountOwnerUserId,
+      provider_configuration_id: configurationId,
+      sender_type: "long_code",
+      sender_display_label: "Business Texting Number",
+      created_by_user_id: actorUserId,
+      updated_by_user_id: actorUserId,
+      ...senderPatch,
+    });
+    require("sender insert", error);
+  }
+
+  const { error: stampError } = await admin
     .from("sms_provisioning_registrations")
     .update({ campaign_status: "VERIFIED", completed_at: nowIso, last_error: null })
     .eq("id", registration.id);
+  require("completion stamp", stampError);
 }
