@@ -13,9 +13,21 @@
  * signal is the only submission path.
  */
 
-/** Bumping this invalidates every stored draft — old shapes are discarded, not migrated. */
-export const FIELD_DRAFT_VERSION = "v1";
-export const FIELD_DRAFT_KEY_PREFIX = `esfw-draft:${FIELD_DRAFT_VERSION}`;
+/**
+ * Bumping this invalidates every stored draft — old shapes are discarded, not
+ * migrated.
+ *
+ * v1 → v2: v1 snapshotted EVERY field in the form, including server-rendered
+ * defaults the tech never touched. Those drafts can never agree with the next
+ * server render (the server normalizes what it stores — an exception label
+ * lands back in the notes box, "2.0" comes back as "2"), so they re-offered
+ * themselves after every save and a restore could not settle them. They hold
+ * no typed reading worth the loop, so they are dropped rather than migrated.
+ */
+export const FIELD_DRAFT_VERSION = "v2";
+/** Shared by every version of the format, so superseded ones can be swept up. */
+export const FIELD_DRAFT_KEY_NAMESPACE = "esfw-draft";
+export const FIELD_DRAFT_KEY_PREFIX = `${FIELD_DRAFT_KEY_NAMESPACE}:${FIELD_DRAFT_VERSION}`;
 
 /** At most this many drafts on a device; oldest go first. */
 export const FIELD_DRAFT_MAX_ENTRIES = 50;
@@ -36,6 +48,15 @@ export type FieldDraft = {
    * different current token means the readings on file changed underneath it.
    */
   serverStateToken: string | null;
+  /**
+   * ISO timestamp of the Save that these values were handed to, or null if they
+   * have not been submitted since they were last edited.
+   *
+   * Set at submit rather than deleted at submit: a save can still fail on the
+   * way out, and the draft is the only copy of the reading until the server
+   * confirms it landed.
+   */
+  submittedAt: string | null;
   values: FieldDraftValues;
 };
 
@@ -61,6 +82,18 @@ export function buildFieldDraftKey(params: {
 
 export function isFieldDraftKey(key: unknown): boolean {
   return String(key ?? "").startsWith(`${FIELD_DRAFT_KEY_PREFIX}:`);
+}
+
+/**
+ * A draft this build can no longer read: written by an older format version.
+ *
+ * Bumping the version orphans those entries — they no longer match any key this
+ * code looks up, so nothing would ever reap them. They get swept on the next
+ * prune instead of sitting on the device until the tech clears their browser.
+ */
+export function isSupersededFieldDraftKey(key: unknown): boolean {
+  const value = String(key ?? "");
+  return value.startsWith(`${FIELD_DRAFT_KEY_NAMESPACE}:`) && !isFieldDraftKey(value);
 }
 
 /** A field as read from (or written back to) the DOM. */
@@ -156,6 +189,52 @@ export function draftDiffersFromCurrent(
 }
 
 /**
+ * True when the draft holds a difference the tech could actually act on — a
+ * value that disagrees with a field CURRENTLY on screen.
+ *
+ * Drives whether the restore banner appears. A draft value whose field is not
+ * mounted (the measured-CFM box after an exemption hides the results section)
+ * has nowhere to be restored to: offering it produces a banner that Restore
+ * cannot clear, so it comes back on every render. Those values are kept —
+ * losing a typed reading is worse — but they stay silent until their field is
+ * back on screen.
+ */
+export function draftHasRestorableDifference(
+  draftValues: FieldDraftValues | null | undefined,
+  currentValues: FieldDraftValues | null | undefined,
+): boolean {
+  if (!draftValues) return false;
+  const current = currentValues ?? {};
+  const restorable: FieldDraftValues = {};
+  for (const [name, value] of Object.entries(draftValues)) {
+    if (name in current) restorable[name] = value;
+  }
+  return draftDiffersFromCurrent(restorable, current);
+}
+
+/**
+ * Fold a fresh capture into what is already stored.
+ *
+ * `snapshot` is what the edited fields read RIGHT NOW; `retainNames` is every
+ * field the tech has edited this session. A retained field that is no longer in
+ * the DOM — the results box after an exemption unmounts it — keeps its stored
+ * value instead of vanishing from the draft.
+ */
+export function mergeRetainedDraftValues(params: {
+  stored: FieldDraftValues | null | undefined;
+  snapshot: FieldDraftValues;
+  retainNames: Iterable<string>;
+}): FieldDraftValues {
+  const merged: FieldDraftValues = { ...params.snapshot };
+  const stored = params.stored ?? {};
+  for (const name of params.retainNames) {
+    if (name in merged) continue;
+    if (name in stored) merged[name] = stored[name];
+  }
+  return merged;
+}
+
+/**
  * True when the readings on file changed after this draft was captured.
  *
  * A null token on either side means "unknown", which is not evidence of a
@@ -175,13 +254,31 @@ export function buildFieldDraft(params: {
   values: FieldDraftValues;
   serverStateToken: string | null;
   savedAt: string;
+  submittedAt?: string | null;
 }): FieldDraft {
   return {
     version: FIELD_DRAFT_VERSION,
     savedAt: params.savedAt,
     serverStateToken: String(params.serverStateToken ?? "").trim() || null,
+    submittedAt: String(params.submittedAt ?? "").trim() || null,
     values: params.values,
   };
+}
+
+/**
+ * True when this draft was handed to a Save that the server has since acted on.
+ *
+ * The proof that the save landed is the row's token moving: the draft was
+ * submitted against token T and the form now renders token T'. Without that
+ * movement the save may never have reached the server, and the draft is still
+ * the only copy of the reading.
+ */
+export function draftWasSubmittedAndConfirmed(
+  draft: Pick<FieldDraft, "serverStateToken" | "submittedAt"> | null | undefined,
+  currentToken: string | null | undefined,
+): boolean {
+  if (!String(draft?.submittedAt ?? "").trim()) return false;
+  return serverStateChangedSinceDraft(draft, currentToken);
 }
 
 /**
@@ -217,6 +314,7 @@ export function parseStoredDraft(raw: string | null | undefined): FieldDraft | n
     version: FIELD_DRAFT_VERSION,
     savedAt,
     serverStateToken: String(parsed.serverStateToken ?? "").trim() || null,
+    submittedAt: String(parsed.submittedAt ?? "").trim() || null,
     values,
   };
 }

@@ -1616,9 +1616,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           ductOverrideReasonRaw === option.label || ductOverrideReasonRaw.startsWith(`${option.label}:`),
         ) ?? null
       : null;
-  const ductExceptionReasonDefault = ductSelectedException
-    ? ductOverrideReasonRaw.replace(new RegExp(`^${ductSelectedException.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*`), "")
-    : "";
+  // The stored reason is "<label>" with no notes, or "<label>: <notes>". Only
+  // the notes belong in the box — echoing the bare label back into it reads as
+  // a note the tech typed, and comes back out on the next save as
+  // "< 40' of ducting: < 40' of ducting".
+  const ductExceptionReasonDefault =
+    ductSelectedException && ductOverrideReasonRaw !== ductSelectedException.label
+      ? ductOverrideReasonRaw.replace(new RegExp(`^${ductSelectedException.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*`), "")
+      : "";
   const ductOverrideActive = runDL?.override_pass === true || runDL?.override_pass === false;
   const ductOverrideReasonPresent = Boolean(String(runDL?.override_reason ?? "").trim());
   const ductReviewSummary = ductOverrideActive
@@ -1655,9 +1660,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           airflowOverrideReasonRaw === option.label || airflowOverrideReasonRaw.startsWith(`${option.label}:`),
         ) ?? null
       : null;
-  const airflowExceptionReasonDefault = airflowSelectedException
-    ? airflowOverrideReasonRaw.replace(new RegExp(`^${airflowSelectedException.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*`), "")
-    : "";
+  // Same shape as duct leakage above: label-only means there are no notes.
+  const airflowExceptionReasonDefault =
+    airflowSelectedException && airflowOverrideReasonRaw !== airflowSelectedException.label
+      ? airflowOverrideReasonRaw.replace(new RegExp(`^${airflowSelectedException.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*`), "")
+      : "";
   const airflowHasInlineResultStatus =
     Boolean(airflowSelectedException) ||
     runAF?.override_pass === true ||

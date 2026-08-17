@@ -10,9 +10,12 @@ import {
 } from "@/lib/field-drafts/form-draft-storage";
 import {
   draftDiffersFromCurrent,
+  draftHasRestorableDifference,
+  draftWasSubmittedAndConfirmed,
   formatDraftAge,
   isDraftableFieldType,
   isDraftEmpty,
+  mergeRetainedDraftValues,
   serializeDraftFields,
   serverStateChangedSinceDraft,
   type FieldDraft,
@@ -43,6 +46,13 @@ const FIELD_SELECTOR = "input[name], select[name], textarea[name]";
  * reading over newer office-entered data without the tech noticing — on
  * compliance data that is worse than losing the draft.
  *
+ * Only fields the tech actually edited are captured. Snapshotting the whole
+ * form instead would store server-rendered defaults nobody typed, and those can
+ * never agree with the next server render — the row comes back normalized (an
+ * exception label echoed into the notes box, "2.0" stored as "2"), the draft
+ * disagrees, and the banner re-offers itself after every save with nothing a
+ * restore can settle.
+ *
  * The guard NEVER submits, queues, or replays anything. It only reads and
  * writes localStorage.
  */
@@ -61,6 +71,14 @@ export function FormDraftGuard({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const writeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const secondPassTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Field names the tech has edited (or that a stored draft already holds). */
+  const editedNamesRef = useRef<Set<string>>(new Set());
+  /**
+   * Set once the tech has restored here. After that, values matching the form
+   * are matching because the DRAFT put them there, not because they are on
+   * file, so the redundancy cleanup below must not reap them.
+   */
+  const restoredHereRef = useRef(false);
   const [draft, setDraft] = useState<FieldDraft | null>(null);
   const [unrestoredCount, setUnrestoredCount] = useState(0);
   const [restoredCount, setRestoredCount] = useState<number | null>(null);
@@ -101,50 +119,100 @@ export function FormDraftGuard({
    * a flush that relied on it would silently discard the last keystrokes — the
    * exact loss this guard exists to prevent.
    */
-  const flushWrite = useCallback((from?: HTMLElement | null) => {
+  const flushWrite = useCallback((
+    from?: HTMLElement | null,
+    options: { submitted?: boolean } = {},
+  ) => {
     if (writeTimerRef.current) {
       clearTimeout(writeTimerRef.current);
       writeTimerRef.current = null;
     }
     const container = from ?? containerRef.current;
     if (!container) return;
-    const values: FieldDraftValues = serializeDraftFields(readCurrentFields(container));
+    const edited = editedNamesRef.current;
+    // Nothing typed yet: whatever is on screen is the server's own render, and
+    // storing it would only manufacture a conflict with the next one.
+    if (edited.size === 0) return;
+
+    const values: FieldDraftValues = mergeRetainedDraftValues({
+      stored: readDraft(draftKey)?.values,
+      snapshot: serializeDraftFields(
+        readCurrentFields(container).filter((field) => edited.has(field.name)),
+      ),
+      retainNames: edited,
+    });
     if (isDraftEmpty(values)) {
       deleteDraft(draftKey);
       return;
     }
-    writeDraft({ key: draftKey, values, serverStateToken: token });
+    writeDraft({ key: draftKey, values, serverStateToken: token, submitted: options.submitted });
   }, [draftKey, readCurrentFields, token]);
 
-  // On mount: prune old drafts once, then decide whether there is anything
-  // worth offering back.
+  // Prune old drafts once, then decide whether there is anything worth offering
+  // back. Re-runs when the server token moves, which is how a save that landed
+  // while this component stayed mounted gets noticed.
   useEffect(() => {
     pruneDrafts({ keepKey: draftKey });
 
     const stored = readDraft(draftKey);
     if (!stored) return;
 
+    // These values went out with a Save and the row has moved since, so they
+    // are on file now. Anything else re-offers saved readings forever, because
+    // the server's normalized re-render never matches the draft exactly.
+    if (draftWasSubmittedAndConfirmed(stored, token)) {
+      deleteDraft(draftKey);
+      editedNamesRef.current.clear();
+      setDraft(null);
+      return;
+    }
+
+    // Everything already in a draft was typed by the tech, so keep tracking
+    // those names — a later write must not drop them.
+    for (const name of Object.keys(stored.values)) editedNamesRef.current.add(name);
+
     const current = serializeDraftFields(readCurrentFields());
     // Redundant draft: everything in it is already on screen (typically because
     // the save landed and the server re-rendered these very values). Delete it
     // rather than inviting a pointless restore.
     if (isDraftEmpty(stored.values) || !draftDiffersFromCurrent(stored.values, current)) {
-      deleteDraft(draftKey);
+      if (!restoredHereRef.current) {
+        deleteDraft(draftKey);
+        editedNamesRef.current.clear();
+      }
+      setDraft(null);
+      return;
+    }
+    // Held, but not offered: the only differences are in fields that are not
+    // mounted right now, so Restore would have nowhere to put them and the
+    // banner would return on every render.
+    if (!draftHasRestorableDifference(stored.values, current)) {
+      setDraft(null);
       return;
     }
     setNow(Date.now());
     setDraft(stored);
-  }, [draftKey, readCurrentFields]);
+  }, [draftKey, readCurrentFields, token]);
 
   // Capture typing, debounced so a fast typist writes once per pause.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
 
-    const schedule = () => {
+    const schedule = (event: Event) => {
+      const target = event.target as HTMLInputElement | null;
+      const name = String(target?.name ?? "").trim();
+      // Only fields that actually receive activity enter the draft; the rest of
+      // the form is the server's render, not the tech's work.
+      if (name && isDraftableFieldType(target?.type)) editedNamesRef.current.add(name);
       if (writeTimerRef.current) clearTimeout(writeTimerRef.current);
       writeTimerRef.current = setTimeout(() => flushWrite(container), WRITE_DEBOUNCE_MS);
     };
+
+    // Save pressed: the values are on their way to the server. They stay on the
+    // device (the request can still fail) but are marked as delivered, so the
+    // next render that proves the row moved can retire them silently.
+    const onSubmit = () => flushWrite(container, { submitted: true });
 
     // A phone backgrounding the tab is the single most likely moment to lose
     // buffered keystrokes, and it may never fire another event. Both of these
@@ -157,12 +225,14 @@ export function FormDraftGuard({
 
     container.addEventListener("input", schedule);
     container.addEventListener("change", schedule);
+    container.addEventListener("submit", onSubmit);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", flushNow);
 
     return () => {
       container.removeEventListener("input", schedule);
       container.removeEventListener("change", schedule);
+      container.removeEventListener("submit", onSubmit);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", flushNow);
       // Unmount must not discard buffered values either — hence the captured
@@ -226,10 +296,15 @@ export function FormDraftGuard({
 
     const first = applyValues(draft.values);
     const total = Object.keys(draft.values).length;
+    restoredHereRef.current = true;
     setDraft(null);
     setRestoredCount(total - first.missing.length);
     setUnrestoredCount(first.missing.length);
     first.firstNode?.focus?.();
+    // Bring storage in line with the screen immediately. Left to the debounce,
+    // a re-render arriving in between would read a draft that still disagrees
+    // with the form and offer the same restore again.
+    flushWrite();
 
     if (first.missing.length === 0) return;
 
@@ -246,11 +321,15 @@ export function FormDraftGuard({
       // Whatever is still unrestorable STAYS in the draft. Dropping it would
       // destroy a reading the tech typed just because its field is not on
       // screen right now.
+      flushWrite();
     }, SECOND_PASS_DELAY_MS);
-  }, [applyValues, draft]);
+  }, [applyValues, draft, flushWrite]);
 
   const handleDiscard = useCallback(() => {
     deleteDraft(draftKey);
+    // Forget the names too, or the next flush would write the discarded draft
+    // straight back from the fields still on screen.
+    editedNamesRef.current.clear();
     setDraft(null);
     setRestoredCount(null);
     setUnrestoredCount(0);
