@@ -417,6 +417,13 @@ function makeSupabase(fixtures?: {
           calls.push({ table, op: "delete" });
           throw new Error("Unexpected delete");
         }),
+        // The live-send template gate reads the account's real activation
+        // status through a single-row query.
+        maybeSingle: vi.fn(async () => {
+          calls.push({ table, op: "maybeSingle" });
+          const { data } = getRows();
+          return { data: data[0] ?? null, error: null };
+        }),
         then: (
           onFulfilled: (value: { data: any[]; error: null }) => unknown,
           onRejected?: (reason: unknown) => unknown,

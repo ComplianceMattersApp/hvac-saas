@@ -1,3 +1,4 @@
+import { readSmsActivationState } from "@/lib/communications/sms-activation-state";
 import { listContactRecipientsForEntity, type ContactRecipientRow } from "@/lib/communications/contact-recipients-read";
 import { getSmsEligibilityInputsForRecipient } from "@/lib/communications/sms-eligibility-inputs-read";
 import { getSmsProviderReadinessForAccount } from "@/lib/communications/sms-provider-readiness-read";
@@ -184,13 +185,49 @@ function choosePreferredRecipient(recipients: ContactRecipientRow[]) {
   })[0] ?? null;
 }
 
-function selectEligibleTemplateVersion(result: Awaited<ReturnType<typeof getSmsOnTheWayTemplateGovernanceForAccount>>) {
-  const candidates = [result.currentVersion, result.sandboxVersion];
-  const allowedStatuses = new Set(["approved_for_sandbox", "approved_for_activation", "active"]);
+/** Statuses a version must hold to reach a REAL customer. */
+const LIVE_TEMPLATE_STATUSES = new Set(["approved_for_activation", "active"]);
+/** Sandbox is where an approved-for-sandbox version is supposed to be exercised. */
+const SANDBOX_TEMPLATE_STATUSES = new Set([
+  "approved_for_sandbox",
+  "approved_for_activation",
+  "active",
+]);
+
+/**
+ * Which template version may be used, and it depends on where the message goes.
+ *
+ * LIVE: the template's `current_version_id` pointer ONLY, and only at
+ * `approved_for_activation` or `active`. No fallback to the sandbox pointer, and
+ * `approved_for_sandbox` is not enough.
+ *
+ * This used to try `[currentVersion, sandboxVersion]` and accept
+ * `approved_for_sandbox` on either — which meant a version approved only for
+ * sandbox, with reviews still incomplete, was rendering the texts real
+ * customers received. Governance correctly reported "no current governed
+ * version selected" the whole time; the send path was simply ignoring it. The
+ * carriers approved specific message content, so this is the gate that keeps
+ * what they approved and what we send from drifting apart.
+ *
+ * SANDBOX: unchanged — the sandbox pointer and sandbox approval are exactly
+ * what sandbox is for.
+ */
+function selectEligibleTemplateVersion(
+  result: Awaited<ReturnType<typeof getSmsOnTheWayTemplateGovernanceForAccount>>,
+  options: { liveSend: boolean },
+) {
+  const statusOf = (candidate: { versionStatus?: string }) =>
+    asTrimmed(candidate?.versionStatus).toLowerCase();
+
+  if (options.liveSend) {
+    const current = result.currentVersion;
+    return current?.exists && LIVE_TEMPLATE_STATUSES.has(statusOf(current)) ? current : null;
+  }
 
   return (
-    candidates.find((candidate) => candidate.exists && allowedStatuses.has(asTrimmed(candidate.versionStatus).toLowerCase())) ??
-    null
+    [result.currentVersion, result.sandboxVersion].find(
+      (candidate) => candidate?.exists && SANDBOX_TEMPLATE_STATUSES.has(statusOf(candidate)),
+    ) ?? null
   );
 }
 
@@ -370,7 +407,16 @@ export async function evaluateOnTheWayIntentEligibility(
     accountOwnerUserId,
   });
 
-  const selectedTemplateVersion = selectEligibleTemplateVersion(templateGovernance);
+  // Which rules apply depends on whether this account actually sends live.
+  // Read from the row, not from the readiness summary, whose activation status
+  // is a hardcoded literal that can only ever say "disabled".
+  const activationState = await readSmsActivationState({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  });
+  const selectedTemplateVersion = selectEligibleTemplateVersion(templateGovernance, {
+    liveSend: activationState.isLive,
+  });
 
   if (!templateGovernance.template.hasTemplate) {
     blockedReasons.push("template_missing");
