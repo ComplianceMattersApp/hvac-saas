@@ -108,11 +108,22 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
           update: vi.fn((values: Record<string, unknown>) => ({
             eq: vi.fn((_idColumn: string, idValue: unknown) => ({
               eq: vi.fn(() => ({
+                // Metadata reconcile: .eq("id", ...)
                 eq: vi.fn(async () => {
                   writes.push({ table, op: "update", payload: values });
                   updatedAttachmentIds.push(String(idValue ?? "").trim());
                   return { error: null };
                 }),
+                // Finalize stamp: .in("id", ids).is("finalized_at", null)
+                in: vi.fn((_column: string, ids: unknown) => ({
+                  is: vi.fn(async () => {
+                    writes.push({ table, op: "update", payload: values });
+                    updatedAttachmentIds.push(
+                      ...(Array.isArray(ids) ? ids.map((id) => String(id ?? "").trim()) : []),
+                    );
+                    return { error: null };
+                  }),
+                })),
               })),
             })),
           })),

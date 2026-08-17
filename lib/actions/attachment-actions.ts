@@ -90,7 +90,7 @@ async function assertJobAttachmentUploadAuthority(input: {
 }
 
 async function requireOperationalAttachmentEntitlementAccessOrRedirect(params: {
-  supabase: any;
+  supabase: Awaited<ReturnType<typeof createClient>>;
   accountOwnerUserId: string | null | undefined;
 }) {
   const access = await resolveOperationalMutationEntitlementAccess({
@@ -317,6 +317,25 @@ async function loadVerifiedJobAttachments(input: {
     });
   }
 
+  // Everything still standing has a confirmed object behind it, so promote the
+  // staged rows in one statement. Scoped to rows that are still staged: a
+  // re-finalize (double submit, retry) must not rewrite the original timestamp.
+  if (verifiedRows.length) {
+    const { error: finalizeErr } = await supabase
+      .from("attachments")
+      .update({ finalized_at: new Date().toISOString() })
+      .eq("entity_type", "job")
+      .eq("entity_id", jobId)
+      .in("id", verifiedRows.map((row) => row.id))
+      .is("finalized_at", null);
+
+    if (finalizeErr) {
+      // The objects are in storage and the rows are intact; they are simply
+      // still hidden. Surfacing this beats finalizing a partial batch silently.
+      throw new Error(`Could not finalize uploaded attachments: ${finalizeErr.message}`);
+    }
+  }
+
   return verifiedRows;
 }
 
@@ -391,7 +410,10 @@ export async function createJobAttachmentUploadToken(input: {
   const attachmentId = crypto.randomUUID();
   const storagePath = `job/${input.jobId}/${attachmentId}-${cleanName}`;
 
-  // 1) Insert DB row FIRST (required by our storage policy)
+  // 1) Stage the DB row. `finalized_at: null` keeps it out of every read
+  //    surface until the object is confirmed present in storage, so a browser
+  //    that closes mid-upload leaves a sweepable row rather than a permanently
+  //    broken tile in the attachment library.
   const { error: insErr } = await supabase.from("attachments").insert({
     id: attachmentId,
     entity_type: "job",
@@ -402,6 +424,8 @@ export async function createJobAttachmentUploadToken(input: {
     content_type: contentType,
     file_size: fileSize,
     caption: normalizedCaption,
+    created_by_user_id: userData.user.id,
+    finalized_at: null,
   });
 
   if (insErr) throw new Error(insErr.message);

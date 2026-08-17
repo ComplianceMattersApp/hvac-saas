@@ -195,6 +195,16 @@ function makeSessionClientFixture(fixture: {
                     });
                     return Promise.resolve({ error: null });
                   }),
+                  // Finalize stamp: .in("id", ids).is("finalized_at", null)
+                  in: vi.fn((_column: string, ids: unknown) => ({
+                    is: vi.fn(() => {
+                      updatedAttachments.push({
+                        values,
+                        ids: Array.isArray(ids) ? ids.map((id) => String(id ?? "").trim()) : [],
+                      });
+                      return Promise.resolve({ error: null });
+                    }),
+                  })),
                 })),
               })),
             };

@@ -519,7 +519,8 @@ export default async function JobDetailV2Page({
       .from("attachments")
       .select("id", { count: "exact", head: true })
       .eq("entity_type", "job")
-      .eq("entity_id", jobId),
+      .eq("entity_id", jobId)
+      .not("finalized_at", "is", null),
     supabase
       .from("job_events")
       .select("id", { count: "exact", head: true })

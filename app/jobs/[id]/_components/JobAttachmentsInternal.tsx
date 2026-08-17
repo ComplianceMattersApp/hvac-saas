@@ -547,6 +547,12 @@ export default function JobAttachmentsInternal({
                   isImage &&
                   !!a.signedUrl &&
                   !failedPreviewIds.has(a.id);
+                // An image the browser could not decode (HEIC/HEIF from an iOS
+                // picker is the usual cause) must not fall through to the
+                // generic file tile: that renders a broken photo as though it
+                // were an ordinary document, so nobody ever learns the evidence
+                // is unviewable.
+                const previewFailed = isImage && !!a.signedUrl && failedPreviewIds.has(a.id);
                 const isShared = sharedAttachmentIds.has(a.id);
                 const isEditing = editingId === a.id;
                 const isDeleting = deletingId === a.id;
@@ -593,6 +599,20 @@ export default function JobAttachmentsInternal({
                           }}
                         />
                       </a>
+                    ) : previewFailed ? (
+                      <div className="flex h-28 w-full items-center gap-3 bg-amber-50 px-4">
+                        <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-300 bg-white text-[11px] font-semibold tracking-[0.12em] text-amber-700 shadow-sm">
+                          !
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-amber-900" title={a.file_name}>
+                            {a.file_name}
+                          </div>
+                          <div className="mt-1 text-[11px] font-medium text-amber-700">
+                            Preview unavailable in this browser — use Open to download the original.
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <div className="flex h-28 w-full items-center gap-3 bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4">
                         <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-[11px] font-semibold tracking-[0.12em] text-slate-500 shadow-sm">

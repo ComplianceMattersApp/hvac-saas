@@ -141,6 +141,7 @@ export async function listJobDuctAsbestosPhotoImages(params: {
     .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
     .ilike("caption", `${DUCT_ASBESTOS_PHOTO_ATTACHMENT_TAG}%`)
     .order("created_at", { ascending: false })
     .limit(params.limit ?? 20);
@@ -179,6 +180,7 @@ export async function listJobRefrigerantChargeEvidenceImages(params: {
     .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
     .ilike("caption", `${REFRIGERANT_CHARGE_ATTACHMENT_TAG}%`)
     .order("created_at", { ascending: false })
     .limit(params.limit ?? 20);
@@ -217,6 +219,7 @@ export async function listJobEquipmentLabelPhotoImages(params: {
     .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
     .ilike("caption", `${EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG}%`)
     .order("created_at", { ascending: false })
     .limit(params.limit ?? 100);

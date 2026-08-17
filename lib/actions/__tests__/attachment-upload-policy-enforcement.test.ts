@@ -78,10 +78,18 @@ function makeFixture(options: {
             return Promise.resolve({ error: null });
           },
           update: (values: Record<string, unknown>) => ({
-            eq: () => ({ eq: () => ({ eq: async () => {
-              updatedAttachments.push(values);
-              return { error: null };
-            } }) }),
+            eq: () => ({ eq: () => ({
+              // Metadata reconcile: .eq("id", ...)
+              eq: async () => {
+                updatedAttachments.push(values);
+                return { error: null };
+              },
+              // Finalize stamp: .in("id", ids).is("finalized_at", null)
+              in: () => ({ is: async () => {
+                updatedAttachments.push(values);
+                return { error: null };
+              } }),
+            }) }),
           }),
           select: (_columns?: string, selectOptions?: { head?: boolean }) => ({
             eq: () => ({
@@ -245,6 +253,34 @@ describe("job attachment upload policy enforcement", () => {
       expect(token.contentType).toBe("image/heic");
       expect(fixture.insertedAttachments[0]).toMatchObject({ content_type: "image/heic" });
     });
+
+    it("stages the row unfinalized so an abandoned upload never reaches a read surface", async () => {
+      const fixture = makeFixture();
+      const { createJobAttachmentUploadToken } = await import("@/lib/actions/attachment-actions");
+
+      await createJobAttachmentUploadToken({
+        jobId: "job-1",
+        fileName: "gauge.jpg",
+        contentType: "image/jpeg",
+        fileSize: 1024,
+      });
+
+      expect(fixture.insertedAttachments[0]).toMatchObject({ finalized_at: null });
+    });
+
+    it("records the uploading user so evidence has provenance", async () => {
+      const fixture = makeFixture();
+      const { createJobAttachmentUploadToken } = await import("@/lib/actions/attachment-actions");
+
+      await createJobAttachmentUploadToken({
+        jobId: "job-1",
+        fileName: "gauge.jpg",
+        contentType: "image/jpeg",
+        fileSize: 1024,
+      });
+
+      expect(String(fixture.insertedAttachments[0].created_by_user_id ?? "")).toBeTruthy();
+    });
   });
 
   describe("finalizeInternalJobAttachmentUpload", () => {
@@ -280,6 +316,46 @@ describe("job attachment upload policy enforcement", () => {
       // The client claimed 1024 bytes; storage says 4 MB, and the row now agrees.
       expect(fixture.updatedAttachments).toContainEqual({ file_size: 4_000_000 });
       expect(fixture.deletedAttachmentIds).toHaveLength(0);
+    });
+
+    it("promotes the staged row once its object is confirmed", async () => {
+      const fixture = makeFixture({
+        attachmentRows: [attachmentRow],
+        storedObjects: {
+          "job/job-1/attachment-1-gauge.jpg": { size: 1024, mimetype: "image/jpeg" },
+        },
+      });
+
+      const { finalizeInternalJobAttachmentUpload } = await import(
+        "@/lib/actions/attachment-actions"
+      );
+
+      await finalizeInternalJobAttachmentUpload({
+        jobId: "job-1",
+        attachmentIds: ["attachment-1"],
+      });
+
+      const stamp = fixture.updatedAttachments.find((values) => "finalized_at" in values);
+      expect(stamp).toBeDefined();
+      expect(typeof stamp?.finalized_at).toBe("string");
+    });
+
+    it("leaves nothing finalized when the object never arrived", async () => {
+      const fixture = makeFixture({
+        attachmentRows: [attachmentRow],
+        storedObjects: {},
+      });
+
+      const { finalizeInternalJobAttachmentUpload } = await import(
+        "@/lib/actions/attachment-actions"
+      );
+
+      await expect(
+        finalizeInternalJobAttachmentUpload({ jobId: "job-1", attachmentIds: ["attachment-1"] }),
+      ).rejects.toThrow();
+
+      expect(fixture.updatedAttachments.some((values) => "finalized_at" in values)).toBe(false);
+      expect(fixture.deletedAttachmentIds).toContain("attachment-1");
     });
 
     it("deletes an upload that overshot the size limit despite a truthful-looking token", async () => {
