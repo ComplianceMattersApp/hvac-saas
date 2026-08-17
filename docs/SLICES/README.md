@@ -35,6 +35,11 @@ Owner decisions already made (do not relitigate inside a slice):
 Parallel strategic track (after core): EDDS regulations research → go/no-go memo.
 
 Status notes:
+- 2026-08-17: template-pointer latent bug (live sends resolved a sandbox-approved version
+  via sandbox-pointer fallback) — DATA HALF FIXED in prod by owner: on_the_way v2 promoted
+  to approved_for_activation and current_version_id set (version 9b55a900…). The Slice 04
+  code tightening (live path reads current pointer only, activation-approved only) can now
+  merge with no outage risk; its former merge precondition is satisfied.
 - 2026-08-17: the three chronically failing test files (attachment-entitlement-hardening,
   job-evaluator, today-hierarchy-wiring) are FIXED on main via the owner's Ops-workspace
   refactor — the full suite is green. Slice reports should no longer carry a
