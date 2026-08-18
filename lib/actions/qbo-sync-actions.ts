@@ -239,14 +239,23 @@ export async function backfillQboEmailSentStatusesFromForm(
       };
     }
 
+    // confirmedSent is the read-back-verified count — QuickBooks accepts these
+    // writes with a 2xx and silently drops the flag when it dislikes them, so
+    // the write count alone must never be reported as "marked".
+    const unconfirmed = result.resynced - result.confirmedSent;
+    const messageParts = [
+      `QuickBooks now shows ${result.confirmedSent} of ${result.candidates} emailed invoice(s) as sent.`,
+      unconfirmed > 0
+        ? `${unconfirmed} did not accept the sent flag — QuickBooks dropped it silently; check those invoices have an email address in QuickBooks.`
+        : null,
+      result.errors > 0 ? `${result.errors} failed to sync — check individual invoices for details.` : null,
+    ].filter(Boolean);
+
     return {
-      synced: result.resynced,
+      synced: result.confirmedSent,
       skipped: result.skipped,
-      errors: result.errors,
-      message:
-        result.errors > 0
-          ? `Marked ${result.resynced} of ${result.candidates} invoice(s) as sent in QuickBooks; ${result.errors} failed — check individual invoices for details.`
-          : `Marked ${result.resynced} of ${result.candidates} invoice(s) as sent in QuickBooks.`,
+      errors: result.errors + unconfirmed,
+      message: messageParts.join(" "),
     };
   } catch (error) {
     return {

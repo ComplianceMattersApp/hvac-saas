@@ -62,6 +62,12 @@ export interface QboInvoiceInput {
    * to send anything itself.
    */
   emailStatus?: "EmailSent" | null;
+  /**
+   * The address EveryStep actually delivered to. QuickBooks silently discards
+   * EmailStatus=EmailSent on invoices with no BillEmail ("sent to whom?"), so
+   * the sent flag only sticks when this accompanies it.
+   */
+  billEmail?: string | null;
 }
 
 export interface QboPaymentInput {
@@ -419,8 +425,14 @@ function buildInvoiceBody(invoice: QboInvoiceInput): Record<string, unknown> {
     ...(invoice.privateNote ? { PrivateNote: invoice.privateNote } : {}),
     // Included on full updates too: QBO's full-update semantics clear omitted
     // writable fields, so leaving this out of a later re-sync would flip an
-    // already-sent invoice back to "Not sent".
-    ...(invoice.emailStatus === "EmailSent" ? { EmailStatus: "EmailSent" } : {}),
+    // already-sent invoice back to "Not sent". BillEmail rides along because
+    // QBO silently drops EmailStatus on invoices with no email address.
+    ...(invoice.emailStatus === "EmailSent"
+      ? {
+          EmailStatus: "EmailSent",
+          ...(invoice.billEmail ? { BillEmail: { Address: invoice.billEmail } } : {}),
+        }
+      : {}),
   };
 }
 
@@ -490,6 +502,13 @@ export interface QboInvoiceSnapshot {
    * so a zeroed synced invoice means it was voided in QBO already.
    */
   looksVoided: boolean;
+  /**
+   * QuickBooks' own record of whether this invoice was emailed ("EmailSent",
+   * "NeedToSend", "NotSet"). QBO silently drops EmailStatus writes it dislikes
+   * while returning 2xx, so anything asserting "marked sent" must confirm
+   * against this read-back value, never the write response.
+   */
+  emailStatus: string | null;
 }
 
 function toQboInvoiceSnapshot(invoice: any): QboInvoiceSnapshot {
@@ -503,6 +522,7 @@ function toQboInvoiceSnapshot(invoice: any): QboInvoiceSnapshot {
     totalAmount,
     totalTax: Number(invoice.TxnTaxDetail?.TotalTax ?? 0),
     looksVoided: totalAmount === 0 && balance === 0,
+    emailStatus: String(invoice.EmailStatus ?? "").trim() || null,
   };
 }
 

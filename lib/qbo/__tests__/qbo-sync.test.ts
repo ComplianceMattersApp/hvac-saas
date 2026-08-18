@@ -187,12 +187,17 @@ describe("syncInvoiceToQbo", () => {
         list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 75, line_subtotal: 75, sort_order: 1 }],
       },
       // A successful EveryStep email delivery for this invoice exists.
-      notifications: { list: [{ id: "n1" }] },
+      notifications: { list: [{ payload: { invoice_id: "inv-mailed", recipient_email: "billing@contractor.test" } }] },
     });
     const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-mailed" });
     expect(result.status).toBe("synced");
     expect(createQboInvoice).toHaveBeenCalledWith(
-      expect.objectContaining({ invoice: expect.objectContaining({ emailStatus: "EmailSent" }) }),
+      expect.objectContaining({
+        invoice: expect.objectContaining({
+          emailStatus: "EmailSent",
+          billEmail: "billing@contractor.test",
+        }),
+      }),
     );
   });
 

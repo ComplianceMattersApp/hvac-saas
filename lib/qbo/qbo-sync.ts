@@ -219,32 +219,43 @@ async function resolveLineItemRefs(
   return { itemRefs, mappingsUsed: [...mappingsUsed] };
 }
 
+export type QboEmailDelivery = { emailStatus: "EmailSent" | null; billEmail: string | null };
+
 /**
- * "EmailSent" when EveryStep has at least one successful email delivery for
- * this invoice — the same notifications lane the invoice workspace's Delivery
- * status reads. Best-effort: a failed read returns null (EmailStatus omitted),
- * which QuickBooks renders as not-sent; the next sync after a send self-heals
- * it. A badge must never fail a money sync.
+ * "EmailSent" (plus the delivered address) when EveryStep has at least one
+ * successful email delivery for this invoice — the same notifications lane the
+ * invoice workspace's Delivery status reads. The address matters: QBO silently
+ * drops an EmailStatus write on an invoice with no BillEmail. Best-effort: a
+ * failed read returns nulls (fields omitted), which QuickBooks renders as
+ * not-sent; the next sync after a send self-heals it. A badge must never fail
+ * a money sync.
  */
-async function resolveQboEmailStatusForInvoice(
+async function resolveQboEmailDeliveryForInvoice(
   supabase: any,
   accountOwnerUserId: string,
   invoiceId: string,
-): Promise<"EmailSent" | null> {
+): Promise<QboEmailDelivery> {
+  const none: QboEmailDelivery = { emailStatus: null, billEmail: null };
   try {
     const { data, error } = await supabase
       .from("notifications")
-      .select("id")
+      .select("payload, sent_at")
       .eq("account_owner_user_id", accountOwnerUserId)
       .eq("channel", "email")
       .eq("notification_type", "internal_invoice_email")
       .eq("status", "sent")
       .eq("payload->>invoice_id", invoiceId)
+      .order("sent_at", { ascending: false })
       .limit(1);
-    if (error) return null;
-    return (data ?? []).length > 0 ? "EmailSent" : null;
+    if (error) return none;
+    const row: any = (data ?? [])[0];
+    if (!row) return none;
+    return {
+      emailStatus: "EmailSent",
+      billEmail: String(row?.payload?.recipient_email ?? "").trim() || null,
+    };
   } catch {
-    return null;
+    return none;
   }
 }
 
@@ -255,10 +266,11 @@ function buildInvoiceInput(
   jobContext: string | null,
   jobContextByJobId: Map<string, string> = new Map(),
   itemRefs: string[] = [],
-  emailStatus: "EmailSent" | null = null,
+  emailDelivery: QboEmailDelivery = { emailStatus: null, billEmail: null },
 ): QboInvoiceInput {
   return {
-    emailStatus,
+    emailStatus: emailDelivery.emailStatus,
+    billEmail: emailDelivery.billEmail,
     docNumber: String(invoiceRow.invoice_display_number ?? invoiceRow.invoice_number ?? ""),
     txnDate: String(invoiceRow.invoice_date ?? "").slice(0, 10),
     customerRef,
@@ -461,7 +473,7 @@ async function syncSingleInvoiceWithContext(
     }
 
     const { itemRefs, mappingsUsed } = await resolveLineItemRefs(ctx, lineItems);
-    const emailStatus = await resolveQboEmailStatusForInvoice(supabase, accountOwnerUserId, invoiceId);
+    const emailDelivery = await resolveQboEmailDeliveryForInvoice(supabase, accountOwnerUserId, invoiceId);
     const invoiceInput = buildInvoiceInput(
       invoiceRow,
       lineItems,
@@ -469,7 +481,7 @@ async function syncSingleInvoiceWithContext(
       resolveJobContext(customerRow, jobRow),
       jobContextByJobId,
       itemRefs,
-      emailStatus,
+      emailDelivery,
     );
     const expectedTotal =
       Math.round(invoiceInput.lines.reduce((sum, line) => sum + toCents(line.amount), 0)) / 100;
@@ -760,7 +772,14 @@ export async function syncAllPendingInvoicesToQbo(params: {
 export async function backfillQboEmailSentStatuses(params: {
   supabase: any;
   accountOwnerUserId: string;
-}): Promise<{ resynced: number; skipped: number; errors: number; candidates: number }> {
+}): Promise<{
+  resynced: number;
+  /** Invoices whose post-write read-back shows EmailStatus=EmailSent — the only honest "marked sent" count. */
+  confirmedSent: number;
+  skipped: number;
+  errors: number;
+  candidates: number;
+}> {
   const { supabase, accountOwnerUserId } = params;
 
   // Every invoice with at least one successful email delivery.
@@ -781,12 +800,12 @@ export async function backfillQboEmailSentStatuses(params: {
     ),
   ];
   if (sentInvoiceIds.length === 0) {
-    return { resynced: 0, skipped: 0, errors: 0, candidates: 0 };
+    return { resynced: 0, confirmedSent: 0, skipped: 0, errors: 0, candidates: 0 };
   }
 
   const { data: candidateRows, error: candidateError } = await supabase
     .from("internal_invoices")
-    .select("id")
+    .select("id, qbo_invoice_id")
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("status", "issued")
     .eq("qbo_sync_status", "synced")
@@ -794,21 +813,48 @@ export async function backfillQboEmailSentStatuses(params: {
     .in("id", sentInvoiceIds);
   if (candidateError) throw new Error(candidateError.message);
 
-  const candidateIds: string[] = (candidateRows ?? []).map((r: any) => String(r.id));
-  if (candidateIds.length === 0) {
-    return { resynced: 0, skipped: 0, errors: 0, candidates: 0 };
+  const candidates: Array<{ id: string; qboInvoiceId: string }> = (candidateRows ?? []).map(
+    (r: any) => ({ id: String(r.id), qboInvoiceId: String(r.qbo_invoice_id) }),
+  );
+  if (candidates.length === 0) {
+    return { resynced: 0, confirmedSent: 0, skipped: 0, errors: 0, candidates: 0 };
   }
 
+  // Token for the confirming reads. QBO has ignored writes while returning 2xx
+  // before in this codebase (voids, and EmailStatus itself when BillEmail is
+  // missing) — so "marked sent" is only claimed for invoices whose read-back
+  // actually says EmailSent.
+  const token = await getValidQboAccessToken({ supabase, accountOwnerUserId });
+  if (!token) {
+    return { resynced: 0, confirmedSent: 0, skipped: 0, errors: 0, candidates: candidates.length };
+  }
+  const baseUrl = getQboBaseUrl();
+
   const results: QboInvoiceSyncResult[] = [];
-  for (const id of candidateIds) {
+  let confirmedSent = 0;
+  for (const candidate of candidates) {
     // Sequential — QBO throttles hard, same as the pending sweep.
-    results.push(await syncInvoiceToQbo({ supabase, accountOwnerUserId, invoiceId: id }));
+    const result = await syncInvoiceToQbo({ supabase, accountOwnerUserId, invoiceId: candidate.id });
+    results.push(result);
+    if (result.status !== "synced") continue;
+    try {
+      const snapshot = await findQboInvoiceById({
+        accessToken: token.accessToken,
+        realmId: token.realmId,
+        baseUrl,
+        qboInvoiceId: candidate.qboInvoiceId,
+      });
+      if (snapshot?.emailStatus === "EmailSent") confirmedSent += 1;
+    } catch {
+      // Unconfirmed reads count as not-sent; the honest number is the point.
+    }
   }
 
   return {
     resynced: results.filter((r) => r.status === "synced").length,
+    confirmedSent,
     skipped: results.filter((r) => r.status === "skipped").length,
     errors: results.filter((r) => r.status === "error").length,
-    candidates: candidateIds.length,
+    candidates: candidates.length,
   };
 }
