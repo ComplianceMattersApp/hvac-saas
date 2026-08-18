@@ -60,6 +60,11 @@ import {
   resolveVisitScopeItemPriceDisplay,
 } from "@/lib/business/visit-scope-billing";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
+import {
+  loadLocationEquipmentOnFile,
+  type LocationUnitOnFile,
+} from "@/lib/customers/location-equipment-adoption";
+import { seedJobEquipmentFromLocationFromForm } from "@/lib/actions/job-equipment-actions";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { buildEquipmentIdentityLabel } from "@/lib/utils/equipment-summary";
@@ -490,6 +495,7 @@ export default async function JobDetailV2Page({
     activeRetestChild,
     receiverWorkshareRequest,
     equipmentLabelPhotoAttachments,
+    equipmentOnFileForLocation,
   ] = await timedPhase("supplementalReads", () => Promise.all([
     getActiveJobAssignmentDisplayMap({ jobIds: [jobId], supabase }),
     job.contractor_id
@@ -561,6 +567,11 @@ export default async function JobDetailV2Page({
           limit: 100,
         })
       : Promise.resolve([] as Awaited<ReturnType<typeof listJobEquipmentLabelPhotoImages>>),
+    // Address-level equipment on file: only fetched when this job hasn't
+    // captured anything yet — it powers the "use equipment on file" seed card.
+    baseEquipmentRows.length === 0 && job.location_id
+      ? loadLocationEquipmentOnFile({ client: supabase, locationId: String(job.location_id) })
+      : Promise.resolve([] as LocationUnitOnFile[]),
   ]));
 
   if (customerLocationsError) throw customerLocationsError;
@@ -2094,6 +2105,54 @@ export default async function JobDetailV2Page({
                   </div>
                 );
               })}
+            </div>
+          ) : equipmentOnFileForLocation.length > 0 ? (
+            <div
+              style={{
+                border: "1px solid oklch(0.88 0.05 255)",
+                background: "oklch(0.975 0.012 255)",
+                borderRadius: "11px",
+                padding: "16px",
+              }}
+            >
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "oklch(0.4 0.07 255)" }}>
+                {equipmentOnFileForLocation.length === 1
+                  ? "1 unit on file for this address"
+                  : `${equipmentOnFileForLocation.length} units on file for this address`}
+              </div>
+              <div style={{ marginTop: "8px", display: "grid", gap: "4px" }}>
+                {equipmentOnFileForLocation.map((unit) => (
+                  <div
+                    key={unit.id}
+                    style={{ fontSize: "14px", color: "oklch(0.45 0.03 255)" }}
+                  >
+                    {buildEquipmentIdentityLabel({
+                      manufacturer: unit.manufacturer,
+                      model: unit.model,
+                      equipment_role: unit.equipment_type,
+                    })}
+                    {unit.serial ? ` · Serial ${unit.serial}` : ""}
+                    {unit.system_name ? ` · ${unit.system_name}` : ""}
+                  </div>
+                ))}
+              </div>
+              <form action={seedJobEquipmentFromLocationFromForm} style={{ marginTop: "12px" }}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <ImmediateSubmitButton
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: "9px",
+                    border: "none",
+                    background: "oklch(0.5 0.13 255)",
+                    color: "white",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Use equipment on file
+                </ImmediateSubmitButton>
+              </form>
             </div>
           ) : (
             <div

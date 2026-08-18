@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath, refresh } from "next/cache";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
+import { adoptJobEquipmentIntoLocationInventory } from "@/lib/customers/location-equipment-adoption";
 import { evaluateEccOpsStatus } from "@/lib/actions/ecc-status";
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from "@/lib/actions/job-evaluator";
 import { forceSetOpsStatus } from "@/lib/actions/ops-status";
@@ -3772,6 +3773,15 @@ if (!canonicalOwnerUserId) {
         throw eqErr;
       }
     }
+  }
+
+  // Equipment captured at intake must also reach the address's canonical
+  // inventory (location-owned; the job is only provenance). Best-effort —
+  // adoption failing must never fail job creation.
+  try {
+    await adoptJobEquipmentIntoLocationInventory({ admin: createAdminClient(), jobId });
+  } catch (e) {
+    console.error("location equipment adoption failed (intake):", e);
   }
 }
 

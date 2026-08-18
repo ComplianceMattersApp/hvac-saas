@@ -6,8 +6,12 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
+import {
+  adoptJobEquipmentIntoLocationInventory,
+  seedJobEquipmentFromLocationInventory,
+} from "@/lib/customers/location-equipment-adoption";
 import {
   archiveSystemFilter,
   createSystemFilter,
@@ -15,9 +19,32 @@ import {
 } from "@/lib/customers/system-filters-read-model";
 import {
   cleanupOrphanSystem,
+  insertJobEvent,
   requireInternalEquipmentMutationAccess,
   requireOperationalScopedJobMutationAccessOrRedirect,
 } from "@/lib/actions/job-actions-shared";
+
+/**
+ * Best-effort canonical adoption: equipment captured on a job must also land
+ * in the address's canonical inventory (VISUAL-ALIGNMENT-SPEC.md §8.1 —
+ * equipment belongs to the location, the job is only provenance). Adoption
+ * failing must never break field capture itself, so failures are logged and
+ * swallowed.
+ */
+async function adoptIntoLocationInventoryBestEffort(params: {
+  jobId: string;
+  propagateSnapshotIds?: string[];
+}) {
+  try {
+    await adoptJobEquipmentIntoLocationInventory({
+      admin: createAdminClient(),
+      jobId: params.jobId,
+      propagateSnapshotIds: params.propagateSnapshotIds,
+    });
+  } catch (e) {
+    console.error("location equipment adoption failed:", e);
+  }
+}
 
 export async function addJobEquipmentFromForm(formData: FormData) {
   "use server";
@@ -121,6 +148,8 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   });
 
   if (eqErr) throw eqErr;
+
+  await adoptIntoLocationInventoryBestEffort({ jobId });
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/info`);
@@ -242,6 +271,9 @@ export async function updateJobEquipmentFromForm(formData: FormData) {
   if (previousSystemId && previousSystemId !== String(systemId ?? "").trim()) {
     await cleanupOrphanSystem({ supabase, jobId, systemId: previousSystemId });
   }
+
+  // Corrections made on the job flow through to the linked canonical unit.
+  await adoptIntoLocationInventoryBestEffort({ jobId, propagateSnapshotIds: [equipmentId] });
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/jobs/${jobId}/info`);
@@ -441,6 +473,58 @@ export async function updateSystemFilterFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}/info`);
   revalidatePath(`/jobs/${jobId}/tests`);
   redirect(`/jobs/${jobId}/info?f=equipment`);
+}
+
+/**
+ * One-tap "use the equipment on file for this address": copies the location's
+ * active canonical units into this job's snapshot tables. Only offered (and
+ * only allowed) when the job has captured nothing yet — seeding never merges
+ * on top of an existing snapshot.
+ */
+export async function seedJobEquipmentFromLocationFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  if (!jobId) throw new Error("Missing job_id");
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEquipmentMutationAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  const result = await seedJobEquipmentFromLocationInventory({
+    admin: createAdminClient(),
+    jobId,
+  });
+
+  if (result.status === "seeded") {
+    try {
+      await insertJobEvent({
+        supabase,
+        jobId,
+        event_type: "equipment_seeded_from_location",
+        meta: { seeded_units: result.seededUnits, created_systems: result.createdSystems },
+        userId: scoped.internalUser.user_id,
+      });
+    } catch (e) {
+      console.error("equipment_seeded_from_location job_events insert failed:", e);
+    }
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/info`);
+  revalidatePath(`/jobs/${jobId}/tests`);
+
+  const banner =
+    result.status === "seeded"
+      ? "equipment_on_file_applied"
+      : result.reason === "job_already_has_equipment"
+        ? "equipment_on_file_already_captured"
+        : "equipment_on_file_unavailable";
+  redirect(`/jobs/${jobId}?tab=ops&banner=${banner}`);
 }
 
 export async function archiveSystemFilterFromForm(formData: FormData) {

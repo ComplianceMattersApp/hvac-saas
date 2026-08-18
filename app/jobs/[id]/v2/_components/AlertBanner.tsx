@@ -53,6 +53,10 @@ const BANNER_COPY: Record<string, string> = {
   callback_visit_reason_required: "Callback reason is required.",
   // contact logging
   contact_attempt_logged: "Contact attempt logged.",
+  // equipment on file (address-level inventory)
+  equipment_on_file_applied: "Equipment on file for this address added to the job.",
+  equipment_on_file_already_captured: "This job already has equipment captured — nothing was copied.",
+  equipment_on_file_unavailable: "No equipment on file for this address yet.",
   // parts & approval tracker
   service_part_ordered_saved: "Part marked as ordered.",
   service_part_ordered_wrong_follow_up: "This job isn't currently waiting on a part.",
@@ -101,6 +105,8 @@ const GUARD_SLUGS = new Set([
   "service_approval_received_wrong_follow_up",
   "ops_details_already_saved",
   "ops_status_already_saved",
+  "equipment_on_file_already_captured",
+  "equipment_on_file_unavailable",
   "interrupt_state_required",
   "pending_info_reason_required",
   "on_hold_reason_required",

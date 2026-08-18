@@ -5,7 +5,8 @@
 
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { adoptJobEquipmentIntoLocationInventory } from "@/lib/customers/location-equipment-adoption";
 import { deriveScheduleAndOps } from "@/lib/utils/scheduling";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -285,6 +286,18 @@ export async function createRetestJobFromForm(formData: FormData) {
       event_type: "equipment_copied",
       meta: { from_job_id: parentJobId },
     });
+
+    // Link the copied snapshot to the address's canonical inventory (and
+    // adopt any units the location doesn't have on file yet). Best-effort —
+    // never fails retest creation.
+    try {
+      await adoptJobEquipmentIntoLocationInventory({
+        admin: createAdminClient(),
+        jobId: child.id,
+      });
+    } catch (e) {
+      console.error("location equipment adoption failed (retest copy):", e);
+    }
   }
 
   revalidatePath(`/jobs/${parentJobId}`);
