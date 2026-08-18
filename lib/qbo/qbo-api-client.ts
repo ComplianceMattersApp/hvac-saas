@@ -55,6 +55,13 @@ export interface QboInvoiceInput {
   customerRef: string; // QBO Customer.Id
   lines: QboInvoiceLineInput[];
   privateNote?: string | null;
+  /**
+   * "EmailSent" when EveryStep already delivered this invoice by email, so
+   * QuickBooks shows "Sent" instead of nagging to send it again. Never any
+   * other value: delivery truth lives in EveryStep, and QBO must not be told
+   * to send anything itself.
+   */
+  emailStatus?: "EmailSent" | null;
 }
 
 export interface QboPaymentInput {
@@ -410,6 +417,10 @@ function buildInvoiceBody(invoice: QboInvoiceInput): Record<string, unknown> {
       },
     })),
     ...(invoice.privateNote ? { PrivateNote: invoice.privateNote } : {}),
+    // Included on full updates too: QBO's full-update semantics clear omitted
+    // writable fields, so leaving this out of a later re-sync would flip an
+    // already-sent invoice back to "Not sent".
+    ...(invoice.emailStatus === "EmailSent" ? { EmailStatus: "EmailSent" } : {}),
   };
 }
 

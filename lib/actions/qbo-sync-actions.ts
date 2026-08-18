@@ -7,7 +7,7 @@ import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { getQboAvailability } from "@/lib/qbo/qbo-env";
 import { getQboConnectionForAccount } from "@/lib/qbo/qbo-connection";
-import { syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
+import { backfillQboEmailSentStatuses, syncAllPendingInvoicesToQbo, syncInvoiceToQbo } from "@/lib/qbo/qbo-sync";
 import { syncAllPendingPaymentsToQbo, syncPaymentToQbo } from "@/lib/qbo/qbo-payment-sync";
 import { voidAllPendingInvoiceVoidsInQbo, voidInvoiceInQbo } from "@/lib/qbo/qbo-void-sync";
 import {
@@ -182,6 +182,78 @@ export async function runReconciliationNowFromForm(
       skipped: 0,
       errors: 0,
       message: error instanceof Error ? error.message : "Reconciliation failed.",
+    };
+  }
+}
+
+/**
+ * One-time repair: push "Sent" status to QuickBooks for already-synced invoices
+ * EveryStep emailed before EmailStatus travelled in the sync payload. Only
+ * updates existing linked QBO invoices — it never creates one and never makes
+ * QuickBooks send any email.
+ */
+export async function backfillQboEmailSentStatusesFromForm(
+  _prevState: unknown,
+  _formData: FormData,
+): Promise<QboSyncActionResult> {
+  try {
+    const supabase = await createClient();
+    const { internalUser } = await requireInternalRole("admin", { supabase });
+
+    const availability = getQboAvailability();
+    if (!availability.available) {
+      return {
+        synced: 0,
+        skipped: 0,
+        errors: 0,
+        message: "QuickBooks Online is not configured for this environment.",
+      };
+    }
+
+    const connection = await getQboConnectionForAccount({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+    if (!connection) {
+      return {
+        synced: 0,
+        skipped: 0,
+        errors: 0,
+        message: "QuickBooks Online is not connected.",
+      };
+    }
+
+    const result = await backfillQboEmailSentStatuses({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+
+    revalidatePath(COMPANY_PROFILE_PATH);
+
+    if (result.candidates === 0) {
+      return {
+        synced: 0,
+        skipped: 0,
+        errors: 0,
+        message: "No synced invoices with an EveryStep email delivery to mark — nothing to update.",
+      };
+    }
+
+    return {
+      synced: result.resynced,
+      skipped: result.skipped,
+      errors: result.errors,
+      message:
+        result.errors > 0
+          ? `Marked ${result.resynced} of ${result.candidates} invoice(s) as sent in QuickBooks; ${result.errors} failed — check individual invoices for details.`
+          : `Marked ${result.resynced} of ${result.candidates} invoice(s) as sent in QuickBooks.`,
+    };
+  } catch (error) {
+    return {
+      synced: 0,
+      skipped: 0,
+      errors: 0,
+      message: error instanceof Error ? error.message : "QuickBooks sent-status update failed.",
     };
   }
 }

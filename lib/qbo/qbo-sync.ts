@@ -219,6 +219,35 @@ async function resolveLineItemRefs(
   return { itemRefs, mappingsUsed: [...mappingsUsed] };
 }
 
+/**
+ * "EmailSent" when EveryStep has at least one successful email delivery for
+ * this invoice — the same notifications lane the invoice workspace's Delivery
+ * status reads. Best-effort: a failed read returns null (EmailStatus omitted),
+ * which QuickBooks renders as not-sent; the next sync after a send self-heals
+ * it. A badge must never fail a money sync.
+ */
+async function resolveQboEmailStatusForInvoice(
+  supabase: any,
+  accountOwnerUserId: string,
+  invoiceId: string,
+): Promise<"EmailSent" | null> {
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("id")
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("channel", "email")
+      .eq("notification_type", "internal_invoice_email")
+      .eq("status", "sent")
+      .eq("payload->>invoice_id", invoiceId)
+      .limit(1);
+    if (error) return null;
+    return (data ?? []).length > 0 ? "EmailSent" : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildInvoiceInput(
   invoiceRow: any,
   lineItems: any[],
@@ -226,8 +255,10 @@ function buildInvoiceInput(
   jobContext: string | null,
   jobContextByJobId: Map<string, string> = new Map(),
   itemRefs: string[] = [],
+  emailStatus: "EmailSent" | null = null,
 ): QboInvoiceInput {
   return {
+    emailStatus,
     docNumber: String(invoiceRow.invoice_display_number ?? invoiceRow.invoice_number ?? ""),
     txnDate: String(invoiceRow.invoice_date ?? "").slice(0, 10),
     customerRef,
@@ -430,6 +461,7 @@ async function syncSingleInvoiceWithContext(
     }
 
     const { itemRefs, mappingsUsed } = await resolveLineItemRefs(ctx, lineItems);
+    const emailStatus = await resolveQboEmailStatusForInvoice(supabase, accountOwnerUserId, invoiceId);
     const invoiceInput = buildInvoiceInput(
       invoiceRow,
       lineItems,
@@ -437,6 +469,7 @@ async function syncSingleInvoiceWithContext(
       resolveJobContext(customerRow, jobRow),
       jobContextByJobId,
       itemRefs,
+      emailStatus,
     );
     const expectedTotal =
       Math.round(invoiceInput.lines.reduce((sum, line) => sum + toCents(line.amount), 0)) / 100;
@@ -711,4 +744,71 @@ export async function syncAllPendingInvoicesToQbo(params: {
   });
 
   return { synced, skipped, errors, results };
+}
+
+/**
+ * One-time repair: re-sync already-synced invoices that EveryStep emailed
+ * before EmailStatus travelled in the sync payload, so QuickBooks shows them
+ * as Sent instead of nagging to send them again.
+ *
+ * Candidates are restricted to invoices ALREADY linked to QBO
+ * (qbo_invoice_id + qbo_sync_status='synced'), so every write is an update to
+ * an existing QBO document — this can never create one, and the connect-time
+ * cutoff question does not arise. Each update goes through the same verified
+ * read-back as any other sync.
+ */
+export async function backfillQboEmailSentStatuses(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<{ resynced: number; skipped: number; errors: number; candidates: number }> {
+  const { supabase, accountOwnerUserId } = params;
+
+  // Every invoice with at least one successful email delivery.
+  const { data: sentRows, error: sentError } = await supabase
+    .from("notifications")
+    .select("payload")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("channel", "email")
+    .eq("notification_type", "internal_invoice_email")
+    .eq("status", "sent");
+  if (sentError) throw new Error(sentError.message);
+
+  const sentInvoiceIds = [
+    ...new Set(
+      (sentRows ?? [])
+        .map((row: any) => String(row?.payload?.invoice_id ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (sentInvoiceIds.length === 0) {
+    return { resynced: 0, skipped: 0, errors: 0, candidates: 0 };
+  }
+
+  const { data: candidateRows, error: candidateError } = await supabase
+    .from("internal_invoices")
+    .select("id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("status", "issued")
+    .eq("qbo_sync_status", "synced")
+    .not("qbo_invoice_id", "is", null)
+    .in("id", sentInvoiceIds);
+  if (candidateError) throw new Error(candidateError.message);
+
+  const candidateIds: string[] = (candidateRows ?? []).map((r: any) => String(r.id));
+  if (candidateIds.length === 0) {
+    return { resynced: 0, skipped: 0, errors: 0, candidates: 0 };
+  }
+
+  const results: QboInvoiceSyncResult[] = [];
+  for (const id of candidateIds) {
+    // Sequential — QBO throttles hard, same as the pending sweep.
+    results.push(await syncInvoiceToQbo({ supabase, accountOwnerUserId, invoiceId: id }));
+  }
+
+  return {
+    resynced: results.filter((r) => r.status === "synced").length,
+    skipped: results.filter((r) => r.status === "skipped").length,
+    errors: results.filter((r) => r.status === "error").length,
+    candidates: candidateIds.length,
+  };
 }

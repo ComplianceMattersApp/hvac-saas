@@ -3104,6 +3104,14 @@ async function deliverInternalInvoiceEmailForContext(
     },
   });
 
+  // Reflect the delivery in QuickBooks (EmailStatus -> "EmailSent") so QBO
+  // stops nagging to send an invoice EveryStep already emailed. Best-effort
+  // re-sync — never blocks or fails the send result.
+  await autoSyncIssuedInvoiceToQbo({
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
+  });
+
   return { attemptKind, status: 'sent' };
 }
 

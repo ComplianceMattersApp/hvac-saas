@@ -146,6 +146,38 @@ describe("qbo-api-client", () => {
     expect(requestUrl.searchParams.get("requestid")).toBe("esinv-invoice-1");
   });
 
+  it("sends EmailStatus=EmailSent only when the invoice was already emailed", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { Invoice: { Id: "104", SyncToken: "0" } } },
+      { status: 200, body: { Invoice: { Id: "105", SyncToken: "0" } } },
+    ]);
+    await createQboInvoice({
+      ...base,
+      invoice: {
+        docNumber: "2005",
+        txnDate: "2026-08-15",
+        customerRef: "55",
+        lines: [{ description: "Repair", amount: 100, quantity: 1, unitPrice: 100, itemRef: "7" }],
+        emailStatus: "EmailSent",
+      },
+    });
+    await createQboInvoice({
+      ...base,
+      invoice: {
+        docNumber: "2006",
+        txnDate: "2026-08-15",
+        customerRef: "55",
+        lines: [{ description: "Repair", amount: 100, quantity: 1, unitPrice: 100, itemRef: "7" }],
+        emailStatus: null,
+      },
+    });
+    const sentBody = JSON.parse(String((fetchMock.mock.calls[0][1] as RequestInit).body));
+    expect(sentBody.EmailStatus).toBe("EmailSent");
+    const unsentBody = JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body));
+    // Absent, not "NotSet": we only ever assert delivery, never un-assert it.
+    expect(unsentBody).not.toHaveProperty("EmailStatus");
+  });
+
   it("posts each line against its own ItemRef, not one catch-all item", async () => {
     const fetchMock = mockFetchSequence([
       { status: 200, body: { Invoice: { Id: "101", SyncToken: "0" } } },

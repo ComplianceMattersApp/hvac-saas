@@ -8,6 +8,7 @@ import {
   initiateQboOAuthFromForm,
 } from "@/lib/actions/qbo-connection-actions";
 import {
+  backfillQboEmailSentStatusesFromForm,
   runReconciliationNowFromForm,
   syncAllPendingInvoicesToQboFromForm,
   type QboSyncActionResult,
@@ -37,6 +38,10 @@ export function QboIntegrationControls({
   );
   const [reconcileResult, reconcileAction, reconciling] = useActionState<QboSyncActionResult | null, FormData>(
     runReconciliationNowFromForm,
+    null,
+  );
+  const [sentStatusResult, sentStatusAction, markingSent] = useActionState<QboSyncActionResult | null, FormData>(
+    backfillQboEmailSentStatusesFromForm,
     null,
   );
   const [disconnectResult, disconnectAction, disconnecting] = useActionState<
@@ -129,6 +134,18 @@ export function QboIntegrationControls({
         </div>
       ) : null}
 
+      {sentStatusResult ? (
+        <div
+          className={`rounded-xl border px-3.5 py-2.5 text-sm ${
+            sentStatusResult.errors > 0
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}
+        >
+          {sentStatusResult.message}
+        </div>
+      ) : null}
+
       {disconnectResult && !disconnectResult.success ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-red-900">
           {disconnectResult.error ?? "Failed to disconnect QuickBooks Online."}
@@ -143,6 +160,18 @@ export function QboIntegrationControls({
             className="inline-flex min-h-11 items-center rounded-lg bg-blue-600 px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
           >
             {syncing ? "Syncing…" : "Sync pending invoices"}
+          </button>
+        </form>
+        {/* Marks QBO invoices "Sent" when EveryStep already emailed them —
+            updates existing linked invoices only, never sends from QBO. New
+            sends push this automatically; the button repairs older invoices. */}
+        <form action={sentStatusAction}>
+          <button
+            type="submit"
+            disabled={markingSent}
+            className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 disabled:opacity-60"
+          >
+            {markingSent ? "Updating…" : "Mark emailed invoices sent in QBO"}
           </button>
         </form>
         {/* Independent check: compares EveryStep against QuickBooks and Stripe

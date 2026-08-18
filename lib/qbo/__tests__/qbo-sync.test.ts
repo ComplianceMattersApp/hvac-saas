@@ -60,6 +60,7 @@ function makeSupabase(
     or: vi.fn(() => builder),
     gte: vi.fn(() => builder),
     in: vi.fn(() => builder),
+    limit: vi.fn(() => builder),
     order: vi.fn(() => builder),
     maybeSingle: vi.fn(async () => ({ data: tables[builder.__table]?.single ?? null, error: null })),
     update: vi.fn((payload: any) => {
@@ -171,6 +172,49 @@ describe("syncInvoiceToQbo", () => {
     const synced = (updates.internal_invoices ?? []).find((p) => p.qbo_sync_status === "synced");
     expect(synced).toBeTruthy();
     expect(synced.qbo_invoice_id).toBe("Q1");
+  });
+
+  it("stamps EmailStatus=EmailSent when EveryStep already emailed the invoice", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-mailed", status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+          billing_name: "Cust", invoice_display_number: 2005, invoice_date: "2026-08-01",
+          qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: {
+        list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 75, line_subtotal: 75, sort_order: 1 }],
+      },
+      // A successful EveryStep email delivery for this invoice exists.
+      notifications: { list: [{ id: "n1" }] },
+    });
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-mailed" });
+    expect(result.status).toBe("synced");
+    expect(createQboInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ invoice: expect.objectContaining({ emailStatus: "EmailSent" }) }),
+    );
+  });
+
+  it("sends no EmailStatus when the invoice has never been emailed", async () => {
+    const { builder } = makeSupabase({
+      internal_invoices: {
+        single: {
+          id: "inv-unmailed", status: "issued", account_owner_user_id: "acc", job_id: null, customer_id: null,
+          billing_name: "Cust", invoice_display_number: 2006, invoice_date: "2026-08-01",
+          qbo_invoice_id: null,
+        },
+      },
+      internal_invoice_line_items: {
+        list: [{ item_name_snapshot: "Svc", quantity: 1, unit_price: 75, line_subtotal: 75, sort_order: 1 }],
+      },
+      notifications: { list: [] },
+    });
+    const result = await syncInvoiceToQbo({ supabase: builder, accountOwnerUserId: "acc", invoiceId: "inv-unmailed" });
+    expect(result.status).toBe("synced");
+    expect(createQboInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ invoice: expect.objectContaining({ emailStatus: null }) }),
+    );
   });
 
   it("updates an existing QBO invoice when qbo_invoice_id is present", async () => {
