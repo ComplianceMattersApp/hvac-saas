@@ -16,6 +16,7 @@ import {
   FIELD_DRAFT_KEY_PREFIX,
   buildFieldDraft,
   isFieldDraftKey,
+  isSupersededFieldDraftKey,
   parseStoredDraft,
   selectDraftKeysToEvict,
   type FieldDraft,
@@ -53,6 +54,16 @@ export function deleteDraft(key: string): void {
   }
 }
 
+/** Keys written by a superseded draft format, which nothing can read anymore. */
+function readSupersededKeys(store: Storage): string[] {
+  const keys: string[] = [];
+  for (let index = 0; index < store.length; index += 1) {
+    const key = store.key(index);
+    if (isSupersededFieldDraftKey(key)) keys.push(key as string);
+  }
+  return keys;
+}
+
 /** Every draft key currently on the device, with its timestamp, for eviction. */
 function readDraftIndex(store: Storage): StoredDraftIndexEntry[] {
   const entries: StoredDraftIndexEntry[] = [];
@@ -77,6 +88,7 @@ export function pruneDrafts(options: { now?: number; keepKey?: string } = {}): v
   if (!store) return;
   const now = options.now ?? Date.now();
   try {
+    for (const key of readSupersededKeys(store)) store.removeItem(key);
     for (const key of selectDraftKeysToEvict(readDraftIndex(store), { now, keepKey: options.keepKey })) {
       store.removeItem(key);
     }
@@ -111,6 +123,8 @@ export function writeDraft(params: {
   key: string;
   values: FieldDraftValues;
   serverStateToken: string | null;
+  /** Set when this write is the form being handed to a Save. */
+  submitted?: boolean;
   now?: number;
 }): void {
   const store = storage();
@@ -125,6 +139,9 @@ export function writeDraft(params: {
     values: params.values,
     serverStateToken: existing ? existing.serverStateToken : params.serverStateToken,
     savedAt: new Date(now).toISOString(),
+    // An edit after a submit clears the marker: these values have not been sent
+    // anywhere, so nothing may treat them as already delivered.
+    submittedAt: params.submitted ? new Date(now).toISOString() : null,
   });
 
   try {
