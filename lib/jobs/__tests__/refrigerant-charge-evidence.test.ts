@@ -111,13 +111,15 @@ describe("refrigerant charge evidence helpers", () => {
         select: () => ({
           eq: () => ({
             eq: () => ({
-              ilike: (_column: string, pattern: string) => ({
-                order: () => ({
-                  limit: async () => ({
-                    data: rows.filter((row) =>
-                      String(row.caption).toLowerCase().startsWith(pattern.replace("%", "").toLowerCase()),
-                    ),
-                    error: null,
+              not: () => ({
+                ilike: (_column: string, pattern: string) => ({
+                  order: () => ({
+                    limit: async () => ({
+                      data: rows.filter((row) =>
+                        String(row.caption).toLowerCase().startsWith(pattern.replace("%", "").toLowerCase()),
+                      ),
+                      error: null,
+                    }),
                   }),
                 }),
               }),
@@ -129,9 +131,16 @@ describe("refrigerant charge evidence helpers", () => {
     const admin = {
       storage: {
         from: () => ({
-          createSignedUrl: async (path: string) => {
-            signedPaths.push(path);
-            return { data: { signedUrl: `https://signed.example/${path}` }, error: null };
+          createSignedUrls: async (paths: string[]) => {
+            signedPaths.push(...paths);
+            return {
+              data: paths.map((path) => ({
+                path,
+                signedUrl: `https://signed.example/${path}`,
+                error: null,
+              })),
+              error: null,
+            };
           },
         }),
       },
@@ -165,21 +174,23 @@ describe("refrigerant charge evidence helpers", () => {
         select: () => ({
           eq: () => ({
             eq: () => ({
-              ilike: () => ({
-                order: () => ({
-                  limit: async () => ({
-                    data: [
-                      {
-                        id: "att-image-1",
-                        bucket: "attachments",
-                        storage_path: "jobs/job-1/att-image-1.jpg",
-                        file_name: "gauge.jpg",
-                        content_type: "image/jpeg",
-                        caption: REFRIGERANT_CHARGE_ATTACHMENT_TAG,
-                        created_at: "2026-06-24T18:00:00Z",
-                      },
-                    ],
-                    error: null,
+              not: () => ({
+                ilike: () => ({
+                  order: () => ({
+                    limit: async () => ({
+                      data: [
+                        {
+                          id: "att-image-1",
+                          bucket: "attachments",
+                          storage_path: "jobs/job-1/att-image-1.jpg",
+                          file_name: "gauge.jpg",
+                          content_type: "image/jpeg",
+                          caption: REFRIGERANT_CHARGE_ATTACHMENT_TAG,
+                          created_at: "2026-06-24T18:00:00Z",
+                        },
+                      ],
+                      error: null,
+                    }),
                   }),
                 }),
               }),
@@ -191,7 +202,7 @@ describe("refrigerant charge evidence helpers", () => {
     const admin = {
       storage: {
         from: () => ({
-          createSignedUrl: async () => ({ data: null, error: new Error("signing failed") }),
+          createSignedUrls: async () => ({ data: null, error: new Error("signing failed") }),
         }),
       },
     };

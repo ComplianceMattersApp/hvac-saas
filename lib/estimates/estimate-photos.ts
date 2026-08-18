@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/server";
+import { signAttachmentRows } from "@/lib/attachments/signed-attachment-urls";
 
 export const ESTIMATE_PHOTO_MAX_BYTES = 12 * 1024 * 1024;
 export const ESTIMATE_PHOTO_MAX_COUNT = 12;
@@ -42,11 +43,13 @@ export async function listEstimatePhotos(params: {
     throw error;
   }
 
-  const photos = await Promise.all((data ?? []).map(async (row) => {
-    const bucket = String(row.bucket ?? "attachments");
-    const path = String(row.storage_path ?? "");
-    const { data: signed } = await admin.storage.from(bucket).createSignedUrl(path, 60 * 60);
-    if (!signed?.signedUrl) return null;
+  const signedRows = await signAttachmentRows({
+    client: admin,
+    rows: (data ?? []).map((row) => ({ ...row, bucket: String(row.bucket ?? "attachments") })),
+  });
+
+  const photos = signedRows.map((row) => {
+    if (!row.signedUrl) return null;
     return {
       id: String(row.id),
       fileName: String(row.file_name),
@@ -54,9 +57,9 @@ export async function listEstimatePhotos(params: {
       fileSize: Number(row.file_size),
       caption: row.caption ? String(row.caption) : null,
       customerVisible: Boolean(row.customer_visible),
-      signedUrl: signed.signedUrl,
+      signedUrl: row.signedUrl,
     } satisfies EstimatePhoto;
-  }));
+  });
 
   return photos.filter((photo): photo is EstimatePhoto => photo !== null);
 }

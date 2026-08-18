@@ -1,3 +1,5 @@
+import { signAttachmentRows } from "@/lib/attachments/signed-attachment-urls";
+
 export const REFRIGERANT_CHARGE_ATTACHMENT_TAG = "[refrigerant-charge-evidence]";
 export const EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG = "[equipment-label-photo]";
 export const DUCT_ASBESTOS_PHOTO_ATTACHMENT_TAG = "[duct-asbestos-photo]";
@@ -139,33 +141,29 @@ export async function listJobDuctAsbestosPhotoImages(params: {
     .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
     .ilike("caption", `${DUCT_ASBESTOS_PHOTO_ATTACHMENT_TAG}%`)
     .order("created_at", { ascending: false })
     .limit(params.limit ?? 20);
 
   if (evidenceErr) throw evidenceErr;
 
-  return Promise.all(
-    ((evidenceRows ?? []) as any[]).filter(isInlineReportImageAttachment).map(async (row: any) => {
-      const bucket = String(row?.bucket ?? "").trim();
-      const storagePath = String(row?.storage_path ?? "").trim().replace(/^\/+/, "");
-      const { data: signed, error: signErr } = bucket && storagePath
-        ? await params.admin.storage.from(bucket).createSignedUrl(storagePath, 60 * 60)
-        : { data: null, error: null };
+  const signedRows = await signAttachmentRows({
+    client: params.admin,
+    rows: ((evidenceRows ?? []) as any[]).filter(isInlineReportImageAttachment),
+  });
 
-      return {
-        id: String(row?.id ?? "").trim(),
-        fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
-        contentType: String(row?.content_type ?? "").trim() || null,
-        uploadedAt: String(row?.created_at ?? "").trim(),
-        uploadedBy: null,
-        caption: String(row?.caption ?? "")
-          .replace(DUCT_ASBESTOS_PHOTO_ATTACHMENT_TAG, "")
-          .trim() || null,
-        signedUrl: !signErr && signed?.signedUrl ? signed.signedUrl : null,
-      };
-    }),
-  );
+  return signedRows.map((row: any) => ({
+    id: String(row?.id ?? "").trim(),
+    fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
+    contentType: row.content_type,
+    uploadedAt: String(row?.created_at ?? "").trim(),
+    uploadedBy: null,
+    caption: String(row?.caption ?? "")
+      .replace(DUCT_ASBESTOS_PHOTO_ATTACHMENT_TAG, "")
+      .trim() || null,
+    signedUrl: row.signedUrl,
+  }));
 }
 
 export async function listJobRefrigerantChargeEvidenceImages(params: {
@@ -182,6 +180,7 @@ export async function listJobRefrigerantChargeEvidenceImages(params: {
     .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
     .ilike("caption", `${REFRIGERANT_CHARGE_ATTACHMENT_TAG}%`)
     .order("created_at", { ascending: false })
     .limit(params.limit ?? 20);
@@ -190,38 +189,17 @@ export async function listJobRefrigerantChargeEvidenceImages(params: {
 
   const imageRows = ((evidenceRows ?? []) as any[]).filter(isInlineReportImageAttachment);
 
-  const signedEvidence = await Promise.all(
-    imageRows.map(async (row: any) => {
-      const id = String(row?.id ?? "").trim();
-      const bucket = String(row?.bucket ?? "").trim();
-      const storagePath = String(row?.storage_path ?? "")
-        .trim()
-        .replace(/^\/+/, "");
-      const contentType = String(row?.content_type ?? "").trim() || null;
+  const signedRows = await signAttachmentRows({ client: params.admin, rows: imageRows });
 
-      let signedUrl: string | null = null;
-
-      if (bucket && storagePath) {
-        const { data: signed, error: signErr } = await params.admin.storage
-          .from(bucket)
-          .createSignedUrl(storagePath, 60 * 60);
-
-        if (!signErr && signed?.signedUrl) {
-          signedUrl = signed.signedUrl;
-        }
-      }
-
-      return {
-        id,
-        fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
-        contentType,
-        uploadedAt: String(row?.created_at ?? "").trim(),
-        uploadedBy: null,
-        caption: stripRefrigerantChargeEvidenceTag(row?.caption) || null,
-        signedUrl,
-      };
-    }),
-  );
+  const signedEvidence = signedRows.map((row: any) => ({
+    id: String(row?.id ?? "").trim(),
+    fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
+    contentType: row.content_type,
+    uploadedAt: String(row?.created_at ?? "").trim(),
+    uploadedBy: null,
+    caption: stripRefrigerantChargeEvidenceTag(row?.caption) || null,
+    signedUrl: row.signedUrl,
+  }));
 
   return signedEvidence.filter((row) => Boolean(row.id));
 }
@@ -241,6 +219,7 @@ export async function listJobEquipmentLabelPhotoImages(params: {
     .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
     .ilike("caption", `${EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG}%`)
     .order("created_at", { ascending: false })
     .limit(params.limit ?? 100);
@@ -255,40 +234,28 @@ export async function listJobEquipmentLabelPhotoImages(params: {
     .map((row) => ({ row, parsed: parseEquipmentLabelPhotoCaption(row?.caption) }))
     .filter(({ parsed }) => !equipmentIdFilter.size || (parsed.equipmentId && equipmentIdFilter.has(parsed.equipmentId)));
 
-  const signedEvidence = await Promise.all(
-    imageRows.map(async ({ row, parsed }: any) => {
-      const id = String(row?.id ?? "").trim();
-      const bucket = String(row?.bucket ?? "").trim();
-      const storagePath = String(row?.storage_path ?? "")
-        .trim()
-        .replace(/^\/+/, "");
-      const contentType = String(row?.content_type ?? "").trim() || null;
+  // signAttachmentRows preserves input order, so the parsed caption metadata
+  // stays aligned with its row by index.
+  const signedRows = await signAttachmentRows({
+    client: params.admin,
+    rows: imageRows.map(({ row }) => row),
+  });
 
-      let signedUrl: string | null = null;
+  const signedEvidence = signedRows.map((row: any, index: number) => {
+    const parsed = imageRows[index].parsed;
 
-      if (bucket && storagePath) {
-        const { data: signed, error: signErr } = await params.admin.storage
-          .from(bucket)
-          .createSignedUrl(storagePath, 60 * 60);
-
-        if (!signErr && signed?.signedUrl) {
-          signedUrl = signed.signedUrl;
-        }
-      }
-
-      return {
-        id,
-        fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
-        contentType,
-        uploadedAt: String(row?.created_at ?? "").trim(),
-        uploadedBy: null,
-        caption: parsed.caption || null,
-        equipmentId: parsed.equipmentId,
-        systemId: parsed.systemId,
-        signedUrl,
-      };
-    }),
-  );
+    return {
+      id: String(row?.id ?? "").trim(),
+      fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
+      contentType: row.content_type,
+      uploadedAt: String(row?.created_at ?? "").trim(),
+      uploadedBy: null,
+      caption: parsed.caption || null,
+      equipmentId: parsed.equipmentId,
+      systemId: parsed.systemId,
+      signedUrl: row.signedUrl,
+    };
+  });
 
   return signedEvidence.filter((row) => Boolean(row.id));
 }

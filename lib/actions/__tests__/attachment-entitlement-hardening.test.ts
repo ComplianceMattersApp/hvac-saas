@@ -57,7 +57,10 @@ type FixtureOptions = {
 
 function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
   const writes: Array<{ table: string; op: string; payload?: unknown }> = [];
-  const storageOps: Array<{ op: "createSignedUploadUrl" | "createSignedUrl" | "remove"; path: string }> = [];
+  const storageOps: Array<{
+    op: "createSignedUploadUrl" | "createSignedUrl" | "list" | "remove";
+    path: string;
+  }> = [];
   const deletedAttachmentIds: string[] = [];
   const updatedAttachmentIds: string[] = [];
   const attachmentRows = options.attachments ?? [
@@ -105,30 +108,54 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
           update: vi.fn((values: Record<string, unknown>) => ({
             eq: vi.fn((_idColumn: string, idValue: unknown) => ({
               eq: vi.fn(() => ({
+                // Metadata reconcile: .eq("id", ...)
                 eq: vi.fn(async () => {
                   writes.push({ table, op: "update", payload: values });
                   updatedAttachmentIds.push(String(idValue ?? "").trim());
                   return { error: null };
                 }),
+                // Finalize stamp: .in("id", ids).is("finalized_at", null)
+                in: vi.fn((_column: string, ids: unknown) => ({
+                  is: vi.fn(async () => {
+                    writes.push({ table, op: "update", payload: values });
+                    updatedAttachmentIds.push(
+                      ...(Array.isArray(ids) ? ids.map((id) => String(id ?? "").trim()) : []),
+                    );
+                    return { error: null };
+                  }),
+                })),
               })),
             })),
           })),
-          select: vi.fn(() => ({
+          select: vi.fn((_columns?: string, selectOptions?: { count?: string; head?: boolean }) => ({
             eq: vi.fn((column: string, value: unknown) => ({
-              eq: vi.fn((nextColumn: string, nextValue: unknown) => ({
-                in: vi.fn(async (_inColumn: string, ids: unknown[]) => {
-                  const wantedIds = ids.map((entry) => String(entry ?? "").trim());
-                  const rows = attachmentRows.filter((row) => {
-                    return (
-                      wantedIds.includes(String((row as any).id ?? "").trim()) &&
-                      String((row as any)?.[column] ?? "") === String(value ?? "") &&
-                      String((row as any)?.[nextColumn] ?? "") === String(nextValue ?? "")
-                    );
-                  });
+              eq: vi.fn((nextColumn: string, nextValue: unknown) => {
+                const scopedRows = attachmentRows.filter(
+                  (row) =>
+                    String((row as any)?.[column] ?? "") === String(value ?? "") &&
+                    String((row as any)?.[nextColumn] ?? "") === String(nextValue ?? ""),
+                );
 
-                  return { data: rows, error: null };
-                }),
-              })),
+                // `await ...eq().eq()` is the count/head form used by the
+                // per-job attachment cap; `.in(...)` is the row fetch form.
+                const countResult = Promise.resolve({
+                  data: selectOptions?.head ? null : scopedRows,
+                  count: scopedRows.length,
+                  error: null,
+                });
+
+                return Object.assign(countResult, {
+                  in: vi.fn(async (_inColumn: string, ids: unknown[]) => {
+                    const wantedIds = ids.map((entry) => String(entry ?? "").trim());
+                    return {
+                      data: scopedRows.filter((row) =>
+                        wantedIds.includes(String((row as any).id ?? "").trim()),
+                      ),
+                      error: null,
+                    };
+                  }),
+                });
+              }),
             })),
           })),
           delete: vi.fn(() => ({
@@ -190,6 +217,24 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
               data: {
                 signedUrl: `https://signed-read.example/${path}`,
               },
+              error: null,
+            };
+          }),
+          list: vi.fn(async (prefix: string, listOptions?: { search?: string }) => {
+            const name = String(listOptions?.search ?? "");
+            storageOps.push({ op: "list", path: `${prefix}/${name}` });
+            return {
+              data: [
+                {
+                  name,
+                  metadata: {
+                    size: 1024,
+                    mimetype: name.toLowerCase().endsWith(".pdf")
+                      ? "application/pdf"
+                      : "image/jpeg",
+                  },
+                },
+              ],
               error: null,
             };
           }),
@@ -432,7 +477,7 @@ describe("attachment entitlement hardening", () => {
         expect.objectContaining({ accountOwnerUserId: "owner-1" }),
       );
       expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
-      expect(fixture.storageOps.some((op) => op.op === "createSignedUrl")).toBe(true);
+      expect(fixture.storageOps.some((op) => op.op === "list")).toBe(true);
       expect(revalidatePathMock).toHaveBeenCalled();
     });
 
@@ -453,7 +498,7 @@ describe("attachment entitlement hardening", () => {
       });
 
       expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
-      expect(fixture.storageOps.some((op) => op.op === "createSignedUrl")).toBe(true);
+      expect(fixture.storageOps.some((op) => op.op === "list")).toBe(true);
     });
 
     it("blocks expired trial finalization before writes", async () => {
@@ -523,7 +568,7 @@ describe("attachment entitlement hardening", () => {
       });
 
       expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
-      expect(fixture.storageOps.some((op) => op.op === "createSignedUrl")).toBe(true);
+      expect(fixture.storageOps.some((op) => op.op === "list")).toBe(true);
     });
 
     it("blocks missing entitlement finalization before writes", async () => {

@@ -6,6 +6,8 @@ import { loadScopedInternalAttachmentJobForMutation } from "@/lib/auth/internal-
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 import { getContractorSharedAttachmentIds } from "@/lib/jobs/attachment-share-state";
+import { signAttachmentRows } from "@/lib/attachments/signed-attachment-urls";
+import { JOB_ATTACHMENT_PAGE_SIZE } from "@/lib/attachments/job-attachment-pagination";
 
 import JobAttachmentsInternal from "../_components/JobAttachmentsInternal";
 
@@ -126,15 +128,34 @@ export default async function JobAttachmentsPage({
 
   const job = scopedJob;
 
-  const { data: attachmentRows, error: attachmentErr } = await supabase
-    .from("attachments")
-    .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
-    .eq("entity_type", "job")
-    .eq("entity_id", jobId)
-    .order("created_at", { ascending: false })
-    .limit(500);
+  // First page only. The remainder is fetched on demand -- every row costs a
+  // signed URL and, for photos, a full-resolution download, so a job with
+  // hundreds of attachments must not pay for all of them on first paint.
+  // Ordering must match loadInternalJobAttachmentsPage exactly, id tiebreaker
+  // included, or the second page will not line up with the first.
+  const [
+    { data: attachmentRows, error: attachmentErr },
+    { count: totalAttachmentCount, error: attachmentCountErr },
+  ] = await Promise.all([
+    supabase
+      .from("attachments")
+      .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
+      .eq("entity_type", "job")
+      .eq("entity_id", jobId)
+      .not("finalized_at", "is", null)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(0, JOB_ATTACHMENT_PAGE_SIZE - 1),
+    supabase
+      .from("attachments")
+      .select("id", { count: "exact", head: true })
+      .eq("entity_type", "job")
+      .eq("entity_id", jobId)
+      .not("finalized_at", "is", null),
+  ]);
 
   if (attachmentErr) throw new Error(attachmentErr.message);
+  if (attachmentCountErr) throw new Error(attachmentCountErr.message);
 
   const { data: shareEvents, error: shareEventsErr } = await supabase
     .from("job_events")
@@ -150,55 +171,20 @@ export default async function JobAttachmentsPage({
 
   const attachmentAdmin = createAdminClient();
 
-  const attachmentItems = await Promise.all(
-    (attachmentRows ?? []).map(async (attachment: any) => {
-      const bucket = String(attachment?.bucket ?? "").trim();
-      const storagePath = String(attachment?.storage_path ?? "")
-        .trim()
-        .replace(/^\/+/, "");
-      const contentType =
-        typeof attachment?.content_type === "string" &&
-        attachment.content_type.trim().length > 0
-          ? attachment.content_type.trim()
-          : null;
+  const attachmentItems = await signAttachmentRows({
+    client: attachmentAdmin,
+    rows: attachmentRows ?? [],
+    onFailure: (failure) => {
+      console.warn("Job attachment signing failed", { jobId, ...failure });
+    },
+  });
 
-      let signedUrl: string | null = null;
-
-      if (!bucket || !storagePath) {
-        console.warn("Job attachment row missing bucket/storage_path", {
-          jobId,
-          attachmentId: String(attachment?.id ?? "").trim() || null,
-          bucket: bucket || null,
-          storagePath: storagePath || null,
-          contentType,
-        });
-      } else {
-        const { data, error: signErr } = await attachmentAdmin.storage
-          .from(bucket)
-          .createSignedUrl(storagePath, 60 * 60);
-
-        if (signErr || !data?.signedUrl) {
-          console.warn("Job attachment signing failed", {
-            jobId,
-            attachmentId: String(attachment?.id ?? "").trim() || null,
-            bucket,
-            storagePath,
-            contentType,
-            error: signErr?.message ?? "missing_signed_url",
-          });
-        } else {
-          signedUrl = data.signedUrl;
-        }
-      }
-
-      return {
-        ...attachment,
-        bucket,
-        storage_path: storagePath,
-        content_type: contentType,
-        signedUrl,
-      };
-    })
+  // Fall back to what was actually returned rather than trusting the count to
+  // be present: a null count with a full page would otherwise hide the
+  // "Load more" control and strand the rest of the library.
+  const attachmentTotal = Math.max(
+    Number(totalAttachmentCount ?? 0) || 0,
+    attachmentItems.length,
   );
 
   const customerName =
@@ -247,7 +233,7 @@ export default async function JobAttachmentsPage({
               Ops: {opsStatusLabel}
             </span>
             <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">
-              {attachmentItems.length} attachment{attachmentItems.length === 1 ? "" : "s"}
+              {attachmentTotal} attachment{attachmentTotal === 1 ? "" : "s"}
             </span>
           </div>
         </div>
@@ -295,6 +281,7 @@ export default async function JobAttachmentsPage({
       <JobAttachmentsInternal
         jobId={job.id}
         initialItems={attachmentItems}
+        totalItemCount={attachmentTotal}
         attachmentInputMode={isRefrigerantChargePhotoContext ? "images" : "all"}
         attachmentEvidenceContext={attachmentEvidenceContext}
         initialSharedAttachmentIds={initialSharedAttachmentIds}

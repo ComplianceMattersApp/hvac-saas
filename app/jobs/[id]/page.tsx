@@ -1610,7 +1610,8 @@ export default async function JobDetailPage({
       .from("attachments")
       .select("id", { count: "exact", head: true })
       .eq("entity_type", "job")
-      .eq("entity_id", jobId);
+      .eq("entity_id", jobId)
+      .not("finalized_at", "is", null);
 
     if (error) return null;
     return Number(count ?? 0) || 0;

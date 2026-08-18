@@ -32,8 +32,8 @@ function makeFixture(options?: {
   attachmentRows?: AttachmentRow[];
   schemaUnavailable?: boolean;
   internalUser?: boolean;
-  createSignedUrl?: (path: string) => Promise<{
-    data: { signedUrl: string } | null;
+  createSignedUrls?: (paths: string[]) => Promise<{
+    data: Array<{ path: string; signedUrl: string | null; error?: unknown }> | null;
     error: unknown;
   }>;
 }) {
@@ -109,10 +109,17 @@ function makeFixture(options?: {
     },
     storage: {
       from: vi.fn(() => ({
-        createSignedUrl: vi.fn(async (path: string) => {
-          calls.signedUrlPaths.push(path);
-          if (options?.createSignedUrl) return options.createSignedUrl(path);
-          return { data: { signedUrl: `https://signed.example/${path}` }, error: null };
+        createSignedUrls: vi.fn(async (paths: string[]) => {
+          calls.signedUrlPaths.push(...paths);
+          if (options?.createSignedUrls) return options.createSignedUrls(paths);
+          return {
+            data: paths.map((path) => ({
+              path,
+              signedUrl: `https://signed.example/${path}`,
+              error: null,
+            })),
+            error: null,
+          };
         }),
       })),
     },
@@ -247,11 +254,7 @@ describe("permit request attachment read model", () => {
     expect(result.attachmentsByPermitRequestId["permit-1"].map((attachment) => attachment.id)).toEqual(["att-1"]);
   });
 
-  it("requests independent signed URLs in parallel while preserving attachment order", async () => {
-    const pendingResolvers: Array<(value: {
-      data: { signedUrl: string };
-      error: null;
-    }) => void> = [];
+  it("signs every attachment in one bulk request and preserves attachment order", async () => {
     const attachmentRows: AttachmentRow[] = ["first.pdf", "second.pdf"].map((fileName, index) => ({
       id: `att-${index + 1}`,
       entity_type: "permit_request",
@@ -264,26 +267,40 @@ describe("permit request attachment read model", () => {
       caption: null,
       created_at: `2026-06-16T12:0${index}:00.000Z`,
     }));
+
+    let bulkRequestCount = 0;
     const fixture = makeFixture({
       attachmentRows,
-      createSignedUrl: () => new Promise((resolve) => pendingResolvers.push(resolve)),
+      // Answer out of order: results are matched back by path, not by position.
+      createSignedUrls: async (paths: string[]) => {
+        bulkRequestCount += 1;
+        return {
+          data: [...paths].reverse().map((path) => ({
+            path,
+            signedUrl: `https://signed.example/${path}`,
+            error: null,
+          })),
+          error: null,
+        };
+      },
     });
+
     const { listInternalPermitRequestAttachmentsForAccount } = await import("../permit-request-attachments-read-model");
 
-    const resultPromise = listInternalPermitRequestAttachmentsForAccount({
+    const result = await listInternalPermitRequestAttachmentsForAccount({
       accountOwnerUserId: "owner-1",
       permitRequestIds: ["permit-1"],
       admin: fixture.admin,
     });
 
-    await vi.waitFor(() => expect(pendingResolvers).toHaveLength(2));
-    pendingResolvers[1]({ data: { signedUrl: "https://signed.example/second.pdf" }, error: null });
-    pendingResolvers[0]({ data: { signedUrl: "https://signed.example/first.pdf" }, error: null });
-
-    const result = await resultPromise;
+    expect(bulkRequestCount).toBe(1);
     expect(result.attachmentsByPermitRequestId["permit-1"].map((attachment) => attachment.fileName)).toEqual([
       "first.pdf",
       "second.pdf",
+    ]);
+    expect(result.attachmentsByPermitRequestId["permit-1"].map((attachment) => attachment.signedUrl)).toEqual([
+      "https://signed.example/permit-requests/first.pdf",
+      "https://signed.example/permit-requests/second.pdf",
     ]);
   });
 

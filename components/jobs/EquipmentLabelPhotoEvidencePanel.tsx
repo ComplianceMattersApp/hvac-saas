@@ -100,7 +100,7 @@ export default function EquipmentLabelPhotoEvidencePanel({
     const token = await createJobAttachmentUploadToken({
       jobId,
       fileName: file.name,
-      contentType: file.type || "application/octet-stream",
+      contentType: file.type,
       fileSize: file.size,
       caption: caption ?? defaultLabel,
       attachmentEvidenceContext: "equipment_label_photo",
@@ -110,7 +110,7 @@ export default function EquipmentLabelPhotoEvidencePanel({
       const { error: uploadError } = await supabase.storage
         .from(token.bucket)
         .uploadToSignedUrl(token.path, token.token, file, {
-          contentType: file.type || "application/octet-stream",
+          contentType: token.contentType,
         });
 
       if (uploadError) throw new Error(uploadError.message);
