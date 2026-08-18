@@ -153,17 +153,19 @@ describe("job billing state read model", () => {
         if (table === "internal_invoices") {
           return {
             select: () => ({
-              neq: () => ({
-                in: async () => ({
-                  data: [
-                    {
-                      job_id: "job-1",
-                      status: "draft",
-                      invoice_number: "INV-2",
-                      issued_at: null,
-                    },
-                  ],
-                  error: null,
+              eq: () => ({
+                neq: () => ({
+                  in: async () => ({
+                    data: [
+                      {
+                        job_id: "job-1",
+                        status: "draft",
+                        invoice_number: "INV-2",
+                        issued_at: null,
+                      },
+                    ],
+                    error: null,
+                  }),
                 }),
               }),
             }),
@@ -339,7 +341,7 @@ describe("job billing state read model", () => {
     const supabase = {
       from: (table: string) => {
         if (table === "internal_business_profiles") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { account_owner_user_id: "owner-1", display_name: "EveryStep FieldWorks", billing_mode: "internal_invoicing", created_at: "2026-01-01", updated_at: "2026-01-01" }, error: null }) }) }) };
-        if (table === "internal_invoices") return { select: () => ({ neq: () => ({ in: async () => ({ data: [], error: null }) }) }) };
+        if (table === "internal_invoices") return { select: () => ({ eq: () => ({ neq: () => ({ in: async () => ({ data: [], error: null }) }) }) }) };
         if (table === "internal_invoice_jobs") return {
           select: () => ({
             in: () => ({

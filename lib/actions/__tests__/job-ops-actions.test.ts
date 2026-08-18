@@ -266,6 +266,8 @@ function makeSupabaseForCertCloseout(params: {
   job: Record<string, unknown>;
   eccRuns?: Array<Record<string, unknown>>;
   internalInvoice?: Record<string, unknown> | null;
+  /** Invoice reachable only through internal_invoice_jobs membership (consolidated). */
+  membershipInvoice?: Record<string, unknown> | null;
   internalInvoiceError?: { message: string } | null;
   recomputedOpsStatus: string;
   certUpdateError?: { message: string } | null;
@@ -355,14 +357,49 @@ function makeSupabaseForCertCloseout(params: {
       }
 
       if (table === "internal_invoices") {
+        // The closeout projection awaits the list builder directly (no
+        // maybeSingle), so this mock resolves as a thenable row list.
         const query: any = {
           select: vi.fn(() => query),
           eq: vi.fn(() => query),
           neq: vi.fn(() => query),
-          maybeSingle: vi.fn(async () => ({
-            data: params.internalInvoiceError ? null : params.internalInvoice ?? null,
-            error: params.internalInvoiceError ?? null,
-          })),
+          in: vi.fn(() => query),
+          then: (onFulfilled: (value: { data: unknown[] | null; error: unknown }) => unknown) =>
+            Promise.resolve(
+              params.internalInvoiceError
+                ? { data: null, error: params.internalInvoiceError }
+                : {
+                    data: params.internalInvoice
+                      ? [{ job_id: params.job.id, ...params.internalInvoice }]
+                      : [],
+                    error: null,
+                  },
+            ).then(onFulfilled),
+        };
+        return query;
+      }
+
+      if (table === "internal_invoice_jobs") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          neq: vi.fn(() => query),
+          in: vi.fn(() => query),
+          then: (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+            Promise.resolve({
+              data: params.membershipInvoice
+                ? [
+                    {
+                      job_id: params.job.id,
+                      internal_invoices: {
+                        invoice_kind: "primary",
+                        ...params.membershipInvoice,
+                      },
+                    },
+                  ]
+                : [],
+              error: null,
+            }).then(onFulfilled),
         };
         return query;
       }
@@ -741,6 +778,69 @@ describe("releaseAndReevaluate", () => {
     ]);
     expect(revalidatePathMock).toHaveBeenCalledWith("/ops/closeout-queue");
     expect(revalidatePathMock).toHaveBeenCalledWith("/reports/closeout");
+  });
+
+  it("closes out certs when the issued invoice is consolidated and reachable only through membership", async () => {
+    // Prod regression (job #1393): an issued consolidated invoice carries the
+    // other member job's job_id, so a job_id-only billing lookup concluded
+    // "unbilled" and wrote invoice_required over an already-billed job.
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForCertCloseout({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: true,
+        billing_disposition: null,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: "PERMIT-123",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+        data_entry_completed_at: null,
+        service_case_id: null,
+      },
+      internalInvoice: null,
+      membershipInvoice: {
+        status: "issued",
+        invoice_number: "INV-CONSOLIDATED-1",
+        issued_at: "2026-06-01T12:00:00.000Z",
+      },
+      recomputedOpsStatus: "closed",
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValueOnce("internal_invoicing");
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#field-status-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=certs_closeout_closed");
+
+    expect(jobUpdates).toContainEqual({ certs_complete: true });
+    expect(jobUpdates).toContainEqual({ ops_status: "closed" });
+    expect(jobUpdates).not.toContainEqual(
+      expect.objectContaining({ ops_status: "invoice_required" }),
+    );
+    expect(jobEvents).toEqual([
+      expect.objectContaining({
+        event_type: "ops_update",
+        message: "Certs marked complete",
+        meta: expect.objectContaining({
+          changes: expect.arrayContaining([
+            { field: "certs_complete", from: false, to: true },
+            { field: "ops_status", from: "paperwork_required", to: "closed" },
+          ]),
+        }),
+      }),
+    ]);
   });
 
   it("falls back when jobs.billing_disposition is unavailable and still resolves cert closeout", async () => {

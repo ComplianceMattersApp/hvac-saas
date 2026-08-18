@@ -53,6 +53,23 @@ vi.mock("@/lib/estimates/estimate-read", () => ({
     getEstimateToInvoiceConversionSchemaReadyMock(...args),
 }));
 
+// The duplicate-invoice guard resolves invoices through the canonical
+// membership-aware resolver, which also touches internal_invoice_jobs and
+// internal_invoice_line_items. This serves any chain shape with an empty result.
+function makeEmptyInvoiceJoinTableQuery() {
+  const query: any = {
+    select: vi.fn(() => query),
+    eq: vi.fn(() => query),
+    neq: vi.fn(() => query),
+    limit: vi.fn(() => query),
+    order: vi.fn(() => query),
+    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+    then: (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(onFulfilled),
+  };
+  return query;
+}
+
 function makeInternalUser() {
   return {
     internalUser: {
@@ -613,6 +630,8 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
               eq: vi.fn().mockReturnThis(),
             }),
           };
+        } else if (table === "internal_invoice_jobs") {
+          return makeEmptyInvoiceJoinTableQuery();
         } else if (table === "internal_invoice_line_items") {
           return {
             select: vi.fn(() => ({ eq: vi.fn(async () => ({ data: [], error: null })) })),
@@ -711,6 +730,11 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
               error: null,
             }),
           };
+        } else if (
+          table === "internal_invoice_jobs" ||
+          table === "internal_invoice_line_items"
+        ) {
+          return makeEmptyInvoiceJoinTableQuery();
         }
         return {};
       }),
@@ -805,6 +829,8 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
               eq: vi.fn().mockReturnThis(),
             }),
           };
+        } else if (table === "internal_invoice_jobs") {
+          return makeEmptyInvoiceJoinTableQuery();
         } else if (table === "internal_invoice_line_items") {
           return {
             // The shared totals seam re-reads the lines after inserting them.
@@ -902,6 +928,8 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
               eq: vi.fn().mockReturnThis(),
             }),
           };
+        } else if (table === "internal_invoice_jobs") {
+          return makeEmptyInvoiceJoinTableQuery();
         } else if (table === "internal_invoice_line_items") {
           return {
             // The shared totals seam re-reads the lines after inserting them.
@@ -1012,6 +1040,8 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
               eq: vi.fn().mockReturnThis(),
             }),
           };
+        } else if (table === "internal_invoice_jobs") {
+          return makeEmptyInvoiceJoinTableQuery();
         } else if (table === "internal_invoice_line_items") {
           return {
             // The shared totals seam re-reads the lines after inserting them.

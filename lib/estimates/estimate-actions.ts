@@ -38,6 +38,7 @@ import {
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { sanitizeVisitScopeItems, type VisitScopeItem } from "@/lib/jobs/visit-scope";
 import { insertInvoiceLineItemWithTaxability, recalculateInvoiceTotals } from "@/lib/invoices/invoice-totals";
+import { resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
 import { readAccountTaxDefaults, readPricebookTaxabilityByIds } from "@/lib/invoices/invoice-tax-state";
 
 /**
@@ -2918,19 +2919,13 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
     };
   }
 
-  let existingInvoice: any = null;
-  try {
-    const { data, error } = await supabase
-      .from("internal_invoices")
-      .select("id, status")
-      .eq("job_id", convertedJobId)
-      .neq("status", "void")
-      .maybeSingle();
-    if (error) throw error;
-    existingInvoice = data;
-  } catch (error) {
-    throw error;
-  }
+  // Membership-aware: a consolidated invoice covering this job carries a
+  // different job_id, and a plain job_id lookup would let conversion create a
+  // second invoice for an already-billed job.
+  const existingInvoice = await resolveInternalInvoiceByJobId({
+    supabase,
+    jobId: convertedJobId,
+  });
 
   if (existingInvoice?.id) {
     return {

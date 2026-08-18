@@ -200,9 +200,13 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
 
   if (billingMode === "internal_invoicing" && jobIds.length > 0) {
     const _t_invoiceFetch = isOpsTimingEnabled() ? Date.now() : 0;
+    // invoice_kind filter keeps this aligned with resolveInternalInvoiceByJobId
+    // and the membership fallback below: billing truth comes from the primary
+    // invoice only, never a supplemental riding the same job_id.
     const { data, error } = await params.supabase
       .from("internal_invoices")
       .select("job_id, status, invoice_number, issued_at")
+      .eq("invoice_kind", "primary")
       .neq("status", "void")
       .in("job_id", jobIds);
 

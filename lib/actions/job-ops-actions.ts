@@ -25,7 +25,8 @@ import {
   insertInternalNotificationForEvent,
 } from "@/lib/actions/notification-actions";
 import {
-  buildJobBillingStateReadModel,
+  buildBillingTruthCloseoutProjectionMap,
+  type JobBillingStateReadModel,
 } from "@/lib/business/job-billing-state";
 import {
   resolveBillingModeByAccountOwnerId,
@@ -66,9 +67,6 @@ import {
   resolvePrimaryOpsQueue,
 } from "@/lib/ops/queue-membership";
 export type { ContractorFailureDetail } from "@/lib/portal/resolveContractorIssues";
-
-type CloseoutInternalInvoiceSnapshot =
-  Parameters<typeof buildJobBillingStateReadModel>[0]["internalInvoice"];
 
 const OPS_STATUSES = [
   "need_to_schedule",
@@ -288,33 +286,27 @@ async function resolveExistingBillingTruthForCloseout(params: {
     invoice_complete?: boolean | null;
     billing_disposition?: string | null;
   };
-}) {
-  const billingMode = await resolveBillingModeByAccountOwnerId({
+}): Promise<JobBillingStateReadModel> {
+  // Delegates to the shared closeout projection so this path sees the same
+  // invoice truth as the Ops queues — including consolidated invoices that are
+  // linked to this job only through internal_invoice_jobs membership. A private
+  // job_id-only lookup here once concluded "unbilled" over an issued
+  // consolidated invoice and reopened a closed job as invoice_required.
+  const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
     supabase: params.supabase,
     accountOwnerUserId: params.accountOwnerUserId,
+    jobs: [
+      {
+        id: params.job.id,
+        invoice_complete: params.job.invoice_complete,
+        billing_disposition: params.job.billing_disposition,
+      },
+    ],
   });
 
-  let internalInvoice: CloseoutInternalInvoiceSnapshot = null;
-
-  if (billingMode === "internal_invoicing") {
-    const { data, error } = await params.supabase
-      .from("internal_invoices")
-      .select("status, invoice_number, issued_at")
-      .eq("job_id", params.job.id)
-      .eq("invoice_kind", "primary")
-      .neq("status", "void")
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    internalInvoice = data ?? null;
-  }
-
-  return buildJobBillingStateReadModel({
-    billingMode,
-    invoiceComplete: params.job.invoice_complete,
-    internalInvoice,
-    billingDisposition: params.job.billing_disposition,
-  });
+  const projection = projectionsByJobId.get(String(params.job.id));
+  if (!projection) throw new Error("Billing truth projection unavailable for job.");
+  return projection.billingState;
 }
 
 function buildJobOpsRedirectPath(params: {
@@ -1474,7 +1466,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     redirectToJob({ notice: "field_not_complete" });
   }
 
-  let billingState: ReturnType<typeof buildJobBillingStateReadModel>;
+  let billingState: JobBillingStateReadModel;
   try {
     billingState = await resolveExistingBillingTruthForCloseout({
       supabase,
