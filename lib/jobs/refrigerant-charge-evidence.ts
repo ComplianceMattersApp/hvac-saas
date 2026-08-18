@@ -1,4 +1,5 @@
 import { signAttachmentRows } from "@/lib/attachments/signed-attachment-urls";
+import { readFinalizedAttachmentsWithLegacyFallback } from "@/lib/attachments/finalized-attachment-read";
 
 export const REFRIGERANT_CHARGE_ATTACHMENT_TAG = "[refrigerant-charge-evidence]";
 export const EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG = "[equipment-label-photo]";
@@ -23,6 +24,32 @@ export type EquipmentLabelPhotoAttachment = RefrigerantChargeEvidenceImageAttach
   equipmentId: string | null;
   systemId: string | null;
 };
+
+async function readJobEvidenceRows(params: {
+  supabase: any;
+  jobId: string;
+  captionPrefix: string;
+  limit: number;
+}): Promise<{ data: any[] | null; error: any; status?: number }> {
+  return readFinalizedAttachmentsWithLegacyFallback<{
+    data: any[] | null;
+    error: any;
+    status?: number;
+  }>((requireFinalized) => {
+    let query = params.supabase
+      .from("attachments")
+      .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
+      .eq("entity_type", "job")
+      .eq("entity_id", params.jobId);
+
+    if (requireFinalized) query = query.not("finalized_at", "is", null);
+
+    return query
+      .ilike("caption", `${params.captionPrefix}%`)
+      .order("created_at", { ascending: false })
+      .limit(params.limit);
+  });
+}
 
 function normalizeWhitespace(value: string) {
   return value.trim().replace(/\s+/g, " ");
@@ -136,15 +163,12 @@ export async function listJobDuctAsbestosPhotoImages(params: {
   const jobId = String(params.jobId ?? "").trim();
   if (!jobId) return [];
 
-  const { data: evidenceRows, error: evidenceErr } = await params.supabase
-    .from("attachments")
-    .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
-    .eq("entity_type", "job")
-    .eq("entity_id", jobId)
-    .not("finalized_at", "is", null)
-    .ilike("caption", `${DUCT_ASBESTOS_PHOTO_ATTACHMENT_TAG}%`)
-    .order("created_at", { ascending: false })
-    .limit(params.limit ?? 20);
+  const { data: evidenceRows, error: evidenceErr } = await readJobEvidenceRows({
+    supabase: params.supabase,
+    jobId,
+    captionPrefix: DUCT_ASBESTOS_PHOTO_ATTACHMENT_TAG,
+    limit: params.limit ?? 20,
+  });
 
   if (evidenceErr) throw evidenceErr;
 
@@ -175,15 +199,12 @@ export async function listJobRefrigerantChargeEvidenceImages(params: {
   const jobId = String(params.jobId ?? "").trim();
   if (!jobId) return [];
 
-  const { data: evidenceRows, error: evidenceErr } = await params.supabase
-    .from("attachments")
-    .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
-    .eq("entity_type", "job")
-    .eq("entity_id", jobId)
-    .not("finalized_at", "is", null)
-    .ilike("caption", `${REFRIGERANT_CHARGE_ATTACHMENT_TAG}%`)
-    .order("created_at", { ascending: false })
-    .limit(params.limit ?? 20);
+  const { data: evidenceRows, error: evidenceErr } = await readJobEvidenceRows({
+    supabase: params.supabase,
+    jobId,
+    captionPrefix: REFRIGERANT_CHARGE_ATTACHMENT_TAG,
+    limit: params.limit ?? 20,
+  });
 
   if (evidenceErr) throw evidenceErr;
 
@@ -214,15 +235,12 @@ export async function listJobEquipmentLabelPhotoImages(params: {
   const jobId = String(params.jobId ?? "").trim();
   if (!jobId) return [];
 
-  const { data: evidenceRows, error: evidenceErr } = await params.supabase
-    .from("attachments")
-    .select("id, bucket, storage_path, file_name, content_type, caption, created_at")
-    .eq("entity_type", "job")
-    .eq("entity_id", jobId)
-    .not("finalized_at", "is", null)
-    .ilike("caption", `${EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG}%`)
-    .order("created_at", { ascending: false })
-    .limit(params.limit ?? 100);
+  const { data: evidenceRows, error: evidenceErr } = await readJobEvidenceRows({
+    supabase: params.supabase,
+    jobId,
+    captionPrefix: EQUIPMENT_LABEL_PHOTO_ATTACHMENT_TAG,
+    limit: params.limit ?? 100,
+  });
 
   if (evidenceErr) throw evidenceErr;
 

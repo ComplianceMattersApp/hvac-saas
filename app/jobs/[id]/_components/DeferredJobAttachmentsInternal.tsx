@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signScopedInternalJobDetailAttachments } from "@/lib/actions/internal-job-detail-read-boundary";
 import { buildAttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
 import { getContractorSharedAttachmentIds } from "@/lib/jobs/attachment-share-state";
+import { readFinalizedAttachmentsWithLegacyFallback } from "@/lib/attachments/finalized-attachment-read";
 
 import JobAttachmentsInternal from "./JobAttachmentsInternal";
 
@@ -18,14 +19,20 @@ export default async function DeferredJobAttachmentsInternal({
 }: DeferredJobAttachmentsInternalProps) {
   const supabase = await createClient();
 
-  const { data: attachmentRows, error: attachmentErr } = await supabase
-    .from("attachments")
-    .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
-    .eq("entity_type", "job")
-    .eq("entity_id", jobId)
-    .not("finalized_at", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(200);
+  const { data: attachmentRows, error: attachmentErr } =
+    await readFinalizedAttachmentsWithLegacyFallback((requireFinalized) => {
+      let query = supabase
+        .from("attachments")
+        .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
+        .eq("entity_type", "job")
+        .eq("entity_id", jobId);
+
+      if (requireFinalized) query = query.not("finalized_at", "is", null);
+
+      return query
+        .order("created_at", { ascending: false })
+        .limit(200);
+    });
 
   if (attachmentErr) throw new Error(attachmentErr.message);
 

@@ -56,20 +56,25 @@ describe("job detail V2 entrypoint", () => {
 
   it("throws Desktop V2 contractor shadow membership read failures", () => {
     expect(v2JobDetailSource).toContain("const { data: shadowMembership, error: shadowMembershipError } = shadowMembershipResult;");
-    expect(v2JobDetailSource).toContain("if (shadowMembershipError) throw shadowMembershipError;");
-    expect(v2JobDetailSource.indexOf("if (shadowMembershipError) throw shadowMembershipError;")).toBeLessThan(
+    expect(v2JobDetailSource).toContain('if (shadowMembershipError) throwPhaseError("contractorShadowMembershipRead", shadowMembershipError);');
+    expect(v2JobDetailSource.indexOf('if (shadowMembershipError) throwPhaseError("contractorShadowMembershipRead", shadowMembershipError);')).toBeLessThan(
       v2JobDetailSource.indexOf("const hasShadowMembership = Boolean(shadowMembership?.contractor_id);"),
     );
   });
 
-  it("throws Desktop V2 supplemental Supabase read failures", () => {
+  it("throws required Desktop V2 supplemental read failures with phase context", () => {
     expect(v2JobDetailSource).toContain("{ data: customerLocationsRaw, error: customerLocationsError }");
     expect(v2JobDetailSource).toContain("{ data: primaryInvoiceRaw, error: primaryInvoiceError }");
-    expect(v2JobDetailSource).toContain("if (customerLocationsError) throw customerLocationsError;");
-    expect(v2JobDetailSource).toContain("if (primaryInvoiceError) throw primaryInvoiceError;");
-    expect(v2JobDetailSource).toContain("if (contactAttemptsResult.error) throw contactAttemptsResult.error;");
-    expect(v2JobDetailSource).toContain("if (attachmentCountResult.error) throw attachmentCountResult.error;");
-    expect(v2JobDetailSource).toContain("if (timelineCountResult.error) throw timelineCountResult.error;");
+    expect(v2JobDetailSource).toContain('throwPhaseError("customerLocationsRead", customerLocationsError)');
+    expect(v2JobDetailSource).toContain('throwPhaseError("primaryInvoiceRead", primaryInvoiceError)');
+    expect(v2JobDetailSource).toContain('throwPhaseError("contactAttemptsRead", contactAttemptsResult.error)');
+    expect(v2JobDetailSource).toContain('throwPhaseError("timelineCountRead", timelineCountResult.error)');
+  });
+
+  it("fails open when optional attachment-count metadata cannot load", () => {
+    expect(v2JobDetailSource).toContain("[job-v2:attachmentCountRead] optional read failed");
+    expect(v2JobDetailSource).toContain("attachmentCountResult.error\n    ? 0");
+    expect(v2JobDetailSource).not.toContain('throwPhaseError("attachmentCountRead", attachmentCountResult.error)');
   });
 
   it("uses full-width schedule action wording in the V2 right rail", () => {

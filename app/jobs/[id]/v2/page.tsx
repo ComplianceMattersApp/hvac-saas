@@ -60,6 +60,7 @@ import {
   resolveVisitScopeItemPriceDisplay,
 } from "@/lib/business/visit-scope-billing";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
+import { readFinalizedAttachmentsWithLegacyFallback } from "@/lib/attachments/finalized-attachment-read";
 import {
   loadLocationEquipmentOnFile,
   type LocationUnitOnFile,
@@ -391,14 +392,46 @@ export default async function JobDetailV2Page({
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const renderStartMs = Date.now();
   const phaseDurationsMs: Record<string, number> = {};
+  const describePhaseError = (error: unknown) => {
+    if (error instanceof Error) return error.message || error.name;
+    if (error && typeof error === "object") {
+      const candidate = error as {
+        code?: unknown;
+        message?: unknown;
+        details?: unknown;
+        hint?: unknown;
+      };
+      const parts = [
+        candidate.code ? `code=${String(candidate.code)}` : "",
+        candidate.message ? `message=${String(candidate.message)}` : "",
+        candidate.details ? `details=${String(candidate.details)}` : "",
+        candidate.hint ? `hint=${String(candidate.hint)}` : "",
+      ].filter(Boolean);
+      if (parts.length > 0) return parts.join(" | ");
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    }
+    return String(error);
+  };
   const timedPhase = async <T,>(phaseName: string, factory: () => PromiseLike<T>): Promise<T> => {
-    if (!timingEnabled) return factory();
-    const startMs = Date.now();
+    const startMs = timingEnabled ? Date.now() : 0;
     try {
       return await factory();
+    } catch (error) {
+      const annotated = new Error(`[job-v2:${phaseName}] ${describePhaseError(error)}`);
+      (annotated as Error & { cause?: unknown }).cause = error;
+      throw annotated;
     } finally {
-      phaseDurationsMs[phaseName] = Date.now() - startMs;
+      if (timingEnabled) phaseDurationsMs[phaseName] = Date.now() - startMs;
     }
+  };
+  const throwPhaseError = (phaseName: string, error: unknown): never => {
+    const annotated = new Error(`[job-v2:${phaseName}] ${describePhaseError(error)}`);
+    (annotated as Error & { cause?: unknown }).cause = error;
+    throw annotated;
   };
 
   // ── auth ──────────────────────────────────────────────────────────────────
@@ -415,11 +448,13 @@ export default async function JobDetailV2Page({
     timedPhase("actorRoleResolution", () =>
       resolveJobDetailActor({ supabase, userId: user.id }),
     ),
-    supabase
-      .from("contractor_users")
-      .select("contractor_id")
-      .eq("user_id", user.id)
-      .maybeSingle(),
+    timedPhase("contractorShadowMembershipRead", () =>
+      supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ),
   ]);
   if (actorResolution.kind === "contractor") redirect(`/portal/jobs/${jobId}`);
   if (actorResolution.kind === "unauthorized") redirect("/login");
@@ -430,7 +465,7 @@ export default async function JobDetailV2Page({
   const isAdmin = internalRole === "admin";
 
   const { data: shadowMembership, error: shadowMembershipError } = shadowMembershipResult;
-  if (shadowMembershipError) throw shadowMembershipError;
+  if (shadowMembershipError) throwPhaseError("contractorShadowMembershipRead", shadowMembershipError);
 
   const hasShadowMembership = Boolean(shadowMembership?.contractor_id);
 
@@ -457,7 +492,7 @@ export default async function JobDetailV2Page({
 
   const { data: job, error: jobError } = mainJobReadResult;
 
-  if (jobError) throw jobError;
+  if (jobError) throwPhaseError("mainJobRead", jobError);
   if (!job) return notFound();
   if (job.deleted_at) redirect("/ops?saved=job_archived");
 
@@ -521,12 +556,16 @@ export default async function JobDetailV2Page({
       .eq("event_type", "customer_attempt")
       .order("created_at", { ascending: false })
       .limit(1),
-    supabase
-      .from("attachments")
-      .select("id", { count: "exact", head: true })
-      .eq("entity_type", "job")
-      .eq("entity_id", jobId)
-      .not("finalized_at", "is", null),
+    readFinalizedAttachmentsWithLegacyFallback((requireFinalized) => {
+      let query = supabase
+        .from("attachments")
+        .select("id", { count: "exact", head: true })
+        .eq("entity_type", "job")
+        .eq("entity_id", jobId);
+
+      if (requireFinalized) query = query.not("finalized_at", "is", null);
+      return query;
+    }),
     supabase
       .from("job_events")
       .select("id", { count: "exact", head: true })
@@ -593,11 +632,16 @@ export default async function JobDetailV2Page({
       : Promise.resolve([] as LocationUnitOnFile[]),
   ]));
 
-  if (customerLocationsError) throw customerLocationsError;
-  if (primaryInvoiceError) throw primaryInvoiceError;
-  if (contactAttemptsResult.error) throw contactAttemptsResult.error;
-  if (attachmentCountResult.error) throw attachmentCountResult.error;
-  if (timelineCountResult.error) throw timelineCountResult.error;
+  if (customerLocationsError) throwPhaseError("customerLocationsRead", customerLocationsError);
+  if (primaryInvoiceError) throwPhaseError("primaryInvoiceRead", primaryInvoiceError);
+  if (contactAttemptsResult.error) throwPhaseError("contactAttemptsRead", contactAttemptsResult.error);
+  if (attachmentCountResult.error) {
+    console.error("[job-v2:attachmentCountRead] optional read failed", {
+      jobId,
+      error: describePhaseError(attachmentCountResult.error),
+    });
+  }
+  if (timelineCountResult.error) throwPhaseError("timelineCountRead", timelineCountResult.error);
 
   const customerLocations: Array<{ id: string; label: string }> = (customerLocationsRaw ?? []).map(
     (loc: any) => ({
@@ -610,7 +654,9 @@ export default async function JobDetailV2Page({
   );
 
   const assignedTeam = assignmentMap[jobId] ?? [];
-  const attachmentCount = Number(attachmentCountResult.count ?? 0);
+  const attachmentCount = attachmentCountResult.error
+    ? 0
+    : Number(attachmentCountResult.count ?? 0);
   const timelineCount = Number(timelineCountResult.count ?? 0);
   const contractor = job.contractor_id
     ? (contractorRows as Array<{ id: string; name?: string | null }>).find(
