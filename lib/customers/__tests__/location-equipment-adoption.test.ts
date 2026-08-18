@@ -235,6 +235,8 @@ describe("job_equipment ↔ canonical equipment bridge wiring", () => {
   it("offers 'use equipment on file' on the v2 job page only when the job snapshot is empty", () => {
     expect(jobV2PageSource).toContain("loadLocationEquipmentOnFile");
     expect(jobV2PageSource).toContain("baseEquipmentRows.length === 0 && job.location_id");
+    expect(jobV2PageSource).toContain("loadLocationEquipmentOnFile failed on job v2 page:");
+    expect(jobV2PageSource).toContain("return [] as LocationUnitOnFile[];");
     expect(jobV2PageSource).toContain("seedJobEquipmentFromLocationFromForm");
     expect(jobV2PageSource).toContain("equipmentOnFileForLocation.length > 0");
     expect(jobV2PageSource).toContain("Use equipment on file");

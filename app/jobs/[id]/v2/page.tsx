@@ -570,7 +570,25 @@ export default async function JobDetailV2Page({
     // Address-level equipment on file: only fetched when this job hasn't
     // captured anything yet — it powers the "use equipment on file" seed card.
     baseEquipmentRows.length === 0 && job.location_id
-      ? loadLocationEquipmentOnFile({ client: supabase, locationId: String(job.location_id) })
+      ? (async () => {
+          try {
+            return await loadLocationEquipmentOnFile({
+              client: supabase,
+              locationId: String(job.location_id),
+            });
+          } catch (error) {
+            // This is an optional convenience read. A schema rollout lag, RLS
+            // mismatch, or malformed legacy equipment row must not take down the
+            // entire job detail page; the equipment card can render its existing
+            // empty state while the server log preserves the diagnostic.
+            console.error("loadLocationEquipmentOnFile failed on job v2 page:", {
+              jobId,
+              locationId: String(job.location_id),
+              error,
+            });
+            return [] as LocationUnitOnFile[];
+          }
+        })()
       : Promise.resolve([] as LocationUnitOnFile[]),
   ]));
 
