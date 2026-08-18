@@ -39,6 +39,21 @@ const jobV2PageSource = readFileSync(
   "utf8",
 );
 
+const jobInfoPageSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/info/page.tsx"),
+  "utf8",
+);
+
+const equipmentCreateFormSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/EquipmentCreateForm.tsx"),
+  "utf8",
+);
+
+const equipmentCreateFormFieldsSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/EquipmentCreateFormFields.tsx"),
+  "utf8",
+);
+
 const alertBannerSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/v2/_components/AlertBanner.tsx"),
   "utf8",
@@ -181,6 +196,40 @@ describe("job_equipment ↔ canonical equipment bridge wiring", () => {
     expect(jobEquipmentActionsSource).toContain("requireInternalEquipmentMutationAccess({ supabase, jobId })");
     expect(jobEquipmentActionsSource).toContain("requireOperationalScopedJobMutationAccessOrRedirect");
     expect(jobEquipmentActionsSource).toContain("equipment_seeded_from_location");
+  });
+
+  it("replace-from-job is explicit, never inferred: defaults to 'additional equipment'", () => {
+    // A same-role capture can legitimately be a second system's first entry
+    // (out-of-scope system captured later), so replacement must be an explicit
+    // tech choice with the no-replace option as the default.
+    expect(equipmentCreateFormSource).toContain("No — adding additional equipment");
+    expect(equipmentCreateFormSource).toContain('name="replaces_canonical_equipment_id"');
+    expect(equipmentCreateFormSource).toContain('name="retire_reason"');
+    // Retire reason only appears (and is required) once a replace target is chosen.
+    expect(equipmentCreateFormSource).toContain("replaceTargetId ? (");
+    // The chooser hides while adding a filter.
+    expect(equipmentCreateFormFieldsSource).toContain("{!addingFilter ? replaceSection : null}");
+  });
+
+  it("replace-from-job runs the same atomic retire+install RPC with job provenance", () => {
+    expect(jobEquipmentActionsSource).toContain('formData.get("replaces_canonical_equipment_id")');
+    expect(jobEquipmentActionsSource).toContain('["failure", "warranty", "upgrade"].includes(retireReason)');
+    expect(jobEquipmentActionsSource).toContain("assertNoClientSuppliedOwnerId(formData)");
+    expect(jobEquipmentActionsSource).toContain("requireScopedEquipmentForMutation({");
+    expect(jobEquipmentActionsSource).toContain('admin.rpc("replace_customer_location_equipment"');
+    expect(jobEquipmentActionsSource).toContain('p_install_source: "job"');
+    expect(jobEquipmentActionsSource).toContain("p_source_job_id: jobId");
+    // The replacement stays in the old unit's canonical system.
+    expect(jobEquipmentActionsSource).toContain("p_system_id: oldSystemRow?.system_id");
+    // The new snapshot row links to the freshly installed canonical unit.
+    expect(jobEquipmentActionsSource).toContain("canonical_equipment_id: canonicalEquipmentIdForSnapshot");
+    expect(jobEquipmentActionsSource).toContain("equipment_replaced");
+  });
+
+  it("job info page offers on-file units as replace targets, best-effort", () => {
+    expect(jobInfoPageSource).toContain("loadLocationEquipmentOnFile");
+    expect(jobInfoPageSource).toContain("unitsOnFile={unitsOnFile}");
+    expect(jobInfoPageSource).toContain("location_id");
   });
 
   it("offers 'use equipment on file' on the v2 job page only when the job snapshot is empty", () => {

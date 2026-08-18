@@ -10,6 +10,8 @@ import {
   type JobSystemFilterRow,
 } from "@/lib/customers/system-filters-read-model";
 import { listJobEquipmentLabelPhotoImages } from "@/lib/jobs/refrigerant-charge-evidence";
+import { loadLocationEquipmentOnFile } from "@/lib/customers/location-equipment-adoption";
+import { buildEquipmentIdentityLabel } from "@/lib/utils/equipment-summary";
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
 import EquipmentCreateForm from "../_components/EquipmentCreateForm";
@@ -167,6 +169,7 @@ const { data: job, error } = await timedPhase("jobEquipmentRead", () => supabase
     city,
     job_address,
     job_type,
+    location_id,
     customer_first_name,
     customer_last_name,
     scheduled_date,
@@ -206,6 +209,35 @@ if (!job) return notFound();
     .order("name", { ascending: true }));
 
   if (systemsErr) throw systemsErr;
+
+  // Active canonical units at this job's address — offered as explicit
+  // replace targets in the add-equipment form. Best-effort: the form works
+  // without them (plain add), so a read failure never blocks the page.
+  let unitsOnFile: Array<{ id: string; display: string }> = [];
+  if (job.location_id) {
+    try {
+      const onFile = await loadLocationEquipmentOnFile({
+        client: supabase,
+        locationId: String(job.location_id),
+      });
+      unitsOnFile = onFile.map((unit) => ({
+        id: String(unit.id),
+        display: [
+          unit.system_name,
+          buildEquipmentIdentityLabel({
+            manufacturer: unit.manufacturer,
+            model: unit.model,
+            equipment_role: unit.equipment_type,
+          }),
+          unit.serial ? `Serial ${unit.serial}` : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      }));
+    } catch (e) {
+      console.error("loadLocationEquipmentOnFile failed on job info page:", e);
+    }
+  }
 
   const systemIds = ((systems ?? []) as Array<{ id?: string | null }>)
     .map((system) => String(system.id ?? "").trim())
@@ -461,7 +493,7 @@ if (!job) return notFound();
             </div>
 
             {/* Add Equipment Form */}
-            <EquipmentCreateForm jobId={job.id} systems={systems ?? []} />
+            <EquipmentCreateForm jobId={job.id} systems={systems ?? []} unitsOnFile={unitsOnFile} />
           </div>
         ) : (
           <div className="rounded-lg border border-slate-200 bg-white p-6 text-center">

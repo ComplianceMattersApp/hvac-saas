@@ -10,8 +10,13 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
 import {
   adoptJobEquipmentIntoLocationInventory,
+  jobEquipmentCanonicalLinkAvailable,
   seedJobEquipmentFromLocationInventory,
 } from "@/lib/customers/location-equipment-adoption";
+import {
+  assertNoClientSuppliedOwnerId,
+  requireScopedEquipmentForMutation,
+} from "@/lib/customers/scoped-equipment";
 import {
   archiveSystemFilter,
   createSystemFilter,
@@ -139,12 +144,115 @@ export async function addJobEquipmentFromForm(formData: FormData) {
     heatingEfficiencyPercent,
   });
 
+  // Optional replace: the tech explicitly said this new unit REPLACES an
+  // active unit on file at the address (never inferred — a same-role add can
+  // legitimately be a second system's first capture). Runs the same atomic
+  // retire+install DB function as the customer-profile Replace flow, with
+  // this job as install provenance, then links the snapshot to the new unit.
+  const replacesCanonicalEquipmentId = String(formData.get("replaces_canonical_equipment_id") || "").trim();
+  const retireReason = String(formData.get("retire_reason") || "").trim();
+  let canonicalEquipmentIdForSnapshot: string | null = null;
+  let canonicalLinkColumnAvailable = false;
+
+  if (replacesCanonicalEquipmentId) {
+    assertNoClientSuppliedOwnerId(formData);
+    if (!["failure", "warranty", "upgrade"].includes(retireReason)) {
+      throw new Error("Select a retire reason (failure, warranty, or upgrade) for the unit being replaced.");
+    }
+
+    const admin = createAdminClient();
+    const accountOwnerUserId = scoped.internalUser.account_owner_user_id;
+
+    const { data: jobRow, error: jobLocErr } = await admin
+      .from("jobs")
+      .select("location_id")
+      .eq("id", jobId)
+      .maybeSingle();
+    if (jobLocErr) throw jobLocErr;
+    const locationId = String(jobRow?.location_id ?? "").trim();
+    if (!locationId) {
+      throw new Error("This job has no service address, so it cannot replace address equipment.");
+    }
+
+    const { data: locationRow, error: locErr } = await admin
+      .from("locations")
+      .select("id, owner_user_id")
+      .eq("id", locationId)
+      .maybeSingle();
+    if (locErr) throw locErr;
+    if (String(locationRow?.owner_user_id ?? "") !== String(accountOwnerUserId)) {
+      throw new Error("Job location is outside the internal account scope");
+    }
+
+    // The RPC only re-checks owner, not location — confirm the target unit
+    // actually belongs to THIS job's address before handing it over.
+    const oldUnit = await requireScopedEquipmentForMutation({
+      admin,
+      equipmentId: replacesCanonicalEquipmentId,
+      locationId,
+      ownerUserId: accountOwnerUserId,
+    });
+    if (oldUnit.status !== "active") {
+      throw new Error("That unit is already retired — refresh the page and try again.");
+    }
+
+    const { data: oldSystemRow, error: oldSysErr } = await admin
+      .from("equipment")
+      .select("system_id")
+      .eq("id", replacesCanonicalEquipmentId)
+      .maybeSingle();
+    if (oldSysErr) throw oldSysErr;
+
+    const { data: newUnit, error: replaceErr } = await admin.rpc("replace_customer_location_equipment", {
+      p_owner_user_id: accountOwnerUserId,
+      p_old_equipment_id: replacesCanonicalEquipmentId,
+      p_retire_reason: retireReason,
+      p_location_id: locationId,
+      p_system_id: oldSystemRow?.system_id ?? null,
+      p_equipment_type: eqFields.equipment_role,
+      p_manufacturer: eqFields.manufacturer,
+      p_model: eqFields.model,
+      p_serial: eqFields.serial,
+      p_notes: eqFields.notes,
+      p_tonnage: eqFields.tonnage,
+      p_refrigerant_type: eqFields.refrigerant_type,
+      p_heating_capacity_kbtu: eqFields.heating_capacity_kbtu,
+      p_heating_output_btu: eqFields.heating_output_btu,
+      p_heating_efficiency_percent: eqFields.heating_efficiency_percent,
+      p_install_source: "job",
+      p_source_job_id: jobId,
+    });
+    if (replaceErr) throw replaceErr;
+
+    canonicalEquipmentIdForSnapshot = String((newUnit as any)?.id ?? "").trim() || null;
+    canonicalLinkColumnAvailable = await jobEquipmentCanonicalLinkAvailable(admin);
+
+    try {
+      await insertJobEvent({
+        supabase,
+        jobId,
+        event_type: "equipment_replaced",
+        meta: {
+          old_equipment_id: replacesCanonicalEquipmentId,
+          new_equipment_id: canonicalEquipmentIdForSnapshot,
+          retire_reason: retireReason,
+        },
+        userId: scoped.internalUser.user_id,
+      });
+    } catch (e) {
+      console.error("equipment_replaced job_events insert failed:", e);
+    }
+  }
+
   const { error: eqErr } = await supabase.from("job_equipment").insert({
     ...(requestedEquipmentId ? { id: requestedEquipmentId } : {}),
     job_id: jobId,
     system_id: systemId,
     system_location: systemLocation,
     ...eqFields,
+    ...(canonicalEquipmentIdForSnapshot && canonicalLinkColumnAvailable
+      ? { canonical_equipment_id: canonicalEquipmentIdForSnapshot }
+      : {}),
   });
 
   if (eqErr) throw eqErr;

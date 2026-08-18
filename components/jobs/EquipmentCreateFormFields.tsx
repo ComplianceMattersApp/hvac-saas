@@ -24,6 +24,7 @@ export default function EquipmentCreateFormFields({
   role: controlledRole,
   onRoleChange,
   actionAccessory,
+  replaceSection,
   showSubmitButton = true,
 }: {
   systems: SystemRow[];
@@ -34,6 +35,8 @@ export default function EquipmentCreateFormFields({
   role?: string;
   onRoleChange?: (role: string) => void;
   actionAccessory?: ReactNode;
+  /** Job-side "replaces an existing on-file unit?" chooser; hidden while adding a filter. */
+  replaceSection?: ReactNode;
   showSubmitButton?: boolean;
 }) {
   const [uncontrolledRole, setUncontrolledRole] = useState("outdoor_unit");
@@ -75,6 +78,8 @@ export default function EquipmentCreateFormFields({
         </div>
 
         {includeSystemPicker ? <SystemLocationPicker systems={systems} /> : null}
+
+        {!addingFilter ? replaceSection : null}
 
         {addingFilter ? (
           <div className="pt-2">
