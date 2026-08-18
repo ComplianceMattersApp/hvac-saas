@@ -18,6 +18,8 @@ export type AttentionItem = {
   actionLabel: string;
   paymentId?: string | null;
   repairFindingId?: string | null;
+  /** qbo_payment_unrecorded findings: adopt the QBO-collected payment into EveryStep. */
+  adoptQboFindingId?: string | null;
 };
 
 function clean(value: unknown) { return String(value ?? "").trim(); }
@@ -165,6 +167,7 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       repairFindingId: ["stripe_charge_unrecorded", "stripe_payment_identity_mismatch"].includes(clean(finding.finding_type))
         ? clean(finding.id)
         : null,
+      adoptQboFindingId: clean(finding.finding_type) === "qbo_payment_unrecorded" ? clean(finding.id) : null,
     });
   }
   for (const payment of moneyOutResult.error ? [] : (moneyOutResult.data ?? [])) {

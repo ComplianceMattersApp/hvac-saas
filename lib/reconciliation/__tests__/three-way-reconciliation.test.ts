@@ -182,6 +182,71 @@ describe("payment reconciliation", () => {
   });
 });
 
+describe("foreign QuickBooks payments (collected through QBO)", () => {
+  const AGREEING_QBO_INVOICE = { id: "4534", syncToken: "1", docNumber: "2109", balance: 0, totalAmount: 840, looksVoided: false };
+
+  it("flags a QBO payment applied to our invoice that EveryStep never recorded", async () => {
+    mockListInvoices.mockResolvedValue([AGREEING_QBO_INVOICE]);
+    mockListPayments.mockResolvedValue([{
+      id: "P77", totalAmount: 840, txnDate: "2026-08-10",
+      linkedInvoiceIds: ["4534"], appliedAmountByInvoiceId: { "4534": 840 },
+    }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], []), accountOwnerUserId: "owner-1",
+    });
+    const finding = result.findings.find((f) => f.findingType === "qbo_payment_unrecorded");
+    expect(finding).toMatchObject({
+      subjectId: "inv-1",
+      externalId: "P77",
+      amountCents: 84000,
+      severity: "critical",
+      jobId: "job-1",
+    });
+  });
+
+  it("does not flag a QBO payment EveryStep already carries by id", async () => {
+    mockListInvoices.mockResolvedValue([AGREEING_QBO_INVOICE]);
+    mockListPayments.mockResolvedValue([{
+      id: "P77", totalAmount: 840, txnDate: "2026-08-10",
+      linkedInvoiceIds: ["4534"], appliedAmountByInvoiceId: { "4534": 840 },
+    }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 84000, payment_status: "recorded", qbo_payment_id: "P77" },
+      ]),
+      accountOwnerUserId: "owner-1",
+    });
+    expect(result.findings.map((f) => f.findingType)).not.toContain("qbo_payment_unrecorded");
+  });
+
+  it("suppresses the finding when a matching recorded payment has simply not pushed to QBO yet", async () => {
+    mockListInvoices.mockResolvedValue([AGREEING_QBO_INVOICE]);
+    mockListPayments.mockResolvedValue([{
+      id: "P88", totalAmount: 840, txnDate: "2026-08-10",
+      linkedInvoiceIds: ["4534"], appliedAmountByInvoiceId: { "4534": 840 },
+    }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 84000, payment_status: "recorded", qbo_payment_id: null },
+      ]),
+      accountOwnerUserId: "owner-1",
+    });
+    expect(result.findings.map((f) => f.findingType)).not.toContain("qbo_payment_unrecorded");
+  });
+
+  it("ignores QBO payments applied to invoices that are not issued in EveryStep", async () => {
+    mockListInvoices.mockResolvedValue([AGREEING_QBO_INVOICE]);
+    mockListPayments.mockResolvedValue([{
+      id: "P99", totalAmount: 840, txnDate: "2026-08-10",
+      linkedInvoiceIds: ["4534"], appliedAmountByInvoiceId: { "4534": 840 },
+    }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([{ ...INVOICE, status: "void" }], []), accountOwnerUserId: "owner-1",
+    });
+    expect(result.findings.map((f) => f.findingType)).not.toContain("qbo_payment_unrecorded");
+  });
+});
+
 describe("Stripe reconciliation", () => {
   beforeEach(() => {
     mockStripeReadiness.mockResolvedValue({ isReady: true, connectedAccountId: "acct_1" });

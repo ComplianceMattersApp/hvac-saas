@@ -277,6 +277,80 @@ function reconcilePaymentsAgainstQbo(params: {
 }
 
 /**
+ * QuickBooks payments applied to our invoices that EveryStep never recorded —
+ * a customer paying through QuickBooks' own portal, or a bookkeeper keying a
+ * payment there. Every other payment check starts from an EveryStep row, so
+ * without this the QBO collection channel is invisible: the app keeps showing
+ * a balance due and can double-collect from a customer who already paid.
+ */
+function reconcileForeignQboPayments(params: {
+  invoices: any[];
+  payments: any[];
+  qboPayments: Awaited<ReturnType<typeof listQboPaymentsSince>>;
+  invoiceLabels: Map<string, string>;
+}): ReconciliationFinding[] {
+  const findings: ReconciliationFinding[] = [];
+  const knownQboPaymentIds = new Set(
+    params.payments.map((payment) => clean(payment.qbo_payment_id)).filter(Boolean),
+  );
+  const invoiceByQboId = new Map<string, any>(
+    params.invoices
+      .filter((invoice) => clean(invoice.qbo_invoice_id))
+      .map((invoice) => [clean(invoice.qbo_invoice_id), invoice]),
+  );
+  // Recorded EveryStep payments whose QBO push has not landed yet look exactly
+  // like a foreign payment once a bookkeeper keys the same money in QBO — the
+  // push's own adoption lane will link them. Suppress amount-matches so this
+  // check only surfaces money EveryStep genuinely has no row for.
+  const unpushedAmountsByInvoiceId = new Map<string, number[]>();
+  for (const payment of params.payments) {
+    if (clean(payment.qbo_payment_id)) continue;
+    if (clean(payment.payment_status).toLowerCase() !== "recorded") continue;
+    const invoiceId = clean(payment.invoice_id);
+    const amounts = unpushedAmountsByInvoiceId.get(invoiceId) ?? [];
+    amounts.push(Number(payment.amount_cents ?? 0));
+    unpushedAmountsByInvoiceId.set(invoiceId, amounts);
+  }
+
+  for (const qboPayment of params.qboPayments) {
+    if (knownQboPaymentIds.has(clean(qboPayment.id))) continue;
+    for (const linkedInvoiceId of qboPayment.linkedInvoiceIds) {
+      const invoice = invoiceByQboId.get(clean(linkedInvoiceId));
+      if (!invoice) continue; // applied to a QBO-only document — not ours to judge
+      // A voided EveryStep invoice with QBO money on it is already screaming
+      // through voided_invoice_open_in_qbo; adoption could not record onto it.
+      if (clean(invoice.status).toLowerCase() !== "issued") continue;
+
+      const appliedCents = toCents(
+        qboPayment.appliedAmountByInvoiceId?.[clean(linkedInvoiceId)]
+          ?? (qboPayment.linkedInvoiceIds.length === 1 ? qboPayment.totalAmount : 0),
+      );
+      if (appliedCents <= 0) continue;
+      if ((unpushedAmountsByInvoiceId.get(clean(invoice.id)) ?? []).includes(appliedCents)) continue;
+
+      const label = params.invoiceLabels.get(clean(invoice.id)) ?? clean(invoice.id);
+      findings.push({
+        findingType: "qbo_payment_unrecorded",
+        severity: "critical",
+        subjectKind: "invoice",
+        subjectId: clean(invoice.id),
+        externalSystem: "quickbooks",
+        externalId: clean(qboPayment.id),
+        title: `QuickBooks holds a payment EveryStep never recorded · invoice ${label}`,
+        detail: `QuickBooks payment ${qboPayment.id} applies ${money(appliedCents)} to this invoice (payment total ${money(toCents(qboPayment.totalAmount))}${qboPayment.txnDate ? `, dated ${qboPayment.txnDate}` : ""}). EveryStep has no payment with this QuickBooks id.`,
+        truth: "Money was collected through QuickBooks. EveryStep still shows a balance due and could double-collect — adopt the payment into EveryStep or reconcile it in QuickBooks.",
+        everystepValue: "no payment recorded",
+        externalValue: `${money(appliedCents)} applied`,
+        amountCents: appliedCents,
+        jobId: clean(invoice.job_id) || null,
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
  * Compare EveryStep payments against Stripe.
  *
  * The reverse direction is the point: Stripe charges carrying one of our
@@ -502,6 +576,7 @@ export async function runThreeWayReconciliation(params: {
         }
         findings.push(...reconcileInvoices({ invoices, qboInvoices }));
         findings.push(...reconcilePaymentsAgainstQbo({ payments, qboPayments, invoiceLabels }));
+        findings.push(...reconcileForeignQboPayments({ invoices, payments, qboPayments, invoiceLabels }));
       }
     } catch (error) {
       // A provider outage must not fail the whole run — the Stripe half is still

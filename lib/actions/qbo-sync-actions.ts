@@ -14,6 +14,8 @@ import {
   persistReconciliationFindings,
   runThreeWayReconciliation,
 } from "@/lib/reconciliation/three-way-reconciliation";
+import { adoptUnrecordedQboPayment } from "@/lib/reconciliation/adopt-qbo-payment";
+import { insertJobEvent } from "@/lib/actions/job-actions-shared";
 
 const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
 
@@ -123,6 +125,68 @@ export async function syncSinglePaymentToQboFromForm(formData: FormData): Promis
   });
   revalidatePath(`/jobs/${jobId}/invoice`);
   redirect(href(result.status === "synced" ? "internal_invoice_payment_qbo_synced" : "internal_invoice_payment_qbo_sync_failed"));
+}
+
+/**
+ * Adopt a QuickBooks-collected payment into EveryStep from an open
+ * qbo_payment_unrecorded finding. Verification-gated in the adoption core:
+ * QuickBooks is re-read live and any surprise blocks with no writes. On
+ * success the invoice balance clears here and the finding resolves.
+ */
+export async function adoptQboPaymentFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser, userId } = await requireInternalRole("admin", { supabase });
+
+  const findingId = String(formData.get("finding_id") ?? "").trim();
+  if (!findingId) redirect("/reports/attention?qbo_adopt=failed");
+
+  let result: Awaited<ReturnType<typeof adoptUnrecordedQboPayment>>;
+  try {
+    result = await adoptUnrecordedQboPayment({
+      admin: createAdminClient(),
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      findingId,
+      recordedByUserId: userId,
+    });
+  } catch (error) {
+    console.error("[adoptQboPaymentFromForm] adoption failed", {
+      findingId,
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+    redirect("/reports/attention?qbo_adopt=failed");
+  }
+
+  if (result.status === "adopted") {
+    if (result.jobId) {
+      try {
+        await insertJobEvent({
+          supabase,
+          jobId: result.jobId,
+          event_type: "payment_recorded",
+          meta: {
+            source_action: "adoptQboPaymentFromForm",
+            note: "QuickBooks-collected payment adopted into EveryStep",
+            payment_id: result.paymentId,
+            invoice_id: result.invoiceId,
+            amount_cents: result.amountCents,
+            reconciliation_finding_id: findingId,
+          },
+          userId,
+        });
+      } catch {
+        // Timeline entry is best-effort; the payment truth already landed.
+      }
+      revalidatePath(`/jobs/${result.jobId}`);
+      revalidatePath(`/jobs/${result.jobId}/invoice`);
+    }
+    revalidatePath("/reports/attention");
+    revalidatePath("/reports/payments");
+    redirect("/reports/attention?qbo_adopt=complete");
+  }
+
+  console.warn("[adoptQboPaymentFromForm] adoption blocked", { findingId, reason: result.error });
+  revalidatePath("/reports/attention");
+  redirect("/reports/attention?qbo_adopt=blocked");
 }
 
 export async function syncAttentionPaymentToQboFromForm(formData: FormData): Promise<void> {
