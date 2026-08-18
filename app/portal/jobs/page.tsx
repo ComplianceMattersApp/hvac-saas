@@ -246,6 +246,7 @@ export default async function PortalAllJobsPage({
     .from("attachments")
     .select("entity_id")
     .eq("entity_type", "job")
+    .not("finalized_at", "is", null)
     .in("entity_id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"]);
 
   const attachmentCountByJob = new Map<string, number>();

@@ -8,6 +8,7 @@ import {
   deleteInternalJobAttachment,
   discardInternalJobAttachmentUpload,
   finalizeInternalJobAttachmentUpload,
+  loadInternalJobAttachmentsPage,
   shareJobAttachmentToContractor,
   shareJobAttachmentsToContractor,
   updateInternalJobAttachmentCaption,
@@ -15,6 +16,10 @@ import {
 import type { AttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
 import { stripRefrigerantChargeEvidenceTag } from "@/lib/jobs/refrigerant-charge-evidence";
 import { downloadAttachmentZip } from "@/lib/attachments/download-attachment-zip";
+import {
+  JOB_ATTACHMENT_ACCEPT_ATTRIBUTE,
+  partitionJobAttachmentFiles,
+} from "@/lib/attachments/attachment-upload-policy";
 
 type Item = {
   id: string;
@@ -85,6 +90,7 @@ function fileGlyph(contentType: string | null, name: string) {
 export default function JobAttachmentsInternal({
   jobId,
   initialItems,
+  totalItemCount,
   attachmentInputMode = "all",
   attachmentEvidenceContext,
   summary,
@@ -92,6 +98,12 @@ export default function JobAttachmentsInternal({
 }: {
   jobId: string;
   initialItems: Item[];
+  /**
+   * Total finalized attachments on the job, which may exceed `initialItems`
+   * when the caller passes only the first page. Omitted by surfaces that render
+   * their whole (already bounded) list.
+   */
+  totalItemCount?: number;
   attachmentInputMode?: "all" | "images";
   attachmentEvidenceContext?: string | null;
   summary?: AttachmentReviewSummary;
@@ -120,10 +132,54 @@ export default function JobAttachmentsInternal({
     () => new Set(initialSharedAttachmentIds)
   );
 
+  const [extraItems, setExtraItems] = useState<Item[]>([]);
+  const [loadedFrom, setLoadedFrom] = useState(initialItems);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
+  // The server sent a fresh first page (an upload, delete, or caption edit
+  // revalidated the route). Pages appended after the previous one were fetched
+  // by offset against the old ordering, so a delete has shifted every row past
+  // it -- keeping them would duplicate or skip attachments. Drop them and let
+  // the user page forward again from a consistent base.
+  if (loadedFrom !== initialItems) {
+    setLoadedFrom(initialItems);
+    setExtraItems([]);
+  }
+
+  // Defensive dedupe: an attachment uploaded between the first page render and
+  // a "load more" shifts the window, and the same row can arrive twice.
+  const items = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: Item[] = [];
+    for (const item of [...(initialItems ?? []), ...extraItems]) {
+      if (!item || seen.has(item.id)) continue;
+      seen.add(item.id);
+      merged.push(item);
+    }
+    return merged;
+  }, [initialItems, extraItems]);
+
   const isImageCaptureMode = attachmentInputMode === "images";
   const hasFiles = files.length > 0;
   const canAct = !isPending && hasFiles;
-  const totalCount = initialItems?.length ?? 0;
+  const totalCount = Math.max(Number(totalItemCount ?? 0) || 0, items.length);
+  const hasMore = items.length < totalCount;
+
+  async function loadMoreAttachments() {
+    setLoadMoreError(null);
+    setIsLoadingMore(true);
+    try {
+      const page = await loadInternalJobAttachmentsPage({ jobId, offset: items.length });
+      setExtraItems((prev) => [...prev, ...((page?.items ?? []) as Item[])]);
+    } catch (loadError) {
+      setLoadMoreError(
+        loadError instanceof Error ? loadError.message : "Could not load more attachments.",
+      );
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
   const contractorUploadCount = Number(summary?.contractorUploadCount ?? 0) || 0;
   const correctionReviewUploadCount = Number(summary?.correctionReviewUploadCount ?? 0) || 0;
   const reviewAnchorUploadCount = Number(summary?.reviewAnchorUploadCount ?? 0) || 0;
@@ -161,6 +217,7 @@ export default function JobAttachmentsInternal({
           idSuffix: "job-file-picker",
           name: "job_file_picker",
           label: "Choose Files",
+          accept: JOB_ATTACHMENT_ACCEPT_ATTRIBUTE,
           multiple: true,
         },
       ];
@@ -172,15 +229,18 @@ export default function JobAttachmentsInternal({
 
   function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const list = Array.from(e.target.files ?? []);
-    setFiles(list);
     e.target.value = "";
+
+    const { accepted, rejected } = partitionJobAttachmentFiles(list);
+    setFiles(accepted);
+    setError(rejected.length ? rejected.join(" ") : null);
   }
 
   async function uploadOne(file: File) {
     const tok = await createJobAttachmentUploadToken({
       jobId,
       fileName: file.name,
-      contentType: file.type || "application/octet-stream",
+      contentType: file.type,
       fileSize: file.size,
       caption: caption.trim() || undefined,
       attachmentEvidenceContext,
@@ -190,7 +250,9 @@ export default function JobAttachmentsInternal({
       const { error: upErr } = await supabase.storage
         .from(tok.bucket)
         .uploadToSignedUrl(tok.path, tok.token, file, {
-          contentType: file.type || "application/octet-stream",
+          // Use the type the server resolved, so files the browser could not
+          // identify still land in storage with a renderable content type.
+          contentType: tok.contentType,
         });
 
       if (upErr) throw new Error(upErr.message);
@@ -306,7 +368,7 @@ export default function JobAttachmentsInternal({
   }
 
   async function downloadSelected() {
-    const selected = initialItems.filter((item) => selectedIds.has(item.id) && item.signedUrl);
+    const selected = items.filter((item) => selectedIds.has(item.id) && item.signedUrl);
     if (!selected.length) return;
     setError(null);
     setBulkAction("download");
@@ -487,7 +549,7 @@ export default function JobAttachmentsInternal({
         </div>
 
         <div className="border-t border-slate-200 pt-2">
-          {!initialItems || initialItems.length === 0 ? (
+          {items.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/72 px-4 py-8 text-center text-sm text-slate-600">
               <div className="font-medium text-slate-700">No files uploaded yet.</div>
               <div className="mt-1 text-xs text-slate-500">
@@ -502,11 +564,13 @@ export default function JobAttachmentsInternal({
                 <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700">
                   <input
                     type="checkbox"
-                    checked={selectedIds.size === initialItems.length}
-                    onChange={() => setSelectedIds(selectedIds.size === initialItems.length ? new Set() : new Set(initialItems.map((item) => item.id)))}
+                    checked={selectedIds.size === items.length}
+                    onChange={() => setSelectedIds(selectedIds.size === items.length ? new Set() : new Set(items.map((item) => item.id)))}
                     className="h-4 w-4 rounded border-slate-300"
                   />
-                  Select all
+                  {/* Selection can only reach what has been paged in, so say so
+                      rather than let a bulk download quietly cover a subset. */}
+                  {hasMore ? `Select all ${items.length} loaded` : "Select all"}
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-slate-500">{selectedIds.size} selected</span>
@@ -521,7 +585,7 @@ export default function JobAttachmentsInternal({
                   <button
                     type="button"
                     onClick={downloadSelected}
-                    disabled={!initialItems.some((item) => selectedIds.has(item.id) && item.signedUrl) || bulkAction != null}
+                    disabled={!items.some((item) => selectedIds.has(item.id) && item.signedUrl) || bulkAction != null}
                     className="rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-black disabled:opacity-50"
                   >
                     {bulkAction === "download" ? "Preparing ZIP…" : "Download selected"}
@@ -529,7 +593,7 @@ export default function JobAttachmentsInternal({
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {initialItems.map((a) => {
+              {items.map((a) => {
                 const isImage =
                   !!a.content_type &&
                   a.content_type.toLowerCase().startsWith("image/");
@@ -537,6 +601,12 @@ export default function JobAttachmentsInternal({
                   isImage &&
                   !!a.signedUrl &&
                   !failedPreviewIds.has(a.id);
+                // An image the browser could not decode (HEIC/HEIF from an iOS
+                // picker is the usual cause) must not fall through to the
+                // generic file tile: that renders a broken photo as though it
+                // were an ordinary document, so nobody ever learns the evidence
+                // is unviewable.
+                const previewFailed = isImage && !!a.signedUrl && failedPreviewIds.has(a.id);
                 const isShared = sharedAttachmentIds.has(a.id);
                 const isEditing = editingId === a.id;
                 const isDeleting = deletingId === a.id;
@@ -583,6 +653,20 @@ export default function JobAttachmentsInternal({
                           }}
                         />
                       </a>
+                    ) : previewFailed ? (
+                      <div className="flex h-28 w-full items-center gap-3 bg-amber-50 px-4">
+                        <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-amber-300 bg-white text-[11px] font-semibold tracking-[0.12em] text-amber-700 shadow-sm">
+                          !
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-amber-900" title={a.file_name}>
+                            {a.file_name}
+                          </div>
+                          <div className="mt-1 text-[11px] font-medium text-amber-700">
+                            Preview unavailable in this browser — use Open to download the original.
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <div className="flex h-28 w-full items-center gap-3 bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4">
                         <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-[11px] font-semibold tracking-[0.12em] text-slate-500 shadow-sm">
@@ -719,6 +803,35 @@ export default function JobAttachmentsInternal({
                 );
               })}
               </div>
+
+              {hasMore || loadMoreError ? (
+                <div className="mt-4 flex flex-col items-center gap-2">
+                  {loadMoreError ? (
+                    <div
+                      role="alert"
+                      className="w-full rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-medium text-rose-700"
+                    >
+                      {loadMoreError}
+                    </div>
+                  ) : null}
+
+                  {hasMore ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={loadMoreAttachments}
+                        disabled={isLoadingMore}
+                        className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        {isLoadingMore ? "Loading…" : "Load more attachments"}
+                      </button>
+                      <div className="text-[11px] font-medium text-slate-500">
+                        Showing {items.length} of {totalCount}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </>
           )}
         </div>

@@ -23,6 +23,7 @@ export default async function DeferredJobAttachmentsInternal({
     .select("id, bucket, storage_path, file_name, content_type, file_size, caption, created_at")
     .eq("entity_type", "job")
     .eq("entity_id", jobId)
+    .not("finalized_at", "is", null)
     .order("created_at", { ascending: false })
     .limit(200);
 

@@ -406,15 +406,15 @@ describe("internal job-detail read boundary hardening", () => {
   it("allows same-account signed URL generation after signing preflight", async () => {
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const createSignedUrlMock = vi.fn(async () => ({
-      data: { signedUrl: "https://signed.example/file-1" },
+    const createSignedUrlsMock = vi.fn(async (paths: string[]) => ({
+      data: paths.map((path) => ({ path, signedUrl: "https://signed.example/file-1", error: null })),
       error: null,
     }));
 
     const admin = {
       storage: {
         from: vi.fn(() => ({
-          createSignedUrl: createSignedUrlMock,
+          createSignedUrls: createSignedUrlsMock,
         })),
       },
     };
@@ -440,21 +440,22 @@ describe("internal job-detail read boundary hardening", () => {
     expect(result.authorized).toBe(true);
     expect(result.items).toHaveLength(1);
     expect(result.items[0].signedUrl).toBe("https://signed.example/file-1");
-    expect(createSignedUrlMock).toHaveBeenCalledTimes(1);
+    // One bulk request covers every row, rather than one request per row.
+    expect(createSignedUrlsMock).toHaveBeenCalledTimes(1);
   });
 
   it("denies cross-account before signed URL generation and does not sign", async () => {
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
 
-    const createSignedUrlMock = vi.fn(async () => ({
-      data: { signedUrl: "https://signed.example/file-2" },
+    const createSignedUrlsMock = vi.fn(async (paths: string[]) => ({
+      data: paths.map((path) => ({ path, signedUrl: "https://signed.example/file-2", error: null })),
       error: null,
     }));
 
     const admin = {
       storage: {
         from: vi.fn(() => ({
-          createSignedUrl: createSignedUrlMock,
+          createSignedUrls: createSignedUrlsMock,
         })),
       },
     };
@@ -478,7 +479,7 @@ describe("internal job-detail read boundary hardening", () => {
     });
 
     expect(result).toEqual({ authorized: false, items: [] });
-    expect(createSignedUrlMock).not.toHaveBeenCalled();
+    expect(createSignedUrlsMock).not.toHaveBeenCalled();
   });
 
   it("scopes contractor enumeration by account owner", async () => {

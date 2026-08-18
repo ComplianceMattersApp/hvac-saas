@@ -76,7 +76,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
     const token = await createJobAttachmentUploadToken({
       jobId,
       fileName: file.name,
-      contentType: file.type || "application/octet-stream",
+      contentType: file.type,
       fileSize: file.size,
       caption: defaultLabel,
       attachmentEvidenceContext: evidenceContext,
@@ -86,7 +86,7 @@ export default function RefrigerantChargePhotoEvidencePanel({
       const { error: uploadError } = await supabase.storage
         .from(token.bucket)
         .uploadToSignedUrl(token.path, token.token, file, {
-          contentType: file.type || "application/octet-stream",
+          contentType: token.contentType,
         });
 
       if (uploadError) throw new Error(uploadError.message);

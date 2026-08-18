@@ -10,6 +10,10 @@ import {
 } from "@/lib/actions/attachment-actions";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 import { downloadAttachmentZip } from "@/lib/attachments/download-attachment-zip";
+import {
+  JOB_ATTACHMENT_ACCEPT_ATTRIBUTE,
+  partitionJobAttachmentFiles,
+} from "@/lib/attachments/attachment-upload-policy";
 
 const portalPrimaryButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_16px_28px_-20px_rgba(37,99,235,0.46)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:opacity-50";
@@ -113,9 +117,12 @@ export default function JobAttachments({
 
   function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const list = Array.from(e.target.files ?? []);
-    setFiles(list);
     // Critical: clear after selection too
     e.target.value = "";
+
+    const { accepted, rejected } = partitionJobAttachmentFiles(list);
+    setFiles(accepted);
+    setError(rejected.length ? rejected.join(" ") : null);
   }
 
   async function uploadOne(file: File) {
@@ -123,16 +130,17 @@ export default function JobAttachments({
     const tok = await createJobAttachmentUploadToken({
       jobId,
       fileName: file.name,
-      contentType: file.type || "application/octet-stream",
+      contentType: file.type,
       fileSize: file.size,
       caption: caption.trim() || undefined,
     });
 
-    // 2) Upload to storage using signed token (client)
+    // 2) Upload to storage using signed token (client), tagged with the type the
+    // server resolved so unidentified files still store a renderable type.
     const { error: upErr } = await supabase.storage
       .from(tok.bucket)
       .uploadToSignedUrl(tok.path, tok.token, file, {
-        contentType: file.type || "application/octet-stream",
+        contentType: tok.contentType,
       });
 
     if (upErr) throw new Error(upErr.message);
@@ -234,6 +242,7 @@ export default function JobAttachments({
           ref={fileRef}
           type="file"
           multiple
+          accept={JOB_ATTACHMENT_ACCEPT_ATTRIBUTE}
           onChange={onPickFiles}
           className="hidden"
           disabled={isPending}

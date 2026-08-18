@@ -279,7 +279,7 @@ describe("job tests page wiring", () => {
     expect(jobAttachmentsInternalSource).toContain('accept: "image/*"');
     expect(jobAttachmentsInternalSource).toContain('accept={control.accept}');
     expect(jobAttachmentsInternalSource).toContain('onChange={onPickFiles}');
-    expect(jobAttachmentsInternalSource).toContain('setFiles(list);');
+    expect(jobAttachmentsInternalSource).toContain('setFiles(accepted);');
     expect(jobAttachmentsInternalSource).not.toContain('Take or Choose Photo');
   });
 
@@ -314,7 +314,11 @@ describe("job tests page wiring", () => {
   });
 
   it("retains selected file state and surfaces attachment upload failures visibly", () => {
-    expect(jobAttachmentsInternalSource).toContain('setFiles(list);');
+    expect(jobAttachmentsInternalSource).toContain('setFiles(accepted);');
+    // Files the upload policy rejects are reported at pick time rather than
+    // failing silently or surviving into the upload loop.
+    expect(jobAttachmentsInternalSource).toContain('partitionJobAttachmentFiles(list)');
+    expect(jobAttachmentsInternalSource).toContain('setError(rejected.length ? rejected.join(" ") : null);');
     expect(jobAttachmentsInternalSource).toContain('Selected: ${files.length} file');
     expect(jobAttachmentsInternalSource).toContain('role="alert"');
     expect(jobAttachmentsInternalSource).toContain('setError(e instanceof Error ? e.message : "Upload failed")');
