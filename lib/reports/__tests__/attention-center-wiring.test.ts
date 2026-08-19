@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const page = readFileSync(resolve(__dirname, "../../../app/reports/attention/page.tsx"), "utf8");
 const model = readFileSync(resolve(__dirname, "../attention-center-read-model.ts"), "utf8");
+const reconciler = readFileSync(resolve(__dirname, "../../reconciliation/three-way-reconciliation.ts"), "utf8");
 const tabs = readFileSync(resolve(__dirname, "../../../components/reports/ReportCenterTabs.tsx"), "utf8");
 
 describe("Needs Attention center", () => {
@@ -35,12 +36,18 @@ describe("Needs Attention center", () => {
     expect(model).toContain('actionLabel: "Open invoice"');
     expect(model).toContain("Inspect Stripe session");
     expect(page).toContain("syncAttentionPaymentToQboFromForm");
+    expect(page).toContain("item.retryQboPaymentId");
+    expect(model).toContain("retryQboPaymentId: clean(payment.id)");
     expect(page).toContain("Retry from hub");
     expect(page).toContain("{item.actionLabel}");
-    expect(model).toContain('finding.finding_type) === "stripe_charge_unrecorded"');
+    expect(model).toContain('"stripe_charge_unrecorded", "stripe_payment_identity_mismatch"');
+    expect(reconciler).toContain('findingType: "stripe_payment_identity_duplicate"');
+    expect(reconciler).toContain("Do not collect again or delete evidence");
     expect(model).not.toContain(': "/reports/attention",');
     expect(page).toContain("linkVerifiedStripePaymentIdentityFromForm");
     expect(page).toContain("Link verified Stripe payment");
     expect(model).toContain("repairFindingId");
+    expect(model).toContain("repairQboAllocationFindingId");
+    expect(page).toContain("repairQboPaymentAllocationFromForm");
   });
 });

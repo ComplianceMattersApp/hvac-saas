@@ -41,16 +41,13 @@ function throwIfTenantMoneyEventShouldRetry(result: TenantPaymentWebhookResult) 
   }
 }
 
-function throwIfTenantMoneyOutEventShouldRetry(
-  result: { applied: boolean; reason?: string },
-  kind: 'refund' | 'dispute',
-) {
+function throwIfTenantMoneyOutEventShouldRetry(result: { applied: boolean; reason?: string }) {
   if (result.applied) return;
   const reason = String(result.reason ?? '').trim();
   if (
     reason === 'Tenant connected account is not ready'
-    || (kind === 'refund' && reason.startsWith('No matching payment for the '))
-    || (kind === 'refund' && reason.startsWith('Could not resolve the account for the '))
+    || reason.startsWith('No matching payment for the ')
+    || reason.startsWith('Could not resolve the account for the ')
   ) {
     throw new Error(`Retryable tenant money-out webhook result: ${reason}`);
   }
@@ -326,26 +323,36 @@ export async function POST(request: Request) {
         ? charge.metadata.invoice_id.trim()
         : "";
 
-      if (invoiceId) {
+      // Connected-account refunds do not reliably retain invoice metadata. The
+      // handler can recover scope from the immutable charge/PaymentIntent ids;
+      // platform subscription refunds (no event.account and no invoice id) are
+      // intentionally left to the platform billing lane.
+      if (invoiceId || connectedAccountId) {
         const refundResult = await recordTenantInvoiceRefundFromStripeCharge({
           charge,
           eventId: event.id,
           connectedAccountId,
         });
-        throwIfTenantMoneyOutEventShouldRetry(refundResult, 'refund');
+        throwIfTenantMoneyOutEventShouldRetry(refundResult);
       }
     }
 
     if (event.type === "charge.dispute.created" || event.type === "charge.dispute.closed") {
       // Disputes do not reliably carry our metadata, so the handler resolves the
-      // account from the payment row the original charge produced.
-      const disputeResult = await recordTenantInvoiceDisputeFromStripe({
-        dispute: event.data.object as Stripe.Dispute,
-        eventId: event.id,
-        closed: event.type === "charge.dispute.closed",
-        connectedAccountId: typeof event.account === "string" ? event.account.trim() : "",
-      });
-      throwIfTenantMoneyOutEventShouldRetry(disputeResult, 'dispute');
+      // account from the payment row the original charge produced. Only Connect
+      // events belong to the tenant invoice lane; a platform subscription
+      // dispute has no event.account and must not be retried as a missing tenant
+      // payment forever.
+      const connectedAccountId = typeof event.account === "string" ? event.account.trim() : "";
+      if (connectedAccountId) {
+        const disputeResult = await recordTenantInvoiceDisputeFromStripe({
+          dispute: event.data.object as Stripe.Dispute,
+          eventId: event.id,
+          closed: event.type === "charge.dispute.closed",
+          connectedAccountId,
+        });
+        throwIfTenantMoneyOutEventShouldRetry(disputeResult);
+      }
     }
 
     return NextResponse.json({ received: true });

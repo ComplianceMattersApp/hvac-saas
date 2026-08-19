@@ -17,9 +17,13 @@ export type AttentionItem = {
   href: string;
   actionLabel: string;
   paymentId?: string | null;
+  /** Only stalled/failed QBO pushes may invoke the idempotent retry lane. */
+  retryQboPaymentId?: string | null;
   repairFindingId?: string | null;
   /** qbo_payment_unrecorded findings: adopt the QBO-collected payment into EveryStep. */
   adoptQboFindingId?: string | null;
+  /** payment_allocation_mismatch findings eligible for a live, safety-gated QBO repair. */
+  repairQboAllocationFindingId?: string | null;
 };
 
 function clean(value: unknown) { return String(value ?? "").trim(); }
@@ -32,7 +36,7 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     // QuickBooks call, so a push that died mid-way leaves collected money
     // unlinked and nothing else would ever surface it.
     params.admin.from("internal_invoice_payments")
-      .select("id, invoice_id, job_id, amount_cents, paid_at, created_at, qbo_payment_id, qbo_sync_status, qbo_sync_error, processor_name")
+      .select("id, invoice_id, job_id, amount_cents, paid_at, created_at, updated_at, qbo_payment_id, qbo_sync_status, qbo_sync_error, processor_name")
       .eq("account_owner_user_id", ownerId).eq("payment_status", "recorded")
       .in("qbo_sync_status", [...RETRYABLE_QBO_PAYMENT_SYNC_STATUSES]).order("paid_at", { ascending: false }).limit(250),
     params.admin.from("internal_invoices")
@@ -89,11 +93,29 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     if (result.error) throw new Error(`Failed to load attention center: ${result.error.message ?? "unknown error"}`);
   }
 
+  const findingPaymentIds = (reconciliationResult.error ? [] : (reconciliationResult.data ?? []))
+    .filter((row: any) => clean(row.subject_kind) === "payment")
+    .map((row: any) => clean(row.subject_id))
+    .filter(Boolean);
+  const findingPaymentContextResult = findingPaymentIds.length
+    ? await params.admin.from("internal_invoice_payments")
+      .select("id, invoice_id, job_id")
+      .eq("account_owner_user_id", ownerId)
+      .in("id", findingPaymentIds)
+    : { data: [], error: null };
+  if (findingPaymentContextResult.error) {
+    throw new Error(`Failed to load reconciliation payment context: ${findingPaymentContextResult.error.message}`);
+  }
+  const findingPaymentContexts = new Map<string, any>(
+    (findingPaymentContextResult.data ?? []).map((row: any) => [clean(row.id), row]),
+  );
+
   const invoiceIds = [...new Set([
     ...(paymentResult.data ?? []).map((row: any) => clean(row.invoice_id)),
     ...(chargedAfterVoidResult.error ? [] : (chargedAfterVoidResult.data ?? [])).map((row: any) => clean(row.invoice_id)),
     ...(moneyOutResult.error ? [] : (moneyOutResult.data ?? [])).map((row: any) => clean(row.invoice_id)),
     ...(uncertainSavedMethodResult.data ?? []).map((row: any) => clean(row.invoice_id)),
+    ...(findingPaymentContextResult.data ?? []).map((row: any) => clean(row.invoice_id)),
   ].filter(Boolean))];
   const labelsResult = invoiceIds.length
     ? await params.admin.from("internal_invoices").select("id, job_id, invoice_number, invoice_display_number").eq("account_owner_user_id", ownerId).in("id", invoiceIds)
@@ -107,9 +129,10 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
   for (const payment of paymentResult.data ?? []) {
     if (payment.qbo_sync_status === "not_synced" && clean(payment.processor_name).toLowerCase() !== "stripe") continue;
     // A push in flight passes through 'pending' for a second or two — only
-    // surface one that has been sitting there, and never one already linked.
+    // surface one that has been sitting there. A stored QBO id is only a
+    // durable pointer; it does not prove the confirming read-back succeeded.
     if (payment.qbo_sync_status === "pending"
-      && (clean(payment.qbo_payment_id) || clean(payment.created_at) > stuckPendingBefore)) continue;
+      && clean(payment.updated_at || payment.created_at) > stuckPendingBefore) continue;
     const invoiceId = clean(payment.invoice_id); const jobId = clean(payment.job_id);
     items.push({
       id: `qbo-payment-${payment.id}`, category: "qbo_payment", severity: "critical",
@@ -117,7 +140,7 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       detail: clean(payment.qbo_sync_error) || "Collected payment has not been linked to a QuickBooks payment.",
       truth: `Money is collected in EveryStep. QuickBooks may already contain the payment; retry adopts one exact existing match before creating anything.`, occurredAt: clean(payment.paid_at) || null,
       href: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`, actionLabel: "Open invoice",
-      paymentId: clean(payment.id),
+      paymentId: clean(payment.id), retryQboPaymentId: clean(payment.id),
     });
   }
   for (const invoice of invoiceErrorResult.data ?? []) {
@@ -147,27 +170,36 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
   // Reconciliation findings arrive with their copy already written, because the
   // reconciler is the only thing that saw both sides.
   for (const finding of reconciliationResult.error ? [] : (reconciliationResult.data ?? [])) {
-    const jobId = clean(finding.job_id); const subjectId = clean(finding.subject_id);
-    const isUnrecordedStripeCharge = clean(finding.finding_type) === "stripe_charge_unrecorded";
+    const subjectId = clean(finding.subject_id);
+    const paymentContext = clean(finding.subject_kind) === "payment"
+      ? findingPaymentContexts.get(subjectId)
+      : null;
+    const relatedInvoiceId = paymentContext ? clean(paymentContext.invoice_id) : subjectId;
+    const jobId = clean(paymentContext?.job_id) || clean(finding.job_id);
     const evidence = [clean(finding.everystep_value) && `EveryStep: ${clean(finding.everystep_value)}`,
       clean(finding.external_value) && `${finding.external_system === "stripe" ? "Stripe" : "QuickBooks"}: ${clean(finding.external_value)}`]
       .filter(Boolean).join(" · ");
     items.push({
       id: `reconciliation-${clean(finding.id)}`,
-      category: finding.subject_kind === "payment" ? "qbo_payment" : "qbo_invoice",
+      category: clean(finding.external_system) === "stripe"
+        ? "stripe_pending"
+        : finding.subject_kind === "payment" ? "qbo_payment" : "qbo_invoice",
       severity: clean(finding.severity) === "warning" ? "warning" : "critical",
       title: clean(finding.title),
       detail: [clean(finding.detail), evidence].filter(Boolean).join(" — "),
       truth: clean(finding.truth),
       occurredAt: clean(finding.first_seen_at) || null,
       href: jobId
-        ? `/jobs/${jobId}/invoice${subjectId && (finding.subject_kind === "invoice" || isUnrecordedStripeCharge) ? `?invoice_id=${encodeURIComponent(subjectId)}` : ""}#invoice-workspace`
+        ? `/jobs/${jobId}/invoice${relatedInvoiceId ? `?invoice_id=${encodeURIComponent(relatedInvoiceId)}` : ""}#invoice-workspace`
         : finding.external_system === "stripe" ? "/reports/stripe-reconciliation" : "/reports/invoices",
       actionLabel: "Investigate",
       repairFindingId: ["stripe_charge_unrecorded", "stripe_payment_identity_mismatch"].includes(clean(finding.finding_type))
         ? clean(finding.id)
         : null,
       adoptQboFindingId: clean(finding.finding_type) === "qbo_payment_unrecorded" ? clean(finding.id) : null,
+      repairQboAllocationFindingId: clean(finding.finding_type) === "payment_allocation_mismatch"
+        ? clean(finding.id)
+        : null,
     });
   }
   for (const payment of moneyOutResult.error ? [] : (moneyOutResult.data ?? [])) {
@@ -178,14 +210,14 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
     const amount = `$${(Number(payment.amount_cents ?? 0) / 100).toFixed(2)}`;
 
     if (disputeStatus === "open") {
-      items.push({ id: `stripe-dispute-open-${paymentId}`, category: "qbo_payment", severity: "critical",
+      items.push({ id: `stripe-dispute-open-${paymentId}`, category: "stripe_pending", severity: "critical",
         title: `Payment disputed · Invoice ${label}`,
         detail: clean(payment.dispute_reason) ? `Stripe reason: ${clean(payment.dispute_reason)}` : "A chargeback was filed against this payment.",
         truth: `${amount} is held by Stripe while the dispute runs. It is still counted as collected because the dispute may be won — respond in Stripe before the deadline.`,
         occurredAt: clean(payment.paid_at) || null, href, actionLabel: "Respond in Stripe", paymentId,
       });
     } else if (disputeStatus === "lost") {
-      items.push({ id: `stripe-dispute-lost-${paymentId}`, category: "qbo_payment", severity: "critical",
+      items.push({ id: `stripe-dispute-lost-${paymentId}`, category: "stripe_pending", severity: "critical",
         title: `Dispute lost · Invoice ${label}`,
         detail: "The chargeback was decided against this account and the payment has been reversed.",
         truth: `${amount} is gone. The invoice balance has reopened; QuickBooks and job closeout may still show it paid.`,
@@ -200,7 +232,7 @@ export async function buildAttentionCenterReadModel(params: { admin: any; accoun
       });
     } else {
       const refunded = `$${(Number(payment.stripe_refunded_amount_cents ?? 0) / 100).toFixed(2)}`;
-      items.push({ id: `stripe-partial-refund-${paymentId}`, category: "qbo_payment", severity: "critical",
+      items.push({ id: `stripe-partial-refund-${paymentId}`, category: "stripe_pending", severity: "critical",
         title: `Partial refund needs accounting follow-up · Invoice ${label}`,
         detail: `Stripe refunded ${refunded} of a ${amount} payment.`,
         truth: "EveryStep reopened the refunded portion of the invoice balance. Confirm the refund and remaining receivable are also reflected correctly in QuickBooks.",

@@ -21,19 +21,28 @@ vi.mock("@/lib/business/tenant-stripe-connect-readiness", () => ({
   resolveTenantStripeConnectReadiness: mockStripeReadiness,
 }));
 
-import { runThreeWayReconciliation } from "@/lib/reconciliation/three-way-reconciliation";
+import {
+  persistReconciliationFindings,
+  runThreeWayReconciliation,
+  type ReconciliationRunResult,
+} from "@/lib/reconciliation/three-way-reconciliation";
 
-function makeAdmin(invoices: any[], payments: any[]) {
+function makeAdmin(invoices: any[], payments: any[], contextInvoices: any[] = invoices) {
   return {
     from: vi.fn((table: string) => {
       const rows = table === "internal_invoices" ? invoices : payments;
+      let contextLookup = false;
       const query: any = {
         select: vi.fn(() => query),
         eq: vi.fn(() => query),
         gte: vi.fn(() => query),
+        in: vi.fn(() => { contextLookup = true; return query; }),
         is: vi.fn(() => query),
         order: vi.fn(() => query),
-        limit: vi.fn(async () => ({ data: rows, error: null })),
+        limit: vi.fn(async () => ({
+          data: table === "internal_invoices" && contextLookup ? contextInvoices : rows,
+          error: null,
+        })),
       };
       return query;
     }),
@@ -132,6 +141,35 @@ describe("invoice reconciliation against QuickBooks", () => {
 });
 
 describe("payment reconciliation", () => {
+  it("reports duplicate local Stripe identities even when Stripe is unavailable", async () => {
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        {
+          id: "pay-duplicate-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 9900,
+          payment_status: "recorded", payment_method: "card_stripe_online", processor_name: "stripe",
+          processor_charge_id: "ch_duplicate", stripe_payment_intent_id: "pi_duplicate",
+        },
+        {
+          id: "pay-duplicate-2", invoice_id: "inv-1", job_id: "job-1", amount_cents: 9900,
+          payment_status: "recorded", payment_method: "card_stripe_online", processor_name: "stripe",
+          processor_charge_id: "ch_duplicate", stripe_payment_intent_id: "pi_duplicate",
+        },
+      ]),
+      accountOwnerUserId: "owner-1",
+    });
+
+    const duplicateFindings = result.findings.filter(
+      (finding) => finding.findingType === "stripe_payment_identity_duplicate",
+    );
+    expect(duplicateFindings).toHaveLength(1);
+    expect(duplicateFindings[0]).toMatchObject({
+      severity: "critical",
+      externalId: "ch_duplicate",
+      amountCents: 9900,
+      truth: expect.stringContaining("Do not collect again"),
+    });
+  });
+
   it("flags a reversed payment QuickBooks still holds", async () => {
     mockListPayments.mockResolvedValue([{ id: "qp-1", totalAmount: 840, txnDate: "2026-08-01", linkedInvoiceIds: ["4534"] }]);
     const result = await runThreeWayReconciliation({
@@ -161,7 +199,31 @@ describe("payment reconciliation", () => {
       ]),
       accountOwnerUserId: "owner-1",
     });
-    expect(result.findings.map((f) => f.findingType)).toContain("payment_allocation_mismatch");
+    const finding = result.findings.find((f) => f.findingType === "payment_allocation_mismatch");
+    expect(finding).toMatchObject({
+      title: expect.stringContaining("Payment received"),
+      truth: expect.stringContaining("not a failed or missing customer payment"),
+    });
+    expect(finding?.detail).toContain("different invoice");
+  });
+
+  it("uses an older invoice as payment context without treating it as in-window invoice drift", async () => {
+    mockListPayments.mockResolvedValue([{
+      id: "qp-1",
+      totalAmount: 840,
+      txnDate: "2026-08-18",
+      linkedInvoiceIds: ["4534"],
+      appliedAmountByInvoiceId: { "4534": 840 },
+    }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 84000, payment_status: "recorded", qbo_payment_id: "qp-1" },
+      ], [INVOICE]),
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.findings.map((f) => f.findingType)).not.toContain("payment_allocation_mismatch");
+    expect(result.findings.map((f) => f.findingType)).not.toContain("invoice_missing_in_qbo");
   });
 
   it("compares the invoice allocation instead of a multi-invoice payment total", async () => {
@@ -217,6 +279,37 @@ describe("foreign QuickBooks payments (collected through QBO)", () => {
       accountOwnerUserId: "owner-1",
     });
     expect(result.findings.map((f) => f.findingType)).not.toContain("qbo_payment_unrecorded");
+  });
+
+  it("tracks each invoice allocation when one QBO payment spans multiple invoices", async () => {
+    const secondInvoice = {
+      ...INVOICE,
+      id: "inv-2",
+      job_id: "job-2",
+      invoice_number: "2110",
+      invoice_display_number: "2110",
+      total_cents: 16000,
+      qbo_invoice_id: "4535",
+    };
+    mockListInvoices.mockResolvedValue([
+      AGREEING_QBO_INVOICE,
+      { id: "4535", syncToken: "1", docNumber: "2110", balance: 0, totalAmount: 160, looksVoided: false },
+    ]);
+    mockListPayments.mockResolvedValue([{
+      id: "P77", totalAmount: 1000, txnDate: "2026-08-10",
+      linkedInvoiceIds: ["4534", "4535"],
+      appliedAmountByInvoiceId: { "4534": 840, "4535": 160 },
+    }]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE, secondInvoice], [
+        { id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 84000, payment_status: "recorded", qbo_payment_id: "P77" },
+      ]),
+      accountOwnerUserId: "owner-1",
+    });
+
+    const findings = result.findings.filter((finding) => finding.findingType === "qbo_payment_unrecorded");
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toMatchObject({ subjectId: "inv-2", externalId: "P77", amountCents: 16000 });
   });
 
   it("suppresses the finding when a matching recorded payment has simply not pushed to QBO yet", async () => {
@@ -319,6 +412,31 @@ describe("Stripe reconciliation", () => {
       accountOwnerUserId: "owner-1", stripe,
     });
     expect(result.findings.map((f) => f.findingType)).not.toContain("stripe_charge_unrecorded");
+    expect(result.findings.map((f) => f.findingType)).not.toContain("stripe_payment_record_mismatch");
+  });
+
+  it("flags a recorded payment whose amount disagrees with the matched Stripe charge", async () => {
+    const stripe = stripeWithCharges([
+      {
+        id: "ch_1", payment_intent: "pi_1", status: "succeeded", paid: true,
+        refunded: false, amount: 48000, amount_refunded: 0, currency: "usd",
+        metadata: { invoice_id: "inv-1" },
+      },
+    ]);
+    const result = await runThreeWayReconciliation({
+      admin: makeAdmin([INVOICE], [
+        {
+          id: "pay-1", invoice_id: "inv-1", job_id: "job-1", amount_cents: 48500,
+          payment_status: "recorded", processor_charge_id: "ch_1", stripe_payment_intent_id: "pi_1",
+        },
+      ]),
+      accountOwnerUserId: "owner-1", stripe,
+    });
+
+    expect(result.findings).toContainEqual(expect.objectContaining({
+      findingType: "stripe_payment_record_mismatch",
+      truth: expect.stringContaining("Do not collect again"),
+    }));
   });
 
   it("reports a missing Stripe identity instead of a missing payment when an exact payment exists", async () => {
@@ -373,5 +491,92 @@ describe("degradation", () => {
     });
     expect(result.skipped.join(" ")).toContain("QuickBooks is not connected");
     expect(result.findings).toHaveLength(0);
+  });
+});
+
+describe("finding persistence scope", () => {
+  function makePersistAdmin(openRows: any[]) {
+    const updates: Array<Record<string, unknown>> = [];
+    const admin = {
+      from: vi.fn(() => {
+        let mode: "select" | "update" | "insert" = "select";
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          is: vi.fn(() => query),
+          update: vi.fn((patch: Record<string, unknown>) => {
+            mode = "update";
+            updates.push(patch);
+            return query;
+          }),
+          insert: vi.fn(() => { mode = "insert"; return query; }),
+          then: (resolve: (value: unknown) => void) => resolve(
+            mode === "select"
+              ? { data: openRows, error: null }
+              : { data: null, error: null },
+          ),
+        };
+        return query;
+      }),
+    };
+    return { admin, updates };
+  }
+
+  function emptyResult(evaluated: ReconciliationRunResult["evaluated"]): ReconciliationRunResult {
+    return {
+      accountOwnerUserId: "owner-1",
+      windowDays: 90,
+      checkedInvoices: 0,
+      checkedPayments: 0,
+      findings: [],
+      skipped: [],
+      evaluated,
+    };
+  }
+
+  const noEvaluatedSubjects: ReconciliationRunResult["evaluated"] = {
+    qboInvoiceSubjectIds: [],
+    qboPaymentSubjectIds: [],
+    qboForeignPaymentIds: [],
+    stripePaymentSubjectIds: [],
+    stripeChargeIds: [],
+  };
+
+  it("keeps an open finding when its payment aged outside the rolling window", async () => {
+    const { admin, updates } = makePersistAdmin([{
+      id: "finding-old",
+      finding_type: "payment_allocation_mismatch",
+      subject_kind: "payment",
+      subject_id: "payment-old",
+      external_id: "4533",
+    }]);
+
+    const persisted = await persistReconciliationFindings({
+      admin,
+      result: emptyResult(noEvaluatedSubjects),
+    });
+
+    expect(persisted.resolved).toBe(0);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("auto-resolves a fixed finding only when that exact payment was evaluated", async () => {
+    const { admin, updates } = makePersistAdmin([{
+      id: "finding-current",
+      finding_type: "payment_allocation_mismatch",
+      subject_kind: "payment",
+      subject_id: "payment-1",
+      external_id: "4533",
+    }]);
+
+    const persisted = await persistReconciliationFindings({
+      admin,
+      result: emptyResult({ ...noEvaluatedSubjects, qboPaymentSubjectIds: ["payment-1"] }),
+    });
+
+    expect(persisted.resolved).toBe(1);
+    expect(updates).toContainEqual(expect.objectContaining({
+      resolved_reason: "No longer observed by reconciliation",
+    }));
   });
 });

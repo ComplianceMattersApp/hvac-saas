@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   EVERYSTEP_FALLBACK_QBO_ITEM_NAME,
   QboApiError,
+  applyUnappliedQboPaymentToInvoice,
   createQboInvoice,
   createQboPayment,
   findQboInvoiceByDocNumber,
@@ -334,7 +335,10 @@ describe("qbo-api-client", () => {
     ]);
     await expect(findQboPaymentById({ ...base, qboPaymentId: "P9" })).resolves.toEqual({
       id: "P9",
+      syncToken: "0",
+      customerRef: "",
       totalAmount: 250,
+      unappliedAmount: 0,
       txnDate: "2026-08-04",
       linkedInvoiceIds: ["QI1"],
       appliedAmountByInvoiceId: { QI1: 250 },
@@ -347,6 +351,34 @@ describe("qbo-api-client", () => {
   it("findQboPaymentById returns null when QBO has no such payment", async () => {
     mockFetchSequence([{ status: 200, body: { QueryResponse: {} } }]);
     await expect(findQboPaymentById({ ...base, qboPaymentId: "P-GONE" })).resolves.toBeNull();
+  });
+
+  it("applies a wholly-unapplied payment with the caller's latest SyncToken", async () => {
+    const fetchMock = mockFetchSequence([
+      { status: 200, body: { Payment: { Id: "P9", SyncToken: "8" } } },
+    ]);
+
+    await expect(applyUnappliedQboPaymentToInvoice({
+      ...base,
+      qboPaymentId: "P9",
+      syncToken: "7",
+      customerRef: "C1",
+      invoiceRef: "I1",
+      amount: 410,
+      requestId: "esrepair-finding-1",
+    })).resolves.toEqual({ id: "P9", syncToken: "8" });
+
+    const requestUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requestUrl.pathname).toContain("/payment");
+    expect(requestUrl.searchParams.get("requestid")).toBe("esrepair-finding-1");
+    const request = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toEqual({
+      Id: "P9",
+      SyncToken: "7",
+      sparse: true,
+      CustomerRef: { value: "C1" },
+      Line: [{ Amount: 410, LinkedTxn: [{ TxnId: "I1", TxnType: "Invoice" }] }],
+    });
   });
 
   it("findQboInvoiceByDocNumber returns an exact existing invoice", async () => {
@@ -384,7 +416,10 @@ describe("qbo-api-client", () => {
 
     await expect(listQboPaymentsSince({ ...base, fromDate: "2026-07-01" })).resolves.toEqual([{
       id: "P-MULTI",
+      syncToken: "0",
+      customerRef: "",
       totalAmount: 1000,
+      unappliedAmount: 0,
       txnDate: "2026-08-01",
       linkedInvoiceIds: ["I1", "I2"],
       appliedAmountByInvoiceId: { I1: 840, I2: 160 },

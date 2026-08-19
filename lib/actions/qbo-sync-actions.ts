@@ -15,6 +15,7 @@ import {
   runThreeWayReconciliation,
 } from "@/lib/reconciliation/three-way-reconciliation";
 import { adoptUnrecordedQboPayment } from "@/lib/reconciliation/adopt-qbo-payment";
+import { repairUnappliedQboPaymentAllocation } from "@/lib/reconciliation/repair-qbo-payment-allocation";
 import { insertJobEvent } from "@/lib/actions/job-actions-shared";
 
 const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
@@ -187,6 +188,62 @@ export async function adoptQboPaymentFromForm(formData: FormData): Promise<void>
   console.warn("[adoptQboPaymentFromForm] adoption blocked", { findingId, reason: result.error });
   revalidatePath("/reports/attention");
   redirect("/reports/attention?qbo_adopt=blocked");
+}
+
+/**
+ * Explicit, verification-gated repair for an open QBO allocation mismatch.
+ * Only a fully-unapplied payment with exact customer, amount, and invoice scope
+ * can be changed; any existing allocation remains blocked for human review.
+ */
+export async function repairQboPaymentAllocationFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser, userId } = await requireInternalRole("admin", { supabase });
+  const findingId = String(formData.get("finding_id") ?? "").trim();
+  if (!findingId) redirect("/reports/attention?qbo_allocation_repair=failed");
+
+  let result: Awaited<ReturnType<typeof repairUnappliedQboPaymentAllocation>>;
+  try {
+    result = await repairUnappliedQboPaymentAllocation({
+      admin: createAdminClient(),
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      findingId,
+    });
+  } catch (error) {
+    console.error("[repairQboPaymentAllocationFromForm] repair failed", {
+      findingId,
+      message: error instanceof Error ? error.message : "unknown error",
+    });
+    redirect("/reports/attention?qbo_allocation_repair=failed");
+  }
+  if (result.status === "blocked") {
+    console.warn("[repairQboPaymentAllocationFromForm] repair blocked", {
+      findingId,
+      reason: result.error,
+    });
+    redirect("/reports/attention?qbo_allocation_repair=blocked");
+  }
+  try {
+    await insertJobEvent({
+      supabase,
+      jobId: result.jobId,
+      event_type: "qbo_payment_allocation_repaired",
+      meta: {
+        source_action: "repairQboPaymentAllocationFromForm",
+        payment_id: result.paymentId,
+        invoice_id: result.invoiceId,
+        reconciliation_finding_id: findingId,
+        repair_result: result.status,
+      },
+      userId,
+    });
+  } catch {
+    // The verified accounting repair and finding resolution are authoritative;
+    // a missing convenience timeline entry must not report the repair as failed.
+  }
+  revalidatePath("/reports/attention");
+  revalidatePath("/reports/payments");
+  revalidatePath(`/jobs/${result.jobId}/invoice`);
+  redirect("/reports/attention?qbo_allocation_repair=complete");
 }
 
 export async function syncAttentionPaymentToQboFromForm(formData: FormData): Promise<void> {

@@ -124,6 +124,19 @@ describe("recordTenantInvoiceRefundFromStripeCharge", () => {
 
     expect(result.applied).toBe(false);
     expect(updates).toHaveLength(0);
+    expect(mockUpsertAllocation).toHaveBeenCalledWith(expect.objectContaining({
+      paymentRow: expect.objectContaining({ id: "pay-1", payment_status: "reversed" }),
+    }));
+  });
+
+  it("fails the delivery when reversal allocation cannot be confirmed", async () => {
+    const { recordTenantInvoiceRefundFromStripeCharge } = await import("@/lib/business/tenant-invoice-stripe-webhooks");
+    mockUpsertAllocation.mockResolvedValueOnce({ ok: false, status: "failed", reason: "allocation write failed" });
+    const { admin } = makeAdmin(RECORDED_PAYMENT);
+
+    await expect(recordTenantInvoiceRefundFromStripeCharge({
+      charge: refundCharge(), eventId: "evt_allocation_failure", connectedAccountId: "acct_1", admin,
+    })).rejects.toThrow("invoice allocation could not be updated");
   });
 
   it("ignores a refund event with no refunded money", async () => {

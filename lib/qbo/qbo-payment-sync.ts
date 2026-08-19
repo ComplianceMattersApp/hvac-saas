@@ -103,20 +103,29 @@ async function findAdoptableQboPaymentId(params: {
  * caller records 'failed', which is retryable; recording an unverified success
  * would retire the row and hide the drift.
  *
- * On purpose, the caller does NOT store qbo_payment_id when this throws: the
- * stored id short-circuits later runs as already-synced. The retry instead goes
- * through the balance guard and the adoption lookup, which links the very
- * payment named in the error message without creating a duplicate.
+ * The caller persists qbo_payment_id as soon as the create returns, before this
+ * check. A later retry re-reads that exact identity; it never treats the stored
+ * id as success and never creates a second payment merely because verification
+ * or the process failed after QuickBooks committed the first write.
  */
 async function verifyQboPaymentAfterWrite(params: {
   accessToken: string;
   realmId: string;
   qboPaymentId: string;
   qboInvoiceId: string;
+  qboCustomerRef: string;
   invoiceLabel: string;
   expectedAmount: number;
+  requireExclusiveAllocation: boolean;
 }): Promise<void> {
-  const { qboPaymentId, qboInvoiceId, invoiceLabel, expectedAmount } = params;
+  const {
+    qboPaymentId,
+    qboInvoiceId,
+    qboCustomerRef,
+    invoiceLabel,
+    expectedAmount,
+    requireExclusiveAllocation,
+  } = params;
 
   let confirmation;
   try {
@@ -144,11 +153,18 @@ async function verifyQboPaymentAfterWrite(params: {
 
   const linksInvoice = confirmation.linkedInvoiceIds.includes(qboInvoiceId);
   const totalMatches = centsMatch(confirmation.totalAmount, expectedAmount);
-  if (!linksInvoice || !totalMatches) {
+  const appliedAmount = Number(confirmation.appliedAmountByInvoiceId?.[qboInvoiceId] ?? 0);
+  const appliedMatches = centsMatch(appliedAmount, expectedAmount);
+  const onlyLinksExpectedInvoice = confirmation.linkedInvoiceIds.length === 1 && linksInvoice;
+  const customerMatches = confirmation.customerRef === qboCustomerRef;
+  const allocationShapeMatches = requireExclusiveAllocation
+    ? onlyLinksExpectedInvoice && totalMatches
+    : linksInvoice && confirmation.totalAmount + 0.005 >= expectedAmount;
+  if (!allocationShapeMatches || !appliedMatches || !customerMatches) {
     throw new Error(
       `QuickBooks accepted the payment for invoice ${invoiceLabel} but the read-back does not match — verified `
       + `mismatch (QuickBooks payment id ${confirmation.id}, observed total $${confirmation.totalAmount.toFixed(2)} `
-      + `vs expected $${expectedAmount.toFixed(2)}, applied to invoice(s) `
+      + `vs expected $${expectedAmount.toFixed(2)}, applied $${appliedAmount.toFixed(2)} to invoice(s) `
       + `${confirmation.linkedInvoiceIds.join(", ") || "(NONE)"} vs expected ${qboInvoiceId}). `
       + `It was NOT recorded as synced.`,
     );
@@ -156,7 +172,10 @@ async function verifyQboPaymentAfterWrite(params: {
 }
 
 async function updatePaymentSyncFields(supabase: any, paymentId: string, patch: Record<string, unknown>) {
-  const { error } = await supabase.from("internal_invoice_payments").update(patch).eq("id", paymentId);
+  const { error } = await supabase
+    .from("internal_invoice_payments")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", paymentId);
   if (error) throw new Error(`Failed to persist QBO payment sync status: ${error.message ?? "unknown error"}`);
 }
 
@@ -166,6 +185,7 @@ export async function syncPaymentToQbo(params: {
   paymentId: string;
 }): Promise<QboPaymentSyncResult> {
   const { supabase, accountOwnerUserId, paymentId } = params;
+  let createdQboPaymentId: string | null = null;
   try {
     const { data: payment, error: paymentError } = await supabase
       .from("internal_invoice_payments")
@@ -178,10 +198,6 @@ export async function syncPaymentToQbo(params: {
     if (payment.payment_status !== "recorded") {
       return { paymentId, status: "skipped", error: `Payment status is '${payment.payment_status}'` };
     }
-    if (payment.qbo_payment_id) {
-      return { paymentId, status: "synced", qboPaymentId: String(payment.qbo_payment_id) };
-    }
-
     const token = await getValidQboAccessToken({ supabase, accountOwnerUserId });
     if (!token) {
       const message = "QuickBooks is not connected. Reconnect QuickBooks, then retry this payment.";
@@ -189,12 +205,14 @@ export async function syncPaymentToQbo(params: {
       return { paymentId, status: "error", error: message };
     }
 
-    let { data: invoice, error: invoiceError } = await supabase
+    const invoiceLookup = await supabase
       .from("internal_invoices")
       .select("id, invoice_display_number, invoice_number, qbo_invoice_id, qbo_customer_id")
       .eq("id", payment.invoice_id)
       .eq("account_owner_user_id", accountOwnerUserId)
       .maybeSingle();
+    let invoice = invoiceLookup.data;
+    const invoiceError = invoiceLookup.error;
     if (invoiceError) throw new Error(invoiceError.message);
     if (!invoice) return { paymentId, status: "skipped", error: "Invoice not found" };
 
@@ -236,6 +254,33 @@ export async function syncPaymentToQbo(params: {
     if (!qboInvoice?.id) throw new Error(`QuickBooks invoice ${invoiceLabel} no longer exists in QuickBooks.`);
     if (!qboInvoice.customerRef) throw new Error(`QuickBooks invoice ${invoiceLabel} has no customer reference.`);
     const paymentAmount = Number(payment.amount_cents ?? 0) / 100;
+
+    // A stored external id is a pointer, not proof. Re-read it on every explicit
+    // retry so a historical unverified link or a later QBO edit can never be
+    // reported as synced merely because qbo_payment_id is non-null.
+    if (payment.qbo_payment_id) {
+      const existingQboPaymentId = String(payment.qbo_payment_id);
+      await verifyQboPaymentAfterWrite({
+        accessToken: token.accessToken,
+        realmId: token.realmId,
+        qboPaymentId: existingQboPaymentId,
+        qboInvoiceId: String(invoice.qbo_invoice_id),
+        qboCustomerRef: qboInvoice.customerRef,
+        invoiceLabel,
+        expectedAmount: paymentAmount,
+        // Existing ids can represent one allocation of a legitimate
+        // multi-invoice QBO payment. Verify this invoice's allocation exactly;
+        // do not require the parent payment to belong only to this invoice.
+        requireExclusiveAllocation: false,
+      });
+      await updatePaymentSyncFields(supabase, paymentId, {
+        qbo_sync_status: "synced",
+        qbo_last_synced_at: new Date().toISOString(),
+        qbo_sync_error: null,
+      });
+      return { paymentId, status: "synced", qboPaymentId: existingQboPaymentId };
+    }
+
     if (qboInvoice.balance + 0.005 < paymentAmount) {
       let adoptedQboPaymentId: string | null = null;
       let adoptionLookupFailed = false;
@@ -291,14 +336,33 @@ export async function syncPaymentToQbo(params: {
         privateNote: [String(payment.notes ?? "").trim(), String(payment.received_reference ?? "").trim() ? `EveryStep payment reference: ${String(payment.received_reference).trim()}` : ""].filter(Boolean).join(" · ") || null,
       },
     });
+    createdQboPaymentId = synced.id;
+
+    // Durable external identity before read-back. QuickBooks has committed the
+    // write, so losing this id would make a retry capable of creating another
+    // real payment. 'pending' means unverified and remains retryable.
+    try {
+      await updatePaymentSyncFields(supabase, paymentId, {
+        qbo_sync_status: "pending",
+        qbo_payment_id: synced.id,
+        qbo_sync_error: null,
+      });
+    } catch (error) {
+      throw new Error(
+        `QuickBooks accepted the payment (QuickBooks payment id ${synced.id}) but EveryStep could not `
+        + `record the external identity before verification: ${error instanceof Error ? error.message : "unknown error"}.`,
+      );
+    }
 
     await verifyQboPaymentAfterWrite({
       accessToken: token.accessToken,
       realmId: token.realmId,
       qboPaymentId: synced.id,
       qboInvoiceId: String(invoice.qbo_invoice_id),
+      qboCustomerRef: qboInvoice.customerRef,
       invoiceLabel,
       expectedAmount: paymentAmount,
+      requireExclusiveAllocation: true,
     });
 
     await updatePaymentSyncFields(supabase, paymentId, {
@@ -311,7 +375,11 @@ export async function syncPaymentToQbo(params: {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown QBO payment sync error";
     try {
-      await updatePaymentSyncFields(supabase, paymentId, { qbo_sync_status: "failed", qbo_sync_error: message });
+      await updatePaymentSyncFields(supabase, paymentId, {
+        qbo_sync_status: "failed",
+        qbo_sync_error: message,
+        ...(createdQboPaymentId ? { qbo_payment_id: createdQboPaymentId } : {}),
+      });
     } catch {
       // Payment recording remains authoritative even when downstream accounting fails.
     }
@@ -341,10 +409,9 @@ export async function syncAllPendingPaymentsToQbo(params: {
     const stuckPendingBefore = new Date(Date.now() - STUCK_QBO_PAYMENT_PENDING_MS).toISOString();
     const { data: candidateRows, error: candidateError } = await supabase
       .from("internal_invoice_payments")
-      .select("id, qbo_sync_status, created_at")
+      .select("id, qbo_sync_status, qbo_payment_id, created_at, updated_at")
       .eq("account_owner_user_id", accountOwnerUserId)
       .eq("payment_status", "recorded")
-      .is("qbo_payment_id", null)
       .or(
         `qbo_sync_status.is.null,qbo_sync_status.in.(${RETRYABLE_QBO_PAYMENT_SYNC_STATUSES.join(",")})`,
       );
@@ -353,7 +420,7 @@ export async function syncAllPendingPaymentsToQbo(params: {
     const candidateIds = candidateRows
       .filter((row: any) =>
         String(row.qbo_sync_status ?? "") !== "pending"
-        || String(row.created_at ?? "") <= stuckPendingBefore,
+        || String(row.updated_at ?? row.created_at ?? "") <= stuckPendingBefore,
       )
       .map((row: any) => String(row.id));
     if (candidateIds.length === 0) return empty;

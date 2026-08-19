@@ -52,6 +52,14 @@ export type ReconciliationRunResult = {
   findings: ReconciliationFinding[];
   /** Comparisons that could not run (no connection, provider error). */
   skipped: string[];
+  /** Exact subjects observed this run; only these may auto-resolve old findings. */
+  evaluated: {
+    qboInvoiceSubjectIds: string[];
+    qboPaymentSubjectIds: string[];
+    qboForeignPaymentIds: string[];
+    stripePaymentSubjectIds: string[];
+    stripeChargeIds: string[];
+  };
 };
 
 const clean = (value: unknown) => String(value ?? "").trim();
@@ -260,12 +268,17 @@ function reconcilePaymentsAgainstQbo(params: {
         ?? (qboPayment.linkedInvoiceIds.length === 1 && linkedToExpectedInvoice ? qboPayment.totalAmount : 0);
       const qboAppliedCents = toCents(appliedDollars);
       if (everystepCents !== qboAppliedCents || !linkedToExpectedInvoice) {
+        const allocationDescription = linkedToExpectedInvoice
+          ? "the expected invoice"
+          : qboPayment.linkedInvoiceIds.length === 0
+            ? "no invoice"
+            : "a different invoice";
         findings.push({
           ...base,
           findingType: "payment_allocation_mismatch",
-          title: `QuickBooks payment allocation disagrees · invoice ${label}`,
-          detail: `EveryStep recorded ${money(everystepCents)} against this invoice; QuickBooks payment ${qboPaymentId} applies ${money(qboAppliedCents)} here (payment total ${money(toCents(qboPayment.totalAmount))}) and is linked to ${linkedToExpectedInvoice ? "the expected invoice" : "a different invoice"}.`,
-          truth: "A payment exists in both systems, but its amount or invoice allocation does not agree.",
+          title: `Payment received — QuickBooks allocation needs repair · invoice ${label}`,
+          detail: `EveryStep recorded ${money(everystepCents)} as collected against this invoice. QuickBooks payment ${qboPaymentId} still exists for ${money(toCents(qboPayment.totalAmount))}, but applies ${money(qboAppliedCents)} here and is linked to ${allocationDescription}.`,
+          truth: "The customer payment is recorded. This is a QuickBooks accounting allocation problem, not a failed or missing customer payment.",
           everystepValue: `${money(everystepCents)}, invoice ${label}`,
           externalValue: `${money(qboAppliedCents)} applied, ${qboPayment.linkedInvoiceIds.join(", ") || "no linked invoice"}`,
         });
@@ -290,8 +303,10 @@ function reconcileForeignQboPayments(params: {
   invoiceLabels: Map<string, string>;
 }): ReconciliationFinding[] {
   const findings: ReconciliationFinding[] = [];
-  const knownQboPaymentIds = new Set(
-    params.payments.map((payment) => clean(payment.qbo_payment_id)).filter(Boolean),
+  const knownQboAllocations = new Set(
+    params.payments
+      .filter((payment) => clean(payment.qbo_payment_id) && clean(payment.qbo_invoice_id))
+      .map((payment) => `${clean(payment.qbo_payment_id)}::${clean(payment.qbo_invoice_id)}`),
   );
   const invoiceByQboId = new Map<string, any>(
     params.invoices
@@ -313,8 +328,8 @@ function reconcileForeignQboPayments(params: {
   }
 
   for (const qboPayment of params.qboPayments) {
-    if (knownQboPaymentIds.has(clean(qboPayment.id))) continue;
     for (const linkedInvoiceId of qboPayment.linkedInvoiceIds) {
+      if (knownQboAllocations.has(`${clean(qboPayment.id)}::${clean(linkedInvoiceId)}`)) continue;
       const invoice = invoiceByQboId.get(clean(linkedInvoiceId));
       if (!invoice) continue; // applied to a QBO-only document — not ours to judge
       // A voided EveryStep invoice with QBO money on it is already screaming
@@ -351,6 +366,93 @@ function reconcileForeignQboPayments(params: {
 }
 
 /**
+ * Detect duplicate Stripe identity inside EveryStep itself.
+ *
+ * This check intentionally does not depend on Stripe being reachable. A remote
+ * comparison cannot expose a duplicated local row when both copies point to the
+ * same valid Charge, and that is exactly the failure mode that can make one
+ * customer payment count twice. Database guards stop new races; this detector
+ * makes retained/imported corruption visible until it is explicitly repaired.
+ */
+function reconcileDuplicateStripePaymentIdentities(params: {
+  payments: any[];
+  invoiceLabels: Map<string, string>;
+}): ReconciliationFinding[] {
+  const findings: ReconciliationFinding[] = [];
+  const emittedRowSets = new Set<string>();
+  const stripePayments = params.payments.filter((payment) => (
+    clean(payment.processor_name).toLowerCase() === "stripe"
+    || clean(payment.payment_method) === "card_stripe_online"
+    || Boolean(clean(payment.stripe_payment_intent_id))
+    || Boolean(clean(payment.stripe_checkout_session_id))
+    || /^(ch|py)_/.test(clean(payment.processor_charge_id))
+  ));
+
+  const identities = [
+    {
+      kind: "Charge",
+      column: "processor_charge_id",
+      include: (_payment: any) => true,
+    },
+    {
+      kind: "PaymentIntent",
+      column: "stripe_payment_intent_id",
+      include: (payment: any) => clean(payment.payment_status).toLowerCase() !== "failed",
+    },
+    {
+      kind: "Checkout Session",
+      column: "stripe_checkout_session_id",
+      include: (payment: any) => clean(payment.payment_status).toLowerCase() !== "failed",
+    },
+  ] as const;
+
+  for (const identity of identities) {
+    const groups = new Map<string, any[]>();
+    for (const payment of stripePayments) {
+      if (!identity.include(payment)) continue;
+      const externalId = clean(payment[identity.column]);
+      if (!externalId) continue;
+      const group = groups.get(externalId) ?? [];
+      group.push(payment);
+      groups.set(externalId, group);
+    }
+
+    for (const [externalId, group] of groups.entries()) {
+      if (group.length < 2) continue;
+      const ordered = [...group].sort((left, right) => clean(left.id).localeCompare(clean(right.id)));
+      const rowSet = ordered.map((payment) => clean(payment.id)).join("::");
+      if (emittedRowSets.has(rowSet)) continue;
+      emittedRowSets.add(rowSet);
+
+      const invoiceNames = [...new Set(ordered.map((payment) => (
+        params.invoiceLabels.get(clean(payment.invoice_id)) ?? clean(payment.invoice_id)
+      )).filter(Boolean))];
+      const statuses = [...new Set(ordered.map((payment) => clean(payment.payment_status)).filter(Boolean))];
+      const subject = ordered[0];
+      const label = invoiceNames.join(", ") || "unknown invoice";
+
+      findings.push({
+        findingType: "stripe_payment_identity_duplicate",
+        severity: "critical",
+        subjectKind: "payment",
+        subjectId: clean(subject.id) || null,
+        externalSystem: "stripe",
+        externalId,
+        title: `Stripe payment is recorded more than once - invoice ${label}`,
+        detail: `EveryStep has ${ordered.length} payment rows tied to Stripe ${identity.kind} ${externalId}.`,
+        truth: "Stripe identifies one payment or attempt, but EveryStep has multiple ledger rows for it. Do not collect again or delete evidence; reconcile the duplicate rows so the invoice and financial reports count the money once.",
+        everystepValue: `${ordered.length} rows (${statuses.join(", ") || "unknown status"})`,
+        externalValue: `one ${identity.kind} identity`,
+        amountCents: Math.max(...ordered.map((payment) => Number(payment.amount_cents ?? 0) || 0)),
+        jobId: clean(subject.job_id) || null,
+      });
+    }
+  }
+
+  return findings;
+}
+
+/**
  * Compare EveryStep payments against Stripe.
  *
  * The reverse direction is the point: Stripe charges carrying one of our
@@ -365,6 +467,16 @@ function reconcileAgainstStripe(params: {
 }): ReconciliationFinding[] {
   const findings: ReconciliationFinding[] = [];
   const chargeById = new Map(params.charges.map((charge) => [clean(charge.id), charge]));
+  const chargeByPaymentIntentId = new Map(
+    params.charges
+      .map((charge) => {
+        const intentId = typeof charge.payment_intent === "string"
+          ? clean(charge.payment_intent)
+          : clean(charge.payment_intent?.id);
+        return [intentId, charge] as const;
+      })
+      .filter(([intentId]) => Boolean(intentId)),
+  );
 
   const knownChargeIds = new Set<string>();
   for (const payment of params.payments) {
@@ -376,11 +488,13 @@ function reconcileAgainstStripe(params: {
 
   for (const payment of params.payments) {
     if (clean(payment.payment_status).toLowerCase() !== "recorded") continue;
-    const chargeId = clean(payment.processor_charge_id);
-    if (!chargeId) continue;
-    const charge = chargeById.get(chargeId);
+    const storedChargeId = clean(payment.processor_charge_id);
+    const storedPaymentIntentId = clean(payment.stripe_payment_intent_id);
+    if (!storedChargeId && !storedPaymentIntentId) continue;
+    const charge = chargeById.get(storedChargeId) ?? chargeByPaymentIntentId.get(storedPaymentIntentId);
     if (!charge) continue; // Outside the window or a different account — not evidence of anything.
 
+    const chargeId = clean(charge.id);
     const label = params.invoiceLabels.get(clean(payment.invoice_id)) ?? clean(payment.invoice_id);
     const refundedCents = Number(charge.amount_refunded ?? 0);
     const everyStepRefundedCents = Number(payment.stripe_refunded_amount_cents ?? 0);
@@ -393,6 +507,44 @@ function reconcileAgainstStripe(params: {
       amountCents: Number(payment.amount_cents ?? 0),
       jobId: clean(payment.job_id) || null,
     };
+
+    // A matching external id alone is not reconciliation. Verify the financial
+    // facts Stripe says that id represents: amount, invoice metadata, state,
+    // currency, and PaymentIntent identity.
+    const chargeInvoiceId = clean(charge.metadata?.invoice_id);
+    const chargePaymentIntentId = typeof charge.payment_intent === "string"
+      ? clean(charge.payment_intent)
+      : clean(charge.payment_intent?.id);
+    const stripeDisagreements = [
+      Number(charge.amount ?? 0) !== Number(payment.amount_cents ?? 0)
+        ? `amount ${money(Number(charge.amount ?? 0))} vs ${money(Number(payment.amount_cents ?? 0))}`
+        : null,
+      chargeInvoiceId && chargeInvoiceId !== clean(payment.invoice_id)
+        ? `invoice metadata ${chargeInvoiceId} vs ${clean(payment.invoice_id)}`
+        : null,
+      clean(charge.status) && clean(charge.status) !== "succeeded"
+        ? `status ${clean(charge.status)}`
+        : null,
+      charge.paid === false ? "not paid" : null,
+      clean(charge.currency) && clean(charge.currency).toLowerCase() !== "usd"
+        ? `currency ${clean(charge.currency).toUpperCase()}`
+        : null,
+      storedPaymentIntentId && chargePaymentIntentId && storedPaymentIntentId !== chargePaymentIntentId
+        ? `PaymentIntent ${chargePaymentIntentId} vs ${storedPaymentIntentId}`
+        : null,
+    ].filter((value): value is string => Boolean(value));
+    if (stripeDisagreements.length > 0) {
+      findings.push({
+        ...base,
+        findingType: "stripe_payment_record_mismatch",
+        title: `Payment record disagrees with Stripe · invoice ${label}`,
+        detail: `EveryStep's recorded payment is linked to Stripe charge ${chargeId}, but ${stripeDisagreements.join("; ")}.`,
+        truth: "Do not collect again. Verify the customer-facing payment state in Stripe before changing this record or invoice.",
+        everystepValue: `${money(Number(payment.amount_cents ?? 0))}, invoice ${label}, recorded`,
+        externalValue: `${money(Number(charge.amount ?? 0))}, ${clean(charge.status) || "unknown status"}`,
+      });
+      continue;
+    }
 
     if (refundedCents !== everyStepRefundedCents) {
       findings.push({
@@ -504,6 +656,13 @@ export async function runThreeWayReconciliation(params: {
   const sinceDate = since.slice(0, 10);
   const skipped: string[] = [];
   const findings: ReconciliationFinding[] = [];
+  const evaluated: ReconciliationRunResult["evaluated"] = {
+    qboInvoiceSubjectIds: [],
+    qboPaymentSubjectIds: [],
+    qboForeignPaymentIds: [],
+    stripePaymentSubjectIds: [],
+    stripeChargeIds: [],
+  };
   const qboInvoiceLabels = new Map<string, string>();
 
   const { data: invoiceRows, error: invoiceError } = await admin
@@ -533,26 +692,53 @@ export async function runThreeWayReconciliation(params: {
 
   const { data: paymentRows, error: paymentError } = await admin
     .from("internal_invoice_payments")
-    .select("id, invoice_id, job_id, amount_cents, payment_status, paid_at, processor_charge_id, processor_payment_reference, stripe_payment_intent_id, qbo_payment_id, dispute_status, stripe_refunded_amount_cents")
+    .select("id, invoice_id, job_id, amount_cents, payment_status, payment_method, paid_at, processor_name, processor_charge_id, processor_payment_reference, stripe_checkout_session_id, stripe_payment_intent_id, stripe_identity_dedupe_scope, qbo_payment_id, dispute_status, stripe_refunded_amount_cents")
     .eq("account_owner_user_id", accountOwnerUserId)
     .gte("paid_at", since)
     .limit(5000);
   if (paymentError) throw new Error(`Failed to load payments for reconciliation: ${paymentError.message ?? "unknown error"}`);
   const payments: any[] = paymentRows ?? [];
 
+  // Payment dates and invoice dates are independent. A current payment can
+  // settle an invoice older than the reconciliation window; omitting that
+  // invoice made the expected QBO invoice id blank and produced a false
+  // allocation mismatch. Pull those referenced invoices only as context while
+  // keeping the invoice-drift comparison itself bounded to the requested window.
+  const loadedInvoiceIds = new Set(invoices.map((invoice) => clean(invoice.id)));
+  const missingPaymentInvoiceIds = [...new Set(
+    payments
+      .map((payment) => clean(payment.invoice_id))
+      .filter((invoiceId) => invoiceId && !loadedInvoiceIds.has(invoiceId)),
+  )];
+  let invoiceContexts = invoices;
+  if (missingPaymentInvoiceIds.length > 0) {
+    const { data: contextRows, error: contextError } = await admin
+      .from("internal_invoices")
+      .select("id, job_id, invoice_number, invoice_display_number, status, total_cents, qbo_invoice_id, invoice_date")
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .in("id", missingPaymentInvoiceIds)
+      .limit(5000);
+    if (contextError) {
+      throw new Error(`Failed to load payment invoice context: ${contextError.message ?? "unknown error"}`);
+    }
+    invoiceContexts = [...invoices, ...(contextRows ?? [])];
+  }
+
   const qboInvoiceIdByInvoiceId = new Map<string, string>(
-    invoices.map((invoice) => [clean(invoice.id), clean(invoice.qbo_invoice_id)]),
+    invoiceContexts.map((invoice) => [clean(invoice.id), clean(invoice.qbo_invoice_id)]),
   );
   for (const payment of payments) {
     payment.qbo_invoice_id = qboInvoiceIdByInvoiceId.get(clean(payment.invoice_id)) ?? "";
   }
 
   const invoiceLabels = new Map<string, string>(
-    invoices.map((invoice) => [
+    invoiceContexts.map((invoice) => [
       clean(invoice.id),
       clean(invoice.invoice_display_number) || clean(invoice.invoice_number) || clean(invoice.id),
     ]),
   );
+
+  findings.push(...reconcileDuplicateStripePaymentIdentities({ payments, invoiceLabels }));
 
   // --- QuickBooks ---------------------------------------------------------
   if (!getQboAvailability().available) {
@@ -569,14 +755,17 @@ export async function runThreeWayReconciliation(params: {
           listQboPaymentsSince({ accessToken: token.accessToken, realmId: token.realmId, baseUrl, fromDate: sinceDate }),
         ]);
         const qboInvoicesById = new Map(qboInvoices.map((invoice) => [clean(invoice.id), invoice]));
-        for (const invoice of invoices) {
+        for (const invoice of invoiceContexts) {
           const qboInvoice = qboInvoicesById.get(clean(invoice.qbo_invoice_id));
           const docNumber = clean(qboInvoice?.docNumber);
           if (docNumber) qboInvoiceLabels.set(clean(invoice.id), docNumber);
         }
         findings.push(...reconcileInvoices({ invoices, qboInvoices }));
         findings.push(...reconcilePaymentsAgainstQbo({ payments, qboPayments, invoiceLabels }));
-        findings.push(...reconcileForeignQboPayments({ invoices, payments, qboPayments, invoiceLabels }));
+        findings.push(...reconcileForeignQboPayments({ invoices: invoiceContexts, payments, qboPayments, invoiceLabels }));
+        evaluated.qboInvoiceSubjectIds = invoices.map((invoice) => clean(invoice.id)).filter(Boolean);
+        evaluated.qboPaymentSubjectIds = payments.map((payment) => clean(payment.id)).filter(Boolean);
+        evaluated.qboForeignPaymentIds = qboPayments.map((payment) => clean(payment.id)).filter(Boolean);
       }
     } catch (error) {
       // A provider outage must not fail the whole run — the Stripe half is still
@@ -601,6 +790,8 @@ export async function runThreeWayReconciliation(params: {
         if (charges.length >= 5000) break;
       }
       findings.push(...reconcileAgainstStripe({ payments, charges, invoiceLabels, qboInvoiceLabels }));
+      evaluated.stripePaymentSubjectIds = payments.map((payment) => clean(payment.id)).filter(Boolean);
+      evaluated.stripeChargeIds = charges.map((charge) => clean(charge.id)).filter(Boolean);
     }
   } catch (error) {
     skipped.push(`Stripe comparison failed: ${error instanceof Error ? error.message : "unknown error"}`);
@@ -613,6 +804,7 @@ export async function runThreeWayReconciliation(params: {
     checkedPayments: payments.length,
     findings,
     skipped,
+    evaluated,
   };
 }
 
@@ -633,11 +825,14 @@ export async function persistReconciliationFindings(params: {
   const { admin, result } = params;
   const nowIso = new Date().toISOString();
 
-  const { data: openRows } = await admin
+  const { data: openRows, error: openRowsError } = await admin
     .from("reconciliation_findings")
-    .select("id, finding_type, subject_id, external_id")
+    .select("id, finding_type, subject_kind, subject_id, external_id")
     .eq("account_owner_user_id", result.accountOwnerUserId)
     .is("resolved_at", null);
+  if (openRowsError) {
+    throw new Error(`Failed to load open reconciliation findings: ${openRowsError.message ?? "unknown error"}`);
+  }
 
   const keyOf = (findingType: string, subjectId: string | null, externalId: string | null) =>
     `${findingType}::${subjectId ?? ""}::${externalId ?? ""}`;
@@ -701,6 +896,11 @@ export async function persistReconciliationFindings(params: {
   // as fixed; that would quietly erase real drift during an outage.
   const ranQbo = !result.skipped.some((reason) => reason.toLowerCase().includes("quickbooks"));
   const ranStripe = !result.skipped.some((reason) => reason.toLowerCase().includes("stripe"));
+  const qboInvoiceSubjects = new Set(result.evaluated.qboInvoiceSubjectIds);
+  const qboPaymentSubjects = new Set(result.evaluated.qboPaymentSubjectIds);
+  const qboForeignPayments = new Set(result.evaluated.qboForeignPaymentIds);
+  const stripePaymentSubjects = new Set(result.evaluated.stripePaymentSubjectIds);
+  const stripeCharges = new Set(result.evaluated.stripeChargeIds);
   let resolved = 0;
 
   for (const [key, row] of openByKey.entries()) {
@@ -708,6 +908,22 @@ export async function persistReconciliationFindings(params: {
     const system = clean(row.finding_type).startsWith("stripe_") ? "stripe" : "quickbooks";
     if (system === "quickbooks" && !ranQbo) continue;
     if (system === "stripe" && !ranStripe) continue;
+
+    // Absence is evidence only inside the exact scope this run observed. A
+    // still-open finding must never disappear just because its transaction
+    // aged past the rolling reconciliation window.
+    const subjectId = clean(row.subject_id);
+    const externalId = clean(row.external_id);
+    const wasEvaluated = system === "quickbooks"
+      ? clean(row.finding_type) === "qbo_payment_unrecorded"
+        ? qboForeignPayments.has(externalId)
+        : clean(row.subject_kind) === "payment"
+          ? qboPaymentSubjects.has(subjectId)
+          : qboInvoiceSubjects.has(subjectId)
+      : clean(row.subject_kind) === "payment"
+        ? stripePaymentSubjects.has(subjectId)
+        : stripeCharges.has(externalId);
+    if (!wasEvaluated) continue;
 
     const { error } = await admin
       .from("reconciliation_findings")

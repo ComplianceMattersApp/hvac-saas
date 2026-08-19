@@ -69,6 +69,7 @@ function makeIdentityRow(overrides?: Partial<Record<string, unknown>>) {
     received_reference: null,
     stripe_event_id: null,
     stripe_charged_at: null,
+    stripe_identity_dedupe_scope: null,
     paid_at: null,
     notes: null,
     payment_status: 'recorded',
@@ -413,6 +414,12 @@ describe('tenant invoice Stripe webhook handlers', () => {
 
       expect(result.recorded).toBe(true);
       expect(insert).toHaveBeenCalledTimes(1);
+      expect(insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payment_status: 'failed',
+          stripe_identity_dedupe_scope: 'attempt_v1',
+        }),
+      );
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({
           paymentRow: expect.objectContaining({
@@ -472,7 +479,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
       const { recordTenantInvoicePaymentFromStripeCharge } = await import(
         '@/lib/business/tenant-invoice-stripe-webhooks'
       );
-      const { admin, insert } = makeAdminInsertSuccess({
+      const { admin, insert, update } = makeAdminInsertSuccess({
         identityRows: [
           makeIdentityRow({
             id: 'payment-existing',
@@ -494,10 +501,63 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('Payment already recorded');
       expect(insert).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ stripe_identity_dedupe_scope: 'recorded_v1' }),
+      );
       expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-existing' }),
       );
+    });
+
+    it('rejects a tenant-wide Stripe identity already attached to another invoice', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-other-invoice',
+            invoice_id: 'inv-other',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+          }),
+        ],
+      });
+
+      await expect(recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_cross_invoice_identity',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      })).rejects.toThrow('Stripe payment identity is already attached to a different invoice');
+
+      expect(insert).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).not.toHaveBeenCalled();
+    });
+
+    it('rejects an ambiguous Stripe identity already attached to multiple payment rows', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({ id: 'payment-duplicate-1', processor_charge_id: 'ch_test_1' }),
+          makeIdentityRow({ id: 'payment-duplicate-2', processor_charge_id: 'ch_test_1' }),
+        ],
+      });
+
+      await expect(recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_ambiguous_identity',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      })).rejects.toThrow('Stripe payment identity is attached to multiple payment rows');
+
+      expect(insert).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).not.toHaveBeenCalled();
     });
 
     it('duplicate charge.succeeded identity keeps one canonical payment/allocation path', async () => {

@@ -112,7 +112,7 @@ export async function linkVerifiedStripePaymentIdentity(params: {
     processor_charge_id: externalId,
     ...(chargeIntentId ? { stripe_payment_intent_id: chargeIntentId } : {}),
     ...(stripeChargedAt ? { stripe_charged_at: stripeChargedAt } : {}),
-    ...(clean(payment.payment_method) === "card_stripe_online" ? { stripe_identity_dedupe_scope: "recorded_v1" } : {}),
+    stripe_identity_dedupe_scope: "recorded_v1",
   };
   const { data: updated, error: updateError } = await params.admin
     .from("internal_invoice_payments")

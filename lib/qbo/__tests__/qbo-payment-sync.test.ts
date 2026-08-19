@@ -55,7 +55,10 @@ beforeEach(() => {
     const pushed = createQboPayment.mock.calls.at(-1)?.[0]?.payment;
     return {
       id: String(qboPaymentId),
+      syncToken: "0",
+      customerRef: String(pushed?.customerRef ?? ""),
       totalAmount: Number(pushed?.amount ?? 0),
+      unappliedAmount: 0,
       txnDate: pushed?.txnDate ?? null,
       linkedInvoiceIds: [String(pushed?.invoiceRef ?? "")],
       appliedAmountByInvoiceId: { [String(pushed?.invoiceRef ?? "")]: Number(pushed?.amount ?? 0) },
@@ -85,16 +88,73 @@ describe("syncPaymentToQbo", () => {
       payment: expect.objectContaining({ customerRef: "QC1", invoiceRef: "QI1", amount: 720, paymentRefNum: "CHK-104", privateNote: expect.stringContaining("EveryStep payment reference: CHK-104") }),
     }));
     expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "pending" }));
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "pending", qbo_payment_id: "QP1" }));
     expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "synced", qbo_payment_id: "QP1" }));
   });
 
   it("does not duplicate a payment that already has a QBO id", async () => {
+    findQboPaymentById.mockResolvedValueOnce({
+      id: "QP1",
+      syncToken: "2",
+      customerRef: "QC1",
+      totalAmount: 720,
+      unappliedAmount: 0,
+      txnDate: "2026-07-14",
+      linkedInvoiceIds: ["QI1"],
+      appliedAmountByInvoiceId: { QI1: 720 },
+    });
     const { supabase } = makeSupabase({
-      payment: { id: "pay-1", payment_status: "recorded", qbo_payment_id: "QP1" },
-      invoice: null,
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000, qbo_payment_id: "QP1" },
+      invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
     });
     const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
     expect(result.status).toBe("synced");
+    expect(createQboPayment).not.toHaveBeenCalled();
+    expect(findQboPaymentById).toHaveBeenCalledWith(expect.objectContaining({ qboPaymentId: "QP1" }));
+  });
+
+  it("does not trust an existing QBO id whose live allocation disagrees", async () => {
+    findQboPaymentById.mockResolvedValueOnce({
+      id: "QP1",
+      syncToken: "2",
+      customerRef: "QC1",
+      totalAmount: 720,
+      unappliedAmount: 720,
+      txnDate: "2026-07-14",
+      linkedInvoiceIds: [],
+      appliedAmountByInvoiceId: {},
+    });
+    const { supabase, updates } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000, qbo_payment_id: "QP1" },
+      invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
+    });
+
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+
+    expect(result).toMatchObject({ status: "error", error: expect.stringContaining("applied $0.00") });
+    expect(createQboPayment).not.toHaveBeenCalled();
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "failed" }));
+  });
+
+  it("verifies this invoice allocation when an existing QBO payment spans multiple invoices", async () => {
+    findQboPaymentById.mockResolvedValueOnce({
+      id: "QP-MULTI",
+      syncToken: "5",
+      customerRef: "QC1",
+      totalAmount: 1000,
+      unappliedAmount: 0,
+      txnDate: "2026-07-14",
+      linkedInvoiceIds: ["QI1", "QI2"],
+      appliedAmountByInvoiceId: { QI1: 720, QI2: 280 },
+    });
+    const { supabase } = makeSupabase({
+      payment: { id: "pay-1", payment_status: "recorded", invoice_id: "inv-1", amount_cents: 72000, qbo_payment_id: "QP-MULTI" },
+      invoice: { id: "inv-1", qbo_invoice_id: "QI1", qbo_customer_id: "QC1" },
+    });
+
+    const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
+
+    expect(result).toEqual({ paymentId: "pay-1", status: "synced", qboPaymentId: "QP-MULTI" });
     expect(createQboPayment).not.toHaveBeenCalled();
   });
 
@@ -220,10 +280,11 @@ describe("syncPaymentToQbo", () => {
     expect(result.error).toContain("observed total $100.00");
     expect(result.error).toContain("expected $720.00");
     expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "failed" }));
-    // Never stored as synced, and the QBO id is deliberately not adopted here —
-    // the retry re-links it through the adoption lookup instead.
+    // Never stored as synced. The durable id is retained so retry verifies the
+    // same QBO payment instead of creating another one.
     expect(updates.some((patch: any) => patch.qbo_sync_status === "synced")).toBe(false);
-    expect(updates.some((patch: any) => patch.qbo_payment_id)).toBe(false);
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "pending", qbo_payment_id: "QP1" }));
+    expect(updates).toContainEqual(expect.objectContaining({ qbo_sync_status: "failed", qbo_payment_id: "QP1" }));
   });
 
   it("fails when the read-back payment does not link the expected invoice", async () => {
@@ -236,7 +297,7 @@ describe("syncPaymentToQbo", () => {
     });
     const result = await syncPaymentToQbo({ supabase, accountOwnerUserId: "owner-1", paymentId: "pay-1" });
     expect(result.status).toBe("error");
-    expect(result.error).toContain("applied to invoice(s) QI-OTHER vs expected QI1");
+    expect(result.error).toContain("to invoice(s) QI-OTHER vs expected QI1");
     expect(updates.some((patch: any) => patch.qbo_sync_status === "synced")).toBe(false);
   });
 
@@ -324,11 +385,31 @@ describe("syncAllPendingPaymentsToQbo", () => {
 
     expect(result.synced).toBe(1);
     expect(createQboPayment).toHaveBeenCalledTimes(1);
-    // Only unlinked, recorded payments are candidates.
+    // Every retryable recorded payment is a candidate; a stored external id is
+    // re-verified rather than treated as proof or excluded from recovery.
     expect(filters).toContainEqual(["payment_status", "recorded"]);
-    expect(filters).toContainEqual(["qbo_payment_id", null]);
+    expect(filters).not.toContainEqual(["qbo_payment_id", null]);
     const orFilter = filters.find(([key]) => key === "or")?.[1] ?? "";
     for (const status of RETRYABLE_QBO_PAYMENT_SYNC_STATUSES) expect(orFilter).toContain(status);
+  });
+
+  it("re-verifies a stuck pending payment with a durable QBO id without creating another", async () => {
+    const stale = new Date(Date.now() - STUCK_QBO_PAYMENT_PENDING_MS - 60_000).toISOString();
+    findQboPaymentById.mockResolvedValueOnce({
+      id: "QP1", syncToken: "1", customerRef: "QC1", totalAmount: 720, unappliedAmount: 0,
+      txnDate: "2026-08-01", linkedInvoiceIds: ["QI1"], appliedAmountByInvoiceId: { QI1: 720 },
+    });
+    const { supabase } = makeSweepSupabase(
+      [{ id: "pay-stuck", qbo_sync_status: "pending", qbo_payment_id: "QP1", created_at: stale, updated_at: stale }],
+      { ...recordedPayment, qbo_payment_id: "QP1" },
+      syncedInvoice,
+    );
+
+    const result = await syncAllPendingPaymentsToQbo({ supabase, accountOwnerUserId: "owner-1" });
+
+    expect(result.synced).toBe(1);
+    expect(findQboPaymentById).toHaveBeenCalledWith(expect.objectContaining({ qboPaymentId: "QP1" }));
+    expect(createQboPayment).not.toHaveBeenCalled();
   });
 
   it("leaves a pending push that is still in flight alone", async () => {

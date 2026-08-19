@@ -607,7 +607,10 @@ export async function listQboInvoicesSince(
 
 export type QboPaymentSnapshot = {
   id: string;
+  syncToken: string;
+  customerRef: string;
   totalAmount: number;
+  unappliedAmount: number;
   txnDate: string | null;
   /** Invoice ids this payment is applied to. */
   linkedInvoiceIds: string[];
@@ -628,7 +631,10 @@ function toQboPaymentSnapshot(payment: any): QboPaymentSnapshot {
   }
   return {
     id: String(payment.Id),
+    syncToken: String(payment.SyncToken ?? "0"),
+    customerRef: String(payment.CustomerRef?.value ?? "").trim(),
     totalAmount: Number(payment.TotalAmt ?? 0),
+    unappliedAmount: Number(payment.UnappliedAmt ?? 0),
     txnDate: String(payment.TxnDate ?? "").trim() || null,
     linkedInvoiceIds: [
       ...new Set(
@@ -679,6 +685,47 @@ export async function findQboPaymentById(
   const payment = found?.QueryResponse?.Payment?.[0];
   if (!payment?.Id) return null;
   return toQboPaymentSnapshot(payment);
+}
+
+/**
+ * Apply a wholly-unapplied QBO payment to one invoice.
+ *
+ * This intentionally exposes only the narrow repair EveryStep can prove safe:
+ * callers must read the latest payment first, verify its customer, total, and
+ * unapplied amount, then pass that latest SyncToken here. Reallocating a payment
+ * already linked to any transaction remains a human accounting decision.
+ */
+export async function applyUnappliedQboPaymentToInvoice(
+  params: QboRequestBase & {
+    qboPaymentId: string;
+    syncToken: string;
+    customerRef: string;
+    invoiceRef: string;
+    amount: number;
+    requestId?: string | null;
+  },
+): Promise<QboSyncedEntity> {
+  const updated = await qboFetch({
+    accessToken: params.accessToken,
+    realmId: params.realmId,
+    baseUrl: params.baseUrl,
+    path: "payment",
+    method: "POST",
+    requestId: String(params.requestId ?? "").trim() || undefined,
+    body: {
+      Id: String(params.qboPaymentId),
+      SyncToken: String(params.syncToken),
+      sparse: true,
+      CustomerRef: { value: String(params.customerRef) },
+      Line: [{
+        Amount: round2(params.amount),
+        LinkedTxn: [{ TxnId: String(params.invoiceRef), TxnType: "Invoice" }],
+      }],
+    },
+  });
+  const payment = updated?.Payment;
+  if (!payment?.Id) throw new QboApiError(0, "QBO payment allocation update returned no Id");
+  return { id: String(payment.Id), syncToken: String(payment.SyncToken ?? params.syncToken) };
 }
 
 export async function voidQboInvoice(

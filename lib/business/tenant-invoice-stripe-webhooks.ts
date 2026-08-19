@@ -158,6 +158,27 @@ async function findRecordedPaymentForCharge(params: {
  * returned through Stripe. That makes this webhook the only legitimate way such
  * a payment is ever reversed.
  */
+async function ensureReversedStripePaymentAllocation(params: {
+  admin: any;
+  paymentRow: any;
+}): Promise<void> {
+  const allocation = await upsertInvoicePaymentAllocationForPaymentRow({
+    supabase: params.admin,
+    paymentRow: {
+      id: String(params.paymentRow.id),
+      account_owner_user_id: toCleanString(params.paymentRow.account_owner_user_id),
+      invoice_id: toCleanString(params.paymentRow.invoice_id),
+      amount_cents: Number(params.paymentRow.amount_cents ?? 0),
+      payment_status: 'reversed',
+    },
+  });
+  if (!allocation.ok) {
+    throw new Error(
+      `Stripe payment reversed but its invoice allocation could not be updated: ${allocation.reason ?? 'unknown error'}`,
+    );
+  }
+}
+
 async function reverseStripePayment(params: {
   admin: any;
   paymentRow: any;
@@ -165,6 +186,10 @@ async function reverseStripePayment(params: {
   extraPatch?: Record<string, unknown>;
 }): Promise<boolean> {
   const { admin, paymentRow, reason } = params;
+  if (toCleanString(paymentRow.payment_status).toLowerCase() === 'reversed') {
+    await ensureReversedStripePaymentAllocation({ admin, paymentRow });
+    return false;
+  }
   const nowIso = new Date().toISOString();
 
   const { data: updated, error } = await admin
@@ -185,22 +210,10 @@ async function reverseStripePayment(params: {
     throw new Error(`Stripe-driven payment reversal failed: ${error.message ?? 'unknown error'}`);
   }
   if (!updated?.id) return false;
-
-  const allocation = await upsertInvoicePaymentAllocationForPaymentRow({
-    supabase: admin,
-    paymentRow: {
-      id: String(updated.id),
-      account_owner_user_id: toCleanString(paymentRow.account_owner_user_id),
-      invoice_id: toCleanString(paymentRow.invoice_id),
-      amount_cents: Number(updated.amount_cents ?? paymentRow.amount_cents ?? 0),
-      payment_status: 'reversed',
-    },
+  await ensureReversedStripePaymentAllocation({
+    admin,
+    paymentRow: { ...paymentRow, ...updated, payment_status: 'reversed' },
   });
-  if (!allocation.ok) {
-    console.warn('Allocation dual-write failed after a Stripe-driven reversal', {
-      paymentId: updated.id, invoiceId: paymentRow.invoice_id,
-    });
-  }
   return true;
 }
 
@@ -283,6 +296,11 @@ export async function recordTenantInvoiceRefundFromStripeCharge(params: {
 
   // Idempotent: a replayed refund event must not re-reverse or double-report.
   if (toCleanString(paymentRow.payment_status).toLowerCase() === 'reversed') {
+    await reverseStripePayment({
+      admin,
+      paymentRow,
+      reason: `Idempotent Stripe refund replay for charge ${chargeId}`,
+    });
     return { applied: false, reason: 'Payment already reversed', paymentId: paymentRow.id };
   }
 
@@ -468,6 +486,7 @@ type StripePaymentIdentityRow = {
   received_reference: string | null;
   stripe_event_id: string | null;
   stripe_charged_at: string | null;
+  stripe_identity_dedupe_scope: string | null;
   paid_at: string | null;
   notes: string | null;
   payment_status: 'recorded' | 'failed' | 'pending' | 'reversed' | null;
@@ -563,6 +582,7 @@ async function resolveCanonicalStripePaymentByIdentity(params: {
         'received_reference',
         'stripe_event_id',
         'stripe_charged_at',
+        'stripe_identity_dedupe_scope',
         'paid_at',
         'notes',
         'payment_status',
@@ -570,17 +590,27 @@ async function resolveCanonicalStripePaymentByIdentity(params: {
       ].join(', '),
     )
     .eq('account_owner_user_id', accountOwnerUserId)
-    .eq('invoice_id', invoiceId)
     .neq('payment_status', 'failed')
     .or(identityClauses.join(','))
     .order('created_at', { ascending: true })
-    .limit(1);
+    .limit(100);
 
   if (error) {
     throw new Error(`Failed to resolve canonical Stripe payment identity: ${error.message ?? 'unknown error'}`);
   }
 
-  const row = Array.isArray(data) ? data[0] : null;
+  const rows = Array.isArray(data) ? data : [];
+  const crossInvoiceIdentity = rows.find(
+    (candidate) => toCleanString(candidate?.invoice_id) !== invoiceId,
+  );
+  if (crossInvoiceIdentity) {
+    throw new Error('Stripe payment identity is already attached to a different invoice');
+  }
+  if (rows.length > 1) {
+    throw new Error('Stripe payment identity is attached to multiple payment rows; manual reconciliation is required');
+  }
+
+  const row = rows[0] ?? null;
   if (!row) return null;
 
   return row as StripePaymentIdentityRow;
@@ -607,6 +637,14 @@ async function enrichCanonicalStripePaymentIdentity(params: {
   const stripeChargedAt = toCleanString(params.stripeChargedAt);
   const paidAtIso = toCleanString(params.paidAtIso);
   const note = toCleanString(params.note);
+
+  if (!toCleanString(row.stripe_identity_dedupe_scope)) {
+    if (row.payment_status === 'recorded' || row.payment_status === 'reversed') {
+      patch.stripe_identity_dedupe_scope = 'recorded_v1';
+    } else if (row.payment_status === 'pending') {
+      patch.stripe_identity_dedupe_scope = 'checkout_v1';
+    }
+  }
 
   if (!toCleanString(row.stripe_checkout_session_id) && stripeCheckoutSessionId) {
     patch.stripe_checkout_session_id = stripeCheckoutSessionId;
@@ -2399,6 +2437,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
       stripe_payment_intent_id: stripeRef.stripe_payment_intent_id,
       stripe_charged_at: stripeRef.stripe_charged_at,
       collection_reservation_key: collectionReservationKey,
+      stripe_identity_dedupe_scope: 'attempt_v1',
     })
     .select('id')
     .single();

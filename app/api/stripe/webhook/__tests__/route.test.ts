@@ -550,4 +550,56 @@ describe('Stripe webhook route — charge events', () => {
 
     expect(response.status).toBe(500);
   });
+
+  it('recovers a connected-account refund by Stripe identity when invoice metadata is absent', async () => {
+    mockRecordTenantInvoiceRefundFromStripeCharge.mockResolvedValue({ applied: true });
+
+    const response = await postWebhook({
+      id: 'evt_refund_no_metadata',
+      account: 'acct_connected_2',
+      type: 'charge.refunded',
+      data: {
+        object: {
+          id: 'ch_refund_no_metadata',
+          payment_intent: 'pi_refund_no_metadata',
+          amount: 5000,
+          amount_refunded: 5000,
+          metadata: {},
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoiceRefundFromStripeCharge).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: 'evt_refund_no_metadata',
+      connectedAccountId: 'acct_connected_2',
+    }));
+  });
+
+  it('returns 500 when a dispute arrives before its payment row so Stripe retries it', async () => {
+    mockRecordTenantInvoiceDisputeFromStripe.mockResolvedValue({
+      applied: false,
+      reason: 'No matching payment for the disputed charge',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_dispute_before_payment',
+      account: 'acct_connected_2',
+      type: 'charge.dispute.created',
+      data: { object: { id: 'dp_1', charge: 'ch_disputed' } },
+    });
+
+    expect(response.status).toBe(500);
+  });
+
+  it('does not route a platform subscription dispute into the tenant payment lane', async () => {
+    const response = await postWebhook({
+      id: 'evt_platform_dispute',
+      type: 'charge.dispute.created',
+      data: { object: { id: 'dp_platform', charge: 'ch_platform' } },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoiceDisputeFromStripe).not.toHaveBeenCalled();
+  });
 });
