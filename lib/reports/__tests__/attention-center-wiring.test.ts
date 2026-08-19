@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const page = readFileSync(resolve(__dirname, "../../../app/reports/attention/page.tsx"), "utf8");
 const model = readFileSync(resolve(__dirname, "../attention-center-read-model.ts"), "utf8");
 const reconciler = readFileSync(resolve(__dirname, "../../reconciliation/three-way-reconciliation.ts"), "utf8");
+const qboActions = readFileSync(resolve(__dirname, "../../actions/qbo-sync-actions.ts"), "utf8");
 const tabs = readFileSync(resolve(__dirname, "../../../components/reports/ReportCenterTabs.tsx"), "utf8");
 
 describe("Needs Attention center", () => {
@@ -49,5 +50,9 @@ describe("Needs Attention center", () => {
     expect(model).toContain("repairFindingId");
     expect(model).toContain("repairQboAllocationFindingId");
     expect(page).toContain("repairQboPaymentAllocationFromForm");
+    expect(page).toContain("qboAllocationRepairBlockedMessage");
+    expect(page).toContain("qbo_allocation_repair_reason");
+    expect(qboActions).toContain("qbo_payment_allocation_repair_blocked");
+    expect(qboActions).toContain("qbo_allocation_repair_reason=${encodeURIComponent(result.reason)}");
   });
 });

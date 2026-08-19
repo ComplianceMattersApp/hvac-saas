@@ -220,7 +220,27 @@ export async function repairQboPaymentAllocationFromForm(formData: FormData): Pr
       findingId,
       reason: result.error,
     });
-    redirect("/reports/attention?qbo_allocation_repair=blocked");
+    if (result.jobId) {
+      try {
+        await insertJobEvent({
+          supabase,
+          jobId: result.jobId,
+          event_type: "qbo_payment_allocation_repair_blocked",
+          meta: {
+            source_action: "repairQboPaymentAllocationFromForm",
+            payment_id: result.paymentId ?? null,
+            invoice_id: result.invoiceId ?? null,
+            reconciliation_finding_id: findingId,
+            blocked_reason: result.reason,
+          },
+          userId,
+        });
+      } catch {
+        // The reason remains visible in the redirect. Audit logging must never
+        // turn a safe refusal into a generic action failure.
+      }
+    }
+    redirect(`/reports/attention?qbo_allocation_repair=blocked&qbo_allocation_repair_reason=${encodeURIComponent(result.reason)}`);
   }
   try {
     await insertJobEvent({

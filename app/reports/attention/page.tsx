@@ -15,6 +15,7 @@ import {
 } from "@/lib/actions/qbo-sync-actions";
 import { linkVerifiedStripePaymentIdentityFromForm } from "@/lib/actions/stripe-identity-link-actions";
 import SubmitButton from "@/components/SubmitButton";
+import { qboAllocationRepairBlockedMessage } from "@/lib/reconciliation/qbo-allocation-repair-reasons";
 
 function formatDate(value: string | null) {
   if (!value) return "";
@@ -29,6 +30,7 @@ type AttentionSearchParams = {
   stripe_link?: string;
   qbo_adopt?: string;
   qbo_allocation_repair?: string;
+  qbo_allocation_repair_reason?: string;
 };
 
 export default async function AttentionCenterPage({
@@ -61,7 +63,7 @@ export default async function AttentionCenterPage({
     {query.sync ? <div className={`rounded-xl border p-4 text-sm font-semibold ${query.sync === "complete" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950"}`}>QuickBooks payment sync {query.sync === "complete" ? "completed." : "failed. Review the issue details below."}</div> : null}
     {query.stripe_link ? <div className={`rounded-xl border p-4 text-sm font-semibold ${query.stripe_link === "complete" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950"}`}>{query.stripe_link === "complete" ? "Verified Stripe identity linked to the existing payment. No new payment was created." : query.stripe_link === "blocked" ? "Stripe identity link was blocked by a safety check. No financial records were changed." : "Stripe identity link failed. No financial records were changed."}</div> : null}
     {query.qbo_adopt ? <div className={`rounded-xl border p-4 text-sm font-semibold ${query.qbo_adopt === "complete" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950"}`}>{query.qbo_adopt === "complete" ? "QuickBooks-collected payment adopted. The invoice balance now reflects the money QuickBooks collected." : query.qbo_adopt === "blocked" ? "Adoption was blocked by a safety check. QuickBooks no longer matches the finding and no financial records were changed." : "Adoption failed. No financial records were changed."}</div> : null}
-    {query.qbo_allocation_repair ? <div className={`rounded-xl border p-4 text-sm font-semibold ${query.qbo_allocation_repair === "complete" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950"}`}>{query.qbo_allocation_repair === "complete" ? "QuickBooks payment allocation repaired and verified. The customer payment record was unchanged." : query.qbo_allocation_repair === "blocked" ? "Automatic allocation repair was blocked by a safety check. No financial records were changed." : "QuickBooks allocation repair did not complete or could not be verified. Review the issue before making another change."}</div> : null}
+    {query.qbo_allocation_repair ? <div className={`rounded-xl border p-4 text-sm font-semibold ${query.qbo_allocation_repair === "complete" ? "border-emerald-200 bg-emerald-50 text-emerald-950" : "border-rose-200 bg-rose-50 text-rose-950"}`}>{query.qbo_allocation_repair === "complete" ? "QuickBooks payment allocation repaired and verified. The customer payment record was unchanged." : query.qbo_allocation_repair === "blocked" ? `Automatic repair stopped safely: ${qboAllocationRepairBlockedMessage(query.qbo_allocation_repair_reason)} No financial records were changed.` : "QuickBooks allocation repair did not complete or could not be verified. Review the issue before making another change."}</div> : null}
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {[
         { label: "Total open", value: model.summaries.total },

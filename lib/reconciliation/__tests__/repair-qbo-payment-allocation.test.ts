@@ -144,7 +144,14 @@ describe("repairUnappliedQboPaymentAllocation", () => {
       findingId: "finding-1",
     });
 
-    expect(result).toMatchObject({ status: "blocked", error: expect.stringContaining("accounting review") });
+    expect(result).toMatchObject({
+      status: "blocked",
+      reason: "payment_has_existing_allocation",
+      error: expect.stringContaining("accounting review"),
+      paymentId: "payment-1",
+      invoiceId: "invoice-1",
+      jobId: "job-1",
+    });
     expect(applyAllocation).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);
   });
@@ -159,7 +166,36 @@ describe("repairUnappliedQboPaymentAllocation", () => {
       findingId: "finding-1",
     });
 
-    expect(result).toMatchObject({ status: "blocked", error: expect.stringContaining("customers differ") });
+    expect(result).toMatchObject({
+      status: "blocked",
+      reason: "customer_mismatch",
+      error: expect.stringContaining("customers differ"),
+    });
+    expect(applyAllocation).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+  });
+
+  it("explains when the QuickBooks invoice may already be paid", async () => {
+    findPayment.mockResolvedValueOnce(qboPayment());
+    getInvoiceContext.mockResolvedValueOnce({
+      id: "4520",
+      customerRef: "325",
+      balance: 0,
+      totalAmount: 410,
+    });
+    const { admin, updates } = makeAdmin();
+
+    const result = await repairUnappliedQboPaymentAllocation({
+      admin,
+      accountOwnerUserId: "owner-1",
+      findingId: "finding-1",
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      reason: "invoice_balance_too_small",
+      error: expect.stringContaining("balance is smaller"),
+    });
     expect(applyAllocation).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);
   });

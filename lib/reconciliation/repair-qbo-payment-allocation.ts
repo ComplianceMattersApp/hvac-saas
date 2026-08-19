@@ -7,6 +7,7 @@ import {
 import { getValidQboAccessToken } from "@/lib/qbo/qbo-connection";
 import { getQboBaseUrl } from "@/lib/qbo/qbo-env";
 import { centsMatch } from "@/lib/qbo/qbo-money";
+import type { QboAllocationRepairBlockedReason } from "@/lib/reconciliation/qbo-allocation-repair-reasons";
 
 const clean = (value: unknown) => String(value ?? "").trim();
 
@@ -26,7 +27,22 @@ function matchesExpectedAllocation(params: {
 
 export type QboPaymentAllocationRepairResult =
   | { status: "repaired" | "already_correct"; paymentId: string; invoiceId: string; jobId: string }
-  | { status: "blocked"; error: string };
+  | {
+      status: "blocked";
+      reason: QboAllocationRepairBlockedReason;
+      error: string;
+      paymentId?: string;
+      invoiceId?: string;
+      jobId?: string;
+    };
+
+function blocked(
+  reason: QboAllocationRepairBlockedReason,
+  error: string,
+  context: { paymentId?: string; invoiceId?: string; jobId?: string } = {},
+): QboPaymentAllocationRepairResult {
+  return { status: "blocked", reason, error, ...context };
+}
 
 /**
  * Repair the one QBO mismatch that can be changed without an accounting guess:
@@ -45,7 +61,7 @@ export async function repairUnappliedQboPaymentAllocation(params: {
   const { admin } = params;
   const ownerId = clean(params.accountOwnerUserId);
   const findingId = clean(params.findingId);
-  if (!ownerId || !findingId) return { status: "blocked", error: "Missing repair scope." };
+  if (!ownerId || !findingId) return blocked("missing_scope", "Missing repair scope.");
 
   const { data: finding, error: findingError } = await admin
     .from("reconciliation_findings")
@@ -54,13 +70,13 @@ export async function repairUnappliedQboPaymentAllocation(params: {
     .eq("account_owner_user_id", ownerId)
     .maybeSingle();
   if (findingError) throw new Error(`Failed to load reconciliation finding: ${findingError.message}`);
-  if (!finding || finding.resolved_at) return { status: "blocked", error: "This finding is no longer open." };
+  if (!finding || finding.resolved_at) return blocked("finding_closed", "This finding is no longer open.");
   if (
     clean(finding.finding_type) !== "payment_allocation_mismatch"
     || clean(finding.subject_kind) !== "payment"
     || clean(finding.external_system) !== "quickbooks"
   ) {
-    return { status: "blocked", error: "This finding is not an eligible QuickBooks allocation repair." };
+    return blocked("finding_ineligible", "This finding is not an eligible QuickBooks allocation repair.");
   }
 
   const { data: payment, error: paymentError } = await admin
@@ -71,11 +87,11 @@ export async function repairUnappliedQboPaymentAllocation(params: {
     .maybeSingle();
   if (paymentError) throw new Error(`Failed to load payment: ${paymentError.message}`);
   if (!payment || clean(payment.payment_status) !== "recorded") {
-    return { status: "blocked", error: "The EveryStep payment is no longer recorded." };
+    return blocked("payment_not_recorded", "The EveryStep payment is no longer recorded.");
   }
   const qboPaymentId = clean(payment.qbo_payment_id);
   if (!qboPaymentId || qboPaymentId !== clean(finding.external_id)) {
-    return { status: "blocked", error: "The stored QuickBooks payment link changed after this finding was created." };
+    return blocked("payment_link_changed", "The stored QuickBooks payment link changed after this finding was created.");
   }
 
   const { data: invoice, error: invoiceError } = await admin
@@ -86,14 +102,20 @@ export async function repairUnappliedQboPaymentAllocation(params: {
     .maybeSingle();
   if (invoiceError) throw new Error(`Failed to load invoice: ${invoiceError.message}`);
   if (!invoice || clean(invoice.status) !== "issued" || !clean(invoice.qbo_invoice_id)) {
-    return { status: "blocked", error: "The target invoice is not an issued QuickBooks-linked invoice." };
+    return blocked("invoice_not_repairable", "The target invoice is not an issued QuickBooks-linked invoice.");
   }
   if (clean(invoice.job_id) !== clean(payment.job_id)) {
-    return { status: "blocked", error: "Payment and invoice job scope do not agree." };
+    return blocked("job_scope_mismatch", "Payment and invoice job scope do not agree.");
   }
 
+  const repairContext = {
+    paymentId: clean(payment.id),
+    invoiceId: clean(invoice.id),
+    jobId: clean(invoice.job_id),
+  };
+
   const token = await getValidQboAccessToken({ supabase: admin, accountOwnerUserId: ownerId });
-  if (!token) return { status: "blocked", error: "QuickBooks must be reconnected before repair." };
+  if (!token) return blocked("qbo_reconnect_required", "QuickBooks must be reconnected before repair.", repairContext);
   const baseUrl = getQboBaseUrl();
   const qboInvoiceId = clean(invoice.qbo_invoice_id);
   const [qboPayment, qboInvoice] = await Promise.all([
@@ -110,9 +132,9 @@ export async function repairUnappliedQboPaymentAllocation(params: {
       invoiceId: qboInvoiceId,
     }),
   ]);
-  if (!qboPayment) return { status: "blocked", error: "QuickBooks no longer has this payment." };
+  if (!qboPayment) return blocked("qbo_payment_missing", "QuickBooks no longer has this payment.", repairContext);
   if (!qboInvoice?.id || !qboInvoice.customerRef) {
-    return { status: "blocked", error: "QuickBooks no longer has a usable target invoice." };
+    return blocked("qbo_invoice_missing", "QuickBooks no longer has a usable target invoice.", repairContext);
   }
 
   const amount = Number(payment.amount_cents ?? 0) / 100;
@@ -121,19 +143,19 @@ export async function repairUnappliedQboPaymentAllocation(params: {
 
   if (!matchesExpectedAllocation(expected)) {
     if (!centsMatch(qboPayment.totalAmount, amount)) {
-      return { status: "blocked", error: "QuickBooks payment total does not match EveryStep; no automatic change was made." };
+      return blocked("payment_amount_mismatch", "QuickBooks payment total does not match EveryStep; no automatic change was made.", repairContext);
     }
     if (qboPayment.customerRef !== qboInvoice.customerRef) {
-      return { status: "blocked", error: "QuickBooks payment and invoice customers differ; no automatic change was made." };
+      return blocked("customer_mismatch", "QuickBooks payment and invoice customers differ; no automatic change was made.", repairContext);
     }
     if (qboPayment.linkedInvoiceIds.length > 0) {
-      return { status: "blocked", error: "QuickBooks already applies this payment to a transaction; move it only after accounting review." };
+      return blocked("payment_has_existing_allocation", "QuickBooks already applies this payment to a transaction; move it only after accounting review.", repairContext);
     }
     if (!centsMatch(qboPayment.unappliedAmount, amount)) {
-      return { status: "blocked", error: "QuickBooks does not show the full payment as unapplied; no automatic change was made." };
+      return blocked("payment_not_fully_unapplied", "QuickBooks does not show the full payment as unapplied; no automatic change was made.", repairContext);
     }
     if (qboInvoice.balance + 0.005 < amount) {
-      return { status: "blocked", error: "QuickBooks invoice balance is smaller than this payment; no automatic change was made." };
+      return blocked("invoice_balance_too_small", "QuickBooks invoice balance is smaller than this payment; no automatic change was made.", repairContext);
     }
 
     await applyUnappliedQboPaymentToInvoice({
