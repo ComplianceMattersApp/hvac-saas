@@ -346,7 +346,7 @@ describe("job billing state read model", () => {
           select: () => ({
             in: () => ({
               eq: () => ({
-                neq: async () => ({ data: [{ job_id: "member-job", internal_invoices: { status: "issued", invoice_number: "INV-C", issued_at: "2026-07-20" } }], error: null }),
+                neq: async () => ({ data: [{ job_id: "member-job", internal_invoices: { id: "invoice-c", job_id: "anchor-job", status: "issued", invoice_number: "INV-C", issued_at: "2026-07-20" } }], error: null }),
               }),
             }),
           }),
@@ -360,5 +360,9 @@ describe("job billing state read model", () => {
       jobs: [{ id: "member-job", field_complete: true, job_type: "service", invoice_complete: false }],
     });
     expect(projectionsByJobId.get("member-job")?.billingState).toMatchObject({ internalInvoiceStatus: "issued", billedTruthSatisfied: true });
+    expect(projectionsByJobId.get("member-job")).toMatchObject({
+      internalInvoiceId: "invoice-c",
+      internalInvoiceAnchorJobId: "anchor-job",
+    });
   });
 });

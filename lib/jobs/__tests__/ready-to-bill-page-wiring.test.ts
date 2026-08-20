@@ -28,6 +28,13 @@ describe("Ready to Bill page wiring", () => {
     expect(selection).toContain("Combined expected total");
   });
 
+  it("keeps already-created batch drafts recoverable for issue and send", () => {
+    expect(page).toContain("listUnsentConsolidatedInvoiceDrafts");
+    expect(page).toContain("Unsent Consolidated Drafts");
+    expect(page).toContain("Open Batch Draft");
+    expect(page).toContain("Issue &amp; Send");
+  });
+
   it("creates a draft through the consolidated action without automatic issue or send controls", () => {
     expect(selection).toContain("createConsolidatedInvoiceDraftFromForm");
     expect(selection).toContain("Create Consolidated Draft Invoice");

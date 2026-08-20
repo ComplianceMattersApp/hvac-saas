@@ -5,7 +5,10 @@ import ReadyToBillSelection from "./ReadyToBillSelection";
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import { requireFinancialRegisterAccessOrRedirect } from "@/lib/auth/financial-access";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
-import { listReadyToBillContractorGroups } from "@/lib/business/ready-to-bill";
+import {
+  listReadyToBillContractorGroups,
+  listUnsentConsolidatedInvoiceDrafts,
+} from "@/lib/business/ready-to-bill";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "Ready to Bill" };
@@ -24,7 +27,10 @@ export default async function ReadyToBillPage({ searchParams }: { searchParams?:
 
   const query = (searchParams ? await searchParams : {}) ?? {};
   const contractorParam = Array.isArray(query.contractor) ? query.contractor[0] : query.contractor;
-  const { groups, truncated } = await listReadyToBillContractorGroups({ supabase, accountOwnerUserId: internalUser.account_owner_user_id });
+  const [{ groups, truncated }, unsentDrafts] = await Promise.all([
+    listReadyToBillContractorGroups({ supabase, accountOwnerUserId: internalUser.account_owner_user_id }),
+    listUnsentConsolidatedInvoiceDrafts({ supabase, accountOwnerUserId: internalUser.account_owner_user_id }),
+  ]);
   const selectedGroup = groups.find((group) => group.contractorId === contractorParam) ?? null;
 
   return (
@@ -36,9 +42,35 @@ export default async function ReadyToBillPage({ searchParams }: { searchParams?:
         {truncated ? <p className="text-sm font-semibold text-amber-700">The readiness list is capped at 250 jobs. Narrow the operational backlog before batching older work.</p> : null}
       </header>
 
+      {unsentDrafts.length ? (
+        <section className="space-y-3" aria-labelledby="unsent-consolidated-drafts-heading">
+          <div>
+            <h2 id="unsent-consolidated-drafts-heading" className="text-xl font-bold text-slate-950">Unsent Consolidated Drafts</h2>
+            <p className="mt-1 text-sm text-slate-600">These jobs were already batched. Open the existing draft to review it, then choose Issue &amp; Send.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {unsentDrafts.map((draft) => (
+              <article key={draft.invoiceId} className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Awaiting issue &amp; send</p>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-950">{draft.billingName}</h3>
+                    <p className="mt-1 text-sm text-slate-600">{draft.invoiceReference} · {draft.jobCount} jobs</p>
+                  </div>
+                  <p className="shrink-0 text-lg font-bold text-slate-950">{draft.totalDisplay}</p>
+                </div>
+                <Link href={draft.href} className="mt-4 inline-flex min-h-11 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
+                  Open Batch Draft
+                </Link>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {!selectedGroup ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {groups.length === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">No contractor-billed jobs are ready for consolidated invoicing.</div> : groups.map((group) => (
+          {groups.length === 0 ? <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">No additional contractor-billed jobs are ready for consolidated invoicing.</div> : groups.map((group) => (
             <Link key={group.contractorId} href={`/billing/ready-to-bill?contractor=${encodeURIComponent(group.contractorId)}`} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-blue-300 hover:shadow-md">
               <h2 className="text-lg font-semibold text-slate-950">{group.contractorName}</h2>
               <p className="mt-2 text-sm text-slate-600">{group.readyJobCount} {group.readyJobCount === 1 ? "job" : "jobs"} ready to bill</p>

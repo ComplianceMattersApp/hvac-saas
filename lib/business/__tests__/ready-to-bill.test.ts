@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildReadyToBillGroups, READY_TO_BILL_CANDIDATE_LIMIT } from "@/lib/business/ready-to-bill";
+import {
+  buildReadyToBillGroups,
+  buildUnsentConsolidatedInvoiceDrafts,
+  READY_TO_BILL_CANDIDATE_LIMIT,
+} from "@/lib/business/ready-to-bill";
 
 const contractorId = "20000000-0000-4000-8000-000000000001";
 const ownerId = "10000000-0000-4000-8000-000000000001";
@@ -95,5 +99,27 @@ describe("Ready to Bill grouping", () => {
 
   it("keeps the dedicated read capped", () => {
     expect(READY_TO_BILL_CANDIDATE_LIMIT).toBe(250);
+  });
+
+  it("surfaces only multi-job draft invoices as recoverable unsent batches", () => {
+    const drafts = buildUnsentConsolidatedInvoiceDrafts({
+      invoices: [
+        { id: "batch-1", job_id: "anchor-job", invoice_number: "INV-10", billing_name: "Coaches HVAC", total_cents: 45000, updated_at: "2026-08-20" },
+        { id: "single-1", job_id: "single-job", invoice_number: "INV-11", billing_name: "Customer", total_cents: 10000, updated_at: "2026-08-20" },
+      ],
+      memberships: [
+        { internal_invoice_id: "batch-1" },
+        { internal_invoice_id: "batch-1" },
+        { internal_invoice_id: "single-1" },
+      ],
+    });
+
+    expect(drafts).toEqual([expect.objectContaining({
+      invoiceId: "batch-1",
+      anchorJobId: "anchor-job",
+      jobCount: 2,
+      totalDisplay: "$450.00",
+      href: "/jobs/anchor-job/invoice?invoice_id=batch-1#invoice-workspace",
+    })]);
   });
 });

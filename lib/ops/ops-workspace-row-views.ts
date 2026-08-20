@@ -68,6 +68,7 @@ export type CloseoutRowView = {
   jobId: string;
   cardDomId: string;
   href: string;
+  invoiceDraftHref: string | null;
   title: string;
   subtitle: string;
   jobTypeLabel: string;
@@ -166,7 +167,11 @@ export type OpsWorkspaceRowViewContext = {
   activeWorkspaceHref: string;
   actorUserId: string;
   assignmentDisplayMap: Record<string, ActiveJobAssignmentDisplay[] | undefined>;
-  closeoutProjectionByJob: ReadonlyMap<string, CloseoutProjectionInput>;
+  closeoutProjectionByJob: ReadonlyMap<string, CloseoutProjectionInput & {
+    billingState?: { internalInvoiceStatus?: string | null };
+    internalInvoiceId?: string | null;
+    internalInvoiceAnchorJobId?: string | null;
+  }>;
   defaultContractorName: string;
   followUpTodayDate: string;
   latestCustomerAttemptByJob: ReadonlyMap<string, string>;
@@ -455,7 +460,8 @@ export function createOpsWorkspaceRowViewBuilders(context: OpsWorkspaceRowViewCo
     formattedRecentAttempt: string,
   ): CloseoutRowView {
     const jobId = job.id;
-    const projection = context.closeoutProjectionByJob.get(jobId) ?? job;
+    const closeoutProjection = context.closeoutProjectionByJob.get(jobId);
+    const projection = closeoutProjection ?? job;
     const needs = getCloseoutNeeds(projection);
     const assignmentSummary = formatAssignmentSummaryForJob(jobId, context.assignmentDisplayMap);
     const stateChips = deriveOpsQueueStateChips(reason.label, assignmentSummary);
@@ -466,11 +472,18 @@ export function createOpsWorkspaceRowViewBuilders(context: OpsWorkspaceRowViewCo
         : needs.needsCerts
           ? "Paperwork"
           : "Review";
+    const invoiceDraftHref =
+      closeoutProjection?.billingState?.internalInvoiceStatus === "draft"
+      && closeoutProjection.internalInvoiceId
+      && closeoutProjection.internalInvoiceAnchorJobId
+        ? `/jobs/${encodeURIComponent(closeoutProjection.internalInvoiceAnchorJobId)}/invoice?invoice_id=${encodeURIComponent(closeoutProjection.internalInvoiceId)}#invoice-workspace`
+        : null;
     return {
       kind: "closeout",
       jobId,
       cardDomId: `ops-workspace-closeout-job-${jobId}`,
       href: `/jobs/${jobId}?tab=ops`,
+      invoiceDraftHref,
       title: workspaceTitle(job),
       subtitle: workspaceCustomerLocation(job),
       jobTypeLabel: workspaceJobTypeLabel(job),

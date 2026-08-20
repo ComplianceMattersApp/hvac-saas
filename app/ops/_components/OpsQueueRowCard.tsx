@@ -190,6 +190,11 @@ function DesktopLedgerRow({ view }: { view: LedgerRowView }) {
           </div>
         </div>
         <div className="flex flex-wrap content-center items-center justify-center gap-1.5 border-l border-[#eceeea] bg-slate-50 px-2 py-3">
+          {view.kind === "closeout" && view.invoiceDraftHref ? (
+            <Link href={view.invoiceDraftHref} className="inline-flex min-h-10 items-center rounded-lg bg-amber-500 px-3 text-center text-[12px] font-semibold leading-4 text-slate-950 hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300">
+              Open Batch Draft
+            </Link>
+          ) : null}
           <Link href={view.href} className="inline-flex min-h-10 items-center rounded-lg bg-blue-600 px-3 text-[13px] font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
             {view.kind === "follow_ups"
               ? "Open Follow Up"
@@ -229,6 +234,8 @@ function mobileAgeClass(ageDays: number | null) {
 function MobileOpsCard({
   view,
   actionLabel,
+  actionHref,
+  secondaryAction,
   fields,
   phoneHref,
   textHref,
@@ -236,6 +243,8 @@ function MobileOpsCard({
 }: {
   view: LedgerRowView;
   actionLabel: string;
+  actionHref?: string;
+  secondaryAction?: { href: string; label: string } | null;
   fields: MobileField[];
   phoneHref?: string | null;
   textHref?: string | null;
@@ -308,10 +317,11 @@ function MobileOpsCard({
           {children}
         </div>
 
-        <div className={`grid gap-2 border-t border-slate-300 bg-slate-100 px-4 py-3 ${phoneHref || textHref ? "grid-cols-[minmax(0,1fr)_78px_78px]" : "grid-cols-1"}`}>
-          <Link href={view.href} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
+        <div className={`grid gap-2 border-t border-slate-300 bg-slate-100 px-4 py-3 ${phoneHref || textHref ? "grid-cols-[minmax(0,1fr)_78px_78px]" : secondaryAction ? "grid-cols-2" : "grid-cols-1"}`}>
+          <Link href={actionHref ?? view.href} className="inline-flex min-h-11 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 text-center text-sm font-semibold text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300">
             {actionLabel}
           </Link>
+          {secondaryAction ? <Link href={secondaryAction.href} className={inlineActionClass}>{secondaryAction.label}</Link> : null}
           {phoneHref ? <a href={phoneHref} className={compactContactActionClass}>Call</a> : null}
           {textHref ? <a href={textHref} className={compactContactActionClass}>Text</a> : null}
         </div>
@@ -352,7 +362,9 @@ function CloseoutCard({ view }: { view: CloseoutRowView }) {
   return (
     <MobileOpsCard
       view={view}
-      actionLabel="Open Job"
+      actionLabel={view.invoiceDraftHref ? "Open Batch Draft" : "Open Job"}
+      actionHref={view.invoiceDraftHref ?? view.href}
+      secondaryAction={view.invoiceDraftHref ? { href: view.href, label: "Open Job" } : null}
       fields={[
         { label: "Contractor", value: view.contractorName || view.assignmentSummary || "Internal work" },
         { label: "Last Action", value: view.lastActionText },

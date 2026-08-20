@@ -1,6 +1,7 @@
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 
 export const READY_TO_BILL_CANDIDATE_LIMIT = 250;
+export const UNSENT_CONSOLIDATED_DRAFT_LIMIT = 50;
 
 export type ReadyToBillJobRow = {
   id: string;
@@ -43,6 +44,33 @@ export type ReadyToBillContractorGroup = {
   expectedTotalCents: number;
   expectedTotalDisplay: string;
 };
+
+export type UnsentConsolidatedInvoiceDraft = {
+  invoiceId: string;
+  anchorJobId: string;
+  invoiceReference: string;
+  billingName: string;
+  contractorId: string | null;
+  jobCount: number;
+  totalCents: number;
+  totalDisplay: string;
+  updatedAt: string;
+  href: string;
+};
+
+type UnsentConsolidatedInvoiceDraftRow = {
+  id?: unknown;
+  job_id?: unknown;
+  invoice_display_number?: unknown;
+  invoice_number?: unknown;
+  bill_to_contractor_id?: unknown;
+  billing_name?: unknown;
+  total_cents?: unknown;
+  created_at?: unknown;
+  updated_at?: unknown;
+};
+
+type InvoiceMembershipCountRow = { internal_invoice_id?: unknown };
 
 function currency(cents: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
@@ -142,6 +170,74 @@ export function buildReadyToBillGroups(params: {
   return [...groups.values()]
     .filter((group) => group.readyJobCount > 0 || group.invoiceDetailsJobCount > 0)
     .sort((left, right) => left.contractorName.localeCompare(right.contractorName));
+}
+
+export function buildUnsentConsolidatedInvoiceDrafts(params: {
+  invoices: UnsentConsolidatedInvoiceDraftRow[];
+  memberships: InvoiceMembershipCountRow[];
+}): UnsentConsolidatedInvoiceDraft[] {
+  const membershipCountByInvoiceId = new Map<string, number>();
+  for (const membership of params.memberships ?? []) {
+    const invoiceId = String(membership?.internal_invoice_id ?? "").trim();
+    if (!invoiceId) continue;
+    membershipCountByInvoiceId.set(invoiceId, (membershipCountByInvoiceId.get(invoiceId) ?? 0) + 1);
+  }
+
+  return (params.invoices ?? [])
+    .map((invoice): UnsentConsolidatedInvoiceDraft | null => {
+      const invoiceId = String(invoice?.id ?? "").trim();
+      const anchorJobId = String(invoice?.job_id ?? "").trim();
+      const jobCount = membershipCountByInvoiceId.get(invoiceId) ?? 0;
+      if (!invoiceId || !anchorJobId || jobCount < 2) return null;
+      const rawTotalCents = Number(invoice?.total_cents ?? 0);
+      const totalCents = Number.isFinite(rawTotalCents) ? Math.max(0, Math.round(rawTotalCents)) : 0;
+      return {
+        invoiceId,
+        anchorJobId,
+        invoiceReference:
+          String(invoice?.invoice_display_number ?? "").trim()
+          || String(invoice?.invoice_number ?? "").trim()
+          || "Draft invoice",
+        billingName: String(invoice?.billing_name ?? "").trim() || "Contractor invoice",
+        contractorId: String(invoice?.bill_to_contractor_id ?? "").trim() || null,
+        jobCount,
+        totalCents,
+        totalDisplay: currency(totalCents),
+        updatedAt: String(invoice?.updated_at ?? invoice?.created_at ?? "").trim(),
+        href: `/jobs/${encodeURIComponent(anchorJobId)}/invoice?invoice_id=${encodeURIComponent(invoiceId)}#invoice-workspace`,
+      };
+    })
+    .filter((draft): draft is UnsentConsolidatedInvoiceDraft => draft != null);
+}
+
+export async function listUnsentConsolidatedInvoiceDrafts(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<UnsentConsolidatedInvoiceDraft[]> {
+  const { data: invoices, error: invoicesError } = await params.supabase
+    .from("internal_invoices")
+    .select("id, job_id, invoice_display_number, invoice_number, bill_to_contractor_id, billing_name, total_cents, created_at, updated_at")
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .eq("invoice_kind", "primary")
+    .eq("status", "draft")
+    .order("updated_at", { ascending: false })
+    .limit(UNSENT_CONSOLIDATED_DRAFT_LIMIT);
+  if (invoicesError) throw invoicesError;
+
+  const invoiceIds = ((invoices ?? []) as UnsentConsolidatedInvoiceDraftRow[])
+    .map((invoice) => String(invoice?.id ?? "").trim())
+    .filter(Boolean);
+  if (invoiceIds.length === 0) return [];
+  const { data: memberships, error: membershipsError } = await params.supabase
+    .from("internal_invoice_jobs")
+    .select("internal_invoice_id")
+    .in("internal_invoice_id", invoiceIds);
+  if (membershipsError) throw membershipsError;
+
+  return buildUnsentConsolidatedInvoiceDrafts({
+    invoices: (invoices ?? []) as UnsentConsolidatedInvoiceDraftRow[],
+    memberships: (memberships ?? []) as InvoiceMembershipCountRow[],
+  });
 }
 
 export async function listReadyToBillContractorGroups(params: {

@@ -17,7 +17,10 @@ function finishOpsTiming(label: string, startedAt: number) {
   console.log(`[${label}] ${Date.now() - startedAt}ms`);
 }
 
-type InternalInvoiceSnapshot = Pick<InternalInvoiceRecord, "status" | "invoice_number" | "issued_at"> | null | undefined;
+type InternalInvoiceSnapshot = (
+  Pick<InternalInvoiceRecord, "status" | "invoice_number" | "issued_at">
+  & Partial<Pick<InternalInvoiceRecord, "id" | "job_id">>
+) | null | undefined;
 
 export type JobBillingStateTone = "slate" | "amber" | "emerald" | "rose";
 export type JobBillingDisposition = "externally_billed" | "no_charge";
@@ -62,6 +65,8 @@ export type BillingTruthCloseoutProjection = {
   invoice_complete: boolean;
   certs_complete: boolean;
   billingState: JobBillingStateReadModel;
+  internalInvoiceId?: string | null;
+  internalInvoiceAnchorJobId?: string | null;
 };
 
 export function buildJobBillingStateReadModel(input: {
@@ -205,7 +210,7 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
     // invoice only, never a supplemental riding the same job_id.
     const { data, error } = await params.supabase
       .from("internal_invoices")
-      .select("job_id, status, invoice_number, issued_at")
+      .select("id, job_id, status, invoice_number, issued_at")
       .eq("invoice_kind", "primary")
       .neq("status", "void")
       .in("job_id", jobIds);
@@ -219,6 +224,8 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
       if (!jobId || internalInvoiceByJobId.has(jobId)) continue;
 
       internalInvoiceByJobId.set(jobId, {
+        id: String(row?.id ?? "").trim() || undefined,
+        job_id: jobId,
         status: row?.status ?? null,
         invoice_number: row?.invoice_number ?? null,
         issued_at: row?.issued_at ?? null,
@@ -229,7 +236,7 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
     if (unresolvedJobIds.length > 0) {
       const { data: memberships, error: membershipError } = await params.supabase
         .from("internal_invoice_jobs")
-        .select("job_id, internal_invoices!inner(status, invoice_number, issued_at, invoice_kind)")
+        .select("job_id, internal_invoices!inner(id, job_id, status, invoice_number, issued_at, invoice_kind)")
         .in("job_id", unresolvedJobIds)
         .eq("internal_invoices.invoice_kind", "primary")
         .neq("internal_invoices.status", "void");
@@ -241,6 +248,8 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
           : membership?.internal_invoices;
         if (!jobId || !joined || internalInvoiceByJobId.has(jobId)) continue;
         internalInvoiceByJobId.set(jobId, {
+          id: String(joined.id ?? "").trim() || undefined,
+          job_id: String(joined.job_id ?? "").trim() || undefined,
           status: joined.status ?? null,
           invoice_number: joined.invoice_number ?? null,
           issued_at: joined.issued_at ?? null,
@@ -256,10 +265,11 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
     const jobId = String(job?.id ?? "").trim();
     if (!jobId) continue;
 
+    const internalInvoice = internalInvoiceByJobId.get(jobId);
     const billingState = buildJobBillingStateReadModel({
       billingMode,
       invoiceComplete: job.invoice_complete,
-      internalInvoice: internalInvoiceByJobId.get(jobId),
+      internalInvoice,
       billingDisposition: job.billing_disposition,
       fieldComplete: job.field_complete,
       jobType: job.job_type,
@@ -277,6 +287,8 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
       invoice_complete: billingState.billedTruthSatisfied,
       certs_complete: Boolean(job.certs_complete),
       billingState,
+      internalInvoiceId: String(internalInvoice?.id ?? "").trim() || null,
+      internalInvoiceAnchorJobId: String(internalInvoice?.job_id ?? "").trim() || null,
     });
   }
 

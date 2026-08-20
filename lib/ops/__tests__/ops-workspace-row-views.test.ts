@@ -94,6 +94,9 @@ describe("Operations workspace row views", () => {
           permit_number: "PERMIT-1",
           invoice_complete: false,
           certs_complete: false,
+          billingState: { internalInvoiceStatus: "draft" },
+          internalInvoiceId: "invoice-1",
+          internalInvoiceAnchorJobId: "anchor-job",
         }],
       ]),
     });
@@ -111,6 +114,7 @@ describe("Operations workspace row views", () => {
       kind: "closeout",
       needsLabel: "Invoice + paperwork",
       assignmentSummary: "Alex Tech",
+      invoiceDraftHref: "/jobs/anchor-job/invoice?invoice_id=invoice-1#invoice-workspace",
     });
     expect(view.kind).toBe("closeout");
     if (view.kind === "closeout") expect(view.nextStepText).toBeTruthy();
