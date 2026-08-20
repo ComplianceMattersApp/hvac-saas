@@ -387,14 +387,24 @@ export async function resolveInvoiceCollectedPaymentSummary(
     );
   }
 
-  const invoiceTotalCents = Number(invoice?.total_cents ?? 0) || 0;
-
   const paymentRows = await listInvoicePaymentRows(
     normalizedOwnerId,
     normalizedInvoiceId,
     supabase,
   );
 
+  return buildInvoiceCollectedPaymentSummary(
+    normalizedInvoiceId,
+    Number(invoice?.total_cents ?? 0) || 0,
+    paymentRows,
+  );
+}
+
+function buildInvoiceCollectedPaymentSummary(
+  normalizedInvoiceId: string,
+  invoiceTotalCents: number,
+  paymentRows: InternalInvoicePaymentRow[],
+): InternalInvoiceCollectedPaymentSummary {
   // Phase 4 compatibility layer: derive invoice paid totals from allocation-compatible records.
   const allocations = deriveCompatibilityInvoiceAllocations(paymentRows);
   const amountPaidCents = sumActiveInvoiceAllocationCents(
@@ -428,10 +438,39 @@ export async function resolveInvoiceCollectedPaymentLedger(
   summary: InternalInvoiceCollectedPaymentSummary;
   rows: InternalInvoicePaymentRow[];
 }> {
-  const [summary, rows] = await Promise.all([
-    resolveInvoiceCollectedPaymentSummary(accountOwnerUserId, invoiceId, supabase),
+  const normalizedOwnerId = String(accountOwnerUserId ?? "").trim();
+  const normalizedInvoiceId = String(invoiceId ?? "").trim();
+  if (!normalizedOwnerId || !normalizedInvoiceId) {
+    return {
+      summary: buildInvoiceCollectedPaymentSummary(normalizedInvoiceId, 0, []),
+      rows: [],
+    };
+  }
+
+  // The previous implementation called listInvoicePaymentRows twice: once
+  // directly and once inside resolveInvoiceCollectedPaymentSummary. Fetch the
+  // invoice total and payment rows once, in parallel, then derive the summary.
+  const [invoiceResult, rows] = await Promise.all([
+    supabase
+      .from("internal_invoices")
+      .select("id, total_cents")
+      .eq("id", normalizedInvoiceId)
+      .eq("account_owner_user_id", normalizedOwnerId)
+      .maybeSingle(),
     listInvoicePaymentRows(accountOwnerUserId, invoiceId, supabase),
   ]);
+
+  if (invoiceResult.error) {
+    throw new Error(
+      `Failed to resolve internal invoice payment summary: ${invoiceResult.error.message ?? "unknown error"}`,
+    );
+  }
+
+  const summary = buildInvoiceCollectedPaymentSummary(
+    normalizedInvoiceId,
+    Number(invoiceResult.data?.total_cents ?? 0) || 0,
+    rows,
+  );
 
   return {
     summary,

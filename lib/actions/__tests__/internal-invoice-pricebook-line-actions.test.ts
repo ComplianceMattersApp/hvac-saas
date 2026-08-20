@@ -684,7 +684,7 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(invoiceUpdates).toHaveLength(0);
   });
 
-  it('manual add supports non-redirect mode and narrows revalidation to job detail', async () => {
+  it('manual add returns in non-redirect mode without blocking on route revalidation', async () => {
     const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
@@ -701,8 +701,7 @@ describe('internal invoice line item pricebook plumbing', () => {
     });
     expect(insertedLineItems).toHaveLength(1);
     expect(invoiceUpdates).toHaveLength(1);
-    expect(revalidatePathMock).toHaveBeenCalledTimes(1);
-    expect(revalidatePathMock).toHaveBeenCalledWith('/jobs/job-1');
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it('manual add returns clean validation result in non-redirect mode', async () => {
@@ -727,7 +726,7 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
-  it('draft save supports non-redirect mode and narrows revalidation to job detail', async () => {
+  it('draft save returns in non-redirect mode without blocking on route revalidation', async () => {
     const { supabase, invoiceUpdates } = makeSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
 
@@ -743,8 +742,7 @@ describe('internal invoice line item pricebook plumbing', () => {
       fieldErrors: undefined,
     });
     expect(invoiceUpdates).toHaveLength(2);
-    expect(revalidatePathMock).toHaveBeenCalledTimes(1);
-    expect(revalidatePathMock).toHaveBeenCalledWith('/jobs/job-1');
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it('draft save still redirects in default mode', async () => {

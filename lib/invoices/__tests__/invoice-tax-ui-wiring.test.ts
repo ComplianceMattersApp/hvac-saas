@@ -118,6 +118,9 @@ describe("review follow-ups", () => {
   });
 
   it("issues the editor's independent tax reads together", () => {
-    expect(editorPage).toContain("await Promise.all([\n        readInvoiceTaxState(");
+    expect(editorPage).toContain("const invoiceTaxStatePromise = invoice");
+    expect(editorPage).toContain("const invoiceLineTaxabilityPromise = invoice");
+    expect(editorPage).toContain("invoiceTaxStatePromise,");
+    expect(editorPage).toContain("invoiceLineTaxabilityPromise,");
   });
 });

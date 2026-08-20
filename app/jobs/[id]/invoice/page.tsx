@@ -15,7 +15,6 @@ import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-bo
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
 import { OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS } from "@/lib/ui/page-widths";
 import {
-  type BillingMode,
   resolveBillingModeByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
 import {
@@ -417,6 +416,18 @@ export default async function InternalInvoiceWorkspacePage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<SearchParams>;
 }) {
+  const timingEnabled = process.env.INVOICE_TIMING_DEBUG === "true";
+  const routeStartedAt = timingEnabled ? Date.now() : 0;
+  const phaseDurationsMs: Record<string, number> = {};
+  const timePhase = async <T,>(phase: string, work: () => Promise<T>): Promise<T> => {
+    if (!timingEnabled) return work();
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      phaseDurationsMs[phase] = Date.now() - startedAt;
+    }
+  };
   const { id: jobId } = await params;
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const banner = firstSearchValue(sp.banner);
@@ -429,14 +440,17 @@ export default async function InternalInvoiceWorkspacePage({
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await timePhase("auth", () => supabase.auth.getUser());
 
   if (!user) redirect("/login");
 
-  const actorResolution = await resolveJobDetailActor({
-    supabase,
-    userId: user.id,
-  });
+  const actorResolution = await timePhase(
+    "actor",
+    () => resolveJobDetailActor({
+      supabase,
+      userId: user.id,
+    }),
+  );
 
   if (actorResolution.kind === "contractor") {
     redirect(`/portal/jobs/${jobId}`);
@@ -447,28 +461,30 @@ export default async function InternalInvoiceWorkspacePage({
   }
 
   const internalUser = actorResolution.internalUser;
-  const scopedReadJob = await loadScopedInternalJobDetailReadBoundary({
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    jobId,
-  });
+  const [scopedReadJob, billingMode] = await Promise.all([
+    timePhase(
+      "job_scope",
+      () => loadScopedInternalJobDetailReadBoundary({
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobId,
+      }),
+    ),
+    timePhase(
+      "billing_mode",
+      () => resolveBillingModeByAccountOwnerId({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+      }),
+    ),
+  ]);
 
   if (!scopedReadJob?.id) notFound();
-
-  const billingMode: BillingMode = await resolveBillingModeByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
 
   if (billingMode !== "internal_invoicing") {
     redirect(`/jobs/${jobId}?tab=info&banner=internal_invoicing_billing_pending#internal-invoice-panel`);
   }
 
-  const tenantStripeReadiness = await resolveTenantStripeConnectReadiness(
-    internalUser.account_owner_user_id,
-    supabase,
-  );
-
-  const { data: job, error: jobErr } = await withJobsBillingDispositionSelectFallback<any>({
+  const jobRead = () => withJobsBillingDispositionSelectFallback<any>({
     runPrimary: () =>
       supabase
         .from("jobs")
@@ -540,16 +556,24 @@ export default async function InternalInvoiceWorkspacePage({
     includeDispositionMetadata: true,
   });
 
+  const [jobResult, currentPrimaryInvoice, requestedInvoice] = await Promise.all([
+    timePhase("job", jobRead),
+    timePhase(
+      "primary_invoice",
+      () => resolveInternalInvoiceByJobId({ supabase, jobId }),
+    ),
+    requestedInvoiceId
+      ? timePhase(
+          "requested_invoice",
+          () => resolveInternalInvoiceById({ supabase, invoiceId: requestedInvoiceId }),
+        )
+      : Promise.resolve(null),
+  ]);
+
+  const { data: job, error: jobErr } = jobResult;
+
   if (jobErr) throw jobErr;
   if (!job?.id) notFound();
-
-  const currentPrimaryInvoice = await resolveInternalInvoiceByJobId({ supabase, jobId });
-  const requestedInvoice = requestedInvoiceId
-    ? await resolveInternalInvoiceById({
-        supabase,
-        invoiceId: requestedInvoiceId,
-      })
-    : null;
   const canUseRequestedInvoice = Boolean(
     requestedInvoice
     && requestedInvoice.account_owner_user_id === internalUser.account_owner_user_id
@@ -559,52 +583,142 @@ export default async function InternalInvoiceWorkspacePage({
   const invalidRequestedInvoiceSelection = Boolean(requestedInvoiceId && !canUseRequestedInvoice);
 
   const latestVoidedInternalInvoice = !invoice
-    ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
+    ? await timePhase(
+        "latest_voided_invoice",
+        () => resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId }),
+      )
     : null;
 
-  const [internalInvoiceEmailDeliveries, internalInvoicePaymentLedger, pricebookPickerItems] = invoice
-    ? await Promise.all([
-        resolveInternalInvoiceEmailDeliveries({
+  const emptyTenantStripeReadiness: Awaited<ReturnType<typeof resolveTenantStripeConnectReadiness>> = {
+    connectedAccountId: null,
+    onboardingStatus: "not_started",
+    chargesEnabled: false,
+    payoutsEnabled: false,
+    detailsSubmitted: false,
+    disabledReason: null,
+    lastSyncedAt: null,
+    isReady: false,
+  };
+  const pricebookPromise = invoice?.status === "draft"
+    ? timePhase("pricebook", async () => {
+        const { data: rows, error } = await supabase
+          .from("pricebook_items")
+          .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
+          .eq("account_owner_user_id", internalUser.account_owner_user_id)
+          .eq("is_active", true)
+          .in("item_type", ["service", "material", "diagnostic"])
+          .gte("default_unit_price", 0)
+          .order("item_name", { ascending: true });
+        if (error) throw error;
+        return (rows ?? []).map((row: any) => ({
+          id: String(row?.id ?? "").trim(),
+          item_name: String(row?.item_name ?? "").trim(),
+          item_type: String(row?.item_type ?? "").trim() || "service",
+          category: String(row?.category ?? "").trim() || null,
+          default_description: String(row?.default_description ?? "").trim() || null,
+          default_unit_price: Number(row?.default_unit_price ?? 0) || 0,
+          unit_label: String(row?.unit_label ?? "").trim() || null,
+        }));
+      })
+    : Promise.resolve([]);
+  const emailDeliveriesPromise = invoice?.status === "issued"
+    ? timePhase(
+        "email_deliveries",
+        () => resolveInternalInvoiceEmailDeliveries({
           supabase,
           jobId,
           invoiceId: invoice.id,
         }),
-        resolveInvoiceCollectedPaymentLedger(
+      )
+    : Promise.resolve([]);
+  const paymentLedgerPromise = invoice && invoice.status !== "draft"
+    ? timePhase(
+        "payment_ledger",
+        () => resolveInvoiceCollectedPaymentLedger(
           internalUser.account_owner_user_id,
           invoice.id,
           supabase,
         ),
-        invoice.status === "draft"
-          ? (async () => {
-              const { data: rows, error } = await supabase
-                .from("pricebook_items")
-                .select("id, item_name, item_type, category, default_description, default_unit_price, unit_label")
-                .eq("account_owner_user_id", internalUser.account_owner_user_id)
-                .eq("is_active", true)
-                .in("item_type", ["service", "material", "diagnostic"])
-                .gte("default_unit_price", 0)
-                .order("item_name", { ascending: true });
-              if (error) throw error;
-              return (rows ?? []).map((row: any) => ({
-                id: String(row?.id ?? "").trim(),
-                item_name: String(row?.item_name ?? "").trim(),
-                item_type: String(row?.item_type ?? "").trim() || "service",
-                category: String(row?.category ?? "").trim() || null,
-                default_description: String(row?.default_description ?? "").trim() || null,
-                default_unit_price: Number(row?.default_unit_price ?? 0) || 0,
-                unit_label: String(row?.unit_label ?? "").trim() || null,
-              }));
-            })()
-          : Promise.resolve([]),
-      ])
-    : [[], null, []];
-  const invoiceFamilySummary = invoice
-    ? await resolveInternalInvoiceFamilySummaryByJobId({
-        supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        jobId,
-      })
-    : null;
+      )
+    : Promise.resolve(null);
+  const invoiceFamilyPromise = invoice
+    ? timePhase(
+        "invoice_family",
+        () => resolveInternalInvoiceFamilySummaryByJobId({
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          jobId,
+        }),
+      )
+    : Promise.resolve(null);
+  const duplicateRisksPromise = invoice?.status === "draft"
+    ? timePhase(
+        "duplicate_risks",
+        () => resolveInternalInvoiceDuplicateRisks({
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          invoiceId: invoice.id,
+          customerId: invoice.customer_id,
+          lineItems: invoice.line_items,
+        }),
+      )
+    : Promise.resolve([]);
+  const invoiceTaxStatePromise = invoice
+    ? timePhase("invoice_tax", () => readInvoiceTaxState({ supabase, invoiceId: invoice.id }))
+    : Promise.resolve(null);
+  const invoiceLineTaxabilityPromise = invoice
+    ? timePhase("line_taxability", () => readInvoiceLineTaxability({ supabase, invoiceId: invoice.id }))
+    : Promise.resolve(new Map<string, boolean>());
+  const customerTaxExemptPromise = invoice
+    ? timePhase("customer_tax", () => readCustomerTaxExempt({ supabase, customerId: invoice.customer_id }))
+    : Promise.resolve(false);
+  const accountTaxDefaultsPromise = invoice
+    ? timePhase(
+        "account_tax_defaults",
+        () => readAccountTaxDefaults({ supabase, accountOwnerUserId: internalUser.account_owner_user_id }),
+      )
+    : Promise.resolve({ ratePercent: null, label: null, deployed: false });
+  const explicitCapabilitiesPromise = timePhase(
+    "capabilities",
+    () => loadFieldBillingExplicitCapabilitiesForUser({
+      supabase: supabase as any,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      internalUserId: user.id,
+    }),
+  );
+  const tenantStripeReadinessPromise = invoice?.status === "issued"
+    ? timePhase(
+        "stripe_readiness",
+        () => resolveTenantStripeConnectReadiness(internalUser.account_owner_user_id, supabase),
+      )
+    : Promise.resolve(emptyTenantStripeReadiness);
+
+  const [
+    internalInvoiceEmailDeliveries,
+    internalInvoicePaymentLedger,
+    pricebookPickerItems,
+    invoiceFamilySummary,
+    duplicateChargeRisks,
+    invoiceTaxState,
+    invoiceLineTaxability,
+    customerTaxExempt,
+    accountTaxDefaults,
+    explicitFieldBillingCapabilities,
+    tenantStripeReadiness,
+  ] = await Promise.all([
+    emailDeliveriesPromise,
+    paymentLedgerPromise,
+    pricebookPromise,
+    invoiceFamilyPromise,
+    duplicateRisksPromise,
+    invoiceTaxStatePromise,
+    invoiceLineTaxabilityPromise,
+    customerTaxExemptPromise,
+    accountTaxDefaultsPromise,
+    explicitCapabilitiesPromise,
+    tenantStripeReadinessPromise,
+  ]);
+
   const supplementalInvoiceFamilyItems = (invoiceFamilySummary?.supplementalInvoices ?? []).map((familyInvoice) => ({
     id: familyInvoice.id,
     invoiceDisplayNumber: familyInvoice.invoice_display_number,
@@ -621,21 +735,15 @@ export default async function InternalInvoiceWorkspacePage({
   // Void-propagation state lives outside INTERNAL_INVOICE_SELECT so a lagging
   // migration can never break invoice reads — see lib/qbo/qbo-void-state.ts.
   const qboVoidState = invoice?.status === "void" && invoice.qbo_invoice_id
-    ? await readInvoiceQboVoidState({
-        supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        invoiceId: invoice.id,
-      })
+    ? await timePhase(
+        "qbo_void_state",
+        () => readInvoiceQboVoidState({
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          invoiceId: invoice.id,
+        }),
+      )
     : null;
-  const duplicateChargeRisks = invoice?.status === "draft"
-    ? await resolveInternalInvoiceDuplicateRisks({
-        supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        invoiceId: invoice.id,
-        customerId: invoice.customer_id,
-        lineItems: invoice.line_items,
-      })
-    : [];
 
   const rawVisitScopeRows = Array.isArray((job as any).visit_scope_items)
     ? (job as any).visit_scope_items
@@ -720,18 +828,9 @@ export default async function InternalInvoiceWorkspacePage({
   const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
   const paymentSummary = internalInvoicePaymentLedger?.summary ?? null;
 
-  // Sales tax, all read through the tolerant helpers. With the Slice-02
-  // migration unapplied every one of these is null/empty and the whole tax
-  // block — controls, toggles, split totals — is simply absent.
-  // Four independent reads — issued together, not in series.
-  const [invoiceTaxState, invoiceLineTaxability, customerTaxExempt, accountTaxDefaults] = invoice
-    ? await Promise.all([
-        readInvoiceTaxState({ supabase, invoiceId: invoice.id }),
-        readInvoiceLineTaxability({ supabase, invoiceId: invoice.id }),
-        readCustomerTaxExempt({ supabase, customerId: (invoice as any).customer_id }),
-        readAccountTaxDefaults({ supabase, accountOwnerUserId: internalUser.account_owner_user_id }),
-      ])
-    : [null, new Map<string, boolean>(), false, { ratePercent: null, label: null, deployed: false }];
+  // Sales-tax reads are part of the shared parallel invoice-read group above.
+  // With the Slice-02 migration unapplied they remain null/empty and the tax
+  // controls stay hidden.
   const invoiceTaxProps = invoiceTaxState
     ? {
         enabled: true,
@@ -793,11 +892,6 @@ export default async function InternalInvoiceWorkspacePage({
     actorUserId: user.id,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-  });
-  const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
-    supabase: supabase as any,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    internalUserId: user.id,
   });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
@@ -927,8 +1021,8 @@ export default async function InternalInvoiceWorkspacePage({
   );
 
   const openFieldPaymentReportsForSelectedInvoice =
-    invoice
-      ? await (async () => {
+    invoice?.status === "issued"
+      ? await timePhase("field_payment_reports", async () => {
           const { data, error } = await supabase
             .from("field_payment_collection_reports")
             .select("id, status, amount_cents, payment_method, reference, reported_at")
@@ -943,26 +1037,32 @@ export default async function InternalInvoiceWorkspacePage({
           }
 
           return Array.isArray(data) ? data : [];
-        })()
+        })
       : [];
   const hasOpenFieldPaymentReportForSelectedInvoice = openFieldPaymentReportsForSelectedInvoice.length > 0;
 
-  const failedAutopayAttention = invoice
-    ? await loadFailedAutopayAttentionItems({
-        admin: supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        invoiceId: invoice.id,
-        limit: 8,
-      })
+  const failedAutopayAttention = invoice?.status === "issued"
+    ? await timePhase(
+        "failed_autopay",
+        () => loadFailedAutopayAttentionItems({
+          admin: supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          invoiceId: invoice.id,
+          limit: 8,
+        }),
+      )
     : null;
   const failedAutopayAttentionItems = failedAutopayAttention?.items ?? [];
   const failedAutopayRetryEligibility =
     invoice && failedAutopayAttentionItems.length > 0 && canManageFinancialInvoiceLifecycle
-      ? await runScheduledAutopayEligibilityDryRun({
-          accountOwnerUserId: internalUser.account_owner_user_id,
-          supabase,
-          candidateInvoiceIds: [invoice.id],
-        })
+      ? await timePhase(
+          "autopay_eligibility",
+          () => runScheduledAutopayEligibilityDryRun({
+            accountOwnerUserId: internalUser.account_owner_user_id,
+            supabase,
+            candidateInvoiceIds: [invoice.id],
+          }),
+        )
       : null;
   const canShowFailedAutopayRetryControl = Boolean(
     invoice
@@ -1013,6 +1113,16 @@ export default async function InternalInvoiceWorkspacePage({
       ? stripePaymentReceivedCopy(latestStripeReceivedPayment, invoiceHeaderReference)
       : null;
   const supplementalReasonLabel = formatSupplementalReasonLabel(invoice?.supplemental_reason);
+  if (timingEnabled) {
+    console.info("[internal-invoice-page-timing]", {
+      job_id: jobId,
+      invoice_id: invoice?.id ?? null,
+      invoice_status: invoice?.status ?? null,
+      elapsed_ms: Date.now() - routeStartedAt,
+      phases_ms: phaseDurationsMs,
+      vercel_region: process.env.VERCEL_REGION ?? null,
+    });
+  }
   return (
     <div id="invoice-workspace" className={`mx-auto ${OPERATIONAL_WORKSPACE_MAX_WIDTH_CLASS} space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6`}>
       <section className={`${panelClass} overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-5 sm:p-6`}>

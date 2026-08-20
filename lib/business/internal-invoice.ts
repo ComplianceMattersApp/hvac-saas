@@ -265,11 +265,13 @@ export async function resolveInternalInvoiceById(params: {
   if (error) throw error;
   if (!data) return null;
 
-  const lineItems = await listInternalInvoiceLineItems({
-    supabase: params.supabase,
-    invoiceId: String(data.id ?? ""),
-  });
-  const memberships = await listInternalInvoiceJobMemberships({ supabase: params.supabase, invoiceId });
+  const [lineItems, memberships] = await Promise.all([
+    listInternalInvoiceLineItems({
+      supabase: params.supabase,
+      invoiceId: String(data.id ?? ""),
+    }),
+    listInternalInvoiceJobMemberships({ supabase: params.supabase, invoiceId }),
+  ]);
 
   return {
     ...data,
@@ -318,14 +320,16 @@ export async function resolveInternalInvoiceByJobId(params: {
     return { ...invoice, member_job_ids: memberships.map((row) => row.job_id) };
   }
 
-  const lineItems = await listInternalInvoiceLineItems({
-    supabase: params.supabase,
-    invoiceId: String(data.id ?? ""),
-  });
-  const memberships = await listInternalInvoiceJobMemberships({
-    supabase: params.supabase,
-    invoiceId: String(data.id ?? ""),
-  });
+  const [lineItems, memberships] = await Promise.all([
+    listInternalInvoiceLineItems({
+      supabase: params.supabase,
+      invoiceId: String(data.id ?? ""),
+    }),
+    listInternalInvoiceJobMemberships({
+      supabase: params.supabase,
+      invoiceId: String(data.id ?? ""),
+    }),
+  ]);
 
   return {
     ...data,
@@ -441,7 +445,7 @@ export async function resolveJobAddOnInvoicesWithLines(params: {
   const { data: lineRows, error: lineError } = await params.supabase
     .from("internal_invoice_line_items")
     .select(INTERNAL_INVOICE_LINE_ITEM_SELECT)
-    .in("invoice_id", rows.map((row: any) => String(row.id)))
+    .in("invoice_id", rows.map((row: { id?: unknown }) => String(row.id ?? "")))
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
@@ -482,25 +486,36 @@ export async function listInternalInvoicesByJobId(params: {
   if (error) throw error;
 
   const rows = Array.isArray(data) ? data : [];
-  const invoices = await Promise.all(
-    rows.map(async (row) => {
-      const lineItems = await listInternalInvoiceLineItems({
-        supabase: params.supabase,
-        invoiceId: String(row?.id ?? ""),
-      });
+  if (rows.length === 0) return [];
 
-      return {
-        ...row,
-        invoice_kind: normalizeInternalInvoiceKind(row?.invoice_kind),
-        original_internal_invoice_id: String(row?.original_internal_invoice_id ?? "").trim() || null,
-        supplemental_reason: String(row?.supplemental_reason ?? "").trim() || null,
-        status: normalizeInternalInvoiceStatus(row?.status),
-        subtotal_cents: Number(row?.subtotal_cents ?? 0) || 0,
-        total_cents: Number(row?.total_cents ?? 0) || 0,
-        line_items: lineItems,
-      } as InternalInvoiceRecord;
-    }),
-  );
+  // One line-item query for the whole family avoids an N+1 refresh cost when a
+  // job has supplemental invoices.
+  const { data: lineRows, error: lineError } = await params.supabase
+    .from("internal_invoice_line_items")
+    .select(INTERNAL_INVOICE_LINE_ITEM_SELECT)
+    .in("invoice_id", rows.map((row: any) => String(row.id)))
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (lineError) throw lineError;
+
+  const linesByInvoiceId = new Map<string, InternalInvoiceLineItemRecord[]>();
+  for (const lineRow of Array.isArray(lineRows) ? lineRows : []) {
+    const normalized = normalizeInternalInvoiceLineItemRow(lineRow);
+    const bucket = linesByInvoiceId.get(normalized.invoice_id);
+    if (bucket) bucket.push(normalized);
+    else linesByInvoiceId.set(normalized.invoice_id, [normalized]);
+  }
+
+  const invoices = rows.map((row) => ({
+    ...row,
+    invoice_kind: normalizeInternalInvoiceKind(row?.invoice_kind),
+    original_internal_invoice_id: String(row?.original_internal_invoice_id ?? "").trim() || null,
+    supplemental_reason: String(row?.supplemental_reason ?? "").trim() || null,
+    status: normalizeInternalInvoiceStatus(row?.status),
+    subtotal_cents: Number(row?.subtotal_cents ?? 0) || 0,
+    total_cents: Number(row?.total_cents ?? 0) || 0,
+    line_items: linesByInvoiceId.get(String(row?.id ?? "")) ?? [],
+  } as InternalInvoiceRecord));
 
   return invoices.sort((left, right) => {
     if (left.invoice_kind !== right.invoice_kind) {
@@ -554,11 +569,18 @@ export async function resolveInternalInvoiceFamilySummaryByJobId(params: {
 
   const allInvoices = await Promise.all(
     family.allInvoices.map(async (invoice) => {
-      const paymentSummary = await resolveInvoiceCollectedPaymentSummary(
-        accountOwnerUserId,
-        invoice.id,
-        params.supabase,
-      );
+      // Draft invoices cannot have collected payments. Avoid two payment
+      // queries on every edit-triggered refresh and derive the obvious summary.
+      const paymentSummary = invoice.status === "draft"
+        ? {
+            amountPaidCents: 0,
+            balanceDueCents: Number(invoice.total_cents ?? 0) || 0,
+          }
+        : await resolveInvoiceCollectedPaymentSummary(
+            accountOwnerUserId,
+            invoice.id,
+            params.supabase,
+          );
 
       return {
         id: invoice.id,

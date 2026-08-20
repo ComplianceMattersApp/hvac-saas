@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { startTransition, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import SubmitButton from '@/components/SubmitButton';
@@ -27,6 +27,13 @@ type InlineFeedback = {
   type: 'success' | 'error';
   message: string;
 };
+
+function refreshInvoiceInBackground(router: ReturnType<typeof useRouter>) {
+  // The mutation response is the save completion boundary. Refresh the
+  // authoritative server view without keeping the form's pending state tied to
+  // the invoice page's much larger read model.
+  startTransition(() => router.refresh());
+}
 
 type PricebookPickerItem = PricebookEntryItem;
 
@@ -194,12 +201,12 @@ export function InternalInvoiceDraftSaveForm(props: {
         type: 'success',
         message: invoiceBannerMessage(result.banner) ?? 'Draft invoice saved.',
       });
-      router.refresh();
+      refreshInvoiceInBackground(router);
       return;
     }
 
     setFeedback({ type: 'success', message: 'Draft invoice saved.' });
-    router.refresh();
+    refreshInvoiceInBackground(router);
   }
 
   return (
@@ -312,9 +319,21 @@ function DesktopLineItemEditForm({
 }: DesktopLineItemEditFormProps) {
   const priceRef = useRef<HTMLInputElement>(null);
   const quantityRef = useRef<HTMLInputElement>(null);
-  const [liveSubtotal, setLiveSubtotal] = useState<number | null>(
-    () => Number(lineItem.unit_price) * Number(lineItem.quantity),
-  );
+  const authoritativeSubtotalKey = [
+    lineItem.unit_price,
+    lineItem.quantity,
+    lineItem.line_subtotal,
+  ].join(":");
+  const [liveSubtotalPreview, setLiveSubtotalPreview] = useState<{
+    authoritativeKey: string;
+    value: number | null;
+  }>(() => ({
+    authoritativeKey: authoritativeSubtotalKey,
+    value: Number(lineItem.unit_price) * Number(lineItem.quantity),
+  }));
+  const liveSubtotal = liveSubtotalPreview.authoritativeKey === authoritativeSubtotalKey
+    ? liveSubtotalPreview.value
+    : Number(lineItem.line_subtotal);
 
   // Open the disclosure automatically when it would otherwise hide real data:
   // a non-Service type, a quantity other than 1, or an existing description.
@@ -328,13 +347,16 @@ function DesktopLineItemEditForm({
     // Quantity lives behind the disclosure; when untouched/blank use the server
     // default of 1 so the preview matches what will actually be saved.
     const qty = quantityRef.current?.value.trim() || '1';
-    setLiveSubtotal(computeLiveSubtotal(price, qty));
+    setLiveSubtotalPreview({
+      authoritativeKey: authoritativeSubtotalKey,
+      value: computeLiveSubtotal(price, qty),
+    });
   }
 
-  async function saveWithLivePreviewReset(formData: FormData) {
+  async function saveWithLivePreview(formData: FormData) {
     await handleUpdateLineItem(formData);
-    // Authoritative subtotal returns via router.refresh(); drop the preview.
-    setLiveSubtotal(null);
+    // Keep the already-correct preview visible while the authoritative server
+    // state refreshes in the background.
   }
 
   const subtotalDisplay =
@@ -344,7 +366,7 @@ function DesktopLineItemEditForm({
 
   return (
     <div className="bg-white/72">
-      <form action={saveWithLivePreviewReset} className="px-5 py-5">
+      <form action={saveWithLivePreview} className="px-5 py-5">
         <input type="hidden" name="job_id" value={jobId} />
         <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
         <input type="hidden" name="tab" value={tab} />
@@ -806,13 +828,13 @@ export default function InternalInvoiceLineItemsTable({
         message: invoiceBannerMessage(result.banner) ?? successFallback,
       });
       onSuccess?.(result);
-      router.refresh();
+      refreshInvoiceInBackground(router);
       return;
     }
 
     setFeedback({ type: 'success', message: successFallback });
     onSuccess?.(result);
-    router.refresh();
+    refreshInvoiceInBackground(router);
   }
 
   async function handleAddPricebook(formData: FormData) {

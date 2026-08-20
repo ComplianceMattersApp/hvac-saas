@@ -650,6 +650,18 @@ async function requireOperationalInternalInvoiceEntitlementAccessOrRedirect(para
 }
 
 async function loadInternalInvoiceContext(formData: FormData) {
+  const timingEnabled = process.env.INVOICE_TIMING_DEBUG === 'true';
+  const contextStartedAt = timingEnabled ? Date.now() : 0;
+  const phaseDurationsMs: Record<string, number> = {};
+  const timePhase = async <T>(phase: string, work: () => Promise<T>): Promise<T> => {
+    if (!timingEnabled) return work();
+    const startedAt = Date.now();
+    try {
+      return await work();
+    } finally {
+      phaseDurationsMs[phase] = Date.now() - startedAt;
+    }
+  };
   const jobId =
     getTrimmedString(formData.get('job_id')) ||
     getTrimmedString(formData.get('id'));
@@ -661,59 +673,88 @@ async function loadInternalInvoiceContext(formData: FormData) {
 
   const tab = getTrimmedString(formData.get('tab')) || 'info';
   const supabase = await createClient();
-  const { userId, internalUser } = await requireInternalUser({ supabase });
-  const scopedJob = await loadScopedInternalJobForMutation({
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    jobId,
-    select: 'id',
-  });
+  const { userId, internalUser } = await timePhase(
+    'identity',
+    () => requireInternalUser({ supabase }),
+  );
+  const scopedJob = await timePhase(
+    'job_scope',
+    () => loadScopedInternalJobForMutation({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      select: 'id',
+    }),
+  );
 
   if (!scopedJob?.id) {
     redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
   }
 
-  await requireOperationalInternalInvoiceEntitlementAccessOrRedirect({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
+  await timePhase(
+    'entitlement',
+    () => requireOperationalInternalInvoiceEntitlementAccessOrRedirect({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    }),
+  );
 
-  const billingMode = await resolveBillingModeByAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
+  const billingMode = await timePhase(
+    'billing_mode',
+    () => resolveBillingModeByAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    }),
+  );
 
   if (billingMode !== 'internal_invoicing') {
     redirect(buildJobDetailHref(jobId, tab, 'internal_invoicing_billing_pending'));
   }
 
-  const { data: job, error: jobErr } = await withJobsBillingDispositionSelectFallback<any>({
-    runPrimary: () =>
-      supabase
-        .from('jobs')
-        .select(
-          'id, title, job_type, status, field_complete, ops_status, invoice_complete, billing_disposition, billing_disposition_note, billing_disposition_at, billing_disposition_by_user_id, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
-        )
-        .eq('id', jobId)
-        .single(),
-    runCompat: () =>
-      supabase
-        .from('jobs')
-        .select(
-          'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
-        )
-        .eq('id', jobId)
-        .single(),
-    includeDispositionMetadata: true,
-  });
+  // Once account scope, entitlement, and billing mode are proven, the job,
+  // invoice, and explicit-capability reads are independent. Issuing them
+  // together removes two cross-region round trips from every invoice mutation.
+  const [jobResult, invoice, fieldBillingExplicitCapabilities] = await Promise.all([
+    timePhase(
+      'job',
+      () => withJobsBillingDispositionSelectFallback<any>({
+        runPrimary: () =>
+          supabase
+            .from('jobs')
+            .select(
+              'id, title, job_type, status, field_complete, ops_status, invoice_complete, billing_disposition, billing_disposition_note, billing_disposition_at, billing_disposition_by_user_id, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
+            )
+            .eq('id', jobId)
+            .single(),
+        runCompat: () =>
+          supabase
+            .from('jobs')
+            .select(
+              'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
+            )
+            .eq('id', jobId)
+            .single(),
+        includeDispositionMetadata: true,
+      }),
+    ),
+    timePhase(
+      'invoice',
+      () => invoiceIdInput
+        ? resolveInternalInvoiceById({ supabase, invoiceId: invoiceIdInput })
+        : resolveInternalInvoiceByJobId({ supabase, jobId }),
+    ),
+    timePhase(
+      'capabilities',
+      () => loadFieldBillingExplicitCapabilitiesForUser({
+        supabase: supabase as any,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        internalUserId: internalUser.user_id,
+      }),
+    ),
+  ]);
+
+  const { data: job, error: jobErr } = jobResult;
 
   if (jobErr) throw jobErr;
-
-  const invoice = invoiceIdInput
-    ? await resolveInternalInvoiceById({
-        supabase,
-        invoiceId: invoiceIdInput,
-      })
-    : await resolveInternalInvoiceByJobId({ supabase, jobId });
 
   if (
     invoice
@@ -725,11 +766,15 @@ async function loadInternalInvoiceContext(formData: FormData) {
     redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
   }
 
-  const fieldBillingExplicitCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
-    supabase: supabase as any,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    internalUserId: internalUser.user_id,
-  });
+  if (timingEnabled) {
+    console.info('[internal-invoice-context-timing]', {
+      job_id: jobId,
+      invoice_id: invoice?.id ?? invoiceIdInput ?? null,
+      elapsed_ms: Date.now() - contextStartedAt,
+      phases_ms: phaseDurationsMs,
+      vercel_region: process.env.VERCEL_REGION ?? null,
+    });
+  }
 
   return {
     supabase,
@@ -1882,8 +1927,8 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
     throw error;
   }
 
-  revalidatePath(`/jobs/${context.jobId}`);
   if (!noRedirect) {
+    revalidatePath(`/jobs/${context.jobId}`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
   }
@@ -2386,8 +2431,8 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData): Pr
     userId: context.userId,
   });
 
-  revalidatePath(`/jobs/${context.jobId}`);
   if (!noRedirect) {
+    revalidatePath(`/jobs/${context.jobId}`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
   }
@@ -2534,8 +2579,8 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
     userId: context.userId,
   });
 
-  revalidatePath(`/jobs/${context.jobId}`);
   if (!noRedirect) {
+    revalidatePath(`/jobs/${context.jobId}`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
   }
@@ -2729,8 +2774,8 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
     userId: context.userId,
   });
 
-  revalidatePath(`/jobs/${context.jobId}`);
   if (!noRedirect) {
+    revalidatePath(`/jobs/${context.jobId}`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
   }
@@ -2882,8 +2927,8 @@ export async function updateInternalInvoiceLineItemFromForm(formData: FormData):
     userId: context.userId,
   });
 
-  revalidatePath(`/jobs/${context.jobId}`);
   if (!noRedirect) {
+    revalidatePath(`/jobs/${context.jobId}`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
   }
@@ -2944,8 +2989,8 @@ export async function removeInternalInvoiceLineItemFromForm(formData: FormData):
     userId: context.userId,
   });
 
-  revalidatePath(`/jobs/${context.jobId}`);
   if (!noRedirect) {
+    revalidatePath(`/jobs/${context.jobId}`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
   }

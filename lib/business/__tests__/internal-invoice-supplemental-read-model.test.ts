@@ -215,6 +215,7 @@ function buildSupabaseFixture() {
           const query: any = {
             select: vi.fn(() => query),
             eq: vi.fn(() => query),
+            in: vi.fn(() => query),
             order: vi.fn(() => query),
           };
 

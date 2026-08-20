@@ -99,6 +99,54 @@ export type InvoiceTotalsResult = {
   taxSupported: boolean;
 };
 
+const RECALCULATE_TOTALS_RPC = "recalculate_internal_invoice_totals_v1";
+
+function isMissingInvoiceTotalsRpcError(error: unknown) {
+  const details = error && typeof error === "object"
+    ? error as Record<string, unknown>
+    : {};
+  const code = String(details.code ?? "").trim();
+  const message = [
+    details.message,
+    details.details,
+    details.hint,
+  ].map((value) => String(value ?? "").toLowerCase()).join(" ");
+
+  return (code === "PGRST202" || code === "42883")
+    && message.includes(RECALCULATE_TOTALS_RPC);
+}
+
+function logInvoiceTotalsTiming(method: "rpc" | "legacy", startedAt: number) {
+  if (process.env.INVOICE_TIMING_DEBUG !== "true") return;
+  console.info("[internal-invoice-totals-timing]", {
+    method,
+    elapsed_ms: Date.now() - startedAt,
+    vercel_region: process.env.VERCEL_REGION ?? null,
+  });
+}
+
+function normalizeRpcTotals(row: unknown): InvoiceTotalsResult {
+  const values = row && typeof row === "object"
+    ? row as Record<string, unknown>
+    : {};
+  const subtotalCents = Number(values.subtotal_cents);
+  const taxCents = Number(values.tax_cents);
+  const totalCents = Number(values.total_cents);
+
+  if (
+    !Number.isSafeInteger(subtotalCents)
+    || !Number.isSafeInteger(taxCents)
+    || !Number.isSafeInteger(totalCents)
+    || subtotalCents < 0
+    || taxCents < 0
+    || totalCents !== subtotalCents + taxCents
+  ) {
+    throw new Error("Invoice totals RPC returned an invalid total.");
+  }
+
+  return { subtotalCents, taxCents, totalCents, taxSupported: true };
+}
+
 /**
  * Dollars-as-numeric to integer cents, matching how line_subtotal is stored.
  *
@@ -167,6 +215,26 @@ export async function recalculateInvoiceTotals(params: {
 }): Promise<InvoiceTotalsResult> {
   const invoiceId = String(params.invoiceId ?? "").trim();
 
+  // Fast path: the SQL function performs the line aggregation, tax-context
+  // read, and invoice update atomically in one request. Keep the legacy path
+  // below for safe app-before-migration deploy ordering and test doubles.
+  if (typeof params.supabase?.rpc === "function") {
+    const rpcStartedAt = Date.now();
+    const rpcResult = await params.supabase.rpc(RECALCULATE_TOTALS_RPC, {
+      p_invoice_id: invoiceId,
+      p_updated_by_user_id: params.userId,
+    });
+    if (!rpcResult?.error) {
+      const row = Array.isArray(rpcResult?.data) ? rpcResult.data[0] : rpcResult?.data;
+      if (!row) throw new Error("Invoice totals RPC did not return an invoice.");
+      logInvoiceTotalsTiming("rpc", rpcStartedAt);
+      return normalizeRpcTotals(row);
+    }
+    if (!isMissingInvoiceTotalsRpcError(rpcResult.error)) throw rpcResult.error;
+  }
+
+  const legacyStartedAt = Date.now();
+
   // Ask for taxability alongside the amounts; fall back to amounts alone when
   // the column is not deployed, so this path never 42703s.
   let rows: any[] = [];
@@ -231,10 +299,12 @@ export async function recalculateInvoiceTotals(params: {
     };
   }
 
-  return {
+  const result = {
     subtotalCents: totals.subtotalCents,
     taxCents: taxSupported ? totals.taxCents : 0,
     totalCents: taxSupported ? totals.totalCents : totals.subtotalCents,
     taxSupported,
   };
+  logInvoiceTotalsTiming("legacy", legacyStartedAt);
+  return result;
 }

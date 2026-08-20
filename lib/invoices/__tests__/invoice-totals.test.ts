@@ -84,6 +84,53 @@ function makeSupabase(config: {
 describe("recalculateInvoiceTotals", () => {
   const taxableInvoice = { id: "inv-1", customer_id: "cust-1", tax_rate_percent: 7.975 };
 
+  it("uses the one-round-trip totals RPC when it is deployed", async () => {
+    const rpc = vi.fn(async () => ({
+      data: [{ subtotal_cents: 12500, tax_cents: 798, total_cents: 13298 }],
+      error: null,
+    }));
+    const supabase = {
+      rpc,
+      from: vi.fn(() => {
+        throw new Error("legacy totals path should not run");
+      }),
+    };
+
+    await expect(
+      recalculateInvoiceTotals({ supabase, invoiceId: "inv-1", userId: "user-1" }),
+    ).resolves.toEqual({
+      subtotalCents: 12500,
+      taxCents: 798,
+      totalCents: 13298,
+      taxSupported: true,
+    });
+    expect(rpc).toHaveBeenCalledWith("recalculate_internal_invoice_totals_v1", {
+      p_invoice_id: "inv-1",
+      p_updated_by_user_id: "user-1",
+    });
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("falls back safely while the totals RPC is not in the schema cache", async () => {
+    const fixture = makeSupabase({
+      lineItems: [{ line_subtotal: "10.00", is_taxable: false }],
+      invoice: { id: "inv-1", customer_id: null, tax_rate_percent: null },
+    });
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: {
+        code: "PGRST202",
+        message: "Could not find the function public.recalculate_internal_invoice_totals_v1",
+      },
+    }));
+    const supabase = { ...fixture.supabase, rpc };
+
+    const totals = await recalculateInvoiceTotals({ supabase, invoiceId: "inv-1", userId: "user-1" });
+
+    expect(totals).toMatchObject({ subtotalCents: 1000, taxCents: 0, totalCents: 1000 });
+    expect(fixture.updates).toHaveLength(1);
+  });
+
   it("writes total = subtotal + tax from the line items", async () => {
     const { supabase, updates } = makeSupabase({
       lineItems: [
