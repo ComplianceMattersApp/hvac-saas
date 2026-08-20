@@ -113,10 +113,14 @@ export async function healStalePaperworkOpsStatus(jobId: string): Promise<boolea
   if (!job?.id) throw new Error("Job not found");
 
   const currentOps = String(job.ops_status ?? "").toLowerCase();
-  const isPaperworkRequired = currentOps === "paperwork_required";
-  const isFullyComplete = Boolean(job.field_complete) && Boolean(job.certs_complete) && Boolean(job.invoice_complete);
+  const isDerivedCloseoutStatus = currentOps === "paperwork_required" || currentOps === "invoice_required";
 
-  if (!isPaperworkRequired || !isFullyComplete) {
+  // Historical name retained for compatibility with existing callers. This is
+  // now the final closeout-invariant guard for both derived closeout statuses:
+  // if their underlying cert/invoice flags have advanced, the status must also
+  // advance. Explicit waiting, follow-up, failure, and hold states are never
+  // touched here.
+  if (!isDerivedCloseoutStatus || !Boolean(job.field_complete)) {
     return false;
   }
 
