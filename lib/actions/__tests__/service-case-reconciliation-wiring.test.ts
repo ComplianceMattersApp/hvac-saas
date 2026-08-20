@@ -279,4 +279,35 @@ describe("service-case reconciliation wiring", () => {
       }),
     );
   });
+
+  it("issues without sending and opens collection for the onsite payment flow", async () => {
+    createClientMock.mockResolvedValue(makeInternalInvoiceSupabaseMock());
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValue("internal_invoicing");
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue({
+      id: "invoice-1",
+      status: "draft",
+      billing_name: "Jane Doe",
+      total_cents: 5000,
+      line_items: [{ id: "line-1" }],
+      invoice_number: "INV-1001",
+      account_owner_user_id: "owner-1",
+      job_id: "job-1",
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("tab", "info");
+    formData.set("issue_flow", "onsite_payment");
+    formData.set(
+      "return_to",
+      "/jobs/job-1/invoice?invoice_id=invoice-1&view=payment#invoice-payment-actions",
+    );
+
+    const { issueInternalInvoiceFromForm } = await import("@/lib/actions/internal-invoice-actions");
+
+    await expect(issueInternalInvoiceFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/invoice?invoice_id=invoice-1&view=payment&banner=internal_invoice_issued_for_onsite_payment#invoice-payment-actions",
+    );
+  });
 });

@@ -2044,6 +2044,10 @@ async function requireDuplicateChargeReviewBeforeIssue(context: LoadedInternalIn
 
 export async function issueInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
+  const issueFlow = getTrimmedString(formData.get('issue_flow')).toLowerCase();
+  const successBanner = issueFlow === 'onsite_payment'
+    ? 'internal_invoice_issued_for_onsite_payment'
+    : 'internal_invoice_issued';
 
   requireFieldInvoiceIssueAccessOrRedirect({
     actorUserId: context.userId,
@@ -2082,7 +2086,7 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
   revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
-  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issued', context.returnTo));
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, successBanner, context.returnTo));
 }
 
 function billingDispositionBanner(disposition: JobBillingDisposition) {

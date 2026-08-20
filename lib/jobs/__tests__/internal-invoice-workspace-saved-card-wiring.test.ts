@@ -23,7 +23,9 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain('import {');
     expect(source).toContain("resolveFieldBillingCapabilities");
     expect(source).toContain("loadFieldBillingExplicitCapabilitiesForUser");
-    expect(source).toContain("const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser");
+    expect(source).toContain("const explicitCapabilitiesPromise = timePhase(");
+    expect(source).toContain("() => loadFieldBillingExplicitCapabilitiesForUser({");
+    expect(source).toContain("explicitFieldBillingCapabilities,");
     expect(source).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(source).toContain("hasDirectInvoiceDraftMutationAccess");
     expect(source).toContain("const fieldBillingCapabilities = resolveFieldBillingCapabilities");
@@ -142,6 +144,19 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source.match(/This contractor bill-to is incomplete \(missing/g)).toHaveLength(2);
     expect(source).not.toContain("Need another invoice control?");
     expect(source).not.toContain("Billing details, notes, no-charge resolution, and administrative controls remain available in the full workspace.");
+  });
+
+  it("offers onsite payment without emailing the unpaid invoice first", () => {
+    expect(source).toContain("const canStartOnsitePayment = Boolean(");
+    expect(source).toContain("canManageFinancialInvoiceLifecycle || canCollectFieldPaymentAccess");
+    expect(source).toContain('name="issue_flow" value="onsite_payment"');
+    expect(source).toContain('name="return_to" value={props.onsitePaymentReturnTo}');
+    expect(source).toContain('onsitePaymentReturnTo={onsitePaymentReturnTo}');
+    expect(source).toContain("Take Payment On Site");
+    expect(source).toContain("Freeze the invoice without emailing it, then go straight to payment collection.");
+    expect(source).toContain("&view=payment#invoice-payment-actions");
+    expect(source).toContain("Send the paid invoice");
+    expect(source).toContain("Send Paid Invoice");
   });
 
   it("keeps an issued but unsent invoice focused on delivery", () => {

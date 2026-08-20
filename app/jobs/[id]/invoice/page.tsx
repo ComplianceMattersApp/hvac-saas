@@ -253,6 +253,7 @@ function bannerMessage(value?: string | null) {
     internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
     internal_invoice_issued: "Invoice issued — not sent yet. The billing recipient has not received it until you send it.",
+    internal_invoice_issued_for_onsite_payment: "Invoice issued without emailing. Choose a payment action below, then send the completed invoice.",
     internal_invoice_issue_blocked: "Invoice cannot be issued until job and field work are complete.",
     internal_invoice_issue_incomplete: "Review recipient, charges, and total before issuing.",
     internal_invoice_duplicate_review_required: "Possible duplicate charges were found. Review the matching invoice and confirm before issuing.",
@@ -407,6 +408,89 @@ function resolveInvoiceRevenueWorkflowRail(params: {
     stage: "Invoice workflow",
     next: "Review current invoice state and continue the documented billing sequence.",
   };
+}
+
+function DraftInvoiceFinishActions(props: {
+  jobId: string;
+  invoiceId: string;
+  billingName: string | null;
+  billingEmail: string | null;
+  returnTo: string;
+  onsitePaymentReturnTo: string;
+  canCompoundIssueSend: boolean;
+  canStartOnsitePayment: boolean;
+  canIssue: boolean;
+  hasDuplicateChargeRisks: boolean;
+  className?: string;
+}) {
+  const duplicateReview = props.hasDuplicateChargeRisks ? (
+    <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
+      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
+    </label>
+  ) : null;
+
+  return (
+    <div className={`${props.className ?? ""} flex flex-col gap-3`}>
+      {props.canCompoundIssueSend ? (
+        <form action={issueAndSendInternalInvoiceFromForm} className="order-2 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div className="text-sm font-semibold text-slate-950">
+            Send it now{props.billingName ? ` to ${props.billingName}` : ""}
+          </div>
+          <input type="hidden" name="job_id" value={props.jobId} />
+          <input type="hidden" name="invoice_id" value={props.invoiceId} />
+          <input type="hidden" name="tab" value="info" />
+          <input type="hidden" name="return_to" value={props.returnTo} />
+          <div>
+            <label className={labelClass}>Send To</label>
+            <input type="email" name="recipient_email" defaultValue={props.billingEmail ?? ""} placeholder="billing@example.com" className={inputClass} required />
+          </div>
+          {duplicateReview}
+          <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`} disabled={!props.canIssue}>
+            Issue &amp; Send Invoice
+          </SubmitButton>
+        </form>
+      ) : null}
+
+      {props.canStartOnsitePayment ? (
+        <form action={issueInternalInvoiceFromForm} className="order-1 space-y-3 rounded-xl border border-blue-200 bg-blue-50/55 p-3">
+          <input type="hidden" name="job_id" value={props.jobId} />
+          <input type="hidden" name="invoice_id" value={props.invoiceId} />
+          <input type="hidden" name="tab" value="info" />
+          <input type="hidden" name="issue_flow" value="onsite_payment" />
+          <input type="hidden" name="return_to" value={props.onsitePaymentReturnTo} />
+          <div>
+            <div className="text-sm font-semibold text-slate-950">Customer is paying now</div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Freeze the invoice without emailing it, then go straight to payment collection. Send the completed invoice after payment.
+            </p>
+          </div>
+          {duplicateReview}
+          <SubmitButton loadingText="Preparing payment..." className={`${primaryButtonClass} w-full`} disabled={!props.canIssue}>
+            Take Payment On Site
+          </SubmitButton>
+        </form>
+      ) : null}
+
+      {!props.canCompoundIssueSend && !props.canStartOnsitePayment ? (
+        <form action={issueInternalInvoiceFromForm}>
+          <input type="hidden" name="job_id" value={props.jobId} />
+          <input type="hidden" name="invoice_id" value={props.invoiceId} />
+          <input type="hidden" name="tab" value="info" />
+          <input type="hidden" name="return_to" value={props.returnTo} />
+          {duplicateReview ? <div className="mb-3">{duplicateReview}</div> : null}
+          <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`} disabled={!props.canIssue}>
+            Issue Without Sending
+          </SubmitButton>
+          <p className="mt-2 text-xs leading-5 text-slate-500">
+            {props.billingEmail
+              ? "You can issue but not send — this records the invoice but does not deliver it."
+              : "No email on file — this records the invoice but does not deliver it. Add an email under Edit billing details to send."}
+          </p>
+        </form>
+      ) : null}
+    </div>
+  );
 }
 
 export default async function InternalInvoiceWorkspacePage({
@@ -924,6 +1008,10 @@ export default async function InternalInvoiceWorkspacePage({
   const canCollectFieldPaymentAccess = hasFieldPaymentCollectionAccess(fieldBillingCapabilities);
   const canCollectCardPaymentAccess = fieldBillingCapabilities.can_collect_card_payment;
   const canReportNonCardPaymentAccess = fieldBillingCapabilities.can_report_non_card_collection;
+  const canStartOnsitePayment = Boolean(
+    canIssueInvoiceLifecycle
+    && (canManageFinancialInvoiceLifecycle || canCollectFieldPaymentAccess),
+  );
 
   const invoiceCustomerId = String(invoice?.customer_id ?? "").trim() || null;
   const savedCardMethodRows =
@@ -960,6 +1048,9 @@ export default async function InternalInvoiceWorkspacePage({
   const returnTo = invoice
     ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}#invoice-workspace`
     : `/jobs/${jobId}/invoice#invoice-workspace`;
+  const onsitePaymentReturnTo = invoice
+    ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}&view=payment#invoice-payment-actions`
+    : returnTo;
   const jobReturnHref = `/jobs/${jobId}?tab=ops`;
   const recipientEmailReady = Boolean(String(invoice?.billing_email ?? "").trim());
   // Single source of truth for issue readiness. Every surface (compressed field
@@ -976,15 +1067,14 @@ export default async function InternalInvoiceWorkspacePage({
     billingDispositionResolved,
     billingDispositionLabel: jobBillingDispositionLabel,
   });
-  // Issue and send in one action whenever the actor holds both rights and the
-  // recipient has an email. This is the fast path a tech needs between stops,
-  // and it is no worse for office staff, so it is not gated by surface.
+  // Sending and onsite collection are intentionally separate finish paths.
+  // Both freeze the draft first; only the send path delivers an unpaid invoice.
   const canCompoundIssueSend =
     canIssueInvoiceLifecycle && canSendInvoiceLifecycle && recipientEmailReady;
   const invoiceReadinessHeading = resolveInvoiceReadinessHeading({
     billingDispositionResolved,
     canIssue,
-    willAlsoSend: canCompoundIssueSend,
+    willAlsoSend: canCompoundIssueSend && !canStartOnsitePayment,
   });
   const effectiveBanner = !banner && invalidRequestedInvoiceSelection
     ? "internal_invoice_selection_invalid"
@@ -1445,44 +1535,20 @@ export default async function InternalInvoiceWorkspacePage({
               onlyBlockers
               className={`${panelClass} p-4 sm:p-5`}
             >
-              {canCompoundIssueSend ? (
-                <form action={issueAndSendInternalInvoiceFromForm} className="mt-4 space-y-3">
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="invoice_id" value={invoice.id} />
-                  <input type="hidden" name="tab" value="info" />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <input type="hidden" name="payment_operation_id" value={crypto.randomUUID()} />
-                  <div>
-                    <label className={labelClass}>Send To</label>
-                    <input type="email" name="recipient_email" defaultValue={invoice.billing_email ?? ""} placeholder="billing@example.com" className={inputClass} required />
-                  </div>
-                  {duplicateChargeRisks.length > 0 ? (
-                    <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
-                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
-                    </label>
-                  ) : null}
-                  <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>Issue &amp; Send Invoice</SubmitButton>
-                </form>
-              ) : canIssueInvoiceLifecycle ? (
-                <form action={issueInternalInvoiceFromForm} className="mt-4">
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="invoice_id" value={invoice.id} />
-                  <input type="hidden" name="tab" value="info" />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  {duplicateChargeRisks.length > 0 ? (
-                    <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
-                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
-                    </label>
-                  ) : null}
-                  <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>Issue Without Sending</SubmitButton>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    {!recipientEmailReady
-                      ? "No email on file — this records the invoice but does not deliver it. Add an email under Edit billing details to send."
-                      : "You can issue but not send — this records the invoice but does not deliver it."}
-                  </p>
-                </form>
+              {canIssueInvoiceLifecycle ? (
+                <DraftInvoiceFinishActions
+                  jobId={jobId}
+                  invoiceId={invoice.id}
+                  billingName={invoice.billing_name}
+                  billingEmail={invoice.billing_email}
+                  returnTo={returnTo}
+                  onsitePaymentReturnTo={onsitePaymentReturnTo}
+                  canCompoundIssueSend={canCompoundIssueSend}
+                  canStartOnsitePayment={canStartOnsitePayment}
+                  canIssue={canIssue}
+                  hasDuplicateChargeRisks={duplicateChargeRisks.length > 0}
+                  className="mt-4"
+                />
               ) : null}
             </InvoiceReadinessRail>
 
@@ -1568,9 +1634,17 @@ export default async function InternalInvoiceWorkspacePage({
             <section className={`${panelClass} p-4 sm:p-6`}>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-800">Ready to send</div>
-                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Send the invoice</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">The charges are issued and locked. Confirm the recipient, then send the invoice PDF.</p>
+                  <div className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-800">
+                    {hasOutstandingInvoiceBalance ? "Ready to send" : "Paid — ready to send"}
+                  </div>
+                  <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                    {hasOutstandingInvoiceBalance ? "Send the invoice" : "Send the paid invoice"}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {hasOutstandingInvoiceBalance
+                      ? "The charges are issued and locked. Confirm the recipient, then send the invoice PDF."
+                      : "Payment is recorded and the balance is $0.00. Send the completed invoice to the customer."}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left sm:min-w-44 sm:text-right">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Balance Due</div>
@@ -1587,7 +1661,9 @@ export default async function InternalInvoiceWorkspacePage({
                   <label className={labelClass}>Send To</label>
                   <div className="mt-1 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <input type="email" name="recipient_email" defaultValue={invoice.billing_email ?? ""} placeholder="billing@example.com" className={inputClass} required />
-                    <SubmitButton loadingText="Sending..." className={`${primaryButtonClass} w-full sm:w-auto`}>Send Invoice Email</SubmitButton>
+                    <SubmitButton loadingText="Sending..." className={`${primaryButtonClass} w-full sm:w-auto`}>
+                      {hasOutstandingInvoiceBalance ? "Send Invoice Email" : "Send Paid Invoice"}
+                    </SubmitButton>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-slate-500">Sending does not create another invoice or change its charges.</p>
                 </form>
@@ -1616,6 +1692,7 @@ export default async function InternalInvoiceWorkspacePage({
               <div className="mt-3 space-y-2">
                 {readinessRow("Invoice", true, "Issued and charges locked.")}
                 {readinessRow("Recipient", Boolean(invoice.billing_email), invoice.billing_email || "Email needed.")}
+                {readinessRow("Payment", !hasOutstandingInvoiceBalance, hasOutstandingInvoiceBalance ? `${formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? invoice.total_cents)} due.` : "Paid in full.")}
                 {readinessRow("Delivery", false, "Not sent yet.")}
                 {readinessRow("QuickBooks", invoice.qbo_sync_status === "synced", invoice.qbo_sync_status === "synced" ? "Synced." : invoice.qbo_sync_status === "error" ? "Needs attention." : "Pending.")}
               </div>
@@ -2035,7 +2112,7 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
 
             {canShowFieldCollectionSection ? (
-              <section className={`${panelClass} order-5 p-4 sm:p-5`}>
+              <section id="invoice-payment-actions" className={`${panelClass} order-5 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Collection</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collect or report payment</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -2248,47 +2325,20 @@ export default async function InternalInvoiceWorkspacePage({
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/75 px-3 py-2.5 text-sm text-emerald-900">
                   {jobBillingDispositionLabel ?? "Billing Handled"}
                 </div>
-              ) : invoice.status === "draft" && canCompoundIssueSend ? (
-                <form action={issueAndSendInternalInvoiceFromForm} className="mt-4">
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="invoice_id" value={invoice.id} />
-                  <input type="hidden" name="tab" value="info" />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-sm text-slate-600">
-                    Sending to <span className="font-semibold text-slate-900">{invoice.billing_name}</span>
-                    <span className="block text-xs text-slate-500">{invoice.billing_email}</span>
-                  </div>
-                  {duplicateChargeRisks.length > 0 ? (
-                    <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
-                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
-                    </label>
-                  ) : null}
-                  <SubmitButton loadingText="Issuing &amp; sending..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>
-                    Issue &amp; Send Invoice
-                  </SubmitButton>
-                </form>
               ) : invoice.status === "draft" && canIssueInvoiceLifecycle ? (
-                <form action={issueInternalInvoiceFromForm} className="mt-4">
-                  <input type="hidden" name="job_id" value={jobId} />
-                  <input type="hidden" name="invoice_id" value={invoice.id} />
-                  <input type="hidden" name="tab" value="info" />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  {duplicateChargeRisks.length > 0 ? (
-                    <label className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
-                      <input type="checkbox" name="duplicate_charge_review_confirmed" value="1" required className="mt-1" />
-                      <span>I reviewed the matching invoice and confirm this is a separate charge.</span>
-                    </label>
-                  ) : null}
-                  <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>
-                    Issue Without Sending
-                  </SubmitButton>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">
-                    {!recipientEmailReady
-                      ? "No email on file — this records the invoice but does not deliver it. Add an email under Edit billing details to send."
-                      : "You can issue but not send — this records the invoice but does not deliver it."}
-                  </p>
-                </form>
+                <DraftInvoiceFinishActions
+                  jobId={jobId}
+                  invoiceId={invoice.id}
+                  billingName={invoice.billing_name}
+                  billingEmail={invoice.billing_email}
+                  returnTo={returnTo}
+                  onsitePaymentReturnTo={onsitePaymentReturnTo}
+                  canCompoundIssueSend={canCompoundIssueSend}
+                  canStartOnsitePayment={canStartOnsitePayment}
+                  canIssue={canIssue}
+                  hasDuplicateChargeRisks={duplicateChargeRisks.length > 0}
+                  className="mt-4"
+                />
               ) : invoice.status === "draft" ? (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-600">
                   Invoice issue authority is not available for your current role.
